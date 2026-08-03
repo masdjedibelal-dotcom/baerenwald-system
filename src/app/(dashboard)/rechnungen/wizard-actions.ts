@@ -1232,6 +1232,7 @@ export async function saveRechnungWizardDraft(
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${created.id}`)
+  revalidatePath('/vorgaenge')
   revalidateAuftragPfad(input.auftrag_id)
   return {
     ok: true,
@@ -1490,6 +1491,7 @@ export async function sendRechnungWizard(input: {
   if (!res.ok) return res
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${input.rechnungId}`)
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 

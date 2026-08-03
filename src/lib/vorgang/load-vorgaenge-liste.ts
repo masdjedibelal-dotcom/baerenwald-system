@@ -1,9 +1,6 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
-import {
-  leadKontaktAnzeigeName,
-  leadVertragsKundeId,
-} from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
@@ -13,6 +10,7 @@ import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-
 import {
   isPhaseWinningRechnung,
   resolveSatellitenRechnungVorgang,
+  resolveStandaloneDirektrechnung,
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
 import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
@@ -42,6 +40,9 @@ const VORGAENGE_LEAD_SELECT = `
   org_freigabe_status,
   hv_meldung_status,
   funnel_daten,
+  preis_min,
+  preis_max,
+  budget_ca,
   created_at,
   updated_at,
   kontakt_email,
@@ -211,6 +212,9 @@ export async function loadVorgaengeListe(): Promise<{
     org_freigabe_status: string | null
     hv_meldung_status: string | null
     funnel_daten: unknown
+    preis_min: number | null
+    preis_max: number | null
+    budget_ca: number | null
     created_at: string
     updated_at: string
     ist_wiederkehrend?: boolean | null
@@ -473,6 +477,16 @@ export async function loadVorgaengeListe(): Promise<{
     }
 
     const wertLabelForPhase = (phase: VorgangPhase, entityId: string): string | null => {
+      if (phase === 'anfrage') {
+        const label = resolveLeadPreisAnzeige(
+          lead.kanal,
+          lead.budget_ca,
+          lead.preis_min,
+          lead.preis_max,
+          lead.funnel_daten
+        )
+        return label === '—' ? null : label
+      }
       if (phase === 'rechnung') return wertLabelForRechnung(entityId)
       if (phase === 'angebot') {
         const ang = (angeboteByLead.get(lead.id) ?? []).find((a) => a.id === entityId)
@@ -595,32 +609,22 @@ export async function loadVorgaengeListe(): Promise<{
     const titel = nr
       ? `Rechnung ${nr}`
       : r.kunde_name?.trim() || 'Direktrechnung'
-    const resolved = resolveVorgang({
-      lead: {
-        id: `standalone-rechnung:${r.id}`,
-        status: 'neu',
-        kontakt_name: r.kunde_name,
+    const resolved = resolveStandaloneDirektrechnung({
+      rechnung: {
+        id: r.id,
+        status: r.status,
+        faellig: r.faellig,
         created_at: r.created_at,
         updated_at: r.updated_at,
+        rechnung_art: r.rechnung_art ?? 'voll',
+        abschlag_index: r.abschlag_index,
+        rechnungsnummer: r.rechnungsnummer,
+        brutto: r.brutto,
+        ist_wiederkehrend: r.ist_wiederkehrend,
+        wiederkehr_turnus: r.wiederkehr_turnus,
       },
-      angebote: [],
-      auftraege: [],
-      rechnungen: [
-        {
-          id: r.id,
-          status: r.status,
-          faellig: r.faellig,
-          created_at: r.created_at,
-          updated_at: r.updated_at,
-          rechnung_art: r.rechnung_art ?? 'voll',
-          abschlag_index: r.abschlag_index,
-          rechnungsnummer: r.rechnungsnummer,
-          brutto: r.brutto,
-          ist_wiederkehrend: r.ist_wiederkehrend,
-          wiederkehr_turnus: r.wiederkehr_turnus,
-        },
-      ],
       titel,
+      kundeName: r.kunde_name,
     })
     const wertLabel =
       r.brutto == null
@@ -640,6 +644,7 @@ export async function loadVorgaengeListe(): Promise<{
       ist_wiederkehrend: Boolean(r.ist_wiederkehrend),
       wiederkehr_turnus: r.wiederkehr_turnus ?? null,
       standalone: true,
+      ersetzt_durch: r.ersetzt_durch ?? null,
     })
   }
 

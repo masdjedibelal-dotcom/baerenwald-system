@@ -96,6 +96,20 @@ export function buildStaffFunnelSummaryRows(state: StaffFunnelState): StaffFunne
   push('Adresse', adresse)
   push('Ort', [state.plz, state.ort].filter((x) => x.trim()).join(' '))
 
+  if (state.kundentyp === 'verwaltung') {
+    const mieter = [state.mieterVorname.trim(), state.mieterNachname.trim()]
+      .filter(Boolean)
+      .join(' ')
+    push('Mieter', mieter)
+    const leistung = [
+      [state.objektStrasse.trim(), state.objektHausnummer.trim()].filter(Boolean).join(' '),
+      [state.objektPlz.trim(), state.objektOrt.trim()].filter(Boolean).join(' '),
+    ]
+      .filter(Boolean)
+      .join(', ')
+    push('Leistungsort', leistung)
+  }
+
   if (state.preisModus === 'komplex') {
     push('Preis', 'Beratung / komplex')
   } else if (state.preisMin != null || state.preisMax != null) {

@@ -277,83 +277,99 @@ export function AbschlagsplanEditorModal({
           : 'Abschläge hinzufügen oder entfernen. Pro Zeile % oder Festbetrag (€ netto) — Rest deckt den Restbetrag automatisch.'}
       </p>
 
-      <div className="zahlplan-editor-table">
-        <div className="zahlplan-editor-head zahlplan-editor-head--typed">
-          <div>Bezeichnung</div>
-          <div>Art</div>
-          <div style={{ textAlign: 'right' }}>Wert</div>
-          <div style={{ textAlign: 'right' }}>Betrag</div>
-          <div>Fällig</div>
-          <div />
-        </div>
+      <div className="zahlplan-editor-list">
         {rates.map((r) => {
           const betrag = bruttoById.get(r.id) ?? 0
           const isFrozen = frozen.has(r.id)
           return (
-            <div
+            <article
               key={r.id}
-              className={cn('zahlplan-editor-row zahlplan-editor-row--typed', isFrozen && 'is-frozen')}
+              className={cn('zahlplan-rate-card', isFrozen && 'is-frozen')}
             >
-              <input
-                className="txt"
-                value={r.label}
-                disabled={isFrozen}
-                onChange={(e) => upd(r.id, { label: e.target.value })}
-                style={{ height: 32 }}
-              />
-              <select
-                className="sel"
-                value={r.typ}
-                disabled={isFrozen}
-                onChange={(e) => setTyp(r.id, e.target.value as ZahlungsplanAbschlagTyp)}
-                style={{ height: 32, fontSize: 'var(--fs-meta)' }}
-              >
-                <option value="prozent">%</option>
-                <option value="betrag">€ netto</option>
-                <option value="rest">Rest</option>
-              </select>
-              {r.typ === 'rest' ? (
-                <div className="zahlplan-editor-betrag" style={{ color: 'var(--text-3)', fontWeight: 500 }}>
-                  auto
-                </div>
-              ) : (
-                <div className="txt-prefix" style={{ maxWidth: 100 }}>
-                  <ClearableNumberInput
+              <div className="zahlplan-rate-card__head">
+                <label className="zahlplan-rate-card__field zahlplan-rate-card__field--grow">
+                  <span className="zahlplan-rate-card__lbl">Bezeichnung</span>
+                  <input
                     className="txt"
-                    min={0}
-                    max={r.typ === 'prozent' ? 100 : undefined}
-                    value={r.wert}
+                    value={r.label}
                     disabled={isFrozen}
-                    onValueChange={(wert) => upd(r.id, { wert })}
-                    style={{ textAlign: 'right' }}
+                    onChange={(e) => upd(r.id, { label: e.target.value })}
                   />
-                  <span className="prefix" style={{ right: 8, left: 'auto' }}>
-                    {r.typ === 'prozent' ? '%' : '€'}
+                </label>
+                {isFrozen ? (
+                  <span className="zahlplan-rate-card__badge" title="Eingefroren">
+                    fest
                   </span>
+                ) : (
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="trash"
+                    onClick={() => remove(r.id)}
+                    title="Entfernen"
+                  />
+                )}
+              </div>
+
+              <div className="zahlplan-rate-card__grid">
+                <label className="zahlplan-rate-card__field">
+                  <span className="zahlplan-rate-card__lbl">Art</span>
+                  <select
+                    className="sel"
+                    value={r.typ}
+                    disabled={isFrozen}
+                    onChange={(e) => setTyp(r.id, e.target.value as ZahlungsplanAbschlagTyp)}
+                  >
+                    <option value="prozent">%</option>
+                    <option value="betrag">€ netto</option>
+                    <option value="rest">Rest</option>
+                  </select>
+                </label>
+
+                <label className="zahlplan-rate-card__field">
+                  <span className="zahlplan-rate-card__lbl">Wert</span>
+                  {r.typ === 'rest' ? (
+                    <div className="zahlplan-rate-card__auto">auto</div>
+                  ) : (
+                    <div className="txt-prefix zahlplan-rate-card__wert">
+                      <ClearableNumberInput
+                        className="txt"
+                        min={0}
+                        max={r.typ === 'prozent' ? 100 : undefined}
+                        value={r.wert}
+                        disabled={isFrozen}
+                        onValueChange={(wert) => upd(r.id, { wert })}
+                        style={{ textAlign: 'right' }}
+                      />
+                      <span className="prefix" style={{ right: 8, left: 'auto' }}>
+                        {r.typ === 'prozent' ? '%' : '€'}
+                      </span>
+                    </div>
+                  )}
+                </label>
+
+                <div className="zahlplan-rate-card__field">
+                  <span className="zahlplan-rate-card__lbl">Betrag (brutto)</span>
+                  <div className="zahlplan-editor-betrag zahlplan-rate-card__betrag">
+                    {formatEurBetrag(betrag)}
+                  </div>
                 </div>
-              )}
-              <div className="zahlplan-editor-betrag">{formatEurBetrag(betrag)}</div>
-              <input
-                className="txt"
-                type="date"
-                value={r.faellig_am}
-                disabled={isFrozen}
-                onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
-                style={{ height: 32, fontSize: 'var(--fs-meta)' }}
-              />
-              {isFrozen ? (
-                <span
-                  title="Eingefroren"
-                  style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', padding: '0 4px' }}
-                >
-                  fest
-                </span>
-              ) : (
-                <MockBtn sm kind="ghost" icon="trash" onClick={() => remove(r.id)} title="Entfernen" />
-              )}
-            </div>
+
+                <label className="zahlplan-rate-card__field">
+                  <span className="zahlplan-rate-card__lbl">Fällig</span>
+                  <input
+                    className="txt"
+                    type="date"
+                    value={r.faellig_am}
+                    disabled={isFrozen}
+                    onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
+                  />
+                </label>
+              </div>
+            </article>
           )
         })}
+
         <div className="zahlplan-editor-foot">
           <button
             type="button"

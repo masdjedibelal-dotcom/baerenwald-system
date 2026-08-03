@@ -98,7 +98,7 @@ export function NotfallDirektBeauftragenModal({
         toast.error(r.message)
         return
       }
-      toast.success(fromAnfrage ? 'Notfall-Auftrag angelegt' : 'Notfall beauftragt — nach Aufwand')
+      toast.success(fromAnfrage ? 'Direktauftrag angelegt' : 'Direkt beauftragt — nach Aufwand')
       onClose()
       onDone?.(r.auftragId)
     })
@@ -109,8 +109,8 @@ export function NotfallDirektBeauftragenModal({
       <div className="space-y-4 p-1">
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           {fromAnfrage
-            ? `Direktauftrag ohne Angebot: Notfalleinsatz [${gewerkLabel}] als Position nach Aufwand. Stunden später über Bautagebuch → Rechnung.`
-            : `Direktauftrag ohne Angebot mit Position nach Aufwand („Notfalleinsatz [${gewerkLabel}]“). Festpreis läuft über Angebot annehmen.`}
+            ? `Direktauftrag ohne Angebot: Einsatz [${gewerkLabel}] als Position nach Aufwand. Stunden später über Bautagebuch → Rechnung.`
+            : `Direktauftrag ohne Angebot mit Position nach Aufwand („Einsatz [${gewerkLabel}]“). Festpreis läuft über Angebot annehmen.`}
         </p>
 
         <label className="block text-[length:var(--fs-meta)] font-medium text-bw-text">

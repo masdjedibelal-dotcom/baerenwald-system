@@ -210,7 +210,7 @@ function PositionenDraftCard({
                 it.gewerk?.trim() || null,
               ]
                 .filter(Boolean)
-                .join(' · ')}
+                .join(' · ') || '—'}
             </span>
           </li>
         ))}
@@ -219,6 +219,52 @@ function PositionenDraftCard({
         type="button"
         className="btn primary sm ki-pos-draft-card__apply"
         disabled={disabled}
+        onClick={onApply}
+      >
+        {applyLabel}
+      </button>
+    </div>
+  )
+}
+
+function TextDraftCard({
+  draft,
+  onApply,
+  disabled,
+  applyLabel,
+}: {
+  draft: Extract<KiAssistDraft, { type: 'text' | 'mail' | 'maengel' }>
+  onApply: () => void
+  disabled?: boolean
+  applyLabel: string
+}) {
+  const head =
+    draft.type === 'mail'
+      ? 'Mail-Vorschlag'
+      : draft.type === 'maengel'
+        ? 'Mängel-Vorschlag'
+        : 'Feldtext-Vorschlag'
+  const titel =
+    draft.type === 'mail'
+      ? draft.betreff?.trim()
+      : draft.type === 'text'
+        ? draft.titel?.trim()
+        : undefined
+  const text = draft.text?.trim() || ''
+
+  return (
+    <div className="ki-pos-draft-card">
+      <div className="ki-pos-draft-card__head">{head}</div>
+      {titel ? <p className="ki-pos-draft-card__name">{titel}</p> : null}
+      {text ? (
+        <p className="ki-pos-draft-card__desc ki-pos-draft-card__desc--pre">{text}</p>
+      ) : (
+        <p className="ki-pos-draft-card__meta">Kein Text im Vorschlag</p>
+      )}
+      <button
+        type="button"
+        className="btn primary sm ki-pos-draft-card__apply"
+        disabled={disabled || !text}
         onClick={onApply}
       >
         {applyLabel}
@@ -547,17 +593,19 @@ export function AssistentPanel() {
                 const draft = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
                 const displayRaw =
                   m.role === 'assistant' && draft
-                    ? stripBwApplyBlock(m.content) || m.content
+                    ? stripBwApplyBlock(m.content)
                     : m.content
                 const display =
                   m.role === 'assistant'
                     ? sanitizeAssistentChatText(displayRaw)
                     : displayRaw
+                const showBubble = Boolean(display.trim()) || m.role === 'user'
                 return (
                   <div
                     key={`${m.role}-${i}`}
                     className={cn('assistent-msg', m.role === 'user' && 'assistent-msg--user')}
                   >
+                    {showBubble ? (
                     <div
                       className={cn(
                         'assistent-bubble',
@@ -571,6 +619,7 @@ export function AssistentPanel() {
                         display
                       )}
                     </div>
+                    ) : null}
                     {draft?.type === 'position' ? (
                       <PositionDraftCard
                         draft={draft}
@@ -587,6 +636,15 @@ export function AssistentPanel() {
                             ? `Alle ${draft.items.length} übernehmen`
                             : `Alle ${draft.items.length} in Formular`
                         }
+                        onApply={() => applyDraftFromMessage(m.content)}
+                      />
+                    ) : draft?.type === 'text' ||
+                      draft?.type === 'mail' ||
+                      draft?.type === 'maengel' ? (
+                      <TextDraftCard
+                        draft={draft}
+                        disabled={pending}
+                        applyLabel={overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
                         onApply={() => applyDraftFromMessage(m.content)}
                       />
                     ) : draft ? (

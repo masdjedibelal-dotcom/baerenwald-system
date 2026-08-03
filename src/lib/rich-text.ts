@@ -127,37 +127,51 @@ export function richTextToSafePdfHtml(text: string | null | undefined): string {
   return safe
 }
 
+function decodeBasicEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#160;/g, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/gi, "'")
+}
+
+/** HTML-Entities in Plain-Text (z. B. literal `&nbsp;` aus Editoren). */
+export function decodeHtmlEntities(text: string | null | undefined): string {
+  return decodeBasicEntities(String(text ?? ''))
+}
+
 /** Plain-Text — Leerzeichen/Zwischenstand für Editoren erhalten (kein trim). */
 export function richTextToEditablePlain(html: string | null | undefined): string {
   const raw = html ?? ''
   if (!raw) return ''
-  if (!looksLikeHtml(raw)) return raw
+  if (!looksLikeHtml(raw)) return decodeHtmlEntities(raw)
   if (typeof document === 'undefined') {
-    return raw.replace(/<[^>]+>/g, ' ')
+    return decodeHtmlEntities(raw.replace(/<[^>]+>/g, ' '))
   }
   const doc = new DOMParser().parseFromString(raw, 'text/html')
-  return doc.body.textContent ?? ''
+  return decodeHtmlEntities(doc.body.textContent ?? '')
 }
 
 /** Plain-Text für Vorschau / Suche. */
 export function richTextToPlain(html: string | null | undefined): string {
   const raw = (html ?? '').trim()
   if (!raw) return ''
-  if (!looksLikeHtml(raw)) return raw
+  if (!looksLikeHtml(raw)) {
+    return decodeHtmlEntities(raw).replace(/\s+/g, ' ').trim()
+  }
   if (typeof document === 'undefined') {
-    return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    return decodeHtmlEntities(raw.replace(/<[^>]+>/g, ' '))
+      .replace(/\s+/g, ' ')
+      .trim()
   }
   const doc = new DOMParser().parseFromString(raw, 'text/html')
-  return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim()
-}
-
-function decodeBasicEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
+  return decodeHtmlEntities(doc.body.textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /** HTML oder Plain-Text → einzelne Checklisten-Zeilen (Listen, Absätze, Zeilenumbrüche). */
@@ -166,7 +180,7 @@ export function richTextToChecklistLines(html: string | null | undefined): strin
   if (!raw) return []
 
   if (!looksLikeHtml(raw)) {
-    return raw
+    return decodeHtmlEntities(raw)
       .split(/\n+/)
       .map((line) => line.replace(/^[-•*]\s*/, '').trim())
       .filter((t) => t.length > 0)

@@ -143,17 +143,17 @@ function isVorgangErledigt(row: VorgangListeRow): boolean {
   return kind === 'storniert' || kind === 'fertig'
 }
 
-/** Parse Anzeige „1.234 €“ → Euro-Zahl für Wert-Filter/Sort. */
+/** Parse Anzeige „1.234 €“ / „207 – 813 €“ → Euro-Zahl für Wert-Filter/Sort. */
 function wertEuro(row: VorgangListeRow): number | null {
   if (!row.wertLabel) return null
-  const n = Number(
-    row.wertLabel
-      .replace(/\s/g, '')
-      .replace(/€/g, '')
-      .replace(/\./g, '')
-      .replace(',', '.')
-  )
-  return Number.isFinite(n) ? n : null
+  const matches = [...row.wertLabel.matchAll(/(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?)/g)]
+  if (!matches.length) return null
+  const nums = matches
+    .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')))
+    .filter((n) => Number.isFinite(n))
+  if (!nums.length) return null
+  // Bei von–bis die Obergrenze für Sortierung/Filter nutzen
+  return Math.max(...nums)
 }
 
 function toExportRow(row: VorgangListeRow): Record<string, unknown> {

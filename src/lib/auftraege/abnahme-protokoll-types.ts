@@ -5,7 +5,7 @@ import {
 } from '@/lib/angebote/angebot-position-blocks'
 import { istGesamtrabattPosition, istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
-import { richTextToChecklistLines, richTextToPlain } from '@/lib/rich-text'
+import { decodeHtmlEntities, richTextToChecklistLines, richTextToPlain } from '@/lib/rich-text'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 
 export type AbnahmePunktStatus = 'offen' | 'ok' | 'mangel'
@@ -110,7 +110,7 @@ function leistungName(p: AbnahmePunkt): string {
 
 /** Alte Default-Bezeichnung aus dem Freitext-Block entfernen. */
 export function bereinigeAbnahmeLeistungName(name: string | null | undefined): string {
-  const t = (name ?? '').trim()
+  const t = decodeHtmlEntities(name ?? '').replace(/\s+/g, ' ').trim()
   if (!t || /^zusätzlicher punkt$/i.test(t)) return ''
   return t
 }
@@ -120,10 +120,12 @@ export function notizenFuerLeistung(punkte: AbnahmePunkt[]): string[] {
   if (!punkte.length) return []
   const primary = punkte[0]
   if (primary.notizen && primary.notizen.length > 0) {
-    return primary.notizen.map((n) => String(n ?? ''))
+    return primary.notizen
+      .map((n) => decodeHtmlEntities(String(n ?? '')).replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
   }
   const legacy = punkte
-    .map((p) => p.notiz?.trim())
+    .map((p) => decodeHtmlEntities(p.notiz ?? '').replace(/\s+/g, ' ').trim())
     .filter((n): n is string => Boolean(n))
   return legacy
 }
@@ -147,8 +149,12 @@ export function setNotizenFuerLeistung(
 
 /** Alle Notiztexte eines Punkts (für PDF). */
 export function notizenEinesPunkts(p: AbnahmePunkt): string[] {
-  if (p.notizen?.length) return p.notizen.map((n) => String(n ?? '')).filter((n) => n.trim())
-  const legacy = p.notiz?.trim()
+  if (p.notizen?.length) {
+    return p.notizen
+      .map((n) => decodeHtmlEntities(String(n ?? '')).replace(/\s+/g, ' ').trim())
+      .filter((n) => n.length > 0)
+  }
+  const legacy = decodeHtmlEntities(p.notiz ?? '').replace(/\s+/g, ' ').trim()
   return legacy ? [legacy] : []
 }
 

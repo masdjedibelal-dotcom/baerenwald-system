@@ -369,13 +369,14 @@ export async function downloadAbschlussdokumentationPdf(
   }
 }
 
-/** Erzeugt und speichert den Abschlussbericht (ohne Versand / ohne Auftrag abzuschließen). */
+/** Erzeugt und speichert den Abschlussbericht (ohne Versand / ohne Auftrag abzuschließen).
+ * Standard: Dokumentationsformat ohne Preise — Abrechnung bleibt Rechnung/Endabrechnung. */
 export async function createAbschlussberichtPdf(
   auftragId: string,
   optionen: AbschlussdokuOptionen = {
     mitBautagebuch: true,
     mitFotos: true,
-    mitPreisen: true,
+    mitPreisen: false,
   }
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
   const built = await buildAbschlussPdf(auftragId, optionen)

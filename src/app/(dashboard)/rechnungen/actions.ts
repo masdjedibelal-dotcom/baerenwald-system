@@ -166,6 +166,7 @@ export async function createRechnungEntwurf(input: {
   if (error || !row) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
 
   revalidatePath('/rechnungen')
+  revalidatePath('/vorgaenge')
   return { ok: true, id: row.id as string }
 }
 
@@ -230,6 +231,7 @@ export async function updateRechnungEntwurf(
   if (error) return { ok: false, message: error.message }
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${id}`)
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
@@ -312,6 +314,7 @@ export async function createGutschriftFromRechnung(
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath(`/rechnungen/${row.id}`)
+  revalidatePath('/vorgaenge')
   return { ok: true, id: row.id as string }
 }
 
@@ -782,16 +785,39 @@ export async function sendRechnung(
   if (!pdf.ok) return pdf
 
   /** Storno-Gutschrift zur gleichen Planzeile (nach „Stornieren & neu stellen“) mitversenden. */
-  let stornoAnhang: { id: string; nr: string; buffer: Buffer } | null = null
+  type StornoAnhang = { id: string; nr: string; buffer: Buffer }
+  let stornoAnhang: StornoAnhang | null = null
   const belegTyp = String(rec.beleg_typ ?? 'rechnung')
   if (belegTyp !== 'gutschrift') {
     const { data: neuMeta } = await supabase
       .from('rechnungen')
-      .select('zahlungsplan_abschlag_id, auftrag_id')
+      .select('zahlungsplan_abschlag_id, auftrag_id, kunde_id')
       .eq('id', rechnungId)
       .maybeSingle()
     const zeileId = String(neuMeta?.zahlungsplan_abschlag_id ?? '').trim()
     const auftragIdMeta = String(neuMeta?.auftrag_id ?? rec.auftrag_id ?? '').trim()
+    const kundeIdMeta = String(neuMeta?.kunde_id ?? rec.kunde_id ?? '').trim()
+
+    async function loadGutschriftAnhang(origId: string): Promise<StornoAnhang | null> {
+      const { data: gs } = await supabase
+        .from('rechnungen')
+        .select('id, rechnungsnummer, status')
+        .eq('bezug_rechnung_id', origId)
+        .eq('beleg_typ', 'gutschrift')
+        .in('status', ['entwurf', 'gesendet'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!gs?.id) return null
+      const gsPdf = await persistPdfForRechnung(String(gs.id))
+      if (!gsPdf.ok) return null
+      return {
+        id: String(gs.id),
+        nr: String(gs.rechnungsnummer ?? 'Gutschrift').trim() || 'Gutschrift',
+        buffer: gsPdf.buffer,
+      }
+    }
+
     if (zeileId && auftragIdMeta) {
       const { data: stornierte } = await supabase
         .from('rechnungen')
@@ -805,24 +831,40 @@ export async function sendRechnung(
       for (const st of stornierte ?? []) {
         const origId = String(st.id ?? '')
         if (!origId) continue
-        const { data: gs } = await supabase
-          .from('rechnungen')
-          .select('id, rechnungsnummer, status')
-          .eq('bezug_rechnung_id', origId)
-          .eq('beleg_typ', 'gutschrift')
-          .in('status', ['entwurf', 'gesendet'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (!gs?.id) continue
-        const gsPdf = await persistPdfForRechnung(String(gs.id))
-        if (!gsPdf.ok) continue
-        stornoAnhang = {
-          id: String(gs.id),
-          nr: String(gs.rechnungsnummer ?? 'Gutschrift').trim() || 'Gutschrift',
-          buffer: gsPdf.buffer,
+        const found = await loadGutschriftAnhang(origId)
+        if (found) {
+          stornoAnhang = found
+          break
         }
-        break
+      }
+    }
+
+    // Direktrechnung / FAB: Gutschrift nach Korrektur ohne Auftrag/Planzeile mitnehmen
+    if (!stornoAnhang && kundeIdMeta && !auftragIdMeta) {
+      const { data: openGs } = await supabase
+        .from('rechnungen')
+        .select('id, rechnungsnummer, bezug_rechnung_id')
+        .eq('kunde_id', kundeIdMeta)
+        .eq('beleg_typ', 'gutschrift')
+        .eq('status', 'entwurf')
+        .is('auftrag_id', null)
+        .order('created_at', { ascending: false })
+        .limit(8)
+      for (const gs of openGs ?? []) {
+        const bezugId = String(gs.bezug_rechnung_id ?? '').trim()
+        if (!bezugId) continue
+        const { data: orig } = await supabase
+          .from('rechnungen')
+          .select('id, status, kunde_id')
+          .eq('id', bezugId)
+          .maybeSingle()
+        if (!orig || String(orig.status) !== 'storniert') continue
+        if (String(orig.kunde_id ?? '') !== kundeIdMeta) continue
+        const found = await loadGutschriftAnhang(bezugId)
+        if (found) {
+          stornoAnhang = found
+          break
+        }
       }
     }
   }

@@ -7,6 +7,10 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import {
   abnahmePunktAusAuftragPosition,
   abnahmePunktErbrachteLeistung,
@@ -21,7 +25,41 @@ import {
   type AbnahmePunktStatus,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AuftragPosition } from '@/lib/types'
+import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
+import type { KiAssistDraft } from '@/lib/copilot/ki-assist-scopes'
+
+function applyTextDraftToTitelNotiz(
+  d: Extract<KiAssistDraft, { type: 'text' }>,
+  setTitel: (v: string) => void,
+  setNotiz: (v: string) => void
+) {
+  const titel = d.titel?.trim() || ''
+  const text = d.text?.trim() || ''
+  if (titel) {
+    setTitel(titel)
+    setNotiz(text)
+    return
+  }
+  if (!text) return
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length >= 2) {
+    setTitel(lines[0]!)
+    setNotiz(lines.slice(1).join('\n'))
+  } else {
+    setTitel(text)
+  }
+}
+
+function maengelLinesFromDraft(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((l) => l.replace(/^[-•*\d.)\s]+/, '').trim())
+    .filter(Boolean)
+}
 
 function leistungKey(p: AbnahmePunkt): string {
   return p.leistung_id?.trim() || p.id
@@ -71,7 +109,7 @@ function leistungNotiz(leistung: AbnahmeLeistungGruppe): string {
     .filter(Boolean)
   if (notes.length) return notes.join('\n')
   const name = bereinigeAbnahmeLeistungName(leistung.leistung_name)
-  const besch = leistung.punkte[0]?.beschreibung?.trim() || ''
+  const besch = richTextToPlain(leistung.punkte[0]?.beschreibung ?? '')
   if (besch && besch !== name) return besch
   return ''
 }
@@ -231,6 +269,23 @@ export function AbnahmeBegehListe({
     setEditId(null)
   }
 
+  useKiAssistDraftConsumer(addOpen, 'text', (d) => {
+    if (d.type !== 'text') return
+    // Nur strukturierte Übernahme (Titel gesetzt) — reine Feld-KI läuft über KiAssistFieldLabel
+    if (!d.titel?.trim()) return
+    setAddMode('frei')
+    applyTextDraftToTitelNotiz(d, setDraftTitel, setDraftNotiz)
+  })
+
+  useKiAssistDraftConsumer(Boolean(editId), 'text', (d) => {
+    if (d.type !== 'text') return
+    if (!d.titel?.trim()) return
+    applyTextDraftToTitelNotiz(d, setEditTitel, setEditNotiz)
+  })
+
+  const leistungKiHint =
+    'Abnahmeprotokoll: erbrachte Leistung für den Kunden (Titel + optionale Notiz). Keine Preise.'
+
   return (
     <div className="abnahme-begeh">
       {flatLeistungen.length === 0 ? (
@@ -266,9 +321,29 @@ export function AbnahmeBegehListe({
         title="Leistung hinzufügen"
         context="detail"
         size="md"
-        onConfirm={confirmAdd}
-        confirmDisabled={
-          addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()
+        headerEnd={
+          <div className="flex items-center gap-1">
+            <KiAssistIconButton
+              overSheet
+              scope="abnahme_leistung"
+              title="Leistung mit KI formulieren"
+              extraHint={leistungKiHint}
+              draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
+              onBeforeOpen={() => setAddMode('frei')}
+            />
+            <button
+              type="button"
+              className="editor-sheet__confirm"
+              disabled={
+                addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()
+              }
+              onClick={confirmAdd}
+              aria-label="Übernehmen"
+              title="Übernehmen"
+            >
+              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+            </button>
+          </div>
         }
       >
         <div className="form-grid form-grid--sheet">
@@ -306,21 +381,33 @@ export function AbnahmeBegehListe({
             />
           ) : null}
 
-          <Input
+          <KiAssistFieldLabel
             label={addMode === 'katalog' ? 'Titel (optional anpassen)' : 'Titel'}
             value={draftTitel}
-            onChange={(e) => setDraftTitel(e.target.value)}
-            placeholder={
-              addMode === 'katalog' ? 'Wie im Auftrag — oder umbenennen' : 'z. B. Heizkörper getauscht'
-            }
-          />
-          <Textarea
+            onApply={setDraftTitel}
+            extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
+          >
+            <Input
+              value={draftTitel}
+              onChange={(e) => setDraftTitel(e.target.value)}
+              placeholder={
+                addMode === 'katalog' ? 'Wie im Auftrag — oder umbenennen' : 'z. B. Heizkörper getauscht'
+              }
+            />
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
             label="Notiz (optional)"
-            rows={3}
             value={draftNotiz}
-            onChange={(e) => setDraftNotiz(e.target.value)}
-            placeholder="Kurzbeschreibung fürs Protokoll…"
-          />
+            onApply={setDraftNotiz}
+            extraHint="Kurzbeschreibung unter dem Titel im PDF."
+          >
+            <Textarea
+              rows={3}
+              value={draftNotiz}
+              onChange={(e) => setDraftNotiz(e.target.value)}
+              placeholder="Kurzbeschreibung fürs Protokoll…"
+            />
+          </KiAssistFieldLabel>
         </div>
       </EditorSheet>
 
@@ -330,23 +417,55 @@ export function AbnahmeBegehListe({
         title="Leistung bearbeiten"
         context="detail"
         size="md"
-        onConfirm={confirmEdit}
-        confirmDisabled={!editTitel.trim()}
+        headerEnd={
+          <div className="flex items-center gap-1">
+            <KiAssistIconButton
+              overSheet
+              scope="abnahme_leistung"
+              title="Leistung mit KI formulieren"
+              extraHint={leistungKiHint}
+              draftInput={[editTitel.trim(), editNotiz.trim()].filter(Boolean).join('\n') || null}
+            />
+            <button
+              type="button"
+              className="editor-sheet__confirm"
+              disabled={!editTitel.trim()}
+              onClick={confirmEdit}
+              aria-label="Übernehmen"
+              title="Übernehmen"
+            >
+              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+            </button>
+          </div>
+        }
       >
         <div className="form-grid form-grid--sheet">
-          <Input
+          <KiAssistFieldLabel
             label="Titel"
             value={editTitel}
-            onChange={(e) => setEditTitel(e.target.value)}
+            onApply={setEditTitel}
             required
-          />
-          <Textarea
+            extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
+          >
+            <Input
+              value={editTitel}
+              onChange={(e) => setEditTitel(e.target.value)}
+              required
+            />
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
             label="Notiz (optional)"
-            rows={4}
             value={editNotiz}
-            onChange={(e) => setEditNotiz(e.target.value)}
-            placeholder="Beschreibung unter dem Titel im PDF…"
-          />
+            onApply={setEditNotiz}
+            extraHint="Beschreibung unter dem Titel im PDF."
+          >
+            <Textarea
+              rows={4}
+              value={editNotiz}
+              onChange={(e) => setEditNotiz(e.target.value)}
+              placeholder="Beschreibung unter dem Titel im PDF…"
+            />
+          </KiAssistFieldLabel>
         </div>
       </EditorSheet>
     </div>
@@ -418,6 +537,24 @@ export function AbnahmeMaengelCheckliste({
     setEditIdx(null)
   }
 
+  useKiAssistDraftConsumer(editIdx != null, ['maengel', 'text'], (d) => {
+    if (d.type === 'maengel') {
+      const lines = maengelLinesFromDraft(d.text)
+      if (!lines.length) return
+      if (lines.length > 1 && (isNew || editIdx === -1)) {
+        onChange([...items, ...lines.map((l) => neuerMangelCheckItem(l, ''))])
+        setEditIdx(null)
+        return
+      }
+      setDraftTitel(lines[0]!)
+      if (lines.length > 1) setDraftNotiz(lines.slice(1).join('\n'))
+      return
+    }
+    if (d.type === 'text') {
+      applyTextDraftToTitelNotiz(d, setDraftTitel, setDraftNotiz)
+    }
+  })
+
   return (
     <div className="abnahme-begeh">
       {items.length === 0 ? (
@@ -469,23 +606,54 @@ export function AbnahmeMaengelCheckliste({
         title={isNew || editIdx === -1 ? 'Mangel hinzufügen' : 'Mangel bearbeiten'}
         context="detail"
         size="md"
-        onConfirm={confirm}
-        confirmDisabled={!draftTitel.trim() && !draftNotiz.trim()}
+        headerEnd={
+          <div className="flex items-center gap-1">
+            <KiAssistIconButton
+              overSheet
+              scope="mangel"
+              title="Mangel mit KI formulieren"
+              extraHint="Abnahmeprotokoll: Mängel klar und prüfbar (Ort + Mangel). Ein Punkt oder Liste."
+              draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
+            />
+            <button
+              type="button"
+              className="editor-sheet__confirm"
+              disabled={!draftTitel.trim() && !draftNotiz.trim()}
+              onClick={confirm}
+              aria-label="Übernehmen"
+              title="Übernehmen"
+            >
+              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+            </button>
+          </div>
+        }
       >
         <div className="form-grid form-grid--sheet">
-          <Input
+          <KiAssistFieldLabel
             label="Titel"
             value={draftTitel}
-            onChange={(e) => setDraftTitel(e.target.value)}
-            placeholder="z. B. Dichtung nachziehen"
-          />
-          <Textarea
+            onApply={setDraftTitel}
+            extraHint="Kurzer Mangel-Titel fürs Abnahmeprotokoll."
+          >
+            <Input
+              value={draftTitel}
+              onChange={(e) => setDraftTitel(e.target.value)}
+              placeholder="z. B. Dichtung nachziehen"
+            />
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
             label="Notiz (optional)"
-            rows={3}
             value={draftNotiz}
-            onChange={(e) => setDraftNotiz(e.target.value)}
-            placeholder="Details zur Nacharbeit…"
-          />
+            onApply={setDraftNotiz}
+            extraHint="Details zur Nacharbeit im Protokoll."
+          >
+            <Textarea
+              rows={3}
+              value={draftNotiz}
+              onChange={(e) => setDraftNotiz(e.target.value)}
+              placeholder="Details zur Nacharbeit…"
+            />
+          </KiAssistFieldLabel>
         </div>
       </EditorSheet>
     </div>

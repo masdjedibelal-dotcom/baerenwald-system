@@ -16,9 +16,43 @@
   background: transparent;
   box-shadow: none;
   border: none;
-  max-width: 640px;
+  width: 100%;
+  max-width: min(640px, 100%);
   margin: 0 auto;
   padding: 8px 16px 32px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Kunde-Card: Felder dürfen nicht aus dem Viewport ragen (CSS-Grid min-width:auto) */
+.staff-funnel .sf-sec,
+.staff-funnel .card,
+.staff-funnel .card-b,
+.staff-funnel .form-section,
+.staff-funnel .form-grid,
+.staff-funnel .form-grid > *,
+.staff-funnel .field,
+.staff-funnel .kunde-auswahl {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.staff-funnel .card {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.staff-funnel .card-b {
+  overflow-x: hidden;
+}
+
+.staff-funnel input.input,
+.staff-funnel select.input,
+.staff-funnel textarea.input {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .staff-funnel .document-canvas__header {

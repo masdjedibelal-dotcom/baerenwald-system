@@ -249,6 +249,10 @@ export type NeueAnfragePayload = {
   kunde_id?: string | null
   /** HV: Auftraggeber-Organisation (Pipeline hv_meldung) */
   auftraggeber_kunde_id?: string | null
+  /** HV: Gebäude/Objekt der Meldung */
+  kunde_objekt_id?: string | null
+  /** HV: Mieter-/Meldername (Vor- + Nachname) */
+  melder_name?: string | null
   /** projekt | meldung — HV-Meldung braucht anlass meldung */
   anlass?: 'projekt' | 'meldung' | null
   /** Anzeigename / Fallback (z. B. „Vorname Nachname“ oder Firma). */
@@ -405,6 +409,8 @@ export async function createAnfrage(
     .insert({
       kunde_id: kundeId,
       auftraggeber_kunde_id: payload.auftraggeber_kunde_id?.trim() || null,
+      kunde_objekt_id: payload.kunde_objekt_id?.trim() || null,
+      melder_name: payload.melder_name?.trim() || null,
       anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
       kanal: payload.kanal,
       status: 'neu',

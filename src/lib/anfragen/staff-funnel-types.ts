@@ -63,6 +63,11 @@ export type StaffFunnelState = {
   objektOrt: string
   objektStrasse: string
   objektHausnummer: string
+  /** HV optional: Mieter (Melder) */
+  mieterVorname: string
+  mieterNachname: string
+  /** HV: verknüpftes Gebäude aus kunden_objekte */
+  kundeObjektId: string | null
   // preis
   preisModus: 'rahmen' | 'komplex' | 'manual'
   preisMin: number | null
@@ -291,6 +296,9 @@ export function createInitialStaffFunnelState(
     objektOrt: '',
     objektStrasse: '',
     objektHausnummer: '',
+    mieterVorname: '',
+    mieterNachname: '',
+    kundeObjektId: null,
     preisModus: 'rahmen',
     preisMin: null,
     preisMax: null,

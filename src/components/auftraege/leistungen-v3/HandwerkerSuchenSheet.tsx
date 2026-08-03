@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
 import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
@@ -136,13 +135,8 @@ export function HandwerkerSuchenSheet({
       context="detail"
       size="lg"
       overlayClassName="editor-sheet-overlay--stack"
-      footer={
-        <div className="rate-drawer-cta">
-          <MockBtn kind="primary" icon="check" disabled={draft.size === 0} onClick={confirm}>
-            Übernehmen{draft.size > 0 ? ` · ${draft.size}` : ''}
-          </MockBtn>
-        </div>
-      }
+      onConfirm={confirm}
+      confirmDisabled={draft.size === 0}
     >
       <div className="space-y-3">
         {chipGewerke.length > 0 ? (

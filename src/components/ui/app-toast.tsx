@@ -123,7 +123,7 @@ export function ToastProvider() {
 
   return (
     <div
-      className="pointer-events-none fixed right-4 top-14 z-toast flex w-full max-w-md flex-col gap-2 px-4 md:top-16 md:px-0"
+      className="pointer-events-none fixed left-1/2 top-14 z-toast flex w-[min(100%-2rem,28rem)] -translate-x-1/2 flex-col items-stretch gap-2 md:top-16"
       style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
     >
       {toasts.map((t) => {

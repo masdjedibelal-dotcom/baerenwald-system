@@ -98,8 +98,15 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     objekt_hausnummer: state.objektHausnummer.trim() || null,
     objekt_plz: state.objektPlz.trim() || null,
     objekt_ort: state.objektOrt.trim() || null,
+    kunde_objekt_id: state.kundeObjektId?.trim() || null,
+    mieter_vorname: state.mieterVorname.trim() || null,
+    mieter_nachname: state.mieterNachname.trim() || null,
+    melder_name:
+      [state.mieterVorname.trim(), state.mieterNachname.trim()].filter(Boolean).join(' ') ||
+      null,
     meldeadresse_abweichend: Boolean(
-      state.objektStrasse.trim() ||
+      state.kundeObjektId?.trim() ||
+        state.objektStrasse.trim() ||
         state.objektHausnummer.trim() ||
         state.objektPlz.trim() ||
         state.objektOrt.trim()
@@ -154,5 +161,10 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     anlass: isHv ? 'meldung' : undefined,
     auftraggeber_kunde_id:
       isHv && state.kundeId && kundentyp === 'verwaltung' ? state.kundeId : undefined,
+    kunde_objekt_id: isHv ? state.kundeObjektId?.trim() || null : null,
+    melder_name: isHv
+      ? [state.mieterVorname.trim(), state.mieterNachname.trim()].filter(Boolean).join(' ') ||
+        null
+      : null,
   }
 }

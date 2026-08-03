@@ -243,27 +243,35 @@ export function mailOrgAngebotZurInfo(
   }
 }
 
-/** Notfall-Direktauftrag: HV nur Info inkl. Regie-Stundensatz. */
+/** Direktauftrag: HV nur zur Info — wir kümmern uns; Portal-Zugang wie gewohnt. */
 export function mailOrgNotfallDirektInfo(
   data: {
     orgName: string
     objektTitel: string
-    stundensatz: number
+    /** @deprecated Nicht mehr in der Mail; optional für Aufrufer-Kompatibilität. */
+    stundensatz?: number
     portalLink: string
   },
   b: MailBranding
 ): { betreff: string; html: string } {
-  const betreff = `Notfall beauftragt — ${data.objektTitel.trim() || 'Objekt'}`
+  const objekt = data.objektTitel.trim() || 'Ihr Objekt'
+  const firma = b.firmenname.trim() || 'Bärenwald'
+  const betreff = `Direktauftrag — ${objekt}`
+  const gruss = mailTeamGruss('sie', firma)
   const body = `
-    <p>Guten Tag,</p>
-    <p>für <strong>${esc(data.objektTitel)}</strong> wurde ein <strong>Notfall-/Akuteinsatz</strong> direkt beauftragt (keine Freigabe nötig).</p>
-    <p>Regieposition: Verrechnung nach Aufwand zu <strong>${esc(
-      data.stundensatz.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
-    )}/h</strong> netto; Stunden über Bautagebuch, Abrechnung per Rechnung.</p>
+    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">Guten Tag,</p>
+    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
+      für <strong>${esc(objekt)}</strong> haben wir einen <strong>Direktauftrag</strong> angelegt.
+      <strong>${esc(firma)}</strong> kümmert sich darum — Sie müssen nichts freigeben.
+    </p>
+    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
+      Den aktuellen Stand sehen Sie jederzeit im Auftraggeber-Portal.
+    </p>
+    <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>
   `
   return {
     betreff,
-    html: mailHtmlBase(body, 'Notfall beauftragt', b, undefined, {
+    html: mailHtmlBase(body, 'Direktauftrag angelegt', b, undefined, {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: data.portalLink,

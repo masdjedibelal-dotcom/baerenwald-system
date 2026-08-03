@@ -18,8 +18,10 @@ import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
 import {
   downloadAbnahmeprotokollPdf,
+  getAbnahmeprotokollMailDefaults,
   saveAbnahmeAndAbschliessen,
   saveAbnahmeprotokollPdfOnly,
+  saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import { istAuftragPositionFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
@@ -145,9 +147,6 @@ export function AbnahmeprotokollCreateWizard({
   const hasSignatur = Boolean(
     meta.unterschrift_ort_datum_an.trim() && meta.unterschrift_ort_datum_ag.trim()
   )
-  const primaryCtaLabel = hasSignatur
-    ? 'Abnahme speichern & Auftrag abschließen'
-    : 'Abnahme speichern'
 
   function patchMeta(patch: Partial<AbnahmeProtokollMeta>) {
     setMeta((m) => ({ ...m, ...patch }))
@@ -276,7 +275,7 @@ export function AbnahmeprotokollCreateWizard({
     }
   }
 
-  function erstellen(opts?: { abschliessen?: boolean }) {
+  function erstellen(opts?: { abschliessen?: boolean; send?: boolean }) {
     const err = validateBeforeSave()
     if (err) {
       toast.error(err)
@@ -285,6 +284,7 @@ export function AbnahmeprotokollCreateWizard({
     const metaReady = ensureUnterschriftOrtDatum(meta)
     setMeta(metaReady)
     const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
+    const send = Boolean(opts?.send)
     startTransition(async () => {
       const payload = {
         auftragId,
@@ -296,27 +296,76 @@ export function AbnahmeprotokollCreateWizard({
         protokollId,
       }
       if (abschliessen) {
-        const r = await saveAbnahmeAndAbschliessen(payload)
+        const r = await saveAbnahmeAndAbschliessen({
+          ...payload,
+          sendToKunde: send,
+        })
         if (!r.ok) {
           toast.error(r.message)
           return
         }
         downloadPdfFromBase64(r.pdfBase64, r.filename)
         const prev = r.previousStatus
-        toast.success('Abnahme gespeichert — Auftrag abgeschlossen', {
-          action: {
-            label: 'Rückgängig',
-            onClick: () => {
-              void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                if (!u.ok) toast.error(u.message)
-                else {
-                  toast.success('Abschluss rückgängig gemacht')
-                  router.refresh()
-                }
-              })
-            },
-          },
+        if (r.sendWarning) {
+          toast.error(
+            `Abnahme gespeichert und Auftrag abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`,
+            {
+              action: {
+                label: 'Rückgängig',
+                onClick: () => {
+                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                    if (!u.ok) toast.error(u.message)
+                    else {
+                      toast.success('Abschluss rückgängig gemacht')
+                      router.refresh()
+                    }
+                  })
+                },
+              },
+            }
+          )
+        } else {
+          toast.success(
+            r.sentToKunde
+              ? 'Abnahme gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
+              : 'Abnahme gespeichert — Auftrag abgeschlossen',
+            {
+              action: {
+                label: 'Rückgängig',
+                onClick: () => {
+                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                    if (!u.ok) toast.error(u.message)
+                    else {
+                      toast.success('Abschluss rückgängig gemacht')
+                      router.refresh()
+                    }
+                  })
+                },
+              },
+            }
+          )
+        }
+        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        router.refresh()
+        return
+      }
+      if (send) {
+        const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId)
+        if (!mailDefaults.ok) {
+          toast.error(mailDefaults.message)
+          return
+        }
+        const r = await saveAndSendAbnahmeprotokoll({
+          ...payload,
+          betreff: mailDefaults.defaultBetreff,
+          nachricht: mailDefaults.defaultNachricht,
+          anrede: mailDefaults.defaultAnrede,
         })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success('Abnahmeprotokoll gespeichert und an den Kunden gesendet')
         router.push(`/auftraege/${auftragId}?tab=leistungen`)
         router.refresh()
         return
@@ -764,15 +813,26 @@ export function AbnahmeprotokollCreateWizard({
           </Button>
           <Button
             type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            loading={pending}
+            disabled={previewBusy}
+            onClick={() => erstellen({ abschliessen: hasSignatur, send: false })}
+          >
+            Speichern
+          </Button>
+          <Button
+            type="button"
             variant="primary"
             size="sm"
             className="gap-1.5"
             loading={pending}
             disabled={previewBusy}
-            onClick={() => erstellen({ abschliessen: hasSignatur })}
+            onClick={() => erstellen({ abschliessen: hasSignatur, send: true })}
           >
             <Check className="h-4 w-4" />
-            {primaryCtaLabel}
+            Speichern und senden
           </Button>
         </>
       )}
@@ -783,8 +843,8 @@ export function AbnahmeprotokollCreateWizard({
     <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-5">
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         {hasSignatur
-          ? 'Vorschau prüfen — Speichern schließt den Auftrag ab.'
-          : 'Unterschriften (Ort/Datum AN + AG) setzen, dann Abnahme speichern & abschließen.'}
+          ? 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
+          : 'Unterschriften (Ort/Datum AN + AG) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">

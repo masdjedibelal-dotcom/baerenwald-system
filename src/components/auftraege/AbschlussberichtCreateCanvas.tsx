@@ -7,7 +7,6 @@ import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { createAbschlussberichtPdf } from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
-import { betragAnzeige } from '@/lib/angebot-einfach'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 
@@ -43,18 +42,12 @@ export type AbschlussberichtCreateCanvasProps = {
   abschlussUrl: string | null
 }
 
-function euro(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return '—'
-  return betragAnzeige(n, null, null)
-}
-
 export function AbschlussberichtCreateCanvas({
   auftragId,
   auftragsLabel,
   kundeName,
   zeitraumLabel,
   gewerkGruppen,
-  gesamtNetto,
   bautagebuch,
   hasAbnahme,
   hasAbschlussbericht,
@@ -142,8 +135,9 @@ export function AbschlussberichtCreateCanvas({
         </div>
 
         <p className="abschluss-canvas-intro">
-          Automatisch zusammengestellt aus Leistungen, Bautagebuch und Abnahmeprotokoll. Geht mit der
-          Rechnung an den Kunden.
+          Automatisch zusammengestellt aus Leistungen, Bautagebuch und Abnahmeprotokoll — als
+          Dokumentationsbericht ohne Rechnungsbeträge. Optional als Anhang zur Rechnung /
+          Endabrechnung.
         </p>
 
         <div className="abschluss-canvas-meta">
@@ -178,15 +172,10 @@ export function AbschlussberichtCreateCanvas({
                           <div className="abschluss-canvas-pos__desc">{l.beschreibung}</div>
                         ) : null}
                       </div>
-                      <div className="abschluss-canvas-pos__preis">{euro(l.preisNetto)}</div>
                     </div>
                   ))}
                 </div>
               ))}
-              <div className="abschluss-canvas-total">
-                <span>Gesamt (netto)</span>
-                <span className="abschluss-canvas-total__val">{euro(gesamtNetto)}</span>
-              </div>
             </div>
           )}
         </section>

@@ -386,6 +386,36 @@ export function resolveSatellitenRechnungVorgang(
   }
 }
 
+/**
+ * FAB-/Direktrechnung ohne Lead/Auftrag: immer Rechnungsphase —
+ * auch als Entwurf (sonst fällt resolveVorgang auf synthetische Anfrage zurück).
+ */
+export function resolveStandaloneDirektrechnung(input: {
+  rechnung: VorgangRechnungInput
+  titel: string
+  kundeName?: string | null
+}): ResolvedVorgang {
+  const r = input.rechnung
+  const st = (r.status ?? '').trim().toLowerCase() || 'entwurf'
+  const unterstatus = st === 'storniert' ? 'storniert' : st
+  const ueberfaellig =
+    unterstatus === 'gesendet' && isUeberfaellig(r.faellig)
+  return {
+    phase: 'rechnung',
+    unterstatus,
+    unterstatusLabel: unterstatusLabel('rechnung', unterstatus),
+    needsAction: false,
+    actor: null,
+    badges: {},
+    ueberfaellig,
+    kanalMeta: 'Direktkunde',
+    titel: input.titel,
+    entityId: r.id,
+    entityType: 'rechnung',
+    updatedAt: entityTs(r),
+  }
+}
+
 export function satellitenRechnungTitel(
   rechnung: VorgangRechnungInput,
   fallbackTitel: string

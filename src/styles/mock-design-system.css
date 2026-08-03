@@ -2940,9 +2940,12 @@ button.wv-chip:hover {
 
 /* App-Toasts */
 .app-toast--success {
-  background: var(--green-50);
-  border-color: color-mix(in srgb, var(--green) 28%, var(--border));
-  color: var(--green-dark, var(--green));
+  background: var(--green-dark, #1a3d2b);
+  border-color: var(--green-dark, #1a3d2b);
+  color: #fff;
+}
+.app-toast--success .opacity-60 {
+  opacity: 0.75;
 }
 .app-toast--error {
   background: var(--red-bg);
@@ -7915,7 +7918,7 @@ a.hvk-h--link:hover { text-decoration: underline; }
     grid-template-areas:
       "title  status  check   actions"
       "kunde  kunde  kunde   kunde"
-      "datum  datum  datum    datum";
+      "wert   wert   datum    datum";
     column-gap: 8px;
     row-gap: 5px;
     align-items: center;
@@ -7967,7 +7970,7 @@ a.hvk-h--link:hover { text-decoration: underline; }
     grid-template-areas:
       "check  title  status  actions"
       "check  kunde  kunde   kunde"
-      ".      datum  datum   datum";
+      "check  wert   datum   datum";
   }
 
   
@@ -8011,12 +8014,24 @@ a.hvk-h--link:hover { text-decoration: underline; }
   vertical-align: top;
 }
 
-.vg-row > .vg-wert { display: none; }
+.vg-row > .vg-wert {
+  grid-area: wert;
+  display: block !important;
+  justify-self: start;
+  text-align: left !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-text);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
                
-/* Betrag auf Mobil ausblenden */
+/* Betrag auf Mobil in der Card-Zeile mit Datum */
 
   
-.vg-row > .vg-datum { grid-area: datum; font-size: var(--fs-meta); color: var(--text-3); }
+.vg-row > .vg-datum { grid-area: datum; font-size: var(--fs-meta); color: var(--text-3); justify-self: end; }
 
 
 }
@@ -16842,8 +16857,8 @@ textarea.input:focus {
   .zahlplan-summary {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: 6px;
+    margin-bottom: 12px;
   }
   .zahlplan-summary__meta {
     text-align: left;
@@ -16856,7 +16871,7 @@ textarea.input:focus {
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   .zahlplan-table-wrap .list-row.zahlplan-row-head,
   .zahlplan-table-wrap .zahlplan-row-head {
@@ -16870,9 +16885,9 @@ textarea.input:focus {
     grid-template-areas:
       'label menu'
       'betrag faellig';
-    gap: 4px 10px;
+    gap: 8px 12px;
     align-items: start;
-    padding: 14px;
+    padding: 16px;
     margin: 0;
     border: 1px solid var(--border-strong, #d6d3ce);
     border-radius: 12px;
@@ -17202,13 +17217,13 @@ textarea.input:focus {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .abnahme-inline__item {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px 16px;
+  padding: 16px;
   border: 0.5px solid var(--border);
   border-radius: 14px;
   background: var(--card);
@@ -17217,7 +17232,7 @@ textarea.input:focus {
 .abnahme-inline__item-actions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -17434,9 +17449,9 @@ textarea.input:focus {
 
 .zahlplan-editor-presets {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   align-items: center;
 }
 .zahlplan-editor-presets__label {
@@ -17469,6 +17484,104 @@ textarea.input:focus {
   border-radius: 10px;
   overflow: hidden;
   background: var(--card);
+}
+.zahlplan-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.zahlplan-rate-card {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.zahlplan-rate-card.is-frozen {
+  opacity: 0.78;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+}
+.zahlplan-rate-card__head {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+.zahlplan-rate-card__badge {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+.zahlplan-rate-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 12px;
+  min-width: 0;
+}
+.zahlplan-rate-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.zahlplan-rate-card__field--grow {
+  flex: 1 1 auto;
+}
+.zahlplan-rate-card__lbl {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+.zahlplan-rate-card__field .txt,
+.zahlplan-rate-card__field .sel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: 40px;
+}
+.zahlplan-rate-card__wert {
+  width: 100%;
+  max-width: none;
+}
+.zahlplan-rate-card__auto {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-3);
+  font-weight: 500;
+  font-size: var(--fs-text);
+}
+.zahlplan-rate-card__betrag {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 4px;
+  font-size: var(--fs-text);
+}
+@media (min-width: 640px) {
+  .zahlplan-rate-card__grid {
+    grid-template-columns: 110px 1fr 1fr 1.1fr;
+    gap: 14px 14px;
+  }
 }
 .zahlplan-editor-head {
   display: grid;
@@ -17504,8 +17617,10 @@ textarea.input:focus {
 .zahlplan-editor-foot {
   display: flex;
   align-items: center;
-  padding: 8px 14px;
-  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 2px 0;
+  gap: 12px;
+  min-width: 0;
 }
 .zahlplan-editor-summe {
   font-size: var(--fs-meta);
@@ -17521,10 +17636,10 @@ textarea.input:focus {
   width: 100%;
 }
 .zahlplan-editor-hint {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-size: var(--fs-meta);
   color: var(--text-3);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 .zahlplan-editor-row.is-frozen {
   opacity: 0.72;
@@ -18020,6 +18135,8 @@ select:focus-visible {
 }
 .editor-sheet-overlay--bottom {
   @apply items-end justify-stretch p-0;
+  /* Sheet über der Soft-Keyboard; Overlay deckt darunterliegende Seite weiter ab */
+  padding-bottom: var(--keyboard-inset, 0px);
 }
 .editor-sheet-overlay--slide {
   /* Immer rechts — nie links (Mock Split-over). Nur @apply: Raw-CSS nach @apply fällt im Build oft weg. */
@@ -18116,7 +18233,8 @@ select:focus-visible {
 }
 .editor-sheet__footer {
   @apply shrink-0 border-t border-[var(--app-separator)] bg-[var(--card)] px-4 py-3;
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+  background: var(--card, #fff);
 }
 
 @media (max-width: 767px) {
@@ -18476,7 +18594,10 @@ select:focus-visible {
   width: 100%;
   height: 100%;
   height: 100dvh;
-  max-height: 100dvh;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  max-height: none; /* nicht auf 100dvh kappen — iOS-Tastatur lässt sonst Lücken */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -18540,6 +18661,8 @@ select:focus-visible {
 .document-canvas__body {
   @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5;
   background: var(--bg-soft, #f6f7f6);
+  /* iOS: Abstand über Soft-Keyboard, damit Inhalt nicht hinter der Tastatur liegt */
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px));
 }
 .document-canvas__split,
 .dc-split {
@@ -20854,13 +20977,13 @@ button.crow.crow--tap:hover {
 
 .ki-pos-draft-card {
   margin-top: 10px;
-  padding: 12px;
+  padding: 14px 16px;
   border-radius: 14px;
   border: 0.5px solid color-mix(in srgb, var(--green) 30%, var(--border));
   background: color-mix(in srgb, var(--green) 6%, #fff);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 .ki-pos-draft-card__head {
   font-size: var(--fs-meta);

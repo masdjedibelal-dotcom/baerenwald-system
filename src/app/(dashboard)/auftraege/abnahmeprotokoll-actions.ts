@@ -625,6 +625,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
 /**
  * Phase 8: Abnahme speichern und Auftrag abschließen (ein Canvas-Weg).
  * Mit zugewiesenen Partnern: erst alle HW-Teilabnahmen freigegeben → Gesamtabnahme.
+ * Optional: PDF per E-Mail an den Kunden (ohne Status zurück auf „abnahme“ zu setzen).
  */
 export async function saveAbnahmeAndAbschliessen(input: {
   auftragId: string
@@ -634,6 +635,7 @@ export async function saveAbnahmeAndAbschliessen(input: {
   notizen: string | null
   meta?: AbnahmeProtokollMeta | null
   protokollId?: string | null
+  sendToKunde?: boolean
 }): Promise<
   | {
       ok: true
@@ -643,6 +645,8 @@ export async function saveAbnahmeAndAbschliessen(input: {
       updated: boolean
       previousStatus: string
       protokollId: string
+      sentToKunde: boolean
+      sendWarning?: string
     }
   | { ok: false; message: string }
 > {
@@ -684,11 +688,68 @@ export async function saveAbnahmeAndAbschliessen(input: {
   const closed = await finalizeAbschlussdokumentationOhneMail(input.auftragId)
   if (!closed.ok) return closed
 
+  let sentToKunde = false
+  let sendWarning: string | undefined
+  if (input.sendToKunde) {
+    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId)
+    if (!mailDefaults.ok) {
+      sendWarning = mailDefaults.message
+    } else {
+      const mailBuilt = await buildAbnahmeMail({
+        auftragId: input.auftragId,
+        betreff: mailDefaults.defaultBetreff,
+        nachricht: mailDefaults.defaultNachricht,
+        anrede: mailDefaults.defaultAnrede,
+      })
+      if (!mailBuilt.ok) {
+        sendWarning = mailBuilt.message
+      } else {
+        const hatMaengel = countOffeneMaengel(prepareAbnahmePayload(input).maengel) > 0
+        const mail = await sendMail({
+          typ: 'abnahmeprotokoll',
+          an: mailBuilt.kundeEmail,
+          anName: mailBuilt.kundeName,
+          betreff: mailBuilt.betreff,
+          html: mailBuilt.html,
+          pdfBuffer: Buffer.from(saved.pdfBase64, 'base64'),
+          pdfName: `Abnahmeprotokoll-${formatAuftragsNr(detail)}.pdf`,
+          kundeId: detail.kunde_id ?? null,
+          leadId: detail.lead_id ?? null,
+          auftragId: input.auftragId,
+          kontextTyp: 'auftrag',
+        })
+        if (!mail.success) {
+          sendWarning = mail.error ?? 'E-Mail fehlgeschlagen'
+        } else {
+          await supabaseAdmin
+            .from('auftrag_abnahmeprotokolle')
+            .update({ an_kunde_gesendet_at: new Date().toISOString() })
+            .eq('id', saved.protokollId)
+
+          await insertAuftragTimelineEvent({
+            auftrag_id: input.auftragId,
+            typ: 'abnahmeprotokoll_erstellt',
+            titel: 'Abnahmeprotokoll erstellt',
+            beschreibung: hatMaengel
+              ? 'Abnahmeprotokoll mit Mängeln an den Kunden gesendet.'
+              : 'Abnahmeprotokoll ohne Mängel an den Kunden gesendet.',
+            erstellt_von: uid,
+            sichtbar_fuer_kunde: true,
+            fuer_kunde_freigegeben: true,
+            freigegeben_at: new Date().toISOString(),
+            email_log_id: mail.emailLogId ?? null,
+          })
+          sentToKunde = true
+        }
+      }
+    }
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   revalidatePath('/auftraege')
   revalidatePath('/vorgaenge')
 
-  return { ...saved, previousStatus }
+  return { ...saved, previousStatus, sentToKunde, sendWarning }
 }
 
 async function syncAuftragAbnahmeDenorm(auftragId: string): Promise<void> {

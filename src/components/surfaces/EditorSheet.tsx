@@ -235,7 +235,8 @@ export function EditorSheet({
     }
   }, [open, mounted, pauseFocusTrap])
 
-  /* S7: visualViewport — Overlay anpassen bei Tastatur, Panel nicht auf Fullscreen ziehen */
+  /* S7: iOS-Tastatur — Overlay bleibt Vollfläche (sonst Lücke → Seite darunter sichtbar).
+   * Nur --keyboard-inset setzen; Bottom-Sheet per Padding über der Tastatur. */
   useEffect(() => {
     if (!open || !isMobile) return
     const overlay = overlayRef.current
@@ -243,27 +244,35 @@ export function EditorSheet({
     if (!overlay || !vv) return
     const sync = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      overlay.style.top = '0'
+      overlay.style.left = '0'
+      overlay.style.right = '0'
+      overlay.style.bottom = '0'
+      overlay.style.width = '100%'
+      overlay.style.height = `${Math.max(window.innerHeight, vv.height + vv.offsetTop)}px`
+      overlay.style.minHeight = `${window.innerHeight}px`
       overlay.style.setProperty('--keyboard-inset', `${kb}px`)
-      if (kb > 40) {
-        overlay.style.top = `${vv.offsetTop}px`
-        overlay.style.height = `${vv.height}px`
-        overlay.style.bottom = 'auto'
-      } else {
-        overlay.style.top = ''
-        overlay.style.height = ''
-        overlay.style.bottom = ''
-      }
+      document.body.classList.toggle('kb-open', kb > 40)
     }
     sync()
     vv.addEventListener('resize', sync)
     vv.addEventListener('scroll', sync)
+    window.addEventListener('focusin', sync)
+    window.addEventListener('focusout', sync)
     return () => {
       vv.removeEventListener('resize', sync)
       vv.removeEventListener('scroll', sync)
-      overlay.style.height = ''
+      window.removeEventListener('focusin', sync)
+      window.removeEventListener('focusout', sync)
       overlay.style.top = ''
+      overlay.style.left = ''
+      overlay.style.right = ''
       overlay.style.bottom = ''
+      overlay.style.width = ''
+      overlay.style.height = ''
+      overlay.style.minHeight = ''
       overlay.style.removeProperty('--keyboard-inset')
+      document.body.classList.remove('kb-open')
     }
   }, [open, isMobile])
 

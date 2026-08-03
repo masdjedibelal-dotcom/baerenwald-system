@@ -112,7 +112,7 @@ export function buildAbschlussdokuHtmlInput(
       })
     : pdf.projektTitel
 
-  const summen = buildAbschlussSummen(pdf, firm, detail)
+  const summen = pdf.mitPreisen ? buildAbschlussSummen(pdf, firm, detail) : null
 
   const bautagebuch = [...pdf.bautagebuch]
     .sort((a, b) => {
@@ -164,12 +164,13 @@ export function buildAbschlussdokuHtmlInput(
       beschreibung: p.beschreibung,
       menge: p.menge,
       einheit: p.einheit,
-      preis_netto: p.preis_fix,
+      preis_netto: pdf.mitPreisen ? p.preis_fix : null,
     })),
     abnahmePunkte: pdf.abnahmePunkte,
     bautagebuch,
     fotoUrls,
     mitBautagebuch: pdf.mitBautagebuch,
     mitFotos: pdf.mitFotos,
+    mitPreisen: pdf.mitPreisen,
   }
 }

@@ -48,6 +48,7 @@ export function AuftragAbschliessenSheet({
   onNachRechnung?: () => void
 }) {
   const [pending, startTransition] = useTransition()
+  const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
   const [step, setStep] = useState<Step>('frage')
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>([])
@@ -59,6 +60,7 @@ export function AuftragAbschliessenSheet({
     setPunkte([])
     setMaengelItems([])
     setNotizen('')
+    setPendingKind(null)
   }, [open])
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
@@ -85,7 +87,8 @@ export function AuftragAbschliessenSheet({
     })
   }
 
-  function speichernMitAbnahme() {
+  function speichernMitAbnahme(sendToKunde: boolean) {
+    setPendingKind(sendToKunde ? 'send' : 'save')
     startTransition(async () => {
       const maengel = maengelFromCheckItems(maengelItems)
       const hatMaengel = maengel.length > 0
@@ -99,12 +102,24 @@ export function AuftragAbschliessenSheet({
         maengel,
         notizen: notizen.trim() || null,
         meta,
+        sendToKunde,
       })
+      setPendingKind(null)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Gesamtabnahme gespeichert — Auftrag abgeschlossen')
+      if (r.sendWarning) {
+        toast.error(
+          `Gespeichert und abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`
+        )
+      } else {
+        toast.success(
+          r.sentToKunde
+            ? 'Abnahmeprotokoll gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
+            : 'Gesamtabnahme gespeichert — Auftrag abgeschlossen'
+        )
+      }
       onClose()
       onDone?.()
     })
@@ -118,28 +133,23 @@ export function AuftragAbschliessenSheet({
         title="Auftrag abschließen"
         size="md"
         footer={
-          <div className="ldr-cta" style={{ flexDirection: 'column', gap: 8 }}>
+          <div className="sheet-footer-actions zahlplan-editor-footer">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={abschliessenOhneAbnahme}
+            >
+              Speichern
+            </Button>
             <Button
               type="button"
               variant="primary"
-              className="w-full"
               disabled={pending}
               loading={pending}
               onClick={() => setStep('checkliste')}
             >
-              Ja — Abnahmeprotokoll erstellen
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full"
-              disabled={pending}
-              onClick={abschliessenOhneAbnahme}
-            >
-              Nein — nur abschließen
-            </Button>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
-              Abbrechen
+              Erstellen
             </Button>
           </div>
         }
@@ -160,17 +170,24 @@ export function AuftragAbschliessenSheet({
       size="lg"
       dirty={!pending}
       footer={
-        <div className="sheet-footer-actions ldr-cta">
-          <Button type="button" variant="secondary" onClick={() => setStep('frage')} disabled={pending}>
-            Zurück
+        <div className="sheet-footer-actions zahlplan-editor-footer">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            loading={pending && pendingKind === 'save'}
+            onClick={() => speichernMitAbnahme(false)}
+          >
+            Speichern
           </Button>
           <Button
             type="button"
             variant="primary"
-            loading={pending}
-            onClick={speichernMitAbnahme}
+            disabled={pending}
+            loading={pending && pendingKind === 'send'}
+            onClick={() => speichernMitAbnahme(true)}
           >
-            {pending ? 'Protokoll wird erstellt…' : 'Speichern & abschließen'}
+            Speichern und senden
           </Button>
         </div>
       }

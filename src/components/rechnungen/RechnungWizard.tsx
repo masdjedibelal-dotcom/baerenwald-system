@@ -759,6 +759,14 @@ export function RechnungWizard({
       toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
+    if (sendMail) {
+      const to = mailTo.filter((e) => isValidEmail(e))
+      if (!to.length) {
+        toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+        setSheet('versand')
+        return
+      }
+    }
     await actionBusy.run(sendMail ? 'Wird gesendet…' : 'Rechnung wird erstellt…', async () => {
       setSaving(true)
       try {
@@ -796,11 +804,6 @@ export function RechnungWizard({
         }
 
         const to = mailTo.filter((e) => isValidEmail(e))
-        if (!to.length) {
-          toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
-          setSheet('versand')
-          return
-        }
         const res = await sendRechnungWizard({
           rechnungId: id,
           mailTo: to,
@@ -1470,7 +1473,9 @@ export function RechnungWizard({
                 color: 'var(--bw-text-muted, #6b7280)',
               }}
             >
-              Anhang für den Kunden
+              Dokumentationsbericht (Leistungen, Bautagebuch, Abnahme, Fotos) —{' '}
+              <strong>keine</strong> Endabrechnung. Preise und Zahlbetrag bleiben auf der
+              Rechnung.
               {abschlussHint?.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1522,7 +1527,7 @@ export function RechnungWizard({
                 onChange={(e) => setAbschlussMitVersand(e.target.checked)}
               />
               <span>
-                <span style={{ fontWeight: 500 }}>Mit Rechnung versenden</span>
+                <span style={{ fontWeight: 500 }}>Als Anhang zur Rechnung mitsenden</span>
                 <span
                   style={{
                     display: 'block',
@@ -1531,7 +1536,8 @@ export function RechnungWizard({
                     color: 'var(--bw-text-muted, #6b7280)',
                   }}
                 >
-                  Fehlt noch ein PDF, wird es beim Senden automatisch erzeugt.
+                  Ja = Abschlussbericht zusätzlich zur Endabrechnung / Rechnung. Nein = nur die
+                  Rechnung. Fehlt noch ein PDF, wird es beim Senden erzeugt.
                 </span>
               </span>
             </label>

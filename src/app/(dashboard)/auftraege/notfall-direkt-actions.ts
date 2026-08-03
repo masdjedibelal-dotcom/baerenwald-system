@@ -343,7 +343,6 @@ export async function notfallDirektBeauftragen(
         {
           orgName,
           objektTitel: titel,
-          stundensatz,
           portalLink: buildPortalLoginLink(),
         },
         branding

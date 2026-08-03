@@ -5,6 +5,7 @@ export type KiAssistScopeId =
   | 'positionen'
   | 'bautagebuch'
   | 'mangel'
+  | 'abnahme_leistung'
   | 'notiz'
   | 'freitext'
   | 'feld'
@@ -156,13 +157,42 @@ Nutze type "text" mit titel und text.`,
       'Ich formuliere **Mängel** für die Abnahme — klar, prüfbar, ohne Dramatik. Der Text kann im Protokoll landen.',
     placeholder: 'z. B. „Fugen im Duschbereich undicht, Sockelleiste Wohnzimmer lose“…',
     systemHint: `Modus: Abnahme-Mängel (kundensichtbar / Protokoll).
-Formuliere knappe, prüfbare Mängelpunkte (Ort + Mangel), eine Zeile pro Mangel.
-${BW_APPLY_HINT}
-Nutze type "maengel".`,
+Formuliere knappe, prüfbare Mängelpunkte (Ort + Mangel).
+- Ein einzelner Mangel: type "text" mit titel (Kurzfassung) und text (Details/Notiz), ODER type "maengel" mit einer Zeile.
+- Mehrere Mängel auf einmal: type "maengel", text = eine Zeile pro Mangel.
+${BW_APPLY_HINT}`,
     quickPrompts: [
       {
         label: 'Als Liste',
         prompt: 'Formuliere meine Punkte als Abnahme-Mängelliste, eine Zeile pro Mangel.',
+      },
+      {
+        label: 'Ein Mangel',
+        prompt:
+          'Formuliere einen klaren Mangel-Titel und eine kurze Notiz fürs Abnahmeprotokoll.',
+      },
+    ],
+  },
+  abnahme_leistung: {
+    id: 'abnahme_leistung',
+    label: 'Abnahme-Leistung',
+    intro:
+      'Ich formuliere eine **erbrachte Leistung** fürs Abnahmeprotokoll — Titel und optionale Notiz, die der Kunde im PDF sieht.',
+    placeholder: 'z. B. „Heizkörper Bad getauscht, Entlüftet, Dichtungen erneuert“…',
+    systemHint: `Modus: Abnahme-Checkliste Leistung (kundensichtbar im Protokoll).
+Erzeuge einen kurzen Titel (was erledigt wurde) und optional eine sachliche Notiz/Beschreibung darunter.
+Keine Preise, keine internen Codes. Ton: klar, handwerklich, prüfbar.
+Antworte kurz menschlich, dann IMMER bw-apply type "text" mit titel und text (text = Notiz; darf leer sein wenn nur Titel reicht).
+${BW_APPLY_HINT}`,
+    quickPrompts: [
+      {
+        label: 'Aus Stichworten',
+        prompt:
+          'Schreib aus meinen Stichworten Titel und Notiz einer erbrachten Leistung fürs Abnahmeprotokoll.',
+      },
+      {
+        label: 'Kürzer',
+        prompt: 'Formuliere Titel und Notiz knapper und klarer fürs Protokoll.',
       },
     ],
   },

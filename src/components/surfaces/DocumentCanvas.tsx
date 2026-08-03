@@ -164,7 +164,8 @@ export function DocumentCanvas({
     }
   }, [open, mounted])
 
-  /* S7: visualViewport nur mobil (Tastatur) — Desktop immer echter Fullscreen ohne Lücken */
+  /* S7: iOS-Tastatur — Canvas bleibt Vollfläche (sonst Lücke → Dashboard sichtbar).
+   * Nur --keyboard-inset setzen, damit Body/Footer über der Tastatur bleiben. */
   useEffect(() => {
     if (!open || !mounted) return
     const root = rootRef.current
@@ -175,44 +176,64 @@ export function DocumentCanvas({
     if (!isMobile) {
       root.style.top = ''
       root.style.height = ''
+      root.style.minHeight = ''
       root.style.left = ''
       root.style.right = ''
       root.style.width = ''
       root.style.bottom = ''
+      root.style.removeProperty('--keyboard-inset')
       return
     }
 
     const sync = () => {
-      const kbOpen = Math.max(0, window.innerHeight - vv.height - vv.offsetTop) > 40
-      if (!kbOpen) {
-        root.style.top = '0'
-        root.style.left = '0'
-        root.style.right = '0'
-        root.style.width = '100%'
-        root.style.height = '100dvh'
-        root.style.bottom = 'auto'
-        return
-      }
-      root.style.top = `${vv.offsetTop}px`
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      // Immer Layout-Viewport abdecken — nie auf vv.height schrumpfen (iOS-Lücke)
+      root.style.top = '0'
       root.style.left = '0'
       root.style.right = '0'
+      root.style.bottom = '0'
       root.style.width = '100%'
-      root.style.height = `${vv.height}px`
-      root.style.bottom = 'auto'
+      root.style.height = `${Math.max(window.innerHeight, vv.height + vv.offsetTop)}px`
+      root.style.minHeight = `${window.innerHeight}px`
+      root.style.setProperty('--keyboard-inset', `${kb}px`)
+      document.body.classList.toggle('kb-open', kb > 40)
     }
     sync()
     vv.addEventListener('resize', sync)
     vv.addEventListener('scroll', sync)
+    window.addEventListener('focusin', sync)
+    window.addEventListener('focusout', sync)
     return () => {
       vv.removeEventListener('resize', sync)
       vv.removeEventListener('scroll', sync)
+      window.removeEventListener('focusin', sync)
+      window.removeEventListener('focusout', sync)
       root.style.height = ''
+      root.style.minHeight = ''
       root.style.top = ''
       root.style.left = ''
       root.style.right = ''
       root.style.width = ''
       root.style.bottom = ''
+      root.style.removeProperty('--keyboard-inset')
+      document.body.classList.remove('kb-open')
     }
+  }, [open, mounted])
+
+  /* Fokussiertes Feld über die Tastatur scrollen */
+  useEffect(() => {
+    if (!open || !mounted) return
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return
+      if (!rootRef.current?.contains(t)) return
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !t.isContentEditable) return
+      requestAnimationFrame(() => {
+        t.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      })
+    }
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
   }, [open, mounted])
 
   /* Spec §10 / §16: DocBar kompakt beim Scrollen (Body oder Root bei Wizard-Mobil) */

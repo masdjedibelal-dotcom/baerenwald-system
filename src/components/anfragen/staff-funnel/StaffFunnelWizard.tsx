@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
 import {
   FACHDETAILS_CONFIG,
@@ -19,7 +21,7 @@ import {
 } from '@/lib/vorab-formular-config'
 import { defaultGroesseEinheit, GROESSEN_EINHEITEN, groesseEinheitLabel } from '@/lib/dokument-einheiten'
 import { KANAL_LABELS, cn } from '@/lib/utils'
-import type { Kunde, LeadKanal } from '@/lib/types'
+import type { Kunde, KundenObjekt, LeadKanal } from '@/lib/types'
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import {
   DRINGLICHKEIT_OPTIONS,
@@ -82,7 +84,7 @@ function KundenAdresseFields({
 }) {
   return (
     <>
-      <MockField label="Straße" full>
+      <MockField label="Straße" full className="min-w-0">
         <input
           className="input"
           value={
@@ -95,8 +97,8 @@ function KundenAdresseFields({
           autoComplete="street-address"
         />
       </MockField>
-      <div className="full grid gap-3 sm:grid-cols-2">
-        <MockField label="PLZ">
+      <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <MockField label="PLZ" className="min-w-0">
           <input
             className="input"
             value={state.plz}
@@ -107,7 +109,7 @@ function KundenAdresseFields({
             autoComplete="postal-code"
           />
         </MockField>
-        <MockField label="Ort">
+        <MockField label="Ort" className="min-w-0">
           <input
             className="input"
             value={state.ort}
@@ -131,7 +133,7 @@ function MeldeadresseFields({
 }) {
   return (
     <>
-      <MockField label="Straße (Objekt / Leistung)" full>
+      <MockField label="Straße (Objekt / Leistung)" full className="min-w-0">
         <input
           className="input"
           value={
@@ -141,32 +143,145 @@ function MeldeadresseFields({
           }
           onChange={(e) => {
             const s = splitStrasseHausnummer(e.target.value)
-            patch({ objektStrasse: s.strasse, objektHausnummer: s.hausnummer })
+            patch({
+              kundeObjektId: null,
+              objektStrasse: s.strasse,
+              objektHausnummer: s.hausnummer,
+            })
           }}
           placeholder="z.B. Baustellenstr. 12"
         />
       </MockField>
-      <div className="full grid gap-3 sm:grid-cols-2">
-        <MockField label="PLZ (Objekt)">
+      <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <MockField label="PLZ (Objekt)" className="min-w-0">
           <input
             className="input"
             value={state.objektPlz}
-            onChange={(e) => patch({ objektPlz: e.target.value.slice(0, 5) })}
+            onChange={(e) =>
+              patch({ kundeObjektId: null, objektPlz: e.target.value.slice(0, 5) })
+            }
             placeholder="80796"
             inputMode="numeric"
             maxLength={5}
           />
         </MockField>
-        <MockField label="Ort (Objekt)">
+        <MockField label="Ort (Objekt)" className="min-w-0">
           <input
             className="input"
             value={state.objektOrt}
-            onChange={(e) => patch({ objektOrt: e.target.value })}
+            onChange={(e) => patch({ kundeObjektId: null, objektOrt: e.target.value })}
             placeholder="München"
           />
         </MockField>
       </div>
     </>
+  )
+}
+
+const MIETER_OBJEKT_CLEAR = {
+  mieterVorname: '',
+  mieterNachname: '',
+  kundeObjektId: null as string | null,
+  objektPlz: '',
+  objektOrt: '',
+  objektStrasse: '',
+  objektHausnummer: '',
+}
+
+/** Optional: Mieter + Leistungsort (Objekt-Dropdown oder Freitext) bei HV. */
+function HvMieterObjektFields({
+  state,
+  patch,
+  objekte,
+  objekteLaden,
+}: {
+  state: StaffFunnelState
+  patch: (p: Partial<StaffFunnelState>) => void
+  objekte: KundenObjekt[]
+  objekteLaden: boolean
+}) {
+  function selectObjekt(id: string) {
+    if (!id) {
+      patch({
+        kundeObjektId: null,
+        objektStrasse: '',
+        objektHausnummer: '',
+        objektPlz: '',
+        objektOrt: '',
+      })
+      return
+    }
+    const o = objekte.find((x) => x.id === id)
+    if (!o) {
+      patch({ kundeObjektId: id })
+      return
+    }
+    patch({
+      kundeObjektId: o.id,
+      objektStrasse: o.strasse ?? '',
+      objektHausnummer: o.hausnummer ?? '',
+      objektPlz: o.plz ?? '',
+      objektOrt: o.ort ?? '',
+    })
+  }
+
+  return (
+    <div className="full min-w-0 space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+      <p className="m-0 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
+        Mieter (optional)
+      </p>
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <MockField label="Vorname Mieter" className="min-w-0">
+          <input
+            className="input"
+            value={state.mieterVorname}
+            onChange={(e) => patch({ mieterVorname: e.target.value })}
+            placeholder="Max"
+            autoComplete="off"
+          />
+        </MockField>
+        <MockField label="Nachname Mieter" className="min-w-0">
+          <input
+            className="input"
+            value={state.mieterNachname}
+            onChange={(e) => patch({ mieterNachname: e.target.value })}
+            placeholder="Mustermann"
+            autoComplete="off"
+          />
+        </MockField>
+      </div>
+
+      {objekte.length > 0 || objekteLaden ? (
+        <MockField label="Objekt" full className="min-w-0">
+          <select
+            className="input"
+            value={state.kundeObjektId ?? ''}
+            onChange={(e) => selectObjekt(e.target.value)}
+            aria-label="Objekt wählen"
+            disabled={objekteLaden}
+          >
+            <option value="">
+              {objekteLaden ? 'Objekte werden geladen…' : '— Objekt wählen oder Adresse eingeben —'}
+            </option>
+            {objekte.map((o) => (
+              <option key={o.id} value={o.id}>
+                {kundenObjektKurzlabel(o)}
+              </option>
+            ))}
+          </select>
+        </MockField>
+      ) : state.kundeId ? (
+        <p className="m-0 text-xs text-bw-text-muted">
+          Keine hinterlegten Objekte — Leistungsort unten eingeben.
+        </p>
+      ) : (
+        <p className="m-0 text-xs text-bw-text-muted">
+          Objekt-Dropdown nach Auswahl eines Bestandskunden; sonst Adresse eingeben.
+        </p>
+      )}
+
+      <MeldeadresseFields state={state} patch={patch} />
+    </div>
   )
 }
 
@@ -194,6 +309,8 @@ export function StaffFunnelWizard({
   const [bekannterKunde, setBekannterKunde] = useState<Kunde | null>(null)
   const [bestandskunde, setBestandskunde] = useState(Boolean(defaultKundeId))
   const [meldeAbweichend, setMeldeAbweichend] = useState(false)
+  const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [hvObjekteLaden, setHvObjekteLaden] = useState(false)
   const [kundeAdresse, setKundeAdresse] = useState<{
     plz: string
     ort: string
@@ -211,7 +328,29 @@ export function StaffFunnelWizard({
     setError(null)
     setBestandskunde(Boolean(defaultKundeId))
     setMeldeAbweichend(false)
+    setHvObjekte([])
   }, [open, defaultKundeId])
+
+  const isHv =
+    state.kundentyp === 'verwaltung' || istKundeHausverwaltungTyp(bekannterKunde?.typ)
+
+  useEffect(() => {
+    if (!open || !isHv || !state.kundeId) {
+      setHvObjekte([])
+      setHvObjekteLaden(false)
+      return
+    }
+    let cancelled = false
+    setHvObjekteLaden(true)
+    void fetchKundenObjekte(state.kundeId).then((rows) => {
+      if (cancelled) return
+      setHvObjekte(rows)
+      setHvObjekteLaden(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, isHv, state.kundeId])
 
   useEffect(() => {
     if (state.erfassungsModus !== 'formular') return
@@ -277,7 +416,9 @@ export function StaffFunnelWizard({
       telefon: k.telefon ?? '',
       kundentyp: hv ? 'verwaltung' : k.typ === 'gewerbe' ? 'gewerbe' : state.kundentyp || 'eigentuemer',
       ...adresse,
+      ...MIETER_OBJEKT_CLEAR,
     })
+    setMeldeAbweichend(false)
   }
 
   function setBestandskundeOn(on: boolean) {
@@ -285,6 +426,7 @@ export function StaffFunnelWizard({
     if (on) return
     setBekannterKunde(null)
     setKundeAdresse(null)
+    setHvObjekte([])
     patch({
       kundeId: null,
       firmaName: '',
@@ -297,10 +439,7 @@ export function StaffFunnelWizard({
       ort: '',
       strasse: '',
       hausnummer: '',
-      objektPlz: '',
-      objektOrt: '',
-      objektStrasse: '',
-      objektHausnummer: '',
+      ...MIETER_OBJEKT_CLEAR,
     })
     setMeldeAbweichend(false)
   }
@@ -309,6 +448,7 @@ export function StaffFunnelWizard({
     setMeldeAbweichend(on)
     if (!on) {
       patch({
+        kundeObjektId: null,
         objektPlz: '',
         objektOrt: '',
         objektStrasse: '',
@@ -697,15 +837,18 @@ export function StaffFunnelWizard({
             </div>
 
             {bestandskunde ? (
-              <MockField label="Kunde suchen" full>
+              <MockField label="Kunde suchen" full className="min-w-0">
                 <KundeAuswahlFeld
+                  label=""
                   kundeId={state.kundeId}
                   bekannterKunde={bekannterKunde}
                   onKundeIdChange={(id) => {
                     if (!id) {
                       setBekannterKunde(null)
                       setKundeAdresse(null)
-                      patch({ kundeId: null })
+                      setHvObjekte([])
+                      patch({ kundeId: null, ...MIETER_OBJEKT_CLEAR })
+                      setMeldeAbweichend(false)
                     } else {
                       patch({ kundeId: id })
                     }
@@ -720,7 +863,14 @@ export function StaffFunnelWizard({
                     columns={2}
                     options={KUNDENTYP_OPTIONS}
                     value={state.kundentyp}
-                    onChange={(v) => patch({ kundentyp: v })}
+                    onChange={(v) => {
+                      const nextHv = v === 'verwaltung'
+                      patch({
+                        kundentyp: v,
+                        ...(nextHv ? {} : MIETER_OBJEKT_CLEAR),
+                      })
+                      if (!nextHv) setMeldeAbweichend(false)
+                    }}
                   />
                 </MockField>
                 {needsFirma ? (
@@ -780,14 +930,25 @@ export function StaffFunnelWizard({
             )}
 
             <KundenAdresseFields state={state} patch={patch} />
-            <div className="full">
-              <Toggle
-                label="Leistungsort abweichend"
-                checked={meldeAbweichend}
-                onChange={setMeldeAbweichendOn}
+            {isHv ? (
+              <HvMieterObjektFields
+                state={state}
+                patch={patch}
+                objekte={hvObjekte}
+                objekteLaden={hvObjekteLaden}
               />
-            </div>
-            {meldeAbweichend ? <MeldeadresseFields state={state} patch={patch} /> : null}
+            ) : (
+              <>
+                <div className="full">
+                  <Toggle
+                    label="Leistungsort abweichend"
+                    checked={meldeAbweichend}
+                    onChange={setMeldeAbweichendOn}
+                  />
+                </div>
+                {meldeAbweichend ? <MeldeadresseFields state={state} patch={patch} /> : null}
+              </>
+            )}
             </MockFormSection>
           </Card>
         </section>
