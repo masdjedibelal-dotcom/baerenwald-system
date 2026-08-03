@@ -17,7 +17,7 @@ import {
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { ActionsMenu } from '@/components/ui/actions-menu'
@@ -30,6 +30,7 @@ import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import {
   normalizeVorgangWiederkehr,
@@ -54,6 +55,7 @@ import {
   defaultWizardMeta,
   initialDokumentTypFromLead,
   resolveAngebotKundeTyp,
+  syncProjektTitelInBeschreibung,
   wizardPositionenAlsFestpreis,
   type AngebotDokumentTyp,
   type AngebotVariantenPersistJson,
@@ -654,7 +656,7 @@ export function AngebotWizard({
   }, [deferredLeadCreate, leadState])
 
   const persistDraft = useCallback(
-    async (opts?: { notify?: boolean }): Promise<string | null> => {
+    async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
@@ -683,7 +685,11 @@ export function AngebotWizard({
         mit_anfahrt: mitAnfahrt,
       }
 
-      setSaving(true)
+      const manageBusy = opts?.manageBusy !== false
+      if (manageBusy) {
+        setSaving(true)
+        actionBusy.show('Wird gespeichert…')
+      }
       try {
         const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
         const res = await saveAngebotWizardDraft({
@@ -732,7 +738,10 @@ export function AngebotWizard({
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
       } finally {
-        setSaving(false)
+        if (manageBusy) {
+          setSaving(false)
+          actionBusy.hide()
+        }
       }
     },
     [
@@ -850,43 +859,46 @@ export function AngebotWizard({
       setSheet('versand')
       return
     }
-    setSaving(true)
-    try {
-      const id = await persistDraft({ notify: false })
-      if (!id) return
-      const leadId = await ensureLeadId()
-      if (!leadId) return
-      const res = await sendAngebotWizard({
-        angebotId: id,
-        lead_id: leadId,
-        mailTo: recipients,
-        mailCc,
-        betreff: mailBetreff.trim() || undefined,
-        auftragKorrektur: istAuftragKorrektur,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
+    await actionBusy.run('Wird gesendet…', async () => {
+      setSaving(true)
+      try {
+        const id = await persistDraft({ notify: false, manageBusy: false })
+        if (!id) return
+        const leadId = await ensureLeadId()
+        if (!leadId) return
+        const res = await sendAngebotWizard({
+          angebotId: id,
+          lead_id: leadId,
+          mailTo: recipients,
+          mailCc,
+          betreff: mailBetreff.trim() || undefined,
+          auftragKorrektur: istAuftragKorrektur,
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        toast.success(
+          istAuftragKorrektur
+            ? 'Korrektur gespeichert und an den Kunden versendet'
+            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+        )
+        onDone?.(id, {
+          mode: 'sent',
+          auftragKorrektur: istAuftragKorrektur || undefined,
+        })
+        onClose()
+        router.refresh()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
+      } finally {
+        setSaving(false)
       }
-      toast.success(
-        istAuftragKorrektur
-          ? 'Korrektur gespeichert und an den Kunden versendet'
-          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
-      )
-      onDone?.(id, {
-        mode: 'sent',
-        auftragKorrektur: istAuftragKorrektur || undefined,
-      })
-      onClose()
-      router.refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   function patchProjektTitel(v: string) {
+    const oldTitel = meta.leistungsumfang
     setMeta((m) => {
       const lu = v.trim()
       const altLu = m.leistungsumfang.trim() || projekt
@@ -901,6 +913,7 @@ export function AngebotWizard({
       }
       return { ...m, ...patch }
     })
+    setProjektbeschreibung((prev) => syncProjektTitelInBeschreibung(prev, oldTitel, v))
   }
 
 
@@ -1043,7 +1056,7 @@ export function AngebotWizard({
         onClose={handleRequestClose}
         headerEnd={headerEnd}
         busy={saving}
-        busyLabel="Wird gesendet…"
+        busyLabel="Bitte warten…"
         document={documentColumn}
         meta={metaColumn}
         className="wizard-flow"
@@ -1145,29 +1158,24 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Projekt-Titel" full>
-            <input
-              className="input"
-              value={meta.leistungsumfang}
-              onChange={(e) => patchProjektTitel(e.target.value)}
-              placeholder="z.B. Badmodernisierung"
-              autoFocus={focusField === 'titel'}
-            />
-          </MockField>
-          <KiAssistFieldLabel
+          <SheetEditableField
+            label="Projekt-Titel"
+            value={meta.leistungsumfang}
+            onSave={patchProjektTitel}
+            placeholder="z.B. Badmodernisierung"
+            autoOpen={sheet === 'dokument' && focusField === 'titel'}
+            disabled={saving}
+          />
+          <SheetEditableField
             label="Beschreibung"
             value={projektbeschreibung}
-            onApply={setProjektbeschreibung}
-            extraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
-          >
-            <textarea
-              className="input ta wizard-dok-beschreibung"
-              rows={8}
-              value={projektbeschreibung}
-              onChange={(e) => setProjektbeschreibung(e.target.value)}
-              autoFocus={focusField === 'beschreibung'}
-            />
-          </KiAssistFieldLabel>
+            onSave={setProjektbeschreibung}
+            multiline
+            kiExtraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
+            placeholder="Projektbeschreibung…"
+            autoOpen={sheet === 'dokument' && focusField === 'beschreibung'}
+            disabled={saving}
+          />
           <div className="full wizard-dok-fotos">
             <div className="section-h" style={{ marginBottom: 10, textTransform: 'none', letterSpacing: 0 }}>
               Fotos · {projektFotos.length}
@@ -1359,57 +1367,34 @@ export function AngebotWizard({
             hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={saving}
           />
-          <KiAssistFieldLabel
+          <SheetEditableField
             label="Betreff"
             value={mailBetreff || defaultMailBetreff}
-            onApply={setMailBetreff}
-            extraHint="Mail-Betreff für den Angebotsversand an den Kunden."
-            multiline={false}
+            onSave={setMailBetreff}
+            kiExtraHint="Mail-Betreff für den Angebotsversand an den Kunden."
             disabled={saving}
-          >
-            <input
-              className="input"
-              value={mailBetreff || defaultMailBetreff}
-              onChange={(e) => setMailBetreff(e.target.value)}
-              disabled={saving}
-            />
-          </KiAssistFieldLabel>
-          <div className="full">
-            <KiAssistFieldLabel
-              label="E-Mail-Text"
-              value={mailBodyDraft}
-              onApply={(text) => {
-                setMailBodyDraft(text)
-                const parsed = parseAngebotMailFullTextFromEditor(
-                  text,
-                  mailAnrede,
-                  meta.leistungsumfang.trim() || projekt,
-                  mailKundeKontext
-                )
-                setMeta((m) => ({ ...m, einleitung: parsed.einleitung, schluss: parsed.schluss }))
-              }}
-              extraHint={`Kompletter Mail-Text inkl. Begrüßung. Die Zeile „${ANGEBOT_MAIL_BOX_MARKER}“ nicht löschen — dort erscheinen Angebotsnummer, Preis und Gültigkeit.`}
-            >
-              <textarea
-                className="input ta wizard-dok-beschreibung"
-                rows={14}
-                value={mailBodyDraft}
-                disabled={saving}
-                spellCheck
-                onChange={(e) => {
-                  const text = e.target.value
-                  setMailBodyDraft(text)
-                  const parsed = parseAngebotMailFullTextFromEditor(
-                    text,
-                    mailAnrede,
-                    meta.leistungsumfang.trim() || projekt,
-                    mailKundeKontext
-                  )
-                  setMeta((m) => ({ ...m, einleitung: parsed.einleitung, schluss: parsed.schluss }))
-                }}
-              />
-            </KiAssistFieldLabel>
-          </div>
+            sheetContext="detail"
+          />
+          <SheetEditableField
+            label="E-Mail-Text"
+            value={mailBodyDraft}
+            multiline
+            rows={14}
+            disabled={saving}
+            sheetContext="detail"
+            kiExtraHint={`Kompletter Mail-Text inkl. Begrüßung. Die Zeile „${ANGEBOT_MAIL_BOX_MARKER}“ nicht löschen — dort erscheinen Angebotsnummer, Preis und Gültigkeit.`}
+            placeholder="E-Mail-Text…"
+            onSave={(text) => {
+              setMailBodyDraft(text)
+              const parsed = parseAngebotMailFullTextFromEditor(
+                text,
+                mailAnrede,
+                meta.leistungsumfang.trim() || projekt,
+                mailKundeKontext
+              )
+              setMeta((m) => ({ ...m, einleitung: parsed.einleitung, schluss: parsed.schluss }))
+            }}
+          />
           <div className="full">
             <AngebotWizardMailPreview
               angebotId={angebotId}
@@ -1417,6 +1402,9 @@ export function AngebotWizard({
               einleitung={meta.einleitung}
               schluss={meta.schluss}
               leistungsumfang={meta.leistungsumfang.trim() || projekt}
+              gesamtBrutto={mailSummen.bruttoMin}
+              gesamtNetto={mailSummen.nettoMin}
+              gueltigBis={meta.gueltig_bis}
               empfaengerHint={mailTo[0] || sheetEmail || undefined}
             />
           </div>

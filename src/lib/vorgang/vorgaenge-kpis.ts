@@ -25,7 +25,12 @@ export function computeVorgaengeKpis(rows: VorgangListeRow[]): VorgaengeKpis {
     if (r.phase === 'auftrag' && (u === 'offen' || u === 'in_arbeit' || u === 'abnahme')) {
       aktiveAuftraege++
     }
-    if (r.phase === 'rechnung' && (u === 'entwurf' || u === 'gesendet')) offeneRechnungen++
+    if (
+      r.phase === 'rechnung' &&
+      (u === 'ausstehend' || u === 'entwurf' || u === 'gesendet')
+    ) {
+      offeneRechnungen++
+    }
     if (
       r.ist_wiederkehrend &&
       !(

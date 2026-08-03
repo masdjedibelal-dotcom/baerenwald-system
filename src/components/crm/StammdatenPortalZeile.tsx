@@ -145,7 +145,7 @@ export function StammdatenPortalZeile({
               aria-label={hid ? 'Partner-Portal Login' : 'Kundenportal Login'}
               title={hid ? 'Als Partner im Portal anmelden' : 'Als Kunde im Portal anmelden'}
             >
-              <MockIcon ctx="default" n="log-in" size={18} />
+              <MockIcon ctx="btn" n="log-in" size={15} />
               <span>Login</span>
             </button>
           </span>

@@ -11,6 +11,8 @@ import {
   listCrmNotifications,
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
+  typHint,
+  typIcon,
   typLabel,
   type CrmNotificationFilter,
   type CrmNotificationItem,
@@ -18,7 +20,7 @@ import {
 import { formatRelativeDate, cn } from '@/lib/utils'
 
 /**
- * TopBar-Glocke: Unread-Badge · Liste · Detail-Sheet mit CTA zum Vorgang.
+ * TopBar-Glocke: Unread-Badge · Liste · Klick öffnet direkt den Vorgang.
  */
 export function CrmNotificationsBell() {
   const router = useRouter()
@@ -78,7 +80,7 @@ export function CrmNotificationsBell() {
   }
 
   function markLocalRead(item: CrmNotificationItem) {
-    setUnreadCount((c) => Math.max(0, c - 1))
+    setUnreadCount((c) => Math.max(0, c - (item.gelesen ? 0 : 1)))
     if (filter === 'ungelesen') {
       setItems((prev) => prev.filter((x) => x.sourceKey !== item.sourceKey))
     } else {
@@ -86,6 +88,18 @@ export function CrmNotificationsBell() {
         prev.map((x) => (x.sourceKey === item.sourceKey ? { ...x, gelesen: true } : x))
       )
     }
+  }
+
+  /** Klick: gelesen markieren + direkt zum Vorgang. */
+  function goToVorgang(item: CrmNotificationItem) {
+    const href = item.href
+    if (!item.gelesen) {
+      markLocalRead(item)
+      void markCrmNotificationRead(item.sourceKey)
+    }
+    setDetail(null)
+    setOpen(false)
+    router.push(href)
   }
 
   function openDetail(item: CrmNotificationItem) {
@@ -103,14 +117,6 @@ export function CrmNotificationsBell() {
 
   function closeDetail() {
     setDetail(null)
-  }
-
-  function goToVorgang() {
-    if (!detail) return
-    const href = detail.href
-    setDetail(null)
-    setOpen(false)
-    router.push(href)
   }
 
   function onMarkAll() {
@@ -148,7 +154,7 @@ export function CrmNotificationsBell() {
           setOpen(false)
         }}
         title="Updates"
-        subtitle="Externe Meldungen · letzte 7 Tage"
+        subtitle="Portal & externe Meldungen · letzte 7 Tage"
         context="detail"
         size="md"
         overlayClassName={detail ? 'editor-sheet-overlay--recessed' : undefined}
@@ -195,8 +201,15 @@ export function CrmNotificationsBell() {
                 <button
                   type="button"
                   className={cn('crm-notif-row', !item.gelesen && 'is-unread')}
-                  onClick={() => openDetail(item)}
+                  onClick={() => goToVorgang(item)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    openDetail(item)
+                  }}
                 >
+                  <span className="crm-notif-row__ico" aria-hidden>
+                    <MockIcon ctx="default" n={typIcon(item.typ)} size={16} />
+                  </span>
                   <span className="crm-notif-row__body">
                     <span className="crm-notif-row__title">{item.title}</span>
                     {item.subtitle ? (
@@ -207,6 +220,9 @@ export function CrmNotificationsBell() {
                     </span>
                   </span>
                   {!item.gelesen ? <span className="crm-notif-row__dot" aria-hidden /> : null}
+                  <span className="crm-notif-row__chev" aria-hidden>
+                    <MockIcon ctx="default" n="chevron-right" size={14} />
+                  </span>
                 </button>
               </li>
             ))}
@@ -231,15 +247,9 @@ export function CrmNotificationsBell() {
               <p className="crm-notif-detail__sub">{detail.subtitle}</p>
             ) : null}
             <p className="crm-notif-detail__meta">{formatRelativeDate(detail.createdAt)}</p>
-            <p className="crm-notif-detail__hint">
-              {detail.typ === 'neue_anfrage'
-                ? 'Neue Anfrage aus dem Meldeformular oder Portal. Öffne die Anfrage, um Kontakt und Details zu prüfen.'
-                : detail.typ === 'handwerker_update'
-                  ? 'Eintrag vom Partner im Bautagebuch. Im Auftrag siehst du den vollständigen Eintrag.'
-                  : 'Der Auftrag wurde als abgeschlossen markiert.'}
-            </p>
+            <p className="crm-notif-detail__hint">{typHint(detail.typ)}</p>
             <div className="crm-notif-detail__actions">
-              <MockBtn kind="primary" icon="arrow-right" onClick={goToVorgang}>
+              <MockBtn kind="primary" icon="arrow-right" onClick={() => goToVorgang(detail)}>
                 {ctaLabel(detail.typ)}
               </MockBtn>
             </div>

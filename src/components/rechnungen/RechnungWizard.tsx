@@ -6,12 +6,12 @@ import { createPortal } from 'react-dom'
 import { Check, FileText } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
   MetaCrowButton,
   TotBand,
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { MockField } from '@/components/mock-ui/MockForm'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { PosBoard } from '@/components/posboard/PosBoard'
@@ -22,6 +22,7 @@ import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import {
@@ -100,6 +101,7 @@ import {
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
+import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 
 type Rechnungsart = 'abschlag' | 'schluss'
 
@@ -108,6 +110,20 @@ const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
   { name: '50 / 50', build: zahlungsplanVorlage50_50 },
   { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
 ]
+
+/** Form ohne IDs/Titel — zum Erkennen der aktiven Vorlage. */
+function planShapeKey(plan: Zahlungsplan): string {
+  return plan.zeilen.map((z) => `${z.typ}:${Number(z.wert) || 0}`).join('|')
+}
+
+function matchingPlanPresetName(plan: Zahlungsplan): string | null {
+  if (!plan.zeilen.length) return null
+  const key = planShapeKey(plan)
+  for (const p of PLAN_PRESETS) {
+    if (planShapeKey(p.build()) === key) return p.name
+  }
+  return null
+}
 
 function formatDateDe(ymd: string): string {
   return formatDateDeYmd(ymd)
@@ -260,6 +276,7 @@ export function RechnungWizard({
   const [sheet, setSheet] = useState<
     'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | null
   >(null)
+  const [planEditorOpen, setPlanEditorOpen] = useState(false)
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const zahlfrist: ZahlfristSeg = zahlfristInit.seg
@@ -536,7 +553,7 @@ export function RechnungWizard({
       toast.error('Abschlagspläne sind nur mit Auftrag möglich.')
       return
     }
-    setPlan(zahlungsplanVorlage30_40_30())
+    setPlanEditorOpen(true)
   }
 
   function clearPlan() {
@@ -544,8 +561,17 @@ export function RechnungWizard({
     setAktivRate(null)
   }
 
+  function applyCustomPlan(next: Zahlungsplan) {
+    setPlan(next)
+    setAktivRate((cur) => {
+      if (cur && next.zeilen.some((z) => z.id === cur)) return cur
+      return next.zeilen[0]?.id ?? null
+    })
+    setPlanEditorOpen(false)
+  }
+
   const persistEinzel = useCallback(
-    async (): Promise<string | null> => {
+    async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
       const planAktiv = hatAuftrag && hasPlan && Boolean(aktivRate)
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
@@ -562,7 +588,11 @@ export function RechnungWizard({
       }
       const nextMeta = buildMetaForSave()
       const sel = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
-      setSaving(true)
+      const manageBusy = opts?.manageBusy !== false
+      if (manageBusy) {
+        setSaving(true)
+        actionBusy.show('Wird gespeichert…')
+      }
       try {
         const res = await saveRechnungWizardDraft({
           rechnungId,
@@ -605,7 +635,10 @@ export function RechnungWizard({
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
       } finally {
-        setSaving(false)
+        if (manageBusy) {
+          setSaving(false)
+          actionBusy.hide()
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildMeta uses current closure
@@ -633,7 +666,7 @@ export function RechnungWizard({
     ]
   )
 
-  const persistPlan = useCallback(async (): Promise<string | null> => {
+  const persistPlan = useCallback(async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
     if (!bootstrap.auftragId?.trim()) {
       toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
       return null
@@ -647,7 +680,11 @@ export function RechnungWizard({
       return null
     }
     const nextMeta = buildMetaForSave()
-    setSaving(true)
+    const manageBusy = opts?.manageBusy !== false
+    if (manageBusy) {
+      setSaving(true)
+      actionBusy.show('Wird gespeichert…')
+    }
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
       if (!planSave.ok) {
@@ -682,7 +719,10 @@ export function RechnungWizard({
       toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
       return null
     } finally {
-      setSaving(false)
+      if (manageBusy) {
+        setSaving(false)
+        actionBusy.hide()
+      }
     }
   }, [
     bootstrap.auftragId,
@@ -701,17 +741,17 @@ export function RechnungWizard({
     defaultBetreff,
   ])
 
-  async function persistDraft(): Promise<string | null> {
+  async function persistDraft(opts?: { manageBusy?: boolean }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
       toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
       return null
     }
     // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
     if (hasPlan && aktivRate) {
-      return persistEinzel()
+      return persistEinzel(opts)
     }
-    if (hasPlan) return persistPlan()
-    return persistEinzel()
+    if (hasPlan) return persistPlan(opts)
+    return persistEinzel(opts)
   }
 
   async function handleFinish(sendMail: boolean) {
@@ -719,70 +759,72 @@ export function RechnungWizard({
       toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
-    const id = await persistDraft()
-    if (!id) return
+    await actionBusy.run(sendMail ? 'Wird gesendet…' : 'Rechnung wird erstellt…', async () => {
+      setSaving(true)
+      try {
+        const id = await persistDraft({ manageBusy: false })
+        if (!id) return
 
-    const nextMeta = buildMetaForSave()
-    const nrLabel = () =>
-      abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
-      (id === activeVersandId ? rechnungsnummer.trim() : '') ||
-      previewNr
+        const nextMeta = buildMetaForSave()
+        const nrLabel = () =>
+          abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
+          (id === activeVersandId ? rechnungsnummer.trim() : '') ||
+          previewNr
 
-    setSaving(true)
-    try {
-      const sync = await syncRechnungWizardMetaToEntwurf(id, {
-        kunde_id: kundeId,
-        meta: nextMeta,
-      })
-      if (!sync.ok) {
-        toast.error(sync.message)
-        return
-      }
+        const sync = await syncRechnungWizardMetaToEntwurf(id, {
+          kunde_id: kundeId,
+          meta: nextMeta,
+        })
+        if (!sync.ok) {
+          toast.error(sync.message)
+          return
+        }
 
-      if (!sendMail) {
-        const res = await finalizeRechnungWizardWithoutMail(id)
+        if (!sendMail) {
+          const res = await finalizeRechnungWizardWithoutMail(id)
+          if (!res.ok) {
+            toast.error(res.message)
+            return
+          }
+          toast.success(
+            `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+          )
+          onDone?.(id)
+          onClose()
+          router.refresh()
+          return
+        }
+
+        const to = mailTo.filter((e) => isValidEmail(e))
+        if (!to.length) {
+          toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+          setSheet('versand')
+          return
+        }
+        const res = await sendRechnungWizard({
+          rechnungId: id,
+          mailTo: to,
+          mailCc: mailCc.filter((e) => isValidEmail(e)),
+          mitAbschlussbericht: Boolean(
+            abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
+          ),
+        })
         if (!res.ok) {
           toast.error(res.message)
           return
         }
         toast.success(
-          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+          `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
         )
         onDone?.(id)
         onClose()
         router.refresh()
-        return
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+      } finally {
+        setSaving(false)
       }
-
-      const to = mailTo.filter((e) => isValidEmail(e))
-      if (!to.length) {
-        toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
-        setSheet('versand')
-        return
-      }
-      const res = await sendRechnungWizard({
-        rechnungId: id,
-        mailTo: to,
-        mailCc: mailCc.filter((e) => isValidEmail(e)),
-        mitAbschlussbericht: Boolean(
-          abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
-        ),
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(
-        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
-      )
-      onDone?.(id)
-      onClose()
-      router.refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   async function handleCanvasClose() {
@@ -1079,7 +1121,7 @@ export function RechnungWizard({
         onClose={handleRequestClose}
         headerEnd={headerEnd}
         busy={saving}
-        busyLabel="Wird versendet…"
+        busyLabel="Bitte warten…"
         document={documentColumn}
         meta={metaColumn}
         className="wizard-flow"
@@ -1157,17 +1199,16 @@ export function RechnungWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Rechnungstitel" full>
-            <input
-              className="input"
-              value={rechnungTitel}
-              onChange={(e) => {
-                setRechnungTitel(e.target.value)
-                setDraftDirty(true)
-              }}
-              placeholder="z.B. Badsanierung München"
-            />
-          </MockField>
+          <SheetEditableField
+            label="Rechnungstitel"
+            value={rechnungTitel}
+            placeholder="z.B. Badsanierung München"
+            sheetContext="detail"
+            onSave={(v) => {
+              setRechnungTitel(v)
+              setDraftDirty(true)
+            }}
+          />
         </div>
       </EditorSheet>
 
@@ -1267,12 +1308,29 @@ export function RechnungWizard({
                       <button
                         key={p.name}
                         type="button"
-                        className="zahlplan-preset-chip"
-                        onClick={() => setPlan(p.build())}
+                        className={cn(
+                          'zahlplan-preset-chip',
+                          matchingPlanPresetName(plan) === p.name && 'is-on'
+                        )}
+                        onClick={() => {
+                          const next = p.build()
+                          setPlan(next)
+                          setAktivRate(next.zeilen[0]?.id ?? null)
+                        }}
                       >
                         {p.name}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className={cn(
+                        'zahlplan-preset-chip',
+                        hasPlan && !matchingPlanPresetName(plan) && 'is-on'
+                      )}
+                      onClick={() => setPlanEditorOpen(true)}
+                    >
+                      Individuell
+                    </button>
                     <MockBtn sm kind="ghost" onClick={clearPlan}>
                       Entfernen
                     </MockBtn>
@@ -1323,6 +1381,20 @@ export function RechnungWizard({
           <div className="full">{steuernBlock}</div>
         </div>
       </EditorSheet>
+
+      <AbschlagsplanEditorModal
+        open={planEditorOpen}
+        onClose={() => setPlanEditorOpen(false)}
+        gesamtNetto={vkNettoPlan}
+        gesamtBrutto={
+          bootstrap.abschlag?.gesamtBrutto ??
+          (vkNettoPlan > 0
+            ? Math.round(vkNettoPlan * (1 + defaultMwst / 100) * 100) / 100
+            : brutto)
+        }
+        initial={hasPlan ? plan : null}
+        onSave={applyCustomPlan}
+      />
 
       <EditorSheet
         open={sheet === 'vorschau'}
@@ -1519,34 +1591,23 @@ export function RechnungWizard({
             placeholder="optional"
             disabled={saving}
           />
-          <KiAssistFieldLabel
+          <SheetEditableField
             label="Betreff"
             value={mailBetreff || defaultBetreff}
-            onApply={setMailBetreff}
-            extraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
-            multiline={false}
-          >
-            <input
-              className="input"
-              value={mailBetreff || defaultBetreff}
-              onChange={(e) => setMailBetreff(e.target.value)}
-            />
-          </KiAssistFieldLabel>
-          <div className="full">
-            <KiAssistFieldLabel
-              label="Einleitung"
-              value={einleitung}
-              onApply={setEinleitung}
-              extraHint="Anschreiben in der Mail und auf der Rechnung."
-            >
-              <textarea
-                className="input ta"
-                rows={5}
-                value={einleitung}
-                onChange={(e) => setEinleitung(e.target.value)}
-              />
-            </KiAssistFieldLabel>
-          </div>
+            onSave={setMailBetreff}
+            kiExtraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
+            sheetContext="detail"
+          />
+          <SheetEditableField
+            label="Einleitung"
+            value={einleitung}
+            onSave={setEinleitung}
+            multiline
+            rows={5}
+            kiExtraHint="Anschreiben in der Mail und auf der Rechnung."
+            placeholder="Einleitung…"
+            sheetContext="detail"
+          />
           <div className="full">
             <RechnungWizardMailPreview
               rechnungId={activeVersandId}

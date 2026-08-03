@@ -18,8 +18,11 @@ export const ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT = `
   hw_angebot_anhang_urls,
   hw_rechnung_pdf_url,
   hw_rechnung_eingereicht_at,
+  hw_rechnung_status,
+  hw_rechnung_bezahlt_at,
+  hw_rechnung_betrag_brutto,
   hw_eingereicht_at,
-  handwerker(id, name, email, telefon),
+  handwerker(id, name, email, telefon, iban),
   gewerke(id, name, slug)
 `.trim()
 

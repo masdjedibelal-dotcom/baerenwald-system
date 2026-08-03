@@ -1,5 +1,6 @@
 /**
- * Portal → CRM: Abnahmeprotokoll nach Kunden-Signatur + Bestätigen/Versenden.
+ * Portal → CRM: Teilabnahme nach Kunden-Signatur.
+ * Kein Auto-Mail / kein an_kunde_gesendet_at — Status zur_freigabe für CRM.
  */
 import {
   getAbnahmeprotokollMailDefaults,
@@ -53,6 +54,30 @@ function partnerAbnahmeLink(auftragId: string, protokollId: string): string {
   return `${base}${sep}focus=abnahme&protokoll=${encodeURIComponent(protokollId)}`
 }
 
+async function loadHwProtokollId(
+  auftragId: string,
+  handwerkerId: string
+): Promise<string | null> {
+  const { data: link } = await supabaseAdmin
+    .from('auftrag_handwerker')
+    .select('abnahme_protokoll_id')
+    .eq('auftrag_id', auftragId)
+    .eq('handwerker_id', handwerkerId)
+    .maybeSingle()
+  if (link?.abnahme_protokoll_id) return String(link.abnahme_protokoll_id)
+
+  const { data: row } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .select('id')
+    .eq('auftrag_id', auftragId)
+    .eq('handwerker_id', handwerkerId)
+    .eq('ebene', 'handwerker')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (row?.id as string | null) ?? null
+}
+
 export async function getPortalAbnahmeStatus(
   auftragId: string,
   handwerkerId: string,
@@ -68,6 +93,7 @@ export async function getPortalAbnahmeStatus(
       an_kunde_gesendet_at: string | null
       handwerker_bestaetigt_at: string | null
       abnahme_ergebnis: string | null
+      freigabe_status: string | null
     }
   | { ok: false; message: string }
 > {
@@ -75,7 +101,10 @@ export async function getPortalAbnahmeStatus(
     return { ok: false, message: 'Kein Zugriff auf diesen Auftrag.' }
   }
 
-  const summary = await loadAbnahmeprotokollSummary(auftragId, protokollId)
+  const ownId = protokollId?.trim() || (await loadHwProtokollId(auftragId, handwerkerId))
+  const summary = ownId
+    ? await loadAbnahmeprotokollSummary(auftragId, ownId)
+    : null
   if (!summary) {
     return {
       ok: true,
@@ -87,6 +116,7 @@ export async function getPortalAbnahmeStatus(
       an_kunde_gesendet_at: null,
       handwerker_bestaetigt_at: null,
       abnahme_ergebnis: null,
+      freigabe_status: null,
     }
   }
 
@@ -102,15 +132,20 @@ export async function getPortalAbnahmeStatus(
     an_kunde_gesendet_at: summary.an_kunde_gesendet_at,
     handwerker_bestaetigt_at: summary.meta.handwerker_bestaetigt_at ?? null,
     abnahme_ergebnis: summary.meta.abnahme_ergebnis ?? null,
+    freigabe_status: summary.freigabe_status,
   }
 }
 
+/**
+ * Partner-Teilabnahme nach Signatur → CRM zur Freigabe.
+ * Kein Kundenversand, kein Unterlagen-Auto, kein Auftrag-abgeschlossen.
+ */
 export async function createPortalAbnahmeNachSignatur(
   auftragId: string,
   handwerkerId: string,
   body: PortalAbnahmeNachSignaturBody
 ): Promise<
-  | { ok: true; protokoll_id: string; pdf_url: string }
+  | { ok: true; protokoll_id: string; pdf_url: string; freigabe_status: 'zur_freigabe' }
   | { ok: false; message: string }
 > {
   if (!(await assertPartnerOwnsAuftrag(auftragId, handwerkerId))) {
@@ -128,10 +163,19 @@ export async function createPortalAbnahmeNachSignatur(
     return { ok: false, message: 'Abnahmedatum ungültig.' }
   }
 
+  const normalizedMeta = normalizeAbnahmeProtokollMeta(body.meta ?? {})
+  const fromClient = body.meta && 'abnahme_ergebnis' in (body.meta as object)
+  const abnahme_ergebnis = fromClient
+    ? normalizedMeta.abnahme_ergebnis
+    : maengel.length > 0
+      ? 'mit_vorbehalt'
+      : 'abgenommen'
   const meta = emptyAbnahmeProtokollMeta({
-    ...normalizeAbnahmeProtokollMeta(body.meta ?? {}),
-    abnahme_ergebnis: maengel.length > 0 ? 'mit_vorbehalt' : 'abgenommen',
+    ...normalizedMeta,
+    abnahme_ergebnis,
   })
+
+  const existingId = await loadHwProtokollId(auftragId, handwerkerId)
 
   const saved = await saveAbnahmeprotokollPdfOnly({
     auftragId,
@@ -140,14 +184,37 @@ export async function createPortalAbnahmeNachSignatur(
     maengel,
     notizen: body.notizen?.trim() || null,
     meta,
+    protokollId: existingId,
+    handwerkerId,
+    ebene: 'handwerker',
+    freigabeStatus: 'zur_freigabe',
+    skipAuftragStatusBump: true,
   })
   if (!saved.ok) return { ok: false, message: saved.message }
 
-  const summary = await loadAbnahmeprotokollSummary(auftragId)
-  const protokollId = summary?.id
-  if (!protokollId) {
-    return { ok: false, message: 'Protokoll konnte nicht geladen werden.' }
-  }
+  const protokollId = saved.protokollId
+  const now = new Date().toISOString()
+
+  await supabaseAdmin
+    .from('auftrag_handwerker')
+    .update({
+      abnahme_signiert_am: now,
+      abnahme_protokoll_id: protokollId,
+    })
+    .eq('auftrag_id', auftragId)
+    .eq('handwerker_id', handwerkerId)
+
+  // Sicherstellen: kein vorzeitiger Kundenversand
+  await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .update({
+      an_kunde_gesendet_at: null,
+      freigabe_status: 'zur_freigabe',
+      ebene: 'handwerker',
+      handwerker_id: handwerkerId,
+      updated_at: now,
+    })
+    .eq('id', protokollId)
 
   const { data: auf } = await supabaseAdmin
     .from('auftraege')
@@ -160,46 +227,25 @@ export async function createPortalAbnahmeNachSignatur(
     handwerkerId,
     typ: 'erinnerung',
     projektName,
-    leistungName: 'Abnahmedokument verfügbar',
+    leistungName: 'Teilabnahme zur Freigabe an CRM übermittelt',
     link: partnerAbnahmeLink(auftragId, protokollId),
     auftragId,
   })
 
-  // Q8: Sofort sichtbar für Kunde + an_kunde_gesendet_at
-  const now = new Date().toISOString()
-  await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({ an_kunde_gesendet_at: now })
-    .eq('id', protokollId)
-
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
     typ: 'abnahme',
-    titel: 'Abnahmeprotokoll signiert',
-    beschreibung: 'Abnahmedokument verfügbar — Unterlagen für Verwaltung und Mieter.',
-    sichtbar_fuer_kunde: true,
-    fuer_kunde_freigegeben: true,
-    freigegeben_at: now,
+    titel: 'Teilabnahme zur Freigabe',
+    beschreibung: 'Partner hat Teilabnahme eingereicht — CRM-Freigabe ausstehend.',
+    sichtbar_fuer_kunde: false,
+    fuer_kunde_freigegeben: false,
   })
-
-  // A6: Unterlagen HV + Mieter + Notify „Abnahmedokument verfügbar“
-  try {
-    const { verteileAbnahmeAnUnterlagen } = await import(
-      '@/lib/auftraege/abnahme-unterlagen-verteilung'
-    )
-    await verteileAbnahmeAnUnterlagen({
-      auftragId,
-      pdfUrl: saved.publicUrl,
-      protokollId,
-    })
-  } catch (e) {
-    console.warn('verteileAbnahmeAnUnterlagen:', e)
-  }
 
   return {
     ok: true,
     protokoll_id: protokollId,
     pdf_url: saved.publicUrl,
+    freigabe_status: 'zur_freigabe',
   }
 }
 
@@ -212,7 +258,10 @@ export async function bestaetigePortalAbnahme(
     return { ok: false, message: 'Kein Zugriff auf diesen Auftrag.' }
   }
 
-  const summary = await loadAbnahmeprotokollSummary(auftragId, protokollId)
+  const ownId = protokollId?.trim() || (await loadHwProtokollId(auftragId, handwerkerId))
+  const summary = ownId
+    ? await loadAbnahmeprotokollSummary(auftragId, ownId)
+    : null
   if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll gefunden.' }
 
   const now = new Date().toISOString()
@@ -240,6 +289,10 @@ export async function bestaetigePortalAbnahme(
   return { ok: true }
 }
 
+/**
+ * Expliziter Versand nur nach CRM-Freigabe (Portal-Legacy-Pfad).
+ * Ohne Freigabe: Fehler — CRM entscheidet über Kundenversand.
+ */
 export async function versendePortalAbnahme(
   auftragId: string,
   handwerkerId: string,
@@ -249,8 +302,18 @@ export async function versendePortalAbnahme(
     return { ok: false, message: 'Kein Zugriff auf diesen Auftrag.' }
   }
 
-  const summary = await loadAbnahmeprotokollSummary(auftragId, protokollId)
+  const ownId = protokollId?.trim() || (await loadHwProtokollId(auftragId, handwerkerId))
+  const summary = ownId
+    ? await loadAbnahmeprotokollSummary(auftragId, ownId)
+    : null
   if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll gefunden.' }
+
+  if (summary.freigabe_status !== 'freigegeben') {
+    return {
+      ok: false,
+      message: 'Versand erst nach CRM-Freigabe möglich.',
+    }
+  }
 
   if (!summary.meta.handwerker_bestaetigt_at) {
     const confirm = await bestaetigePortalAbnahme(auftragId, handwerkerId, summary.id)

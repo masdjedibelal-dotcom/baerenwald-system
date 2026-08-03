@@ -322,12 +322,31 @@
 .crm-notif-row.is-unread:hover {
   background: color-mix(in srgb, var(--green) 10%, transparent);
 }
+.crm-notif-row__ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bg-soft, #f4f5f4);
+  color: var(--green);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 .crm-notif-row__body {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
   flex: 1;
+}
+.crm-notif-row__chev {
+  display: flex;
+  align-items: center;
+  color: var(--text-4);
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 .crm-notif-row__title {
   font-size: var(--fs-text);
@@ -1695,20 +1714,25 @@ button.wv-chip:hover {
 }
 .vgid-portal__login {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  min-width: 40px;
-  padding: 2px 6px;
-  border: none;
-  background: transparent;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card, #fff);
   color: var(--green);
+  font-size: var(--fs-meta);
+  font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 .vgid-portal__login:hover {
+  background: color-mix(in srgb, var(--green) 8%, #fff);
+  border-color: var(--green);
   color: var(--green-dark, #1a3d2b);
 }
 .vgid-portal__login:disabled {
@@ -1716,9 +1740,9 @@ button.wv-chip:hover {
   cursor: not-allowed;
 }
 .vgid-portal__login span {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
   color: inherit;
 }
 @media (max-width: 767px) {
@@ -2124,7 +2148,8 @@ button.wv-chip:hover {
 .action-busy {
   position: fixed;
   inset: 0;
-  z-index: 700;
+  /* Über EditorSheets / Canvas (≈560–600) */
+  z-index: 900;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8427,6 +8452,14 @@ body.has-detail-mobile-cta.detail-cta-mode .bottomnav {
   pointer-events: none;
 }
 
+/* Vollbild-Wizard/Canvas offen: Floating-CTA + Bottom-Nav komplett aus dem Hit-Test */
+body.has-document-canvas .detail-mobile-action-bar,
+body.has-document-canvas .bottomnav,
+body.has-document-canvas .fab-wrap {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
   
 .bottomnav-item {
     flex: 1;
@@ -10876,7 +10909,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
   padding-left: 0;
   margin-left: 0;
 }
-/* Native Indicator unsichtbar aber klickbar — sichtbares Icon liegt darüber / daneben */
+/* Nativer Indicator ausgeblendet — sichtbares Icon-Button öffnet den Picker */
 .date-field__input::-webkit-calendar-picker-indicator,
 input[type='date']::-webkit-calendar-picker-indicator {
   position: absolute;
@@ -10887,15 +10920,15 @@ input[type='date']::-webkit-calendar-picker-indicator {
   height: 100%;
   margin: 0;
   padding: 0;
-  cursor: pointer;
   opacity: 0;
+  pointer-events: none;
 }
 .date-field__icon {
   position: absolute;
   right: 2px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 1;
+  z-index: 3;
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -10964,15 +10997,15 @@ input[type='time']::-webkit-calendar-picker-indicator {
   height: 100%;
   margin: 0;
   padding: 0;
-  cursor: pointer;
   opacity: 0;
+  pointer-events: none;
 }
 .time-field__icon {
   position: absolute;
   right: 2px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 1;
+  z-index: 3;
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -17003,13 +17036,85 @@ textarea.input:focus {
 }
 .abnahme-inline__item {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
   padding: 14px 16px;
   border: 0.5px solid var(--border);
   border-radius: 14px;
   background: var(--card);
   box-shadow: var(--shadow);
+}
+.abnahme-inline__item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.abnahme-inline__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.abnahme-inline__icon-btn:hover {
+  background: var(--bg-soft);
+  color: var(--green);
+}
+.abnahme-begeh__empty {
+  margin: 0 0 12px;
+  font-size: var(--fs-text);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.abnahme-begeh__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  height: 44px;
+  border-radius: 10px;
+  border: 0.5px dashed var(--border-strong, #c8d0c9);
+  background: var(--bg-soft, #f4f5f4);
+  color: var(--green);
+  font-size: var(--fs-text);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.abnahme-begeh__add:hover {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 8%, #fff);
+}
+.abnahme-begeh__seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.abnahme-begeh__seg-btn {
+  height: 36px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.abnahme-begeh__seg-btn.is-active {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, #fff);
+  color: var(--green);
 }
 .abnahme-inline__check {
   width: 28px;
@@ -17184,6 +17289,11 @@ textarea.input:focus {
   font-weight: 500;
 }
 .zahlplan-preset-chip:hover { background: var(--bg-soft); }
+.zahlplan-preset-chip.is-on {
+  border-color: var(--green);
+  background: var(--green-50);
+  color: var(--green);
+}
 .zahlplan-editor-table {
   border: 0.5px solid var(--border);
   border-radius: 10px;
@@ -18201,6 +18311,8 @@ select:focus-visible {
   flex-direction: column;
   align-items: stretch;
   justify-content: stretch;
+  /* Explizit: sonst fallen Touches bei body pointer-events:none durch auf CTAs darunter */
+  pointer-events: auto;
   /* CRM-Mock ist light-only — Dark-Scheme-Tokens nicht übernehmen */
   --bw-bg-canvas: var(--bg-soft, #f6f7f6);
   --bw-bg-paper: var(--card, #ffffff);
@@ -20831,6 +20943,63 @@ button.crow.crow--tap:hover {
     border: none;
     box-shadow: none;
     background: transparent;
+  }
+}
+
+/* Read-only Feldzeile → Stift öffnet EditorSheet */
+.sheet-editable-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.sheet-editable-field__hint {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.sheet-editable-field__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.sheet-editable-field__value {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-soft, var(--surface-2, #f4f4f2));
+  color: var(--text-1);
+  font-size: var(--fs-text);
+  line-height: 1.45;
+  padding: 10px 12px;
+  cursor: pointer;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.sheet-editable-field__value--multi {
+  -webkit-line-clamp: 5;
+  white-space: pre-wrap;
+  min-height: 88px;
+}
+.sheet-editable-field__value.is-empty {
+  color: var(--text-4);
+  font-style: italic;
+}
+.sheet-editable-field__value:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.sheet-editable-field__edit {
+  flex-shrink: 0;
+}
+@media (max-width: 767px) {
+  .sheet-editable-field__value {
+    min-height: 44px;
   }
 }
 

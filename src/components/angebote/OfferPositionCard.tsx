@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { Combobox, COMBOBOX_OPTION_THRESHOLD } from '@/components/ui/Combobox'
 import { Select } from '@/components/ui/Select'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -165,14 +166,16 @@ export function OfferPositionCard({
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Input
-              label="Menge"
-              type="number"
-              min={0.01}
-              step={0.1}
-              value={row.menge}
-              onChange={(e) => onPatch({ menge: Number(e.target.value) || 1 })}
-            />
+            <div className="w-full">
+              <label className="input-label">Menge</label>
+              <ClearableNumberInput
+                className="input"
+                min={0.01}
+                blurEmptyValue={1}
+                value={row.menge}
+                onValueChange={(menge) => onPatch({ menge })}
+              />
+            </div>
             <Input
               label="Einheit"
               value={row.einheit}

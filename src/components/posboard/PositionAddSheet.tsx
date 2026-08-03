@@ -19,6 +19,8 @@ import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 import { Toggle } from '@/components/ui/Toggle'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { cn } from '@/lib/utils'
 import type { KatalogPickResult } from '@/components/posboard/KatalogPickModal'
 
@@ -554,15 +556,15 @@ export function PositionAddSheet({
                   inputMode="decimal"
                 />
               </label>
-              <label className="block text-[length:var(--fs-text)] text-bw-text-muted">
-                Beschreibung
-                <textarea
-                  className="sel mt-0.5 w-full"
-                  rows={3}
-                  value={beschreibung}
-                  onChange={(e) => setBeschreibung(e.target.value)}                  placeholder="Projektspezifisch"
-                />
-              </label>
+              <SheetEditableField
+                label="Beschreibung"
+                value={beschreibung}
+                onSave={setBeschreibung}
+                multiline
+                rows={3}
+                placeholder="Projektspezifisch"
+                sheetContext="detail"
+              />
             </div>
           ) : null}
         </div>
@@ -596,16 +598,15 @@ export function PositionAddSheet({
               placeholder="z.B. Wandfliesen verlegen"
             />
           </div>
-          <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <div className="field-label">Beschreibung</div>
-            <textarea
-              className="ta"
-              value={frei.beschreibung}
-              onChange={(e) => setFrei((f) => ({ ...f, beschreibung: e.target.value }))}
-              rows={2}
-              placeholder="Details zur Leistung…"
-            />
-          </div>
+          <SheetEditableField
+            label="Beschreibung"
+            value={frei.beschreibung}
+            onSave={(beschreibung) => setFrei((f) => ({ ...f, beschreibung }))}
+            multiline
+            rows={3}
+            placeholder="Details zur Leistung…"
+            sheetContext="detail"
+          />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <Toggle
               checked={Boolean(frei.regie)}
@@ -623,17 +624,10 @@ export function PositionAddSheet({
           <div className="field">
             <div className="field-label">{frei.regie ? 'Geschätzte Stunden' : 'Menge'}</div>
             <div style={{ display: 'flex', gap: 4 }}>
-              <input
+              <ClearableNumberInput
                 className="txt"
-                type="number"
-                step="0.5"
                 value={frei.menge}
-                onChange={(e) =>
-                  setFrei((f) => ({
-                    ...f,
-                    menge: e.target.value === '' ? 0 : Number(e.target.value),
-                  }))
-                }
+                onValueChange={(menge) => setFrei((f) => ({ ...f, menge }))}
                 style={{ flex: 1 }}
               />
               <select
@@ -661,13 +655,11 @@ export function PositionAddSheet({
             <div className="pos-add-preis-ust__row">
               <div className="txt-prefix pos-add-preis-ust__preis">
                 <span className="prefix">{frei.regie ? '€/h' : '€'}</span>
-                <input
+                <ClearableNumberInput
                   className="txt"
-                  type="number"
                   value={frei.preis}
-                  onChange={(e) =>
-                    setFrei((f) => ({ ...f, preis: Number(e.target.value) || 0 }))
-                  }
+                  onValueChange={(preis) => setFrei((f) => ({ ...f, preis }))}
+                  min={0}
                 />
               </div>
               {showUst ? (
@@ -719,16 +711,15 @@ export function PositionAddSheet({
               placeholder="z. B. Wichtiger Hinweis"
             />
           </div>
-          <div className="field" style={{ gridColumn: '1 / -1' }}>
-            <div className="field-label">Text</div>
-            <textarea
-              className="ta"
-              value={freitext.beschreibung}
-              onChange={(e) => setFreitext((f) => ({ ...f, beschreibung: e.target.value }))}
-              rows={3}
-              placeholder="Erscheint ohne Preis auf dem Dokument"
-            />
-          </div>
+          <SheetEditableField
+            label="Text"
+            value={freitext.beschreibung}
+            onSave={(beschreibung) => setFreitext((f) => ({ ...f, beschreibung }))}
+            multiline
+            rows={3}
+            placeholder="Erscheint ohne Preis auf dem Dokument"
+            sheetContext="detail"
+          />
         </div>
       ) : null}
 
@@ -765,15 +756,11 @@ export function PositionAddSheet({
             </div>
             <div className="txt-prefix">
               <span className="prefix">{nachlass.nachlassModus === 'prozent' ? '%' : '€'}</span>
-              <input
+              <ClearableNumberInput
                 className="txt"
-                type="number"
-                step={nachlass.nachlassModus === 'prozent' ? '0.5' : '0.01'}
                 min={0}
                 value={nachlass.preis}
-                onChange={(e) =>
-                  setNachlass((n) => ({ ...n, preis: Number(e.target.value) || 0 }))
-                }
+                onValueChange={(preis) => setNachlass((n) => ({ ...n, preis }))}
               />
             </div>
           </div>

@@ -34,6 +34,7 @@ export function KundeModal({
   revalidateAnfrageId,
   onSaved,
   context = 'detail',
+  manageHistory = true,
 }: {
   open: boolean
   onClose: () => void
@@ -47,6 +48,11 @@ export function KundeModal({
   onSaved?: (kundeId?: string, saved?: Partial<Kunde>) => void
   /** canvas = über Wizard/DocumentCanvas (z. B. Angebot → Kunde bearbeiten). */
   context?: EditorSheetContext
+  /**
+   * Browser-History für Back-to-Close.
+   * Aus bei FAB/Gate → Wizard-Navigation nach Anlegen (sonst frisst history.back() die Ziel-URL).
+   */
+  manageHistory?: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -224,12 +230,14 @@ export function KundeModal({
         notizen: notizen || null,
         ...(firmaPflicht ? { name: firmaName.trim() || undefined } : {}),
       }
-      onClose()
+      // Zuerst Parent (kann zu Wizard navigieren), dann schließen —
+      // sonst history.back() vom Sheet frisst die Navigation.
       if (stayOnPage) {
         onSaved?.(res.id, saved)
-        router.refresh()
+        onClose()
       } else {
         onSaved?.(res.id, saved)
+        onClose()
         router.push(`/kunden/${res.id}`)
         router.refresh()
       }
@@ -243,6 +251,7 @@ export function KundeModal({
       title={isCreate ? 'Neuen Kunden anlegen' : 'Kunde bearbeiten'}
       crumb={isCreate ? 'Kunden >' : null}
       context={context}
+      manageHistory={manageHistory}
       dirty={dirty}
       size="lg"
       onConfirm={submit}

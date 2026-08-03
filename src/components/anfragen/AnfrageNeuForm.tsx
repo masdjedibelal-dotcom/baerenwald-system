@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { Textarea } from '@/components/ui/Textarea'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { createAnfrage, updateAnfrageAusNeuForm } from '@/app/(dashboard)/anfragen/actions'
 import type { LeadDetail, LeadKanal } from '@/lib/types'
 import {
@@ -1022,24 +1022,22 @@ export function AnfrageNeuForm({
 
       <Card title="Notizen">
         <div className="space-y-4">
-          <Field label="Anmerkungen vom Kunden">
-            <Textarea
-              name="freitext"
-              value={freitext}
-              onChange={(e) => setFreitext(e.target.value)}
-              placeholder="Was hat der Kunde noch erwähnt?"
-              rows={3}
-            />
-          </Field>
-          <Field label="Interne Notiz">
-            <Textarea
-              name="interneNotiz"
-              value={interneNotiz}
-              onChange={(e) => setInterneNotiz(e.target.value)}
-              placeholder="Interne Bemerkungen zum Gespräch…"
-              rows={3}
-            />
-          </Field>
+          <SheetEditableField
+            label="Anmerkungen vom Kunden"
+            value={freitext}
+            onSave={setFreitext}
+            multiline
+            rows={3}
+            placeholder="Was hat der Kunde noch erwähnt?"
+          />
+          <SheetEditableField
+            label="Interne Notiz"
+            value={interneNotiz}
+            onSave={setInterneNotiz}
+            multiline
+            rows={3}
+            placeholder="Interne Bemerkungen zum Gespräch…"
+          />
         </div>
       </Card>
 

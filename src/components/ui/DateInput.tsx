@@ -4,7 +4,7 @@ import {
   forwardRef,
   useRef,
   type InputHTMLAttributes,
-  type MouseEvent,
+  type PointerEvent,
 } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
@@ -14,6 +14,20 @@ export type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' 
   wrapperClassName?: string
   /** Kompakt (Filter, Range-Rows) */
   size?: 'sm' | 'md'
+}
+
+function openNativePicker(el: HTMLInputElement | null, disabled?: boolean) {
+  if (!el || disabled) return
+  el.focus({ preventScroll: true })
+  try {
+    if (typeof el.showPicker === 'function') {
+      void el.showPicker()
+      return
+    }
+  } catch {
+    /* showPicker kann je nach Browser scheitern */
+  }
+  el.click()
 }
 
 /**
@@ -31,17 +45,10 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function D
     else if (ref) ref.current = node
   }
 
-  function openPicker(e?: MouseEvent) {
-    e?.preventDefault()
-    e?.stopPropagation()
-    const el = localRef.current
-    if (!el || disabled) return
-    try {
-      el.showPicker?.()
-    } catch {
-      el.focus()
-      el.click()
-    }
+  function onIconPointerDown(e: PointerEvent<HTMLButtonElement>) {
+    // pointerdown: User-Geste für showPicker; kein preventDefault (sonst kann der Picker blocken)
+    e.stopPropagation()
+    openNativePicker(localRef.current, disabled)
   }
 
   return (
@@ -68,7 +75,11 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(function D
         disabled={disabled}
         aria-label="Kalender öffnen"
         title="Kalender öffnen"
-        onClick={openPicker}
+        onPointerDown={onIconPointerDown}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
       >
         <MockIcon ctx="btn" n="calendar" size={size === 'sm' ? 14 : 15} />
       </button>

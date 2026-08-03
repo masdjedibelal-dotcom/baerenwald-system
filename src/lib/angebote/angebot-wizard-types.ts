@@ -380,10 +380,50 @@ export function isDefaultProjektBeschreibung(text: string, projektTitel: string)
   variants.add(defaultProjektBeschreibungText(titel))
   variants.add(defaultProjektBeschreibungText(''))
   variants.add(defaultProjektBeschreibungText('Ihr Projekt'))
+  variants.add(defaultProjektBeschreibungText('Projekt'))
   if (titel !== projektTitel) {
     variants.add(defaultProjektBeschreibungText(projektTitel))
   }
   return variants.has(t)
+}
+
+/**
+ * Hält den Projekttitel in der Beschreibung aktuell:
+ * - Standardtext → komplett neu generieren
+ * - Sonst „alter Titel“ / Legacy „Projekt“ in der ersten Satzformel ersetzen
+ */
+export function syncProjektTitelInBeschreibung(
+  text: string,
+  oldTitel: string,
+  newTitel: string
+): string {
+  const next = newTitel.trim() || 'Ihr Projekt'
+  if (
+    isDefaultProjektBeschreibung(text, oldTitel) ||
+    isDefaultProjektBeschreibung(text, '') ||
+    isDefaultProjektBeschreibung(text, 'Projekt')
+  ) {
+    return defaultProjektBeschreibungText(next)
+  }
+
+  const prevRaw = oldTitel.trim() || 'Ihr Projekt'
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const candidates = Array.from(
+    new Set([prevRaw, 'Ihr Projekt', 'Projekt'].filter((s) => s.length > 0))
+  ).sort((a, b) => b.length - a.length)
+
+  let out = text
+  for (const prev of candidates) {
+    const re = new RegExp(
+      `(Umsetzung von\\s*)([„"]|„)${escape(prev)}([“"]|“)`,
+      'gi'
+    )
+    if (re.test(out)) {
+      out = out.replace(re, `$1„${next}“`)
+      break
+    }
+  }
+  return out
 }
 
 /** Standard „Wichtige Hinweise“ für Projekt-Angebote (editierbar im Wizard). */

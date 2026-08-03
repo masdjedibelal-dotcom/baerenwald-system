@@ -653,6 +653,77 @@ export async function updateLeadPreisindikation(
   return { ok: true }
 }
 
+/**
+ * Manuell „Als akut markieren“ / aufheben — für Direktbeauftragung ohne Angebot
+ * (situation=notfall + freigabe_bypass_grund=akut).
+ */
+export async function setLeadAlsAkut(
+  leadId: string,
+  akut: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = leadId?.trim()
+  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
+
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const { data: lead, error: fetchErr } = await supabase
+    .from('leads')
+    .select('id, situation, funnel_daten, freigabe_bypass_grund')
+    .eq('id', id)
+    .maybeSingle()
+  if (fetchErr || !lead) return { ok: false, message: fetchErr?.message ?? 'Anfrage nicht gefunden.' }
+
+  const fdRaw =
+    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
+      ? { ...(lead.funnel_daten as Record<string, unknown>) }
+      : {}
+
+  if (akut) {
+    if (!fdRaw._akut_prev_situation && lead.situation && lead.situation !== 'notfall') {
+      fdRaw._akut_prev_situation = lead.situation
+    }
+    fdRaw.melde_kategorie = 'notfall'
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        situation: 'notfall',
+        freigabe_bypass_grund: 'akut',
+        funnel_daten: fdRaw,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) return { ok: false, message: error.message }
+  } else {
+    const prevSit =
+      typeof fdRaw._akut_prev_situation === 'string' && fdRaw._akut_prev_situation.trim()
+        ? String(fdRaw._akut_prev_situation).trim()
+        : 'kaputt'
+    delete fdRaw._akut_prev_situation
+    if (fdRaw.melde_kategorie === 'notfall') delete fdRaw.melde_kategorie
+    const patch: Record<string, unknown> = {
+      funnel_daten: fdRaw,
+      updated_at: new Date().toISOString(),
+    }
+    if (lead.situation === 'notfall' || (lead.freigabe_bypass_grund ?? '') === 'akut') {
+      patch.situation = prevSit
+    }
+    if ((lead.freigabe_bypass_grund ?? '') === 'akut') {
+      patch.freigabe_bypass_grund = null
+    }
+    const { error } = await supabase.from('leads').update(patch).eq('id', id)
+    if (error) return { ok: false, message: error.message }
+  }
+
+  revalidatePath(`/anfragen/${id}`)
+  revalidatePath('/anfragen')
+  revalidatePath('/vorgaenge')
+  return { ok: true }
+}
+
 /** Leichtgewicht für Listen-⋯ / Split-over „Anfrage bearbeiten“. */
 export async function getAnfragePhaseEditLead(
   leadId: string

@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { actionBusy, useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
@@ -313,26 +313,24 @@ export function RechnungDetailClient({
   }, [timelineInitial, detail, belegTyp, mahnMails])
 
   async function setStatus(s: RechnungStatus, opts?: { notifyKunde?: boolean }) {
-    startTransition(async () => {
-      const r = await updateRechnungStatus(detail.id, s, opts)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      if (s === 'bezahlt') {
-        toast.success(
-          r.zahlungsbestaetigungGesendet
-            ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
-            : 'Als bezahlt markiert (ohne Kunden-Mail)'
-        )
-      }
-      setDetail((d) => ({
-        ...d,
-        status: s,
-        ...(s === 'bezahlt' ? { bezahlt_at: new Date().toISOString() } : {}),
-      }))
-      refresh()
-    })
+    const r = await updateRechnungStatus(detail.id, s, opts)
+    if (!r.ok) {
+      toast.error(r.message)
+      return
+    }
+    if (s === 'bezahlt') {
+      toast.success(
+        r.zahlungsbestaetigungGesendet
+          ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
+          : 'Als bezahlt markiert (ohne Kunden-Mail)'
+      )
+    }
+    setDetail((d) => ({
+      ...d,
+      status: s,
+      ...(s === 'bezahlt' ? { bezahlt_at: new Date().toISOString() } : {}),
+    }))
+    refresh()
   }
 
   function handleGutschrift() {
@@ -363,7 +361,7 @@ export function RechnungDetailClient({
   }
 
   function handleSenden() {
-    startTransition(async () => {
+    void actionBusy.run('Wird gesendet…', async () => {
       const r = await sendRechnung(detail.id)
       if (!r.ok) {
         toast.error(r.message)
@@ -395,6 +393,18 @@ export function RechnungDetailClient({
     if (cta?.id === 'rechnung_versenden') {
       return { label: cta.label, icon: cta.icon, onClick: handleSenden, disabled: pending }
     }
+    if (cta?.id === 'als_bezahlt' && belegTyp === 'rechnung') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: () => {
+          void actionBusy.run('Wird als bezahlt markiert…', async () => {
+            await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
+          })
+        },
+        disabled: pending,
+      }
+    }
     if (cta?.id === 'bewertung_einholen') {
       return {
         label: cta.label,
@@ -417,22 +427,19 @@ export function RechnungDetailClient({
         },
       }
     }
-    /* Gesendet: kein anderer Primary → Bearbeiten als CTA */
-    if (rechnungKorrekturModus(detail.status) !== 'gesperrt' && detail.status === 'gesendet') {
-      return {
-        label: 'Rechnung bearbeiten',
-        icon: 'pencil',
-        onClick: handleKorrigieren,
-        disabled: pending,
-      }
-    }
     return null
-  }, [detail.status, detail.auftrag_id, ueberfaellig, pending, handleSenden])
+  }, [
+    detail.status,
+    detail.auftrag_id,
+    ueberfaellig,
+    pending,
+    handleSenden,
+    belegTyp,
+    kundeEmail,
+  ])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (rechnungKorrekturModus(detail.status) === 'gesperrt') return null
-    /* Bei gesendet ist Bearbeiten bereits Primary */
-    if (detail.status === 'gesendet') return null
     return {
       label: 'Rechnung bearbeiten',
       icon: 'pencil',

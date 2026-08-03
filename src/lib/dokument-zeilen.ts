@@ -151,6 +151,46 @@ export function istPreisPosition(p: AngebotPosition): boolean {
   return !istFreitextPosition(p) && !istGesamtrabattPosition(p)
 }
 
+/** Meta aus gespeicherter Nachlass-Position (`beschreibung` = `prozent:10` / `betrag:200`). */
+export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
+  modus: 'prozent' | 'betrag'
+  wert: number
+  bezeichnung: string
+} {
+  const besch = (p.beschreibung ?? '').trim()
+  const colon = besch.indexOf(':')
+  const modusRaw = colon >= 0 ? besch.slice(0, colon).trim().toLowerCase() : ''
+  const wertRaw = colon >= 0 ? besch.slice(colon + 1).trim() : ''
+  const modus: 'prozent' | 'betrag' = modusRaw === 'betrag' ? 'betrag' : 'prozent'
+  let wert = Math.abs(Number(String(wertRaw).replace(',', '.')))
+  if (!Number.isFinite(wert) || wert <= 0) {
+    wert =
+      Math.abs(Number(p.gesamt_min) || 0) ||
+      Math.abs(Number(p.lohn_netto) || 0) ||
+      Math.abs(Number(p.vk_netto) || 0)
+  }
+  return {
+    modus,
+    wert: Number.isFinite(wert) ? wert : 0,
+    bezeichnung: (p.leistung || p.leistung_name || 'Nachlass').trim() || 'Nachlass',
+  }
+}
+
+/** Nachlass-Abzug (positiv) aus Angebots-Positionen — auch wenn Beträge beim Laden auf 0 gesetzt wurden. */
+export function gesamtrabattAbzugAusAngebotPositionen(
+  positionen: AngebotPosition[],
+  artikelNetto: number
+): number {
+  const r = positionen.find(istGesamtrabattPosition)
+  if (!r) return 0
+  const { modus, wert } = parseGesamtrabattMetaFromPosition(r)
+  if (wert <= 0) return 0
+  if (modus === 'prozent') {
+    return Math.round(artikelNetto * (Math.min(100, wert) / 100) * 100) / 100
+  }
+  return Math.round(Math.min(Math.max(0, artikelNetto), wert) * 100) / 100
+}
+
 export function artikelZeilenNetto(z: DokumentArtikelZeile): number {
   const m = Math.max(z.menge, 0.0001)
   const bruttoZeile = z.vkNetto * m

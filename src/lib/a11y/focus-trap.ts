@@ -8,15 +8,28 @@ export function listFocusable(root: HTMLElement): HTMLElement[] {
   )
 }
 
+function isFocusableElement(el: Element | null): el is HTMLElement {
+  return el instanceof HTMLElement && el.matches(FOCUSABLE) && !el.hasAttribute('disabled')
+}
+
 /**
  * Tab-Taste im Dialog halten + initialen Fokus setzen.
  * Rückgabe: Cleanup (Listener entfernen + Fokus zurückgeben).
+ *
+ * Wichtig mobil: Bei Re-Init (Parent-Rerender) keinen Fokus klauen, sonst klappt
+ * die iOS-Tastatur zu — typisch wenn ein EditorSheet-Portal über dem Canvas liegt.
  */
 export function trapFocus(root: HTMLElement, onEscape?: () => void): () => void {
   const previouslyFocused =
     document.activeElement instanceof HTMLElement ? document.activeElement : null
 
   const focusFirst = () => {
+    const active = document.activeElement
+    // Schon im Root → nicht springen (Re-Init während Tippen)
+    if (active instanceof HTMLElement && root.contains(active)) return
+    // Fokus liegt sinnvoll außerhalb (z. B. EditorSheet-Portal) → nicht klauen
+    if (isFocusableElement(active) && !root.contains(active)) return
+
     const items = listFocusable(root)
     ;(items[0] ?? root).focus()
   }
@@ -30,6 +43,10 @@ export function trapFocus(root: HTMLElement, onEscape?: () => void): () => void 
       return
     }
     if (e.key !== 'Tab') return
+    const active = document.activeElement
+    // Fokus außerhalb (Portal-Sheet): Tab-Trap nicht umleiten
+    if (active instanceof HTMLElement && !root.contains(active)) return
+
     const items = listFocusable(root)
     if (items.length === 0) {
       e.preventDefault()
@@ -38,7 +55,6 @@ export function trapFocus(root: HTMLElement, onEscape?: () => void): () => void 
     }
     const first = items[0]
     const last = items[items.length - 1]
-    const active = document.activeElement
     if (e.shiftKey) {
       if (active === first || !root.contains(active)) {
         e.preventDefault()
@@ -54,6 +70,12 @@ export function trapFocus(root: HTMLElement, onEscape?: () => void): () => void 
   return () => {
     window.clearTimeout(t)
     document.removeEventListener('keydown', onKeyDown)
-    previouslyFocused?.focus()
+    // Nur zurückgeben, wenn Fokus noch im Root ist (sonst Portal-Input nicht blurren)
+    if (
+      document.activeElement instanceof HTMLElement &&
+      root.contains(document.activeElement)
+    ) {
+      previouslyFocused?.focus()
+    }
   }
 }

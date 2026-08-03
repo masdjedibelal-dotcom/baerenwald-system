@@ -27,6 +27,9 @@ type ModalState = {
  * - Abgelaufene Session → Modal → Logout
  * - Lange Inaktivität → Warn-Modal mit Countdown → Logout
  * - Weniger blinde router.refresh()-Stürme nach Tab-Fokus / Token-Refresh
+ *
+ * Wichtig: SIGNED_OUT / fehlendes getUser kurz nach Tab-Wechsel nicht sofort als
+ * Logout werten (Portal auf gleichem Host kann Cookies kurz überschreiben / Race).
  */
 export function SessionGuard() {
   const router = useRouter()
@@ -45,7 +48,7 @@ export function SessionGuard() {
     loggingOutRef.current = true
     try {
       const supabase = createClient()
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
     } catch {
       /* trotzdem zur Login */
     }
@@ -58,6 +61,26 @@ export function SessionGuard() {
       return { kind: 'expired', secondsLeft: 12 }
     })
   }, [])
+
+  /** Erst nach Bestätigung (mehrere Retries), dass wirklich keine Session mehr da ist. */
+  const confirmMissingSession = useCallback(async () => {
+    const supabase = createClient()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 350 + attempt * 250))
+      const { data, error } = await supabase.auth.getUser()
+      if (!error && data.user) return true
+      // Kurz Token-Refresh versuchen, bevor wir aufgeben
+      if (attempt < 2) {
+        try {
+          await supabase.auth.refreshSession()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    openExpired()
+    return false
+  }, [openExpired])
 
   const softRefresh = useCallback(() => {
     const now = Date.now()
@@ -89,7 +112,10 @@ export function SessionGuard() {
       const { data, error } = await supabase.auth.getUser()
       if (cancelled) return false
       if (error || !data.user) {
-        if (opts.onMissing === 'modal') openExpired()
+        if (opts.onMissing === 'modal') {
+          const ok = await confirmMissingSession()
+          return !cancelled && ok
+        }
         return false
       }
       return true
@@ -100,11 +126,11 @@ export function SessionGuard() {
     } = supabase.auth.onAuthStateChange((event) => {
       if (cancelled) return
       if (event === 'SIGNED_OUT') {
-        openExpired()
+        // Nicht sofort Logout — oft Race mit anderem Tab / Portal auf localhost
+        void confirmMissingSession()
         return
       }
       if (event === 'TOKEN_REFRESHED') {
-        // Kein sofortiger Full-Refresh — Token-Refresh reicht; UI bleibt flüssig
         return
       }
       if (event === 'SIGNED_IN') {
@@ -114,6 +140,8 @@ export function SessionGuard() {
 
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return
+      // Aktivität zurücksetzen: kurzer Portal-Besuch soll kein Idle auslösen
+      lastActivityRef.current = Date.now()
       void ensureSession({ onMissing: 'modal' }).then((ok) => {
         if (ok && !cancelled) softRefresh()
       })
@@ -138,7 +166,7 @@ export function SessionGuard() {
       window.removeEventListener('focus', onVisibility)
       window.removeEventListener('crm-session-expired', onCrmExpired)
     }
-  }, [openExpired, softRefresh])
+  }, [confirmMissingSession, openExpired, softRefresh])
 
   // Idle-Tracking
   useEffect(() => {

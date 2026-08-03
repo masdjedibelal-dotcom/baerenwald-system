@@ -95,6 +95,8 @@ export function DocumentCanvas({
   const handleClose = useCallback(() => {
     onClose()
   }, [onClose])
+  const handleCloseRef = useRef(handleClose)
+  handleCloseRef.current = handleClose
 
   const requestDiscard = useCallback(() => {
     if (!onDiscard) return
@@ -128,7 +130,7 @@ export function DocumentCanvas({
       }
       if (editorSheetStackDepth() > 0) return
       historyPushed.current = false
-      handleClose()
+      handleCloseRef.current()
     }
     window.addEventListener('popstate', onPop)
     return () => {
@@ -138,25 +140,29 @@ export function DocumentCanvas({
         window.history.back()
       }
     }
-  }, [open, mounted, portal, manageHistory, handleClose])
+  }, [open, mounted, portal, manageHistory])
 
-  /* Body scroll lock + focus trap — Escape schließt nicht, solange ein EditorSheet offen ist */
+  /* Body scroll lock + focus trap — Escape schließt nicht, solange ein EditorSheet offen ist.
+   * handleClose absichtlich per Ref: sonst re-init bei jedem Parent-Rerender → Fokus klauen → iOS-Tastatur zu. */
   useEffect(() => {
     if (!open || !mounted) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    // Floating Detail-CTAs / Bottom-Nav darunter dürfen keine Touches stehlen
+    document.body.classList.add('has-document-canvas')
     const el = rootRef.current
     const release = el
       ? trapFocus(el, () => {
           if (editorSheetStackDepth() > 0) return
-          handleClose()
+          handleCloseRef.current()
         })
       : undefined
     return () => {
       document.body.style.overflow = prev
+      document.body.classList.remove('has-document-canvas')
       release?.()
     }
-  }, [open, mounted, handleClose])
+  }, [open, mounted])
 
   /* S7: visualViewport nur mobil (Tastatur) — Desktop immer echter Fullscreen ohne Lücken */
   useEffect(() => {

@@ -5,6 +5,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { PosAddRow, type PosAddKind } from '@/components/posboard/PosAddRow'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 
@@ -373,17 +374,13 @@ export function PosTable({
                     <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !onMengeChange}>
                       {onMengeChange ? (
                         <span className="pt2-menge pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
-                          <input
+                          <ClearableNumberInput
                             className="pt2-menge-input"
-                            type="number"
-                            step="0.5"
                             min={0.01}
                             aria-label="Menge"
-                            value={it.menge ?? ''}
-                            onChange={(e) => {
-                              const n = Number(String(e.target.value).replace(',', '.'))
-                              onMengeChange(it.id, Number.isFinite(n) && n > 0 ? n : 0.01)
-                            }}
+                            value={it.menge ?? 0}
+                            blurEmptyValue={0.01}
+                            onValueChange={(n) => onMengeChange(it.id, n)}
                           />
                           {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
                         </span>
@@ -396,17 +393,13 @@ export function PosTable({
                   <div className="pt2-menge pt2-menge--desk">
                     {onMengeChange ? (
                       <span className="pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
-                        <input
+                        <ClearableNumberInput
                           className="pt2-menge-input"
-                          type="number"
-                          step="0.5"
                           min={0.01}
                           aria-label="Menge"
-                          value={it.menge ?? ''}
-                          onChange={(e) => {
-                            const n = Number(String(e.target.value).replace(',', '.'))
-                            onMengeChange(it.id, Number.isFinite(n) && n > 0 ? n : 0.01)
-                          }}
+                          value={it.menge ?? 0}
+                          blurEmptyValue={0.01}
+                          onValueChange={(n) => onMengeChange(it.id, n)}
                         />
                         {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
                       </span>

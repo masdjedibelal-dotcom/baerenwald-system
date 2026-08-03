@@ -7,6 +7,7 @@ import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { formatLeadListDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -124,6 +125,7 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
     ? FREIGABE_BADGE[lead.org_freigabe_status]
     : null
   const notfallAutopass = (lead.hv_meldung_status ?? '').trim() === 'notmassnahme'
+  const istAkut = leadIstAkut(lead)
 
   const melderTel = lead.melder_telefon?.trim() || lead.kontakt_telefon?.trim() || null
   const melderMail = lead.melder_email?.trim() || lead.kontakt_email?.trim() || null
@@ -134,6 +136,9 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
         <div className="hvk-head-l">
           <MockIcon ctx="default" n="inbox" size={15} aria-hidden />
           <span className="hvk-title">HV-Meldung</span>
+          {istAkut ? (
+            <span className={cn('hvk-badge', 'hvk-badge--red')}>Akut</span>
+          ) : null}
           {freigabe ? (
             <span className={cn('hvk-badge', `hvk-badge--${freigabe.tone}`)}>{freigabe.label}</span>
           ) : null}

@@ -7,6 +7,7 @@ export type KiAssistScopeId =
   | 'mangel'
   | 'notiz'
   | 'freitext'
+  | 'feld'
   | 'mail'
   | 'dokument'
   | 'portal'
@@ -187,6 +188,34 @@ ${BW_APPLY_HINT}
 Nutze type "text".`,
     quickPrompts: [
       { label: 'Ausformulieren', prompt: 'Formuliere meinen Entwurf fertig und klar.' },
+    ],
+  },
+  feld: {
+    id: 'feld',
+    label: 'Feld',
+    intro:
+      'Schreib den **Text für genau dieses Feld**. Sag mir im Chat, was geändert oder neu formuliert werden soll — danach übernimmst du den fertigen Text.',
+    placeholder: 'z. B. „Kürzer, Bärenwald macht alles selbst, ohne Subunternehmer“…',
+    systemHint: `Modus: Genau EIN Formularfeld umschreiben oder neu schreiben.
+Im Zusatzkontext stehen Feldname und aktueller Text.
+Deine Aufgabe: den kompletten neuen Feldinhalt erzeugen (nicht nur Diff/Hinweise).
+Antworte kurz menschlich, dann IMMER genau einen bw-apply-Block type "text" — "text" enthält NUR den fertigen Feldwert.
+Keine Anführungszeichen um den gesamten Text, keine Meta-Sätze im text-Feld.
+${BW_APPLY_HINT}`,
+    quickPrompts: [
+      {
+        label: 'Kürzer',
+        prompt: 'Formuliere den aktuellen Feldtext kürzer und klarer — als fertigen Feldtext zum Übernehmen.',
+      },
+      {
+        label: 'Neu schreiben',
+        prompt:
+          'Schreib den Feldtext komplett neu anhand meiner Anweisung und dem aktuellen Text.',
+      },
+      {
+        label: 'Seriöser',
+        prompt: 'Formuliere den aktuellen Feldtext seriöser und kundentauglich.',
+      },
     ],
   },
   mail: {

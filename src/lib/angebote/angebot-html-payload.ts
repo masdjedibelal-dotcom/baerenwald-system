@@ -276,6 +276,13 @@ export function buildAngebotHtmlInputAusDetail(
       mwst_prozent: mwstSatz,
       mwst_betrag: Math.round(mwst * 100) / 100,
       brutto: Math.round(brutto * 100) / 100,
+      ...(summen.nachlassNetto > 0
+        ? {
+            nachlass_netto: Math.round(summen.nachlassNetto * 100) / 100,
+            nachlass_label: summen.nachlassLabel,
+            netto_vor_nachlass: Math.round(summen.nettoVorNachlass * 100) / 100,
+          }
+        : {}),
     },
     kostenaufstellung: summenKostenaufstellungAusPositionen(pos),
     rechtshinweise,

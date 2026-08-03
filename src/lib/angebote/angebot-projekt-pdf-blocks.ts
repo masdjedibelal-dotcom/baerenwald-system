@@ -15,7 +15,11 @@ import {
   gewerkById,
   resolveIstFachbetriebInPdf,
 } from '@/lib/gewerke-ausfuehrung'
-import { angebotGewerkNameAnzeige, ZEILE_SLUG_FREITEXT } from '@/lib/dokument-zeilen'
+import {
+  angebotGewerkNameAnzeige,
+  istGesamtrabattPosition,
+  ZEILE_SLUG_FREITEXT,
+} from '@/lib/dokument-zeilen'
 import { richTextToPlain } from '@/lib/rich-text'
 
 export type { AngebotPdfFreitext, AngebotBlockPdfEntry, AngebotPositionBlockGroup }
@@ -38,7 +42,9 @@ export function mapAngebotPositionenToTemplateRows(
 ): AngebotTemplatePosition[] {
   let posNr = 0
   return anPos
-    .filter((p) => (p.gewerk_slug ?? '') !== ZEILE_SLUG_FREITEXT)
+    .filter(
+      (p) => (p.gewerk_slug ?? '') !== ZEILE_SLUG_FREITEXT && !istGesamtrabattPosition(p)
+    )
     .map((p) => {
       posNr += 1
       const menge = Math.max(Number(p.menge) || 1, 0.01)
@@ -88,6 +94,13 @@ function summenToTemplate(s: ReturnType<typeof summenAusPositionen>, mwstSatz = 
     mwst_prozent: mwstSatz,
     mwst_betrag: Math.round(s.mwstBetragMin * 100) / 100,
     brutto: Math.round(s.bruttoMin * 100) / 100,
+    ...(s.nachlassNetto > 0
+      ? {
+          nachlass_netto: Math.round(s.nachlassNetto * 100) / 100,
+          nachlass_label: s.nachlassLabel,
+          netto_vor_nachlass: Math.round(s.nettoVorNachlass * 100) / 100,
+        }
+      : {}),
   }
 }
 

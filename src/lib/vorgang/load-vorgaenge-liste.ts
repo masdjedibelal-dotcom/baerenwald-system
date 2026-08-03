@@ -11,6 +11,7 @@ import type { LeadKanal } from '@/lib/types'
 import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
+  isPhaseWinningRechnung,
   resolveSatellitenRechnungVorgang,
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
@@ -488,13 +489,35 @@ export async function loadVorgaengeListe(): Promise<{
       return null
     }
 
+    // Abgeschlossener Auftrag ohne Voll-/Schlussrechnung → Rechnung/Offen
+    // („Offen“). Reine Abschläge gewinnen die Phase nicht (isPhaseWinningRechnung).
+    const rechnungAusstehend =
+      resolved.phase === 'auftrag' &&
+      resolved.unterstatus === 'abgeschlossen' &&
+      !leadRechnungen.some(isPhaseWinningRechnung)
+
+    const listPhase: VorgangPhase = rechnungAusstehend ? 'rechnung' : resolved.phase
+    const listUnterstatus = rechnungAusstehend ? 'ausstehend' : resolved.unterstatus
+    const listUnterstatusLabel = rechnungAusstehend
+      ? unterstatusLabel('rechnung', 'ausstehend')
+      : resolved.unterstatusLabel
+    const listEntityType: VorgangPhase = rechnungAusstehend ? 'auftrag' : resolved.entityType
+    const listDetailHref = rechnungAusstehend
+      ? `/auftraege/${resolved.entityId}`
+      : detailHrefForPhase(resolved.phase, resolved.entityId, lead.id)
+
     rows.push({
       ...resolved,
+      phase: listPhase,
+      unterstatus: listUnterstatus,
+      unterstatusLabel: listUnterstatusLabel,
+      needsAction: rechnungAusstehend ? true : resolved.needsAction,
+      entityType: listEntityType,
       leadId: lead.id,
       kundeId,
       kundeName,
       wertLabel: wertLabelForPhase(resolved.phase, resolved.entityId),
-      detailHref: detailHrefForPhase(resolved.phase, resolved.entityId, lead.id),
+      detailHref: listDetailHref,
       handwerkerIds,
       ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
       wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
@@ -504,22 +527,24 @@ export async function loadVorgaengeListe(): Promise<{
         resolved.phase === 'angebot'
           ? (angeboteByLead.get(lead.id) ?? []).find((a) => a.id === resolved.entityId)
               ?.ersetzt_durch ?? null
-          : resolved.phase === 'rechnung'
+          : listPhase === 'rechnung' && !rechnungAusstehend
             ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
                 ?.ersetzt_durch ?? null
             : null,
     })
 
-    // Abschläge als eigene Zeilen, solange Stamm Auftrag bleibt.
-    // Nach Voll-/Schlussrechnung (Phase Rechnung): weitere Rechnungen als Satelliten.
+    // Abschläge als eigene Zeilen (auch wenn Stamm als „Rechnung ausstehend“ läuft).
+    // Nach Voll-/Schlussrechnung: weitere Rechnungen als Satelliten.
     const showSatelliten =
-      resolved.phase === 'rechnung' || resolved.phase === 'auftrag'
+      resolved.phase === 'rechnung' ||
+      resolved.phase === 'auftrag' ||
+      rechnungAusstehend
     if (showSatelliten) {
       for (const r of leadRechnungen) {
         if (r.status === 'storniert' || r.status === 'entwurf') continue
         if (resolved.entityId === r.id) continue
-        // Bei Auftrag-Stamm nur Abschläge als Satelliten (Schluss gewinnt die Phase)
-        if (resolved.phase === 'auftrag') {
+        // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
+        if (resolved.phase === 'auftrag' || rechnungAusstehend) {
           const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
           if (art !== 'abschlag') continue
         }

@@ -4,9 +4,8 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
 import { Camera } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
@@ -141,34 +140,25 @@ export function CrmPositionEintragModal({
           </select>
         </label>
 
-        <KiAssistFieldLabel
+        <SheetEditableField
           label="Titel"
           value={titel}
-          onApply={setTitel}
-          extraHint="Bautagebuch-Eintrag — Kurztitel fürs Portal."
-          multiline={false}
-        >
-          <input
-            className="input"
-            value={titel}
-            onChange={(e) => setTitel(e.target.value)}
-            placeholder="Kurzer Titel fürs Portal"
-          />
-        </KiAssistFieldLabel>
+          onSave={setTitel}
+          kiExtraHint="Bautagebuch-Eintrag — Kurztitel fürs Portal."
+          placeholder="Kurzer Titel fürs Portal"
+          sheetContext="detail"
+        />
 
-        <KiAssistFieldLabel
+        <SheetEditableField
           label="Beschreibung"
           value={beschreibung}
-          onApply={setBeschreibung}
-          extraHint="Bautagebuch-Eintrag — Was ist auf der Baustelle passiert?"
-        >
-          <Textarea
-            rows={4}
-            value={beschreibung}
-            onChange={(e) => setBeschreibung(e.target.value)}
-            placeholder="Was ist auf der Baustelle passiert?"
-          />
-        </KiAssistFieldLabel>
+          onSave={setBeschreibung}
+          multiline
+          rows={4}
+          kiExtraHint="Bautagebuch-Eintrag — Was ist auf der Baustelle passiert?"
+          placeholder="Was ist auf der Baustelle passiert?"
+          sheetContext="detail"
+        />
 
         <div>
           <span className="lt-field-lbl">Fotos</span>

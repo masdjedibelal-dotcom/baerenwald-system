@@ -106,7 +106,7 @@ export function AngebotVersandSection({
     to: string[]
     cc: string[]
   } | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition('Wird gesendet…')
 
   const kunde = detail.kunden
   const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, detail.leads?.kundentyp)

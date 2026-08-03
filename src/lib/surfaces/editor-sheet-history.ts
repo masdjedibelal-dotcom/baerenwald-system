@@ -13,18 +13,46 @@ const stack: SheetEntry[] = []
 let suppressPop = 0
 let listening = false
 let fallthroughTimer: ReturnType<typeof setTimeout> | null = null
+let fallthroughEl: HTMLDivElement | null = null
 
 /**
  * Nach Sheet-Close: Ghost-Clicks/Touches auf die Zeile darunter blockieren
  * (sonst öffnet sich das Sheet sofort wieder — wirkt wie „lässt sich nicht schließen“).
+ *
+ * Wichtig: kein `body { pointer-events: none }` — sonst fallen Touches durch den
+ * Wizard/Canvas auf Floating-CTAs / Bottom-Nav darunter (z. B. Kunde-Crow öffnet
+ * Versand oder Notiz). Stattdessen ein transparenter Vollbild-Blocker ganz oben.
  */
 export function guardSheetPointerFallthrough(ms = 320) {
   if (typeof document === 'undefined') return
   if (fallthroughTimer) clearTimeout(fallthroughTimer)
-  document.body.style.pointerEvents = 'none'
+
+  if (!fallthroughEl) {
+    const el = document.createElement('div')
+    el.setAttribute('data-sheet-pointer-guard', '')
+    el.setAttribute('aria-hidden', 'true')
+    el.style.cssText =
+      'position:fixed;inset:0;z-index:2147483646;touch-action:none;cursor:default;'
+    // Capture-Phase: Touch/Click schlucken, bevor darunter etwas reagiert
+    const swallow = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    el.addEventListener('pointerdown', swallow, true)
+    el.addEventListener('pointerup', swallow, true)
+    el.addEventListener('click', swallow, true)
+    el.addEventListener('touchstart', swallow, true)
+    el.addEventListener('touchend', swallow, true)
+    fallthroughEl = el
+  }
+
+  if (!fallthroughEl.isConnected) {
+    document.body.appendChild(fallthroughEl)
+  }
+
   fallthroughTimer = setTimeout(() => {
     fallthroughTimer = null
-    document.body.style.pointerEvents = ''
+    fallthroughEl?.remove()
   }, ms)
 }
 

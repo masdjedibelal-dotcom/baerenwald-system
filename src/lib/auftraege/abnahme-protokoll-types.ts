@@ -38,6 +38,9 @@ export type AbnahmeMangelVerlaufEintrag = {
 
 export type AbnahmeMangel = {
   punkt_id: string
+  /** Kurztitel (PDF fett); optional — sonst gilt `beschreibung` als Titel */
+  titel?: string | null
+  /** Detail / Notiz (PDF kleiner darunter) bzw. Legacy-Einzeiler */
   beschreibung: string
   foto_urls?: string[]
   frist: string | null
@@ -51,6 +54,13 @@ export type AbnahmeMangel = {
   verlauf?: AbnahmeMangelVerlaufEintrag[]
 }
 
+/** Freier Mangel-Checklistenpunkt in der Abnahme-UI. */
+export type AbnahmeMangelCheckItem = {
+  id: string
+  titel: string
+  notiz: string
+}
+
 export type AuftragAbnahmeprotokoll = {
   id: string
   auftrag_id: string
@@ -61,6 +71,13 @@ export type AuftragAbnahmeprotokoll = {
   pdf_url: string | null
   an_kunde_gesendet_at: string | null
   created_at?: string | null
+  handwerker_id?: string | null
+  ebene?: 'handwerker' | 'gesamt'
+  freigabe_status?: 'entwurf' | 'zur_freigabe' | 'freigegeben' | 'abgelehnt'
+  freigegeben_at?: string | null
+  freigegeben_von?: string | null
+  abgelehnt_at?: string | null
+  ablehnung_notiz?: string | null
 }
 
 export type AbnahmeLeistungGruppe = {
@@ -380,6 +397,97 @@ export function renameAbnahmeLeistung(
     if (key !== leistungId) return p
     return { ...p, leistung_name: next }
   })
+}
+
+/** Titel + optionale Notiz einer Leistungsgruppe setzen (UI Stift). */
+export function setTitelUndNotizFuerLeistung(
+  alle: AbnahmePunkt[],
+  leistungId: string,
+  titel: string,
+  notiz: string
+): AbnahmePunkt[] {
+  const name = bereinigeAbnahmeLeistungName(titel)
+  const note = notiz.trim()
+  let first = true
+  return alle.map((p) => {
+    const key = p.leistung_id?.trim() || p.id
+    if (key !== leistungId) return p
+    if (first) {
+      first = false
+      return {
+        ...p,
+        leistung_name: name || p.beschreibung?.trim() || 'Leistung',
+        beschreibung: name || p.beschreibung || 'Leistung',
+        notizen: note ? [note] : [],
+        notiz: null,
+      }
+    }
+    return { ...p, leistung_name: name || p.leistung_name, notizen: undefined, notiz: null }
+  })
+}
+
+/** Auftragsposition → Abnahmepunkt (Status offen = noch nicht abgehakt). */
+export function abnahmePunktAusAuftragPosition(pos: AuftragPosition): AbnahmePunkt {
+  const id = pos.id?.trim() || neuePositionsId()
+  const name = (pos.leistung_name ?? '').trim() || 'Leistung'
+  const beschreibung = richTextToPlain(pos.beschreibung ?? '').trim()
+  return {
+    id: neuePositionsId(),
+    gewerk: abnahmeGewerkLabel(pos.gewerk_name || ABNAHME_GEWERK_OHNE),
+    leistung_id: id,
+    leistung_name: name,
+    beschreibung: beschreibung || name,
+    status: 'offen',
+    notiz: null,
+    notizen: [],
+    foto_urls: [],
+  }
+}
+
+/** Freie erbrachte Leistung ohne Katalog-Bezug. */
+export function abnahmePunktErbrachteLeistung(titel = '', notiz = ''): AbnahmePunkt {
+  const id = neuePositionsId()
+  const name = bereinigeAbnahmeLeistungName(titel) || 'Erbrachte Leistung'
+  const note = notiz.trim()
+  return {
+    id,
+    gewerk: ABNAHME_GEWERK_OHNE,
+    leistung_id: id,
+    leistung_name: name,
+    beschreibung: name,
+    status: 'offen',
+    notiz: null,
+    notizen: note ? [note] : [],
+    foto_urls: [],
+  }
+}
+
+export function neuerMangelCheckItem(titel = '', notiz = ''): AbnahmeMangelCheckItem {
+  return { id: neuePositionsId(), titel, notiz }
+}
+
+export function maengelFromCheckItems(
+  items: AbnahmeMangelCheckItem[],
+  erfasstAt = new Date().toISOString()
+): AbnahmeMangel[] {
+  return items
+    .map((item) => {
+      const titel = item.titel.trim()
+      const notiz = item.notiz.trim()
+      if (!titel && !notiz) return null
+      return {
+        punkt_id: item.id,
+        titel: titel || null,
+        beschreibung: notiz || titel || 'Mangel',
+        foto_urls: [] as string[],
+        frist: null as string | null,
+        status: 'offen' as const,
+        erfasst_at: erfasstAt,
+        foto_nachher_urls: [] as string[],
+        verlauf: [{ at: erfasstAt, typ: 'erfasst', notiz: 'Bei Abnahme erfasst' }],
+      }
+    })
+    .filter((m): m is NonNullable<typeof m> => m != null)
 }
 
 export { maengelAusPunkten, mergeMaengelFromPunkte, countOffeneMaengel, isMangelOffen } from '@/lib/auftraege/abnahme-maengel-helpers'

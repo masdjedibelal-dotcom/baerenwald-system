@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -200,15 +201,16 @@ export function ZahlungsplanEditor({
                 </div>
                 <label className="field sm:col-span-3">
                   <span className="field-l">{z.typ === 'rest' ? 'Rest' : z.typ === 'prozent' ? 'Prozent' : 'Betrag'}</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={z.typ === 'prozent' ? 1 : 0.01}
-                    disabled={z.typ === 'rest'}
-                    value={z.typ === 'rest' ? '' : z.wert}
-                    placeholder={z.typ === 'rest' ? 'automatisch' : undefined}
-                    onChange={(e) => patchZeile(z.id, { wert: Number(e.target.value) || 0 })}
-                  />
+                  {z.typ === 'rest' ? (
+                    <Input disabled value="" placeholder="automatisch" />
+                  ) : (
+                    <ClearableNumberInput
+                      className="input"
+                      min={0}
+                      value={z.wert}
+                      onValueChange={(wert) => patchZeile(z.id, { wert })}
+                    />
+                  )}
                 </label>
                 <div className="flex items-end justify-between gap-2 sm:col-span-2">
                 <div className="text-[length:var(--fs-meta)] text-bw-text-muted">

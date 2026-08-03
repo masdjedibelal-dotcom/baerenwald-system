@@ -360,6 +360,14 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
               type="button"
               variant="primary"
               size="sm"
+              onClick={() => setNotfallModal(true)}
+            >
+              Direkt beauftragen
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
               loading={busy === 'notmassnahme'}
               onClick={() => {
                 setBusy('notmassnahme')

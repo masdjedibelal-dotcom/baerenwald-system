@@ -1864,6 +1864,11 @@ export async function previewAngebotKundeMail(input: {
   einleitung?: string | null
   schluss?: string | null
   leistungsumfang?: string | null
+  /** Live aus dem Wizard — sonst Summe aus gespeicherten Positionen (kann veraltet sein). */
+  gesamtBrutto?: number | null
+  gesamtNetto?: number | null
+  /** Live Gültig-bis (YYYY-MM-DD oder ISO), sonst DB/Fallback. */
+  gueltigBis?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const angebotId = input.angebotId.trim()
   if (!angebotId) return { ok: false, message: 'Angebot fehlt' }
@@ -1883,14 +1888,27 @@ export async function previewAngebotKundeMail(input: {
     detail,
     firmMail
   )
+  const liveBrutto =
+    input.gesamtBrutto != null && Number.isFinite(Number(input.gesamtBrutto))
+      ? Number(input.gesamtBrutto)
+      : null
+  const liveNetto =
+    input.gesamtNetto != null && Number.isFinite(Number(input.gesamtNetto))
+      ? Number(input.gesamtNetto)
+      : null
+  const bruttoAnzeige = liveBrutto ?? summenMail.bruttoMin
+  const nettoAnzeige = liveNetto ?? summenMail.nettoMin
+  const nettoMaxAnzeige = liveNetto ?? summenMail.nettoMax
+
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
   ).toLocaleDateString('de-DE')
-  const gueltig = detail.gueltig_bis
+  const gueltigSource = input.gueltigBis?.trim() || detail.gueltig_bis
+  const gueltig = gueltigSource
     ? (() => {
         try {
-          return new Date(detail.gueltig_bis as string).toLocaleDateString('de-DE')
+          return new Date(gueltigSource as string).toLocaleDateString('de-DE')
         } catch {
           return gueltigFallback
         }
@@ -1928,7 +1946,7 @@ export async function previewAngebotKundeMail(input: {
         ...kundenAnrede,
         angebotsnr: angebotNr,
         leistungsumfang,
-        gesamt_brutto: summenMail.bruttoMin,
+        gesamt_brutto: bruttoAnzeige,
         gueltig_bis: gueltig,
         anrede,
         einleitung: einleitung ?? undefined,
@@ -1948,8 +1966,8 @@ export async function previewAngebotKundeMail(input: {
     {
       name: kundenAnrede.name,
       positionen: posMail,
-      gesamt_min: summenMail.nettoMin,
-      gesamt_max: summenMail.nettoMax,
+      gesamt_min: nettoAnzeige,
+      gesamt_max: nettoMaxAnzeige,
       lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
       gueltig_bis: gueltig,
       statusLink,

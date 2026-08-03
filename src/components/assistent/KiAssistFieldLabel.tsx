@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { KiTextRewriteSheet } from '@/components/assistent/KiTextRewriteSheet'
+import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
+import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { cn } from '@/lib/utils'
 
+/** Welches Feld zuletzt den Assistenten geöffnet hat (nur einer konsumiert text-Drafts). */
+let activeFieldAssistId: string | null = null
+
 /**
- * Label + Sparkles für Textblöcke → Inline-Rewrite-Sheet (kein globaler Assistent).
+ * Label + Sparkles → Assistent-Chat über dem Sheet, trainiert nur auf dieses eine Feld.
+ * Prompt frei formulieren → Übernehmen schreibt den neuen Feldtext.
  */
 export function KiAssistFieldLabel({
   label,
@@ -16,7 +21,7 @@ export function KiAssistFieldLabel({
   required,
   className,
   children,
-  multiline = true,
+  multiline: _multiline = true,
   disabled,
 }: {
   label: ReactNode
@@ -28,12 +33,45 @@ export function KiAssistFieldLabel({
   required?: boolean
   className?: string
   children?: ReactNode
-  /** Einzeiler (Betreff) vs. Textarea */
+  /** @deprecated Chat übernimmt Ein-/Mehrzeiler */
   multiline?: boolean
   disabled?: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  void _multiline
+  const assistent = useAssistentOptional()
+  const fieldId = useId()
+  const [awaiting, setAwaiting] = useState(false)
   const labelText = typeof label === 'string' ? label : 'Text'
+
+  useKiAssistDraftConsumer(awaiting && activeFieldAssistId === fieldId, 'text', (d) => {
+    if (d.type !== 'text') return
+    const text = d.text.trim()
+    if (!text) return
+    onApply(text)
+    setAwaiting(false)
+    if (activeFieldAssistId === fieldId) activeFieldAssistId = null
+  })
+
+  function openFieldChat() {
+    if (!assistent || disabled) return
+    activeFieldAssistId = fieldId
+    setAwaiting(true)
+    const current = value.trim()
+    const hintParts = [
+      `Feldname: ${labelText}`,
+      extraHint?.trim() ? `Hinweis: ${extraHint.trim()}` : null,
+      'Aktueller Feldtext (nur dieses Feld umschreiben/ersetzen):',
+      current
+        ? `"""\n${current}\n"""`
+        : '(leer — formuliere einen passenden neuen Text)',
+    ].filter(Boolean)
+    assistent.openScoped({
+      scopeId: 'feld',
+      extraHint: hintParts.join('\n'),
+      draftInput: null,
+      layer: 'over-sheet',
+    })
+  }
 
   return (
     <div className={cn('ki-assist-field', className)}>
@@ -47,22 +85,13 @@ export function KiAssistFieldLabel({
           className="ki-assist-icon-btn"
           title={`KI: ${labelText} umschreiben`}
           aria-label={`KI: ${labelText} umschreiben`}
-          disabled={disabled}
-          onClick={() => setOpen(true)}
+          disabled={disabled || !assistent}
+          onClick={openFieldChat}
         >
           <MockIcon ctx="btn" n="sparkles" size={16} />
         </button>
       </div>
       {children}
-      <KiTextRewriteSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        fieldLabel={labelText}
-        sourceText={value}
-        extraHint={extraHint}
-        multiline={multiline}
-        onApply={onApply}
-      />
     </div>
   )
 }

@@ -8,9 +8,9 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import {
   finalizeHandwerkerAcceptWizard,
   finalizeNachtragVertrag,
@@ -120,12 +120,16 @@ export function ProjektVertragWizard({
   )
 
   const persistDraft = useCallback(
-    async (opts?: { notify?: boolean }): Promise<string | null> => {
+    async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!meta.handwerker_id) {
         toast.error('Bitte Handwerker wählen.')
         return null
       }
-      setSaving(true)
+      const manageBusy = opts?.manageBusy !== false
+      if (manageBusy) {
+        setSaving(true)
+        actionBusy.show('Wird gespeichert…')
+      }
       try {
         const res = nachtragMode
           ? await saveNachtragDraft({
@@ -148,7 +152,10 @@ export function ProjektVertragWizard({
         if (opts?.notify) toast.success('Entwurf gespeichert')
         return res.vertrag_id
       } finally {
-        setSaving(false)
+        if (manageBusy) {
+          setSaving(false)
+          actionBusy.hide()
+        }
       }
     },
     [bootstrap.auftrag_id, meta, nachtragMode, vertragId]
@@ -185,53 +192,55 @@ export function ProjektVertragWizard({
   }
 
   const handlePdfErzeugen = async () => {
-    setSaving(true)
-    try {
-      const res = acceptMode
-        ? await finalizeHandwerkerAcceptWizard({
-            vertrag_id: vertragId,
-            auftrag_id: bootstrap.auftrag_id,
-            handwerker_id: meta.handwerker_id,
-            meta,
-            compliance_slugs: complianceSlugs,
-          })
-        : nachtragMode
-          ? await finalizeNachtragVertrag({
+    await actionBusy.run('PDF wird erzeugt…', async () => {
+      setSaving(true)
+      try {
+        const res = acceptMode
+          ? await finalizeHandwerkerAcceptWizard({
               vertrag_id: vertragId,
               auftrag_id: bootstrap.auftrag_id,
-              parent_vertrag_id: nachtragMode.parent_vertrag_id,
+              handwerker_id: meta.handwerker_id,
               meta,
-              positionen_auftrag_speichern: positionenAuftragSpeichern,
+              compliance_slugs: complianceSlugs,
             })
-          : await finalizeProjektVertrag({
-              vertrag_id: vertragId,
-              auftrag_id: bootstrap.auftrag_id,
-              meta,
-            })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
+          : nachtragMode
+            ? await finalizeNachtragVertrag({
+                vertrag_id: vertragId,
+                auftrag_id: bootstrap.auftrag_id,
+                parent_vertrag_id: nachtragMode.parent_vertrag_id,
+                meta,
+                positionen_auftrag_speichern: positionenAuftragSpeichern,
+              })
+            : await finalizeProjektVertrag({
+                vertrag_id: vertragId,
+                auftrag_id: bootstrap.auftrag_id,
+                meta,
+              })
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        setVertragId(res.vertrag_id)
+        setVertragsNr(res.vertrags_nr)
+        setPdfUrl(res.pdf_url)
+        if (acceptMode) {
+          toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
+        } else if (nachtragMode) {
+          const mailTeil =
+            'mailGesendet' in res && res.mailGesendet
+              ? ' Partner per E-Mail informiert (Neue Änderungsanfrage).'
+              : 'mailHinweis' in res && res.mailHinweis
+                ? ` (${res.mailHinweis})`
+                : ''
+          toast.success(`Ergänzungsvereinbarung erzeugt.${mailTeil}`)
+        } else {
+          toast.success('Vertrag als PDF erzeugt und hochgeladen')
+        }
+        onDone?.()
+      } finally {
+        setSaving(false)
       }
-      setVertragId(res.vertrag_id)
-      setVertragsNr(res.vertrags_nr)
-      setPdfUrl(res.pdf_url)
-      if (acceptMode) {
-        toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
-      } else if (nachtragMode) {
-        const mailTeil =
-          'mailGesendet' in res && res.mailGesendet
-            ? ' Partner per E-Mail informiert (Neue Änderungsanfrage).'
-            : 'mailHinweis' in res && res.mailHinweis
-              ? ` (${res.mailHinweis})`
-              : ''
-        toast.success(`Ergänzungsvereinbarung erzeugt.${mailTeil}`)
-      } else {
-        toast.success('Vertrag als PDF erzeugt und hochgeladen')
-      }
-      onDone?.()
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   const gewerkOptions = [
@@ -420,42 +429,28 @@ export function ProjektVertragWizard({
             ) : null}
             <Card title={nachtragMode ? 'Vertragstext' : 'Bauvorhaben & Leistung'}>
               <div className="space-y-4">
-                <KiAssistFieldLabel
+                <SheetEditableField
                   label="Bauvorhaben"
                   value={meta.bauvorhaben}
-                  onApply={(text) => setMeta((m) => ({ ...m, bauvorhaben: text }))}
-                  extraHint="Vertrags-Bauvorhaben (kundensichtbar im PDF)."
-                  multiline={false}
-                >
-                  <Input
-                    value={meta.bauvorhaben}
-                    onChange={(e) => setMeta((m) => ({ ...m, bauvorhaben: e.target.value }))}
-                  />
-                </KiAssistFieldLabel>
-                <KiAssistFieldLabel
+                  onSave={(bauvorhaben) => setMeta((m) => ({ ...m, bauvorhaben }))}
+                  kiExtraHint="Vertrags-Bauvorhaben (kundensichtbar im PDF)."
+                />
+                <SheetEditableField
                   label="Leistungsumfang (§2)"
                   value={meta.leistungsumfang}
-                  onApply={(text) => setMeta((m) => ({ ...m, leistungsumfang: text }))}
-                  extraHint="Vertrags-Leistungsumfang für den Kunden."
-                >
-                  <Textarea
-                    rows={4}
-                    value={meta.leistungsumfang}
-                    onChange={(e) => setMeta((m) => ({ ...m, leistungsumfang: e.target.value }))}
-                  />
-                </KiAssistFieldLabel>
-                <KiAssistFieldLabel
+                  onSave={(leistungsumfang) => setMeta((m) => ({ ...m, leistungsumfang }))}
+                  multiline
+                  rows={4}
+                  kiExtraHint="Vertrags-Leistungsumfang für den Kunden."
+                />
+                <SheetEditableField
                   label="Vergütung (§3)"
                   value={meta.verguetung_text}
-                  onApply={(text) => setMeta((m) => ({ ...m, verguetung_text: text }))}
-                  extraHint="Vergütungstext im Vertrag für den Kunden."
-                >
-                  <Textarea
-                    rows={5}
-                    value={meta.verguetung_text}
-                    onChange={(e) => setMeta((m) => ({ ...m, verguetung_text: e.target.value }))}
-                  />
-                </KiAssistFieldLabel>
+                  onSave={(verguetung_text) => setMeta((m) => ({ ...m, verguetung_text }))}
+                  multiline
+                  rows={5}
+                  kiExtraHint="Vergütungstext im Vertrag für den Kunden."
+                />
                 {nachtragMode?.parent_verguetung_text ? (
                   <div className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-meta)] text-bw-text-muted">
                     <p className="mb-1 font-medium text-bw-text">Ursprüngliche Vergütung (Referenz)</p>
@@ -514,11 +509,13 @@ export function ProjektVertragWizard({
                   />
                 </div>
                 <div className="mt-4">
-                  <Textarea
+                  <SheetEditableField
                     label="Interne Notizen"
-                    rows={2}
                     value={meta.notizen}
-                    onChange={(e) => setMeta((m) => ({ ...m, notizen: e.target.value }))}
+                    onSave={(notizen) => setMeta((m) => ({ ...m, notizen }))}
+                    multiline
+                    rows={2}
+                    placeholder="Interne Notizen…"
                   />
                 </div>
               </Card>

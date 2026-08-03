@@ -96,7 +96,7 @@ async function loadLeadOrgKontextOptional(
     const { data } = await supabase
       .from('kunden')
       .select(
-        'id, name, vorname, nachname, email, telefon, plz, ort, strasse, hausnummer, typ, org_anzeigename, org_kennung, ansprechpartner'
+        'id, name, vorname, nachname, email, telefon, plz, ort, strasse, hausnummer, typ, org_anzeigename, org_kennung, ansprechpartner, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt'
       )
       .eq('id', lead.auftraggeber_kunde_id)
       .maybeSingle()

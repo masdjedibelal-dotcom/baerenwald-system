@@ -4,6 +4,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { PickerSheet } from '@/components/surfaces/PickerSheet'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
 import {
   katalogPreisLabel,
@@ -237,16 +238,15 @@ export function KatalogPickModal({
                 inputMode="decimal"
               />
             </label>
-            <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
-              Beschreibung
-              <textarea
-                className="sel mt-0.5 w-full"
-                rows={3}
-                value={beschreibung}
-                onChange={(e) => setBeschreibung(e.target.value)}
-                placeholder="Projektspezifisch"
-              />
-            </label>
+            <SheetEditableField
+              label="Beschreibung"
+              value={beschreibung}
+              onSave={setBeschreibung}
+              multiline
+              rows={3}
+              placeholder="Projektspezifisch"
+              sheetContext="detail"
+            />
             <MockBtn
               sm
               kind="primary"

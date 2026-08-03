@@ -115,9 +115,15 @@ export function primaryCta(
     return null
   }
 
-  // rechnung — Erinnerung/Bezahlt leben im Zahlplan, nicht als Primary
+  // rechnung
+  if (ui === 'ausstehend') {
+    return { id: 'rechnung_erstellen', label: 'Rechnung erstellen', icon: 'file-invoice' }
+  }
   if (ui === 'entwurf') {
     return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+  }
+  if (ui === 'versendet' || ui === 'ueberfaellig') {
+    return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
   }
   if (ui === 'bezahlt') {
     return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }

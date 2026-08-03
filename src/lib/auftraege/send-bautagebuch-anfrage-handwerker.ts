@@ -146,15 +146,16 @@ async function finishSend(opts: {
     return { ok: false, message: mailRes.error ?? 'E-Mail-Versand fehlgeschlagen.' }
   }
 
-  // Portal-Glocke: „Bitte Update geben“ — Portal muss Deep-Link focus=bautagebuch auswerten
+  // Portal-Glocke: nur Bautagebuch-Aufforderung — kein neu/geaendert (keine Auftragsänderung).
+  // Spezial-Mail kommt oben aus dem CRM → Portal ohne zweite „bitte bestätigen“-Mail.
   await notifyPartnerUnified({
     handwerkerId: opts.handwerkerId,
-    typ: 'erinnerung',
+    typ: 'bautagebuch',
     projektName: opts.auftragTitel,
     link: relativeLink,
     auftragId: opts.auftragId,
-    positionIds: opts.positionIds.length ? opts.positionIds : undefined,
     leistungName: 'Bitte Update geben — Bautagebuch',
+    sendMail: false,
   })
 
   return { ok: true, anfrageId: opts.anfrageId }

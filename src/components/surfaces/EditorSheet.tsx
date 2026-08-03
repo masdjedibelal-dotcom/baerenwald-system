@@ -153,6 +153,8 @@ export function EditorSheet({
     }
     finishClose()
   }, [finishClose])
+  const requestCloseRef = useRef(requestClose)
+  requestCloseRef.current = requestClose
 
   const handleHistoryPop = useCallback(() => {
     onDismissAttemptRef.current?.()
@@ -210,7 +212,8 @@ export function EditorSheet({
     updateEditorSheetHistoryPop(sheetId, handleHistoryPop)
   }, [open, sheetId, handleHistoryPop, manageHistory])
 
-  /* Body scroll lock + focus trap (pausiert, wenn KI-Assistent über dem Sheet liegt) */
+  /* Body scroll lock + focus trap (pausiert, wenn KI-Assistent über dem Sheet liegt).
+   * requestClose per Ref — sonst Re-Init bei Parent-Rerender → Fokus klauen → Tastatur zu. */
   useEffect(() => {
     if (!open || !mounted) return
     if (pauseFocusTrap) {
@@ -223,12 +226,14 @@ export function EditorSheet({
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const el = rootRef.current
-    const release = el ? trapFocus(el, () => requestClose()) : undefined
+    const release = el
+      ? trapFocus(el, () => requestCloseRef.current())
+      : undefined
     return () => {
       document.body.style.overflow = prev
       release?.()
     }
-  }, [open, mounted, requestClose, pauseFocusTrap])
+  }, [open, mounted, pauseFocusTrap])
 
   /* S7: visualViewport — Overlay anpassen bei Tastatur, Panel nicht auf Fullscreen ziehen */
   useEffect(() => {

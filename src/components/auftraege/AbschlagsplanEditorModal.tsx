@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   berechneZahlungsplan,
@@ -253,13 +254,11 @@ export function AbschlagsplanEditorModal({
             key={p.name}
             type="button"
             className="zahlplan-preset-chip"
-            disabled={frozen.size > 0 || Boolean(initial?.zeilen?.length)}
+            disabled={frozen.size > 0}
             title={
               frozen.size > 0
                 ? 'Vorlagen gesperrt — gestellte/bezahlte Raten'
-                : initial?.zeilen?.length
-                  ? 'Vorlagen nur beim ersten Anlegen — bestehender Plan wird bearbeitet'
-                  : undefined
+                : 'Vorlage übernehmen und danach individuell anpassen'
             }
             onClick={() => applyPreset(p.build)}
           >
@@ -272,13 +271,11 @@ export function AbschlagsplanEditorModal({
         </span>
       </div>
 
-      {frozen.size > 0 || initial?.zeilen?.length ? (
-        <p className="zahlplan-editor-hint">
-          {frozen.size > 0
-            ? 'Gestellte/bezahlte Raten bleiben fest (IDs & Beträge). Offene Raten kannst du als % oder € anpassen.'
-            : 'Bestehenden Plan bearbeiten — Zeilen-IDs bleiben erhalten. Kein neuer Plan, keine Historie.'}
-        </p>
-      ) : null}
+      <p className="zahlplan-editor-hint">
+        {frozen.size > 0
+          ? 'Gestellte/bezahlte Raten bleiben fest (IDs & Beträge). Offene Raten kannst du als % oder € anpassen.'
+          : 'Abschläge hinzufügen oder entfernen. Pro Zeile % oder Festbetrag (€ netto) — Rest deckt den Restbetrag automatisch.'}
+      </p>
 
       <div className="zahlplan-editor-table">
         <div className="zahlplan-editor-head zahlplan-editor-head--typed">
@@ -321,15 +318,13 @@ export function AbschlagsplanEditorModal({
                 </div>
               ) : (
                 <div className="txt-prefix" style={{ maxWidth: 100 }}>
-                  <input
+                  <ClearableNumberInput
                     className="txt"
-                    type="number"
                     min={0}
                     max={r.typ === 'prozent' ? 100 : undefined}
-                    step={r.typ === 'prozent' ? 1 : 0.01}
                     value={r.wert}
                     disabled={isFrozen}
-                    onChange={(e) => upd(r.id, { wert: Number(e.target.value) || 0 })}
+                    onValueChange={(wert) => upd(r.id, { wert })}
                     style={{ textAlign: 'right' }}
                   />
                   <span className="prefix" style={{ right: 8, left: 'auto' }}>

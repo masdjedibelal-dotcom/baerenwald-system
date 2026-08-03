@@ -33,7 +33,14 @@ import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
+import { AnfrageAkutPanel } from '@/components/anfragen/AnfrageAkutPanel'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
+import {
+  buildAnfrageSchwellenHinweis,
+  leadIstAkut,
+  resolveAnfrageFreigabeRegeln,
+} from '@/lib/anfragen/anfrage-akut-schwelle'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
@@ -215,6 +222,7 @@ export function AnfrageDetailClient({
   const kopieQueryHandledRef = useRef(false)
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
+  const [notfallModalOpen, setNotfallModalOpen] = useState(false)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
 
@@ -246,7 +254,7 @@ export function AnfrageDetailClient({
 
   useEffect(() => {
     setLead(initial)
-  }, [initial.id])
+  }, [initial])
 
   const leadStatusData = useMemo(() => {
     const fd = lead.funnel_daten
@@ -423,12 +431,112 @@ export function AnfrageDetailClient({
 
   const matrixCta = primaryCta('anfrage', lead.status)
 
+  const akutFreigabe = useMemo(() => {
+    const org = lead.auftraggeber
+    const objekt = lead.kunden_objekte
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: org?.portal_modus,
+      freigabeModus: org?.freigabe_modus,
+      orgSchwelleEur: org?.freigabe_schwelle_eur,
+      orgNotfallDirekt: org?.notfall_direkt,
+      objektSchwelleEur: objekt?.freigabe_schwelle_eur,
+      objektNotfallDirekt: objekt?.notfall_direkt,
+    })
+    const hinweis = buildAnfrageSchwellenHinweis({
+      lead,
+      freigabeModus: regeln.freigabeModus,
+      portalModus: regeln.portalModus,
+      schwelleEur: regeln.schwelleEur,
+      notfallDirekt: regeln.notfallDirekt,
+    })
+    return {
+      istAkut: leadIstAkut(lead),
+      notfallDirektErlaubt: hinweis.notfallDirektErlaubt,
+      hinweis,
+    }
+  }, [lead])
+
+  const openDirektBeauftragen = useCallback(() => {
+    if (!akutFreigabe.notfallDirektErlaubt) {
+      toast.error('Org erlaubt Direktbeauftragung nicht („Akut direkt“).')
+      return
+    }
+    setNotfallModalOpen(true)
+  }, [akutFreigabe.notfallDirektErlaubt])
+
   const primaryCtaAction = useCallback(() => {
+    if (akutFreigabe.istAkut && akutFreigabe.notfallDirektErlaubt) {
+      openDirektBeauftragen()
+      return
+    }
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
       openAngebotErstellen()
     }
-  }, [matrixCta, openAngebotErstellen])
+  }, [
+    akutFreigabe.istAkut,
+    akutFreigabe.notfallDirektErlaubt,
+    matrixCta,
+    openAngebotErstellen,
+    openDirektBeauftragen,
+  ])
+
+  const detailPrimary = useMemo(() => {
+    if (akutFreigabe.istAkut && akutFreigabe.notfallDirektErlaubt) {
+      return {
+        label: 'Direkt beauftragen',
+        icon: 'alert-triangle',
+        onClick: primaryCtaAction,
+        disabled: pending,
+      }
+    }
+    if (matrixCta) {
+      return {
+        label: matrixCta.label,
+        icon: matrixCta.icon,
+        onClick: primaryCtaAction,
+        disabled: pending,
+      }
+    }
+    return null
+  }, [
+    akutFreigabe.istAkut,
+    akutFreigabe.notfallDirektErlaubt,
+    matrixCta,
+    pending,
+    primaryCtaAction,
+  ])
+
+  const detailSecondary = useMemo(() => {
+    if (akutFreigabe.istAkut && akutFreigabe.notfallDirektErlaubt && matrixCta?.id === 'angebot_erstellen') {
+      return {
+        label: 'Angebot erstellen',
+        icon: matrixCta.icon,
+        onClick: openAngebotErstellen,
+        disabled: pending,
+      }
+    }
+    if (
+      !akutFreigabe.istAkut &&
+      akutFreigabe.notfallDirektErlaubt &&
+      matrixCta?.id === 'angebot_erstellen'
+    ) {
+      return {
+        label: 'Direkt beauftragen',
+        icon: 'alert-triangle',
+        onClick: openDirektBeauftragen,
+        disabled: pending,
+      }
+    }
+    return null
+  }, [
+    akutFreigabe.istAkut,
+    akutFreigabe.notfallDirektErlaubt,
+    matrixCta,
+    openAngebotErstellen,
+    openDirektBeauftragen,
+    pending,
+  ])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
@@ -444,6 +552,11 @@ export function AnfrageDetailClient({
       orgFreigabeStatus: lead.org_freigabe_status,
     })
     const badge = <StatusBadge status={lead.status} label={s.label} />
+    const akutBadge = akutFreigabe.istAkut ? (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[length:var(--fs-meta)] font-semibold text-red-800">
+        Akut
+      </span>
+    ) : null
     const st = String(lead.status ?? '').trim().toLowerCase()
     const hasAngenommen = angeboteListe.some((a) =>
       isAngenommenesAngebotStatus(a.status, a.status_einfach)
@@ -472,8 +585,13 @@ export function AnfrageDetailClient({
         onClick: () => setStatusModalKind('verloren'),
       })
     }
-    return <StatusBadgeActionPopover badge={badge} actions={actions} title="Status" />
-  }, [lead.status, lead.org_freigabe_status, angeboteListe])
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        {akutBadge}
+        <StatusBadgeActionPopover badge={badge} actions={actions} title="Status" />
+      </span>
+    )
+  }, [lead.status, lead.org_freigabe_status, angeboteListe, akutFreigabe.istAkut])
 
   const noShowTerminHinweis = useMemo(
     () =>
@@ -610,22 +728,15 @@ export function AnfrageDetailClient({
         actions: (
           <DetailActionsBar
             sheetTitle="Anfrage"
-            primary={
-              matrixCta
-                ? {
-                    label: matrixCta.label,
-                    icon: matrixCta.icon,
-                    onClick: primaryCtaAction,
-                    disabled: pending,
-                  }
-                : null
-            }
+            primary={detailPrimary}
+            secondary={detailSecondary}
             menuItems={[]}
           />
         ),
       }}
     >
       <div className="space-y-4">
+      <AnfrageAkutPanel lead={lead} onDirektBeauftragen={openDirektBeauftragen} />
       <DuplikatBand
         leadId={lead.id}
         duplikatHinweis={Boolean((lead as { duplikat_hinweis?: boolean }).duplikat_hinweis)}
@@ -724,6 +835,22 @@ export function AnfrageDetailClient({
             },
           })
           setStatusModalKind('verloren')
+        }}
+      />
+
+      <NotfallDirektBeauftragenModal
+        open={notfallModalOpen}
+        onClose={() => setNotfallModalOpen(false)}
+        leadId={lead.id}
+        variant="anfrage"
+        gewerkName={
+          Array.isArray(lead.bereiche) && lead.bereiche[0]
+            ? String(lead.bereiche[0])
+            : 'Allgemein'
+        }
+        onDone={(auftragId) => {
+          setNotfallModalOpen(false)
+          router.push(`/auftraege/${auftragId}`)
         }}
       />
 

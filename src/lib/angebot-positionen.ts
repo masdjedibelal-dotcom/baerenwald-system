@@ -1,5 +1,11 @@
 import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
-import { istPreisPosition } from '@/lib/dokument-zeilen'
+import {
+  gesamtrabattAbzugAusAngebotPositionen,
+  istGesamtrabattPosition,
+  istPreisPosition,
+  parseGesamtrabattMetaFromPosition,
+  ZEILE_SLUG_GESAMTRABATT,
+} from '@/lib/dokument-zeilen'
 import type {
   AngebotHandwerkerZuweisungInput,
   AngebotPosition,
@@ -108,9 +114,58 @@ export function normalizeAngebotPosition(
 
   const slugLower = (gewerk_slug ?? '').toLowerCase()
   const leistungLower = leistung.toLowerCase()
-  /** Negativzeilen z. B. „Abzüglich Abschlag …“ in der Schlussrechnung */
+  /** Negativzeilen: Nachlass / Abschlag in Schlussrechnung */
   const erlaubtNegativ =
-    slugLower === 'abschlag_abzug' || leistungLower.startsWith('abzüglich')
+    slugLower === ZEILE_SLUG_GESAMTRABATT ||
+    slugLower === 'abschlag_abzug' ||
+    leistungLower.startsWith('abzüglich')
+
+  if (slugLower === ZEILE_SLUG_GESAMTRABATT) {
+    const beschRaw = r.beschreibung != null ? String(r.beschreibung).trim() : ''
+    const meta = parseGesamtrabattMetaFromPosition({
+      id,
+      gewerk_id: '',
+      gewerk_name: gewerk_name || 'Gesamtrabatt',
+      gewerk_slug: ZEILE_SLUG_GESAMTRABATT,
+      leistung: leistung || 'Nachlass',
+      beschreibung: beschRaw,
+      lohn_netto: num(r.lohn_netto),
+      material_netto: 0,
+      gesamt_min: num(r.gesamt_min),
+      gesamt_max: num(r.gesamt_max),
+      menge: 1,
+      einheit: 'Stk.',
+      vk_netto: num(r.vk_netto),
+    })
+    const signed =
+      meta.wert > 0 ? -Math.abs(meta.wert) : num(r.gesamt_min) < 0 ? num(r.gesamt_min) : 0
+    const bezeichnung = (leistung || 'Nachlass').trim() || 'Nachlass'
+    const beschreibung =
+      beschRaw ||
+      (meta.wert > 0 ? `${meta.modus}:${meta.wert}` : '')
+    const outRabatt: AngebotPosition = {
+      id,
+      gewerk_id: '',
+      gewerk_slug: ZEILE_SLUG_GESAMTRABATT,
+      gewerk_name: gewerk_name || 'Gesamtrabatt',
+      leistung: bezeichnung,
+      beschreibung,
+      lohn_netto: signed,
+      material_netto: 0,
+      vk_netto: signed,
+      gesamt_min: signed,
+      gesamt_max: signed,
+      menge: 1,
+      einheit: 'Stk.',
+      preis_typ: 'fix',
+    }
+    const gewerk_block_key =
+      r.gewerk_block_key != null && String(r.gewerk_block_key).trim()
+        ? String(r.gewerk_block_key).trim()
+        : undefined
+    if (gewerk_block_key) outRabatt.gewerk_block_key = gewerk_block_key
+    return outRabatt
+  }
 
   let lohn_netto = num(r.lohn_netto)
   if (lohn_netto <= 0 && (r.lohn_netto == null || r.lohn_netto === '')) {
@@ -362,6 +417,11 @@ export type AngebotSummen = {
   einkaufZeileMax: number
   margeMin: number
   margeMax: number
+  /** Nachlass-Abzug (positiv), 0 wenn keiner */
+  nachlassNetto: number
+  nachlassLabel?: string
+  /** Netto der Preispositionen vor Nachlass */
+  nettoVorNachlass: number
 }
 
 function zeileEinkauf(p: AngebotPosition): { min: number; max: number } {
@@ -408,7 +468,7 @@ export function summenAusPositionen(
   let einkaufZeileMin = 0
   let einkaufZeileMax = 0
 
-  const list = Array.isArray(positionen) ? positionen : []
+  const list = Array.isArray(positionen) ? normalizeAngebotPositionen(positionen) : []
   for (const p of list) {
     if (!istPreisPosition(p)) continue
     const m = p.menge || 1
@@ -423,13 +483,17 @@ export function summenAusPositionen(
     einkaufZeileMax += ek.max
   }
 
-  const nettoMin = lohnZeileMin + materialZeileMin
-  const nettoMax = lohnZeileMax + materialZeileMax
+  const artikelNettoMin = lohnZeileMin + materialZeileMin
+  const artikelNettoMax = lohnZeileMax + materialZeileMax
+  const nachlass = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMin)
+  const nachlassMax = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMax)
+  const nettoMin = Math.max(0, Math.round((artikelNettoMin - nachlass) * 100) / 100)
+  const nettoMax = Math.max(0, Math.round((artikelNettoMax - nachlassMax) * 100) / 100)
   const f = mwstSatz / 100
-  const mwstBetragMin = nettoMin * f
-  const mwstBetragMax = nettoMax * f
-  const bruttoMin = nettoMin + mwstBetragMin
-  const bruttoMax = nettoMax + mwstBetragMax
+  const mwstBetragMin = Math.round(nettoMin * f * 100) / 100
+  const mwstBetragMax = Math.round(nettoMax * f * 100) / 100
+  const bruttoMin = Math.round((nettoMin + mwstBetragMin) * 100) / 100
+  const bruttoMax = Math.round((nettoMax + mwstBetragMax) * 100) / 100
 
   const margeMin = nettoMin - einkaufZeileMax
   const margeMax = nettoMax - einkaufZeileMin
@@ -450,6 +514,12 @@ export function summenAusPositionen(
     einkaufZeileMax,
     margeMin,
     margeMax,
+    nachlassNetto: nachlass,
+    nachlassLabel: (() => {
+      const r = list.find(istGesamtrabattPosition)
+      return r ? parseGesamtrabattMetaFromPosition(r).bezeichnung : undefined
+    })(),
+    nettoVorNachlass: artikelNettoMin,
   }
 }
 

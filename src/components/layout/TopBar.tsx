@@ -134,7 +134,7 @@ export function TopBar({ user }: TopBarProps) {
     setLogoutLoading(true)
     setMenuOpen(false)
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: "local" })
     router.replace('/login')
     router.refresh()
     setLogoutLoading(false)

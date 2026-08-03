@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils'
 type HwOpt = { id: string; name: string; email?: string | null }
 
 /**
- * Tagebuch anfordern: Handwerker wählen → Leistungen anhaken → Senden
- * (E-Mail + Portal-Notification „Bitte Update geben“).
+ * Tagebuch anfordern: Handwerker wählen → Leistungen anhaken → Senden.
+ * Nur Aufforderung zum Eintrag — keine Auftragsänderung / keine Bestätigungspflicht.
  */
 export function TagebuchAnfordernSheet({
   open,
@@ -123,7 +123,7 @@ export function TagebuchAnfordernSheet({
       open={open}
       onClose={onClose}
       title="Tagebuch anfordern"
-      subtitle="Partner erhält Portal-Hinweis „Bitte Update geben“"
+      subtitle="Partner erhält nur die Aufforderung zum Tagebuch-Eintrag"
       context="detail"
       size="md"
       confirmBusy={pending}

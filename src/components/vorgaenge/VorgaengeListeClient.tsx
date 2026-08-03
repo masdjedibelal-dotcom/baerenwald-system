@@ -42,6 +42,11 @@ import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
+import { HwEingangsrechnungenListe } from '@/components/rechnungen/HwEingangsrechnungenListe'
+import {
+  hwRechnungIstErledigt,
+  type HwEingangsrechnungListeRow,
+} from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
@@ -101,11 +106,13 @@ type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 function statusKind(row: VorgangListeRow): string {
   if (row.badges.wartet_freigabe) return 'warten'
+  const u = row.unterstatus.toLowerCase()
+  // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
+  if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
   if (row.phase === 'rechnung') {
     const d = rechnungStatusDisplay(row.unterstatus, { ueberfaellig: row.ueberfaellig })
     return variantToMockBadgeKind(d.variant)
   }
-  const u = row.unterstatus.toLowerCase()
   if (
     u === 'storniert' ||
     u === 'abgebrochen' ||
@@ -167,6 +174,7 @@ function isVorgangFilter(value: string | null): value is (typeof VORGANG_FILTERS
 
 export function VorgaengeListeClient({
   rows,
+  hwEingangsrechnungen = [],
   embedded = false,
   restrictPartnerName,
   restrictHandwerkerId,
@@ -174,6 +182,8 @@ export function VorgaengeListeClient({
   restrictLeadIds,
 }: {
   rows: VorgangListeRow[]
+  /** Partner-Eingangsrechnungen (angebot_handwerker mit PDF) */
+  hwEingangsrechnungen?: HwEingangsrechnungListeRow[]
   embedded?: boolean
   restrictPartnerName?: string
   /** Nur Vorgänge, in denen dieser Handwerker vorkommt (Mock `restrictHandwerker`). */
@@ -203,6 +213,7 @@ export function VorgaengeListeClient({
   const [fDatumVon, setFDatumVon] = useState('')
   const [fDatumBis, setFDatumBis] = useState('')
   const [lifecycle, setLifecycle] = useState<'offen' | 'erledigt'>('offen')
+  const [rechnungRichtung, setRechnungRichtung] = useState<'ausgehend' | 'eingehend'>('ausgehend')
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
@@ -241,7 +252,11 @@ export function VorgaengeListeClient({
   }, [lifecycle])
 
   const syncPhaseToUrl = useCallback(
-    (phase: (typeof VORGANG_FILTERS)[number], nextLifecycle?: 'offen' | 'erledigt') => {
+    (
+      phase: (typeof VORGANG_FILTERS)[number],
+      nextLifecycle?: 'offen' | 'erledigt',
+      nextRichtung?: 'ausgehend' | 'eingehend'
+    ) => {
       const params = new URLSearchParams(searchParams.toString())
       params.delete('phase')
       if (phase === 'alle') {
@@ -255,19 +270,26 @@ export function VorgaengeListeClient({
       } else {
         params.set('lifecycle', lc)
       }
+      const richtung = nextRichtung ?? (phase === 'rechnung' ? rechnungRichtung : 'ausgehend')
+      if (phase === 'rechnung' && richtung === 'eingehend') {
+        params.set('richtung', 'eingehend')
+      } else {
+        params.delete('richtung')
+      }
       const qs = params.toString()
       router.replace(qs ? `/vorgaenge?${qs}` : '/vorgaenge', { scroll: false })
     },
-    [router, searchParams, lifecycle]
+    [router, searchParams, lifecycle, rechnungRichtung]
   )
 
   const setPhaseFilter = useCallback(
     (phase: (typeof VORGANG_FILTERS)[number]) => {
       setFilter(phase)
       setStatusFilter([])
-      if (!embedded) syncPhaseToUrl(phase)
+      if (phase !== 'rechnung') setRechnungRichtung('ausgehend')
+      if (!embedded) syncPhaseToUrl(phase, undefined, phase === 'rechnung' ? rechnungRichtung : 'ausgehend')
     },
-    [embedded, syncPhaseToUrl]
+    [embedded, syncPhaseToUrl, rechnungRichtung]
   )
 
   const setLifecycleFilter = useCallback(
@@ -276,6 +298,15 @@ export function VorgaengeListeClient({
       if (!embedded) syncPhaseToUrl(filter, next)
     },
     [embedded, syncPhaseToUrl, filter]
+  )
+
+  const setRechnungRichtungFilter = useCallback(
+    (next: 'ausgehend' | 'eingehend') => {
+      setRechnungRichtung(next)
+      setStatusFilter([])
+      if (!embedded) syncPhaseToUrl('rechnung', lifecycle, next)
+    },
+    [embedded, syncPhaseToUrl, lifecycle]
   )
 
   useEffect(() => {
@@ -290,6 +321,9 @@ export function VorgaengeListeClient({
     if (lc === 'erledigt' || lc === 'offen') {
       setLifecycle(lc)
     }
+    const r = searchParams.get('richtung')
+    if (r === 'eingehend') setRechnungRichtung('eingehend')
+    else if (tab === 'rechnung') setRechnungRichtung('ausgehend')
   }, [embedded, searchParams])
 
   const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
@@ -346,6 +380,19 @@ export function VorgaengeListeClient({
     }
     return { offen, erledigt }
   }, [baseRows])
+
+  const hwLifecycleCounts = useMemo(() => {
+    let offen = 0
+    let erledigt = 0
+    for (const r of hwEingangsrechnungen) {
+      if (hwRechnungIstErledigt(r.status)) erledigt += 1
+      else offen += 1
+    }
+    return { offen, erledigt }
+  }, [hwEingangsrechnungen])
+
+  const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
+  const effectiveLifecycleCounts = showHwEingang ? hwLifecycleCounts : lifecycleCounts
 
   const lifecycleRows = useMemo(
     () =>
@@ -773,14 +820,14 @@ export function VorgaengeListeClient({
           <div className="listbar-lifecycle-chips">
             <MockChip
               active={lifecycle === 'offen'}
-              count={lifecycleCounts.offen}
+              count={effectiveLifecycleCounts.offen}
               onClick={() => setLifecycleFilter('offen')}
             >
               Offen
             </MockChip>
             <MockChip
               active={lifecycle === 'erledigt'}
-              count={lifecycleCounts.erledigt}
+              count={effectiveLifecycleCounts.erledigt}
               onClick={() => setLifecycleFilter('erledigt')}
             >
               Erledigt
@@ -805,6 +852,29 @@ export function VorgaengeListeClient({
               {phaseChipLabel(p)}
             </MockChip>
           ))}
+          {filter === 'rechnung' ? (
+            <>
+              <span className="listbar-chips-sep" aria-hidden />
+              <MockChip
+                active={rechnungRichtung === 'ausgehend'}
+                count={lifecycle === 'erledigt' ? undefined : counts.rechnung}
+                onClick={() => setRechnungRichtungFilter('ausgehend')}
+              >
+                Ausgehend
+              </MockChip>
+              <MockChip
+                active={rechnungRichtung === 'eingehend'}
+                count={
+                  lifecycle === 'offen'
+                    ? hwLifecycleCounts.offen
+                    : hwLifecycleCounts.erledigt
+                }
+                onClick={() => setRechnungRichtungFilter('eingehend')}
+              >
+                Eingehend
+              </MockChip>
+            </>
+          ) : null}
         </div>
         <ListbarActionsMenu
           title="Listen-Aktionen"
@@ -841,7 +911,7 @@ export function VorgaengeListeClient({
                   )}
                   onClick={() => setLifecycleFilter('offen')}
                 >
-                  Offen {lifecycleCounts.offen}
+                  Offen {effectiveLifecycleCounts.offen}
                 </button>
                 <button
                   type="button"
@@ -851,7 +921,7 @@ export function VorgaengeListeClient({
                   )}
                   onClick={() => setLifecycleFilter('erledigt')}
                 >
-                  Erledigt {lifecycleCounts.erledigt}
+                  Erledigt {effectiveLifecycleCounts.erledigt}
                 </button>
               </div>
               <MockBtn
@@ -1023,6 +1093,9 @@ export function VorgaengeListeClient({
       </MockModal>
 
       <PullToRefresh onRefresh={() => router.refresh()}>
+      {showHwEingang ? (
+        <HwEingangsrechnungenListe rows={hwEingangsrechnungen} lifecycle={lifecycle} />
+      ) : (
       <div
         className="listcard listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
@@ -1128,7 +1201,7 @@ export function VorgaengeListeClient({
                 : filter === 'auftrag'
                   ? 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
                   : filter === 'rechnung'
-                    ? 'Rechnungen entstehen aus dem Auftrag — Tab Finanzen oder Primary „Rechnung erstellen“.'
+                    ? 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
                     : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
             }
             action={
@@ -1152,8 +1225,9 @@ export function VorgaengeListeClient({
             const copy = () => {
               if (v.phase === 'anfrage') runDuplicateAnfrage(v.leadId || v.entityId, router)
               else if (v.phase === 'angebot') runDuplicateAngebot(v.entityId, router)
-              else if (v.phase === 'auftrag') runDuplicateAuftrag(v.entityId, router)
-              else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
+              else if (v.phase === 'auftrag' || v.entityType === 'auftrag') {
+                runDuplicateAuftrag(v.entityId, router)
+              } else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
             const edit = () => openDetail(v.detailHref)
@@ -1277,9 +1351,10 @@ export function VorgaengeListeClient({
           </div>
         ) : null}
       </div>
+      )}
       </PullToRefresh>
 
-      {isMobile ? (
+      {showHwEingang ? null : isMobile ? (
         <ListInfiniteSentinel
           hasMore={hasMore}
           onLoadMore={loadMore}

@@ -18,6 +18,7 @@ import {
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -283,34 +284,41 @@ export function AuftragLeistungenTab({
       </div>
 
       {leistungenView === 'leistungen' ? (
-        <LeistungenTab
-          phase="auftrag"
-          rows={rows}
-          groupByGewerk
-          footerNettoMwst={footerNettoMwst}
-          dokumentHint={null}
-          emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
-          bulkActions={
-            disabled
-              ? undefined
-              : [
-                  { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
-                  { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
-                ]
-          }
-          drawerActionsForRow={
-            disabled
-              ? undefined
-              : (row) => [
-                  {
-                    id: 'zuweisen',
-                    label: 'Zuweisung ändern',
-                    icon: 'user',
-                    onClick: () => setZuweisungIds([row.id]),
-                  },
-                ]
-          }
-        />
+        <>
+          <AuftragPartnerPositionsPruefungPanel
+            auftragId={detail.id}
+            disabled={disabled}
+            onChanged={onSaved}
+          />
+          <LeistungenTab
+            phase="auftrag"
+            rows={rows}
+            groupByGewerk
+            footerNettoMwst={footerNettoMwst}
+            dokumentHint={null}
+            emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
+            bulkActions={
+              disabled
+                ? undefined
+                : [
+                    { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
+                    { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
+                  ]
+            }
+            drawerActionsForRow={
+              disabled
+                ? undefined
+                : (row) => [
+                    {
+                      id: 'zuweisen',
+                      label: 'Zuweisung ändern',
+                      icon: 'user',
+                      onClick: () => setZuweisungIds([row.id]),
+                    },
+                  ]
+            }
+          />
+        </>
       ) : (
         <AuftragBautagebuchSection
           eintraege={bautagebuchEintraege}

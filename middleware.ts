@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+import { crmAuthCookieOptions } from '@/lib/auth/crm-auth-cookie'
+import {
+  matchAuthCookieNames,
+  supabaseLegacyAuthCookieBaseName,
+} from '@/lib/auth/supabase-legacy-auth-cookie'
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 
 function devAuthSkipEnabled(): boolean {
@@ -41,6 +46,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: crmAuthCookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -136,7 +142,35 @@ export async function middleware(request: NextRequest) {
   if (user && path === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      redirect.cookies.set(c.name, c.value)
+    })
+    // Alte Default-Cookies löschen (verhindert Portal↔CRM Kollision auf localhost)
+    const legacyBase = supabaseLegacyAuthCookieBaseName()
+    if (legacyBase) {
+      for (const name of matchAuthCookieNames(
+        request.cookies.getAll().map((c) => c.name),
+        legacyBase
+      )) {
+        redirect.cookies.set(name, '', { path: '/', maxAge: 0 })
+      }
+    }
+    return redirect
+  }
+
+  // Eingeloggt: Legacy-Default-Cookie mitlöschen, falls noch vorhanden
+  if (user) {
+    const legacyBase = supabaseLegacyAuthCookieBaseName()
+    if (legacyBase) {
+      const legacyNames = matchAuthCookieNames(
+        request.cookies.getAll().map((c) => c.name),
+        legacyBase
+      )
+      for (const name of legacyNames) {
+        supabaseResponse.cookies.set(name, '', { path: '/', maxAge: 0 })
+      }
+    }
   }
 
   return supabaseResponse

@@ -35,6 +35,7 @@ type LeadPick = Pick<
   | 'kunde_objekt_id'
   | 'erfassung_von'
   | 'anlass'
+  | 'freigabe_bypass_grund'
 >
 
 type ObjektFreigabePick = {
@@ -48,7 +49,10 @@ function funnelKategorie(funnelDaten: unknown): string | null {
   return typeof kat === 'string' ? kat : null
 }
 
-export function leadIstNotfall(lead: Pick<Lead, 'situation' | 'funnel_daten'>): boolean {
+export function leadIstNotfall(
+  lead: Pick<Lead, 'situation' | 'funnel_daten' | 'freigabe_bypass_grund'>
+): boolean {
+  if ((lead.freigabe_bypass_grund ?? '').trim() === 'akut') return true
   if (lead.situation === 'notfall') return true
   return funnelKategorie(lead.funnel_daten) === 'notfall'
 }

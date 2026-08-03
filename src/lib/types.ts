@@ -297,6 +297,10 @@ export type LeadAuftraggeberEmbed = Pick<
   | 'org_anzeigename'
   | 'org_kennung'
   | 'ansprechpartner'
+  | 'portal_modus'
+  | 'freigabe_modus'
+  | 'freigabe_schwelle_eur'
+  | 'notfall_direkt'
 >
 
 /** Lead inkl. Status-Historie (Detailansicht) */
@@ -525,6 +529,10 @@ export type AngebotHandwerkerRow = {
   hw_angebot_anhang_urls?: string[] | null
   hw_rechnung_pdf_url?: string | null
   hw_rechnung_eingereicht_at?: string | null
+  /** eingereicht | bezahlt | abgelehnt — NULL = eingereicht wenn PDF vorhanden */
+  hw_rechnung_status?: string | null
+  hw_rechnung_bezahlt_at?: string | null
+  hw_rechnung_betrag_brutto?: number | null
   hw_eingereicht_at?: string | null
   hw_status?: string | null
   hw_notiz?: string | null
@@ -536,6 +544,9 @@ export type AngebotHandwerkerRow = {
     name: string
     email: string | null
     telefon: string | null
+    iban?: string | null
+    steuernummer?: string | null
+    ustid?: string | null
   } | null
   gewerke?: {
     id: string

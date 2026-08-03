@@ -1,6 +1,8 @@
 'use client'
 
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -93,15 +95,16 @@ export function PositionModal({
               autoFocus={!p.name}
             />
           </Field>
-          <Field label="Text" full hint="Erscheint ohne Preis auf dem Dokument">
-            <textarea
-              className="ta"
-              value={richTextToEditablePlain(p.beschreibung)}
-              onChange={(e) => onChange({ beschreibung: e.target.value })}
-              rows={3}
-              placeholder="z. B. Hinweis zu Ablauf oder Garantie"
-            />
-          </Field>
+          <SheetEditableField
+            label="Text"
+            hint="Erscheint ohne Preis auf dem Dokument"
+            value={richTextToEditablePlain(p.beschreibung)}
+            onSave={(beschreibung) => onChange({ beschreibung })}
+            multiline
+            rows={3}
+            placeholder="z. B. Hinweis zu Ablauf oder Garantie"
+            sheetContext="detail"
+          />
         </div>
       ) : kind === 'nachlass' ? (
         <div className="form-grid">
@@ -133,13 +136,11 @@ export function PositionModal({
           <Field label={(p.nachlassModus ?? 'prozent') === 'prozent' ? 'Prozent' : 'Betrag netto'}>
             <div className="txt-prefix">
               <span className="prefix">{(p.nachlassModus ?? 'prozent') === 'prozent' ? '%' : '€'}</span>
-              <input
+              <ClearableNumberInput
                 className="txt"
-                type="number"
-                step={(p.nachlassModus ?? 'prozent') === 'prozent' ? '0.5' : '0.01'}
                 min={0}
                 value={p.preis}
-                onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
+                onValueChange={(preis) => onChange({ preis })}
               />
             </div>
           </Field>
@@ -170,15 +171,16 @@ export function PositionModal({
               autoFocus={!p.name}
             />
           </Field>
-          <Field label="Beschreibung" full hint="Erscheint beim Kunden">
-            <textarea
-              className="ta"
-              value={richTextToEditablePlain(p.beschreibung)}
-              onChange={(e) => onChange({ beschreibung: e.target.value })}
-              rows={2}
-              placeholder="Details zur Leistung…"
-            />
-          </Field>
+          <SheetEditableField
+            label="Beschreibung"
+            hint="Erscheint beim Kunden"
+            value={richTextToEditablePlain(p.beschreibung)}
+            onSave={(beschreibung) => onChange({ beschreibung })}
+            multiline
+            rows={3}
+            placeholder="Details zur Leistung…"
+            sheetContext="detail"
+          />
           <Field
             label="Kostenart"
             full
@@ -230,16 +232,10 @@ export function PositionModal({
           </Field>
           <Field label={p.regieSchein ? 'Geschätzte Stunden' : 'Menge'}>
             <div style={{ display: 'flex', gap: 4 }}>
-              <input
+              <ClearableNumberInput
                 className="txt"
-                type="number"
-                step="0.5"
                 value={p.menge}
-                onChange={(e) =>
-                  onChange({
-                    menge: e.target.value === '' ? 0 : Number(e.target.value),
-                  })
-                }
+                onValueChange={(menge) => onChange({ menge })}
                 style={{ flex: 1 }}
               />
               <select
@@ -267,11 +263,11 @@ export function PositionModal({
             <div className="pos-add-preis-ust__row">
               <div className="txt-prefix pos-add-preis-ust__preis">
                 <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
-                <input
+                <ClearableNumberInput
                   className="txt"
-                  type="number"
                   value={p.preis}
-                  onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
+                  onValueChange={(preis) => onChange({ preis })}
+                  min={0}
                 />
               </div>
               {showUst !== false ? (

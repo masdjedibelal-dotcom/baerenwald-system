@@ -3,21 +3,24 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
   AbnahmeBegehListe,
+  AbnahmeMaengelCheckliste,
   AbnahmeProgressBar,
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
-import { saveAbnahmeAndAbschliessen } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import {
+  getGesamtabnahmeGate,
+  saveAbnahmeAndAbschliessen,
+} from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
-  buildAbnahmePunkteInitial,
-  maengelAusPunkten,
+  maengelFromCheckItems,
+  type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { heuteYmd } from '@/lib/angebot-einfach'
@@ -26,8 +29,7 @@ import type { AuftragPosition } from '@/lib/types'
 type Step = 'frage' | 'checkliste'
 
 /**
- * Auftrag abschließen: optional Abnahme-Checkliste (Bottom/Split), sonst direkt abschließen.
- * Signatur entfällt (Portal / vor Ort).
+ * Auftrag abschließen: optionale Abnahme-Checkliste (frei hinzufügbare Leistungen + Mängel).
  */
 export function AuftragAbschliessenSheet({
   open,
@@ -48,21 +50,29 @@ export function AuftragAbschliessenSheet({
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState<Step>('frage')
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
+  const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>([])
   const [notizen, setNotizen] = useState('')
-  const [maengelFrei, setMaengelFrei] = useState('')
 
   useEffect(() => {
     if (!open) return
     setStep('frage')
-    setPunkte(buildAbnahmePunkteInitial({ positionen, angebotPositionen: null, gewerke: [] }))
+    setPunkte([])
+    setMaengelItems([])
     setNotizen('')
-    setMaengelFrei('')
-  }, [open, positionen])
+  }, [open])
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
   function abschliessenOhneAbnahme() {
     startTransition(async () => {
+      const gate = await getGesamtabnahmeGate(auftragId)
+      if (gate.zeilen.length > 0 && !gate.ok) {
+        toast.error(
+          gate.message ||
+            'Mit zugewiesenen Partnern: zuerst alle Teilabnahmen freigeben, dann Gesamtabnahme.'
+        )
+        return
+      }
       const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
       if (!r.ok) {
         toast.error(r.message)
@@ -77,27 +87,24 @@ export function AuftragAbschliessenSheet({
 
   function speichernMitAbnahme() {
     startTransition(async () => {
-      const ausPunkten = maengelAusPunkten(punkte)
-      const hatMaengel = ausPunkten.length > 0 || Boolean(maengelFrei.trim())
+      const maengel = maengelFromCheckItems(maengelItems)
+      const hatMaengel = maengel.length > 0
       const meta = emptyAbnahmeProtokollMeta({
         abnahme_ergebnis: hatMaengel ? 'mit_vorbehalt' : 'abgenommen',
       })
-      const extraNote = [notizen.trim(), maengelFrei.trim() ? `Mängel:\n${maengelFrei.trim()}` : '']
-        .filter(Boolean)
-        .join('\n\n')
       const r = await saveAbnahmeAndAbschliessen({
         auftragId,
         abnahmeDatum: heuteYmd(),
         punkte,
-        maengel: ausPunkten,
-        notizen: extraNote || null,
+        maengel,
+        notizen: notizen.trim() || null,
         meta,
       })
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Abnahmeprotokoll gespeichert — Auftrag abgeschlossen')
+      toast.success('Gesamtabnahme gespeichert — Auftrag abgeschlossen')
       onClose()
       onDone?.()
     })
@@ -174,21 +181,18 @@ export function AuftragAbschliessenSheet({
           <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
             Leistungen
           </h3>
-          <AbnahmeBegehListe punkte={punkte} onChange={setPunkte} />
-        </div>
-        <KiAssistFieldLabel
-          label="Mängel (frei, optional)"
-          value={maengelFrei}
-          onApply={setMaengelFrei}
-          extraHint="Abnahme: freie Mängel ohne Leistungsbezug."
-        >
-          <Textarea
-            rows={3}
-            value={maengelFrei}
-            onChange={(e) => setMaengelFrei(e.target.value)}
-            placeholder="Offene Punkte ohne Leistungsbezug…"
+          <AbnahmeBegehListe
+            punkte={punkte}
+            onChange={setPunkte}
+            katalogPositionen={positionen}
           />
-        </KiAssistFieldLabel>
+        </div>
+        <div>
+          <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+            Mängel (optional)
+          </h3>
+          <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
+        </div>
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>
           <Textarea

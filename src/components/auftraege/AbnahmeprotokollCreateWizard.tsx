@@ -13,9 +13,8 @@ import {
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
 import {
   downloadAbnahmeprotokollPdf,
@@ -103,7 +102,7 @@ export function AbnahmeprotokollCreateWizard({
 }) {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition('Wird gespeichert…')
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -372,32 +371,28 @@ export function AbnahmeprotokollCreateWizard({
           {ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
         </p>
       </fieldset>
-      <KiAssistFieldLabel
+      <SheetEditableField
         label="Hinweis (z. B. nicht Vertragsgegenstand)"
         value={meta.hinweis_sonstiges}
-        onApply={(text) => patchMeta({ hinweis_sonstiges: text })}
-        extraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
-      >
-        <Textarea
-          plain
-          rows={3}
-          value={meta.hinweis_sonstiges}
-          onChange={(e) => patchMeta({ hinweis_sonstiges: e.target.value })}
-          placeholder="Optional…"
-        />
-      </KiAssistFieldLabel>
+        onSave={(hinweis_sonstiges) => patchMeta({ hinweis_sonstiges })}
+        multiline
+        rows={3}
+        kiExtraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
+        placeholder="Optional…"
+      />
       <Input
         label="Mängelbeseitigung (global, PDF)"
         value={meta.maengel_beseitigung_spaetestens}
         onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
         placeholder="z. B. spätestens am 15.08.2026"
       />
-      <Textarea
+      <SheetEditableField
         label="Interne / weitere Anmerkungen"
-        plain
-        rows={3}
         value={notizen}
-        onChange={(e) => setNotizen(e.target.value)}
+        onSave={setNotizen}
+        multiline
+        rows={3}
+        placeholder="Interne Anmerkungen…"
       />
     </div>
   )
@@ -407,7 +402,11 @@ export function AbnahmeprotokollCreateWizard({
       <p className="section-h" style={{ marginBottom: 4 }}>
         Leistungen begehen &amp; abnehmen
       </p>
-      <AbnahmeBegehListe punkte={punkte} onChange={setPunkte} />
+      <AbnahmeBegehListe
+        punkte={punkte}
+        onChange={setPunkte}
+        katalogPositionen={positionen}
+      />
 
       {maengelListe.length > 0 ? (
         <FieldCard title="Festgestellte Mängel">
@@ -421,29 +420,17 @@ export function AbnahmeprotokollCreateWizard({
                   </p>
                   {punkt ? (
                     <>
-                      <KiAssistFieldLabel
+                      <SheetEditableField
                         label="Mangel-Beschreibung (PDF)"
                         value={punkt.notiz ?? ''}
-                        onApply={(text) =>
+                        onSave={(notiz) =>
                           setPunkte((prev) =>
-                            prev.map((p) => (p.id === punkt.id ? { ...p, notiz: text } : p))
+                            prev.map((p) => (p.id === punkt.id ? { ...p, notiz } : p))
                           )
                         }
-                        extraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
-                        multiline={false}
-                      >
-                        <Input
-                          value={punkt.notiz ?? ''}
-                          onChange={(e) =>
-                            setPunkte((prev) =>
-                              prev.map((p) =>
-                                p.id === punkt.id ? { ...p, notiz: e.target.value } : p
-                              )
-                            )
-                          }
-                          placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
-                        />
-                      </KiAssistFieldLabel>
+                        kiExtraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
+                        placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
+                      />
                       <Input
                         label="Beseitigung bis"
                         type="date"
@@ -595,12 +582,14 @@ export function AbnahmeprotokollCreateWizard({
               value={meta.projektadresse}
               onChange={(e) => patchMeta({ projektadresse: e.target.value })}
             />
-            <Textarea
+            <SheetEditableField
               label="Leistungsumfang (Kurz)"
-              plain
-              rows={4}
               value={meta.leistungsumfang_kurz}
-              onChange={(e) => patchMeta({ leistungsumfang_kurz: e.target.value })}
+              onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
+              multiline
+              rows={4}
+              sheetContext="detail"
+              placeholder="Leistungsumfang…"
             />
           </div>
         </MobileEditableBlock>
@@ -830,28 +819,15 @@ export function AbnahmeprotokollCreateWizard({
         </dl>
       </FieldCard>
       <FieldCard title="Rechtshinweise">
-        <MobileEditableBlock
-          sheetTitle="Rechtshinweise"
-          overview={
-            <p className="line-clamp-4 whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text-mid">
-              {meta.rechtshinweise.trim() || '—'}
-            </p>
-          }
-        >
-          <KiAssistFieldLabel
-            label="Weitere Hinweise (Rechtstext)"
-            value={meta.rechtshinweise}
-            onApply={(text) => patchMeta({ rechtshinweise: text })}
-            extraHint="Rechtshinweise im Abnahmeprotokoll (kundensichtbar)."
-          >
-            <Textarea
-              plain
-              rows={6}
-              value={meta.rechtshinweise}
-              onChange={(e) => patchMeta({ rechtshinweise: e.target.value })}
-            />
-          </KiAssistFieldLabel>
-        </MobileEditableBlock>
+        <SheetEditableField
+          label="Weitere Hinweise (Rechtstext)"
+          value={meta.rechtshinweise}
+          onSave={(rechtshinweise) => patchMeta({ rechtshinweise })}
+          multiline
+          rows={6}
+          kiExtraHint="Rechtshinweise im Abnahmeprotokoll (kundensichtbar)."
+          placeholder="Rechtshinweise…"
+        />
       </FieldCard>
       <div className="hidden sm:block">{footerActions}</div>
     </div>

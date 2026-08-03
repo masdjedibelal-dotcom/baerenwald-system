@@ -91,12 +91,17 @@ export function AngebotNeuKundeGate({
         onPick={(k: Kunde) => goWizard(k.id)}
       />
       <KundeModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        stayOnPage
-        onSaved={(id) => {
+        open={createOpen && !opening}
+        onClose={() => {
+          if (openingRef.current) return
           setCreateOpen(false)
+        }}
+        stayOnPage
+        context="canvas"
+        manageHistory={false}
+        onSaved={(id) => {
           if (id) goWizard(id)
+          else setCreateOpen(false)
         }}
       />
     </>

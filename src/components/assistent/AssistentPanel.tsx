@@ -267,7 +267,11 @@ export function AssistentPanel() {
     ? 'KPI-Analyse für den Geschäftsführer'
     : scopeMeta
       ? scoped?.layer === 'over-sheet'
-        ? 'Beschreib die Position — danach Übernehmen in die Karte.'
+        ? scoped.scopeId === 'feld'
+          ? 'Sag, wie der Feldtext werden soll — danach Übernehmen.'
+          : scoped.scopeId === 'positionen' || scoped.scopeId === 'position'
+            ? 'Beschreib die Position(en) — danach Übernehmen in die Karte.'
+            : 'Beschreib, was du brauchst — danach Übernehmen.'
         : 'Ich bin dein Assistent für diesen Editor.'
       : 'Ich bin dein CRM-Assistent.'
 

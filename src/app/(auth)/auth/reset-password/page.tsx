@@ -47,7 +47,7 @@ function ResetPasswordContent() {
       }
       const crm = await verifyCrmStaffSession()
       if (!crm.ok) {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: "local" })
         setError(crm.message)
         setChecking(false)
         return

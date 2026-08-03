@@ -58,16 +58,33 @@ export function maengelAusPunkten(
 ): AbnahmeMangel[] {
   return punkte
     .filter((p) => p.status === 'mangel')
-    .map((p) => ({
-      punkt_id: p.id,
-      beschreibung: p.notiz?.trim() || p.beschreibung,
-      foto_urls: [...(p.foto_urls ?? [])],
-      frist: p.mangel_frist?.trim()?.slice(0, 10) || null,
-      status: 'offen' as const,
-      erfasst_at: erfasstAt,
-      foto_nachher_urls: [],
-      verlauf: [{ at: erfasstAt, typ: 'erfasst', notiz: 'Bei Abnahme als Mangel markiert' }],
-    }))
+    .map((p) => {
+      const titel =
+        bereinigeTitel(p.leistung_name) ||
+        (p.beschreibung?.trim() && p.notiz?.trim() ? p.beschreibung.trim() : null)
+      const detail =
+        p.notiz?.trim() ||
+        (p.notizen ?? []).map((n) => String(n ?? '').trim()).find(Boolean) ||
+        (titel ? '' : p.beschreibung?.trim()) ||
+        ''
+      return {
+        punkt_id: p.id,
+        titel: titel || null,
+        beschreibung: detail || titel || p.beschreibung || 'Mangel',
+        foto_urls: [...(p.foto_urls ?? [])],
+        frist: p.mangel_frist?.trim()?.slice(0, 10) || null,
+        status: 'offen' as const,
+        erfasst_at: erfasstAt,
+        foto_nachher_urls: [],
+        verlauf: [{ at: erfasstAt, typ: 'erfasst', notiz: 'Bei Abnahme als Mangel markiert' }],
+      }
+    })
+}
+
+function bereinigeTitel(name: string | null | undefined): string {
+  const t = (name ?? '').trim()
+  if (!t || /^zusätzlicher punkt$/i.test(t)) return ''
+  return t
 }
 
 /** Beim Speichern: neue Mängel aus Punkten, bestehende Status/Timestamps behalten. */

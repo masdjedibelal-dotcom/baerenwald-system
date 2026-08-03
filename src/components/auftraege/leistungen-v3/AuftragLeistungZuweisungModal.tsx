@@ -16,6 +16,7 @@ import { BEREICH_LABELS, cn } from '@/lib/utils'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 
 function ymdToDisplay(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
@@ -255,19 +256,29 @@ export function AuftragLeistungZuweisungModal({
               />
             </label>
 
-            <label className="hw-anfrage-field">
-              <span className="hw-anfrage-label">Beschreibung</span>
-              <textarea
-                className="input ta"
-                rows={5}
+            <div className="hw-anfrage-field">
+              <KiAssistFieldLabel
+                label="Beschreibung"
                 value={beschreibung}
-                onChange={(e) => {
+                onApply={(text) => {
                   setDirty(true)
-                  setBeschreibung(e.target.value)
+                  setBeschreibung(text)
                 }}
+                extraHint="Leistungsbeschreibung für die Handwerker-Anfrage (Partner-Portal / Mail)."
                 disabled={pending}
-              />
-            </label>
+              >
+                <textarea
+                  className="input ta"
+                  rows={5}
+                  value={beschreibung}
+                  onChange={(e) => {
+                    setDirty(true)
+                    setBeschreibung(e.target.value)
+                  }}
+                  disabled={pending}
+                />
+              </KiAssistFieldLabel>
+            </div>
 
             <label className="hw-anfrage-field">
               <span className="hw-anfrage-label">Partner-EK netto *</span>

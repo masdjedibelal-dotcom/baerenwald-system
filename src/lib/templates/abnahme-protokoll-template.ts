@@ -206,34 +206,44 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
   const blocks = gewerke
     .map((g) => {
       const items = g.leistungen
-        .flatMap((l) => {
+        .map((l) => {
+          const titel =
+            l.leistung_name.trim() ||
+            l.punkte[0]?.beschreibung?.trim() ||
+            'Leistung'
           const notes = notizenFuerLeistung(l.punkte)
             .map((n) => n.trim())
             .filter(Boolean)
-          const bullets = l.punkte.map((p: AbnahmePunkt) => {
-            const text = p.beschreibung?.trim() || l.leistung_name
-            return `<li style="margin:0 0 6px;list-style:none;font-size:9pt;line-height:1.4;color:${TEXT};">
+          // Beschreibung: Notiz, sonst Bullet-Texte die ≠ Titel
+          const descParts = notes.length
+            ? notes
+            : l.punkte
+                .map((p: AbnahmePunkt) => p.beschreibung?.trim())
+                .filter((t): t is string => Boolean(t) && t !== titel)
+          const desc = descParts.join(' · ')
+          return `<li style="margin:0 0 10px;list-style:none;page-break-inside:avoid;">
               <table style="width:100%;border-collapse:collapse;"><tr>
-                <td style="width:18px;vertical-align:top;padding:1px 0 0;line-height:0;">${checkOkHtml()}</td>
-                <td style="vertical-align:top;padding:0 0 0 6px;">${esc(text)}</td>
+                <td style="width:18px;vertical-align:top;padding:2px 0 0;line-height:0;">${checkOkHtml()}</td>
+                <td style="vertical-align:top;padding:0 0 0 6px;">
+                  <div style="font-size:9.5pt;font-weight:700;line-height:1.35;color:${TEXT};">${esc(titel)}</div>
+                  ${
+                    desc
+                      ? `<div style="margin:3px 0 0;font-size:8pt;font-weight:400;line-height:1.4;color:${MUTED};">${esc(desc)}</div>`
+                      : ''
+                  }
+                </td>
               </tr></table>
             </li>`
-          })
-          const noteHtml = notes.length
-            ? `<p style="margin:0 0 8px 22px;font-size:8pt;color:${MUTED};">${notes.map(esc).join(' · ')}</p>`
-            : ''
-          return [
-            l.leistung_name.trim()
-              ? `<p style="margin:8px 0 4px;font-size:9pt;font-weight:700;color:${ACCENT};">${esc(l.leistung_name)}</p>`
-              : '',
-            `<ul style="margin:0;padding:0;">${bullets.join('')}</ul>`,
-            noteHtml,
-          ]
         })
         .join('')
+      const showGewerk = g.gewerk.trim() && g.gewerk !== 'Ohne Gewerk'
       return `<div style="margin:0 0 10px;page-break-inside:avoid;">
-        <p style="margin:0 0 4px;font-size:9.5pt;font-weight:700;color:${TEXT};">${esc(g.gewerk)}</p>
-        ${items}
+        ${
+          showGewerk
+            ? `<p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:${TEXT};">${esc(g.gewerk)}</p>`
+            : ''
+        }
+        <ul style="margin:0;padding:0;">${items}</ul>
       </div>`
     })
     .join('')
@@ -273,14 +283,24 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
     if (offen.length) {
       body += `<ul style="margin:0 0 8px;padding-left:18px;font-size:9pt;line-height:1.45;">
         ${offen
-          .map(
-            (m) =>
-              `<li style="margin:0 0 4px;"><strong>${esc(m.beschreibung)}</strong>${
+          .map((m) => {
+            const titel = (m.titel ?? '').trim()
+            const detail = (m.beschreibung ?? '').trim()
+            const head = titel || detail
+            const sub = titel && detail && detail !== titel ? detail : ''
+            return `<li style="margin:0 0 8px;">
+              <div style="font-weight:700;color:${TEXT};">${esc(head)}${
                 m.frist
-                  ? ` <span style="color:#991B1B;">(Beseitigung bis: ${esc(m.frist.slice(0, 10))})</span>`
+                  ? ` <span style="font-weight:400;color:#991B1B;">(Beseitigung bis: ${esc(m.frist.slice(0, 10))})</span>`
                   : ''
-              }</li>`
-          )
+              }</div>
+              ${
+                sub
+                  ? `<div style="margin:2px 0 0;font-size:8pt;font-weight:400;color:${MUTED};">${esc(sub)}</div>`
+                  : ''
+              }
+            </li>`
+          })
           .join('')}
       </ul>`
     } else {

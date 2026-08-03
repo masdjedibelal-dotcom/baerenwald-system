@@ -41,7 +41,7 @@ function LoginPageContent() {
     void (async () => {
       try {
         if (urlError === 'portal_only') {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
@@ -58,7 +58,7 @@ function LoginPageContent() {
         if (userErr || !data.user) return
         const crm = await verifyCrmStaffSession()
         if (!crm.ok) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
@@ -91,7 +91,7 @@ function LoginPageContent() {
 
     const crm = await verifyCrmStaffSession()
     if (!crm.ok) {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
       setLoading(false)
       return

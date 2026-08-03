@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { Toggle } from '@/components/ui/Toggle'
 import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
@@ -647,19 +648,15 @@ export function StaffFunnelWizard({
                   ) : null}
 
                   {dyn.beratung ? (
-                    <MockField
+                    <SheetEditableField
                       label="Beratung / Hinweis"
-                      full
                       hint="Kurz was im Gespräch geklärt werden soll"
-                    >
-                      <textarea
-                        className="input ta"
-                        rows={3}
-                        value={state.beratungText}
-                        onChange={(e) => patch({ beratungText: e.target.value })}
-                        placeholder="z.B. Vor-Ort-Termin, Aufmaß…"
-                      />
-                    </MockField>
+                      value={state.beratungText}
+                      onSave={(beratungText) => patch({ beratungText })}
+                      multiline
+                      rows={3}
+                      placeholder="z.B. Vor-Ort-Termin, Aufmaß…"
+                    />
                   ) : null}
                 </MockFormSection>
               </section>
@@ -669,23 +666,21 @@ export function StaffFunnelWizard({
         ) : (
           <section className="sf-sec">
             <MockFormSection>
-              <MockField label="Vorhaben" required full>
-                <input
-                  className="input"
-                  value={state.vorhaben}
-                  onChange={(e) => patch({ vorhaben: e.target.value })}
-                  placeholder="z.B. Badsanierung komplett"
-                />
-              </MockField>
-              <MockField label="Beschreibung" full hint="Wortlaut des Kunden">
-                <textarea
-                  className="input ta"
-                  rows={4}
-                  value={state.freitext}
-                  onChange={(e) => patch({ freitext: e.target.value })}
-                  placeholder="Was genau ist zu tun…"
-                />
-              </MockField>
+              <SheetEditableField
+                label="Vorhaben"
+                value={state.vorhaben}
+                onSave={(vorhaben) => patch({ vorhaben })}
+                placeholder="z.B. Badsanierung komplett"
+              />
+              <SheetEditableField
+                label="Beschreibung"
+                hint="Wortlaut des Kunden"
+                value={state.freitext}
+                onSave={(freitext) => patch({ freitext })}
+                multiline
+                rows={4}
+                placeholder="Was genau ist zu tun…"
+              />
             </MockFormSection>
           </section>
         )}

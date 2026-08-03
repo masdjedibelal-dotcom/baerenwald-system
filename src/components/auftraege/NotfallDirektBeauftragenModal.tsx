@@ -41,7 +41,7 @@ export function NotfallDirektBeauftragenModal({
   const [leistungsumfang, setLeistungsumfang] = useState('')
 
   const fromAnfrage = variant === 'anfrage'
-  const title = fromAnfrage ? 'Notfall melden' : 'Direkt beauftragen'
+  const title = 'Direkt beauftragen'
   const gewerkLabel = gewerkName?.trim() || 'Gewerk'
 
   useEffect(() => {

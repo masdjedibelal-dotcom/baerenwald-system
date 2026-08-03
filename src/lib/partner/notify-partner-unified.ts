@@ -5,7 +5,13 @@
 
 import { partnerVorgangRelativeLink } from '@/lib/portal-utils'
 
-export type PartnerNotifyTyp = 'neu' | 'geaendert' | 'entfernt' | 'erinnerung'
+export type PartnerNotifyTyp =
+  | 'neu'
+  | 'geaendert'
+  | 'entfernt'
+  | 'erinnerung'
+  /** Nur Bautagebuch-Aufforderung — keine Auftragsänderung / keine Bestätigungspflicht. */
+  | 'bautagebuch'
 
 function partnerSiteBaseUrl(): string {
   return (
@@ -27,6 +33,11 @@ export async function notifyPartnerUnified(input: {
   positionIds?: string[]
   aenderungTyp?: 'neu' | 'geaendert' | 'entfernt' | null
   preisAlt?: number | null
+  /**
+   * false = nur In-App-Glocke (CRM hat Spezial-Mail schon gesendet).
+   * Default: Portal entscheidet (bei neu/geaendert oft false).
+   */
+  sendMail?: boolean
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
   if (!secret) {
@@ -46,6 +57,8 @@ export async function notifyPartnerUnified(input: {
   if (input.positionIds?.length) body.positionIds = input.positionIds
   if (input.aenderungTyp) body.aenderungTyp = input.aenderungTyp
   if (input.preisAlt != null && Number.isFinite(input.preisAlt)) body.preisAlt = input.preisAlt
+  if (input.sendMail === false) body.sendMail = false
+  if (input.sendMail === true) body.sendMail = true
 
   let res: Response
   try {

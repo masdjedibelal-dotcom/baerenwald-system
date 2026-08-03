@@ -13,6 +13,7 @@ import {
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { PosAddRow } from '@/components/posboard/PosAddRow'
 import { Button } from '@/components/ui/Button'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
 import { Textarea } from '@/components/ui/Textarea'
@@ -361,13 +362,11 @@ function PositionAccordionItem({
             <WizardField label={z.modus === 'prozent' ? 'Prozent' : 'Betrag netto'}>
               <div className="txt-prefix">
                 <span className="prefix">{z.modus === 'prozent' ? '%' : '€'}</span>
-                <input
+                <ClearableNumberInput
                   className="input"
-                  type="number"
-                  step={z.modus === 'prozent' ? '0.5' : '0.01'}
                   min={0}
                   value={z.wert}
-                  onChange={(e) => onPatch({ wert: Number(e.target.value) || 0 })}
+                  onValueChange={(wert) => onPatch({ wert })}
                 />
               </div>
             </WizardField>
@@ -450,15 +449,12 @@ function PositionAccordionItem({
             ) : null}
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
-                <input
+                <ClearableNumberInput
                   className="input min-w-0 flex-1"
-                  type="number"
-                  step="0.5"
                   min={0.01}
+                  blurEmptyValue={0.01}
                   value={z.menge}
-                  onChange={(e) =>
-                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
-                  }
+                  onValueChange={(menge) => onPatch({ menge })}
                 />
                 <select
                   className="input"
@@ -569,15 +565,12 @@ function PositionAccordionItem({
             </WizardField>
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
-                <input
+                <ClearableNumberInput
                   className="input min-w-0 flex-1"
-                  type="number"
-                  step="0.5"
                   min={0.01}
+                  blurEmptyValue={0.01}
                   value={z.menge}
-                  onChange={(e) =>
-                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
-                  }
+                  onValueChange={(menge) => onPatch({ menge })}
                 />
                 <select
                   className="input"
