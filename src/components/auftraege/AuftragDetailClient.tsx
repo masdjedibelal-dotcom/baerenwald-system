@@ -32,6 +32,7 @@ import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
+import { AuftragFachdokuCard } from '@/components/auftraege/AuftragFachdokuCard'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
@@ -1002,6 +1003,10 @@ export function AuftragDetailClient({
             detail={detail}
             rechnungen={rechnungenListe}
             vertraege={vertraegeListe}
+            onChanged={() => refresh()}
+          />
+          <AuftragFachdokuCard
+            auftragId={detail.id}
             onChanged={() => refresh()}
           />
           {istBauprojekt ? (
