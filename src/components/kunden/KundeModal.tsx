@@ -235,8 +235,8 @@ export function KundeModal({
         email: email || null,
         plz,
         ort,
-        strasse: splitAddr.strasse || null,
-        hausnummer: splitAddr.hausnummer || null,
+        strasse: strasse.trim() || null,
+        hausnummer: hausnummer.trim() || null,
         notizen: notizen || null,
         ...(firmaPflicht ? { name: firmaName.trim() || undefined } : {}),
       }
