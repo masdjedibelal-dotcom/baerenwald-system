@@ -402,15 +402,16 @@ export function VorgaengeListeClient({
   }, [hwEingangsrechnungen])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
+  /** Offen/Erledigt nur bei „Alle“ (und HW-Eingang) — in Phasen-Chips kaum sinnvoll. */
+  const showLifecycleToggle = filter === 'alle' || showHwEingang
   const effectiveLifecycleCounts = showHwEingang ? hwLifecycleCounts : lifecycleCounts
 
-  const lifecycleRows = useMemo(
-    () =>
-      baseRows.filter((v) =>
-        lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
-      ),
-    [baseRows, lifecycle]
-  )
+  const lifecycleRows = useMemo(() => {
+    if (!showLifecycleToggle) return baseRows
+    return baseRows.filter((v) =>
+      lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+    )
+  }, [baseRows, lifecycle, showLifecycleToggle])
 
   const statusOptions = useMemo(() => {
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
@@ -910,38 +911,40 @@ export function VorgaengeListeClient({
             ]}
             desktop={
               <>
-                <div
-                  className="segment-toggle segment-toggle--listbar"
-                  role="group"
-                  aria-label="Lebenszyklus"
-                >
-                  <button
-                    type="button"
-                    className={cn(
-                      'segment-toggle-btn',
-                      lifecycle === 'offen' && 'segment-toggle-btn--active'
-                    )}
-                    onClick={() => setLifecycleFilter('offen')}
+                {showLifecycleToggle ? (
+                  <div
+                    className="segment-toggle segment-toggle--listbar"
+                    role="group"
+                    aria-label="Lebenszyklus"
                   >
-                    Offen{' '}
-                    <span className="segment-toggle-count">
-                      {effectiveLifecycleCounts.offen}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'segment-toggle-btn',
-                      lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                    )}
-                    onClick={() => setLifecycleFilter('erledigt')}
-                  >
-                    Erledigt{' '}
-                    <span className="segment-toggle-count">
-                      {effectiveLifecycleCounts.erledigt}
-                    </span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className={cn(
+                        'segment-toggle-btn',
+                        lifecycle === 'offen' && 'segment-toggle-btn--active'
+                      )}
+                      onClick={() => setLifecycleFilter('offen')}
+                    >
+                      Offen{' '}
+                      <span className="segment-toggle-count">
+                        {effectiveLifecycleCounts.offen}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'segment-toggle-btn',
+                        lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+                      )}
+                      onClick={() => setLifecycleFilter('erledigt')}
+                    >
+                      Erledigt{' '}
+                      <span className="segment-toggle-count">
+                        {effectiveLifecycleCounts.erledigt}
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
                 <MockBtn
                   icon="filter"
                   kind={activeFilterCount ? 'primary' : 'ghost'}
@@ -971,40 +974,42 @@ export function VorgaengeListeClient({
             }
           />
         </div>
-        <div
-          className="listbar-lifecycle"
-          role="group"
-          aria-label="Lebenszyklus"
-        >
-          <div className="segment-toggle segment-toggle--listbar segment-toggle--stack">
-            <button
-              type="button"
-              className={cn(
-                'segment-toggle-btn',
-                lifecycle === 'offen' && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setLifecycleFilter('offen')}
-            >
-              Offen{' '}
-              <span className="segment-toggle-count">
-                {effectiveLifecycleCounts.offen}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'segment-toggle-btn',
-                lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setLifecycleFilter('erledigt')}
-            >
-              Erledigt{' '}
-              <span className="segment-toggle-count">
-                {effectiveLifecycleCounts.erledigt}
-              </span>
-            </button>
+        {showLifecycleToggle ? (
+          <div
+            className="listbar-lifecycle"
+            role="group"
+            aria-label="Lebenszyklus"
+          >
+            <div className="segment-toggle segment-toggle--listbar segment-toggle--stack">
+              <button
+                type="button"
+                className={cn(
+                  'segment-toggle-btn',
+                  lifecycle === 'offen' && 'segment-toggle-btn--active'
+                )}
+                onClick={() => setLifecycleFilter('offen')}
+              >
+                Offen{' '}
+                <span className="segment-toggle-count">
+                  {effectiveLifecycleCounts.offen}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'segment-toggle-btn',
+                  lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+                )}
+                onClick={() => setLifecycleFilter('erledigt')}
+              >
+                Erledigt{' '}
+                <span className="segment-toggle-count">
+                  {effectiveLifecycleCounts.erledigt}
+                </span>
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       {isMobile ? (
@@ -1247,22 +1252,34 @@ export function VorgaengeListeClient({
         {displayItems.length === 0 ? (
           <MockEmpty
             icon="folder-open"
-            title={lifecycle === 'erledigt' ? 'Keine erledigten Vorgänge' : 'Keine offenen Vorgänge'}
+            title={
+              !showLifecycleToggle
+                ? 'Keine Vorgänge'
+                : lifecycle === 'erledigt'
+                  ? 'Keine erledigten Vorgänge'
+                  : 'Keine offenen Vorgänge'
+            }
             hint={
-              lifecycle === 'erledigt'
-                ? 'Filter zurücksetzen oder zu „Offen“ wechseln'
-                : filter === 'auftrag'
+              !showLifecycleToggle
+                ? filter === 'auftrag'
                   ? 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
                   : filter === 'rechnung'
-                    ? 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
-                    : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
+                    ? 'Keine Rechnungen in diesem Filter.'
+                    : 'Filter zurücksetzen oder anderen Phasen-Chip wählen.'
+                : lifecycle === 'erledigt'
+                  ? 'Filter zurücksetzen oder zu „Offen“ wechseln'
+                  : filter === 'auftrag'
+                    ? 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
+                    : filter === 'rechnung'
+                      ? 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
+                      : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
             }
             action={
-              lifecycle === 'offen' ? undefined : (
+              showLifecycleToggle && lifecycle !== 'offen' ? (
                 <MockBtn kind="ghost" onClick={() => setLifecycleFilter('offen')}>
                   Zu offenen Vorgängen
                 </MockBtn>
-              )
+              ) : undefined
             }
           />
         ) : (

@@ -252,6 +252,18 @@
     text-size-adjust: 100%;
   }
 
+  @media (max-width: 767px) {
+    html,
+    body {
+      background: var(--bg-mobile, #f1f2f1);
+      height: auto;
+      min-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+    }
+  }
+
   :focus-visible {
     outline: 2px solid color-mix(in srgb, var(--green) 40%, transparent);
     outline-offset: 2px;

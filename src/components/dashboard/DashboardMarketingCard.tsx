@@ -12,7 +12,7 @@ function formatNum(n: number | null | undefined): string {
   return new Intl.NumberFormat('de-DE').format(Math.round(n))
 }
 
-/** Kompakte Mock-KPI-Kachel: Label oben, Wert + Detail in einer Zeile. */
+/** Kompakte Mock-KPI-Kachel: Label oben, Wert (+ optional Detail rechts). */
 function CompactKpi({
   label,
   value,
@@ -23,25 +23,28 @@ function CompactKpi({
 }: {
   label: string
   value: string
-  detail: string
+  detail?: string | null
   detailTone?: 'muted' | 'positive'
   muted?: boolean
   onErrorClick?: () => void
 }) {
+  const showDetail = Boolean(detail?.trim())
   return (
     <div className="mkt-kpi">
       <div className="mkt-kpi-label">{label}</div>
       <div className="mkt-kpi-row">
         <span className={`mkt-kpi-val${muted ? ' muted' : ''}`}>{value}</span>
-        {onErrorClick ? (
-          <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
-            {detail}
-          </button>
-        ) : (
-          <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
-            {detail}
-          </span>
-        )}
+        {showDetail ? (
+          onErrorClick ? (
+            <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
+              {detail}
+            </button>
+          ) : (
+            <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
+              {detail}
+            </span>
+          )
+        ) : null}
       </div>
     </div>
   )
@@ -58,62 +61,30 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
     return Math.max(1, ...counts, data.rechnerStart ?? 0)
   }, [data.funnelStages, data.rechnerStart])
 
-  const worstDropKey = useMemo(() => {
-    let best: (typeof data.funnelStages)[number] | null = null
-    for (const s of data.funnelStages) {
-      if (s.dropoffPct == null || s.dropoffLost == null || s.dropoffLost <= 0) continue
-      if (!best || s.dropoffPct > (best.dropoffPct ?? -1)) best = s
-    }
-    return best?.key ?? null
-  }, [data.funnelStages])
-
   const funnelBody =
     data.funnelOk && data.funnelStages.length > 0 ? (
       <div className="mkt-funnel-list">
-        {data.funnelStages.map((s) => {
-          const hasDrop =
-            s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
-          const isWorst = worstDropKey === s.key
-          const detail = hasDrop
-            ? `↓ −${s.dropoffPct}% · −${formatNum(s.dropoffLost)}${
-                isWorst ? ' · größter Absprung' : ''
-              }`
-            : s.key === 'start'
-              ? 'Start'
-              : s.key === 'lead'
-                ? 'Conversion'
-                : null
-          return (
-            <div key={s.key} className="mkt-funnel-row">
-              <div className="mkt-funnel-left">
-                <span className="mkt-funnel-title">{s.label}</span>
-                {detail ? (
-                  <span
-                    className={
-                      isWorst ? 'mkt-funnel-detail worst' : 'mkt-funnel-detail'
-                    }
-                  >
-                    {detail}
-                  </span>
-                ) : null}
-              </div>
-              <div className="mkt-funnel-bar">
-                <div
-                  className="mkt-funnel-bar-fill"
-                  style={{
-                    width: `${Math.round((s.count / maxFunnel) * 100)}%`,
-                  }}
-                />
-              </div>
-              <div className="mkt-funnel-nums">
-                <span className="mkt-funnel-count">{formatNum(s.count)}</span>
-                <span className="mkt-funnel-pct">
-                  {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
-                </span>
-              </div>
+        {data.funnelStages.map((s) => (
+          <div key={s.key} className="mkt-funnel-row">
+            <div className="mkt-funnel-left">
+              <span className="mkt-funnel-title">{s.label}</span>
             </div>
-          )
-        })}
+            <div className="mkt-funnel-bar">
+              <div
+                className="mkt-funnel-bar-fill"
+                style={{
+                  width: `${Math.round((s.count / maxFunnel) * 100)}%`,
+                }}
+              />
+            </div>
+            <div className="mkt-funnel-nums">
+              <span className="mkt-funnel-count">{formatNum(s.count)}</span>
+              <span className="mkt-funnel-pct">
+                {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     ) : (
       <div className="mkt-funnel-empty">
@@ -167,7 +138,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Website-Besuche"
                 value={data.pageviewsOk ? formatNum(data.pageviews) : '—'}
-                detail={data.pageviewsOk ? 'Website' : 'Fehler'}
+                detail={!data.pageviewsOk ? 'Fehler' : null}
                 muted={!data.pageviewsOk || data.pageviews == null}
                 onErrorClick={
                   !data.pageviewsOk && data.pageviewsError
@@ -178,7 +149,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Rechner gestartet"
                 value={data.funnelOk ? formatNum(data.rechnerStart) : '—'}
-                detail={data.funnelOk ? 'PostHog' : 'Fehler'}
+                detail={!data.funnelOk ? 'Fehler' : null}
                 muted={!data.funnelOk || data.rechnerStart == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -189,16 +160,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Anfrage abgeschickt"
                 value={data.funnelOk ? formatNum(data.rechnerLead) : '—'}
-                detail={
-                  data.funnelOk &&
-                  data.rechnerStart &&
-                  data.rechnerStart > 0 &&
-                  data.rechnerLead != null
-                    ? `${Math.round((data.rechnerLead / data.rechnerStart) * 1000) / 10}% vom Start`
-                    : data.funnelOk
-                      ? 'PostHog'
-                      : 'Fehler'
-                }
+                detail={!data.funnelOk ? 'Fehler' : null}
                 muted={!data.funnelOk || data.rechnerLead == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -243,20 +205,12 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Google-Klicks"
                 value={data.gscOk ? formatNum(data.gscClicks) : '—'}
-                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscClicks == null}
-                onErrorClick={
-                  !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined
-                }
               />
               <CompactKpi
                 label="Impressionen"
                 value={data.gscOk ? formatNum(data.gscImpressions) : '—'}
-                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscImpressions == null}
-                onErrorClick={
-                  !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined
-                }
               />
             </div>
 

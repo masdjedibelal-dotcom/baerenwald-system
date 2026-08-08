@@ -160,13 +160,13 @@ function pushLead(
   items: CrmNotificationItem[],
   row: { id: string; kontakt_name?: string | null; situation?: string | null; plz?: string | null; created_at: string }
 ) {
-  const name = row.kontakt_name?.trim() || 'Anfrage'
+  const name = row.kontakt_name?.trim() || null
   const meta = [row.situation?.trim(), row.plz?.trim()].filter(Boolean).join(' · ')
   items.push({
     sourceKey: `neue_anfrage:${row.id}`,
     typ: 'neue_anfrage',
-    title: typLabel('neue_anfrage'),
-    subtitle: meta ? `${name} · ${meta}` : name,
+    title: name ? `Neue Anfrage von ${name}` : 'Neue Anfrage',
+    subtitle: meta || null,
     href: `/anfragen/${row.id}`,
     createdAt: row.created_at,
     gelesen: false,
@@ -226,7 +226,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   const { data: eintraege, error: peErr } = await supabase
     .from('position_eintraege')
     .select(
-      'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name)'
+      'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
     )
     .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
     .gte('created_at', since)
@@ -237,20 +237,30 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
     for (const row of eintraege ?? []) {
       const pos = one(
         row.auftrag_positionen as
-          | { auftrag_id?: string | null; leistung_name?: string | null }
-          | { auftrag_id?: string | null; leistung_name?: string | null }[]
+          | {
+              auftrag_id?: string | null
+              leistung_name?: string | null
+              handwerker?: { name?: string | null } | { name?: string | null }[] | null
+            }
+          | {
+              auftrag_id?: string | null
+              leistung_name?: string | null
+              handwerker?: { name?: string | null } | { name?: string | null }[] | null
+            }[]
           | null
       )
       const auftragId =
         (row.auftrag_id as string | null)?.trim() || pos?.auftrag_id?.trim() || null
       if (!auftragId) continue
+      const hw = one(pos?.handwerker as { name?: string | null } | { name?: string | null }[] | null)
+      const hwName = hw?.name?.trim() || 'Handwerker'
       const leistung = pos?.leistung_name?.trim()
       const desc = (row.beschreibung as string)?.trim()
       items.push({
         sourceKey: `handwerker_update:${row.id}`,
         typ: 'handwerker_update',
-        title: typLabel('handwerker_update'),
-        subtitle: [leistung, desc].filter(Boolean).join(' · ') || null,
+        title: leistung ? `${hwName}: Update zu ${leistung}` : `${hwName}: Update`,
+        subtitle: desc || null,
         href: `/auftraege/${auftragId}?tab=bautagebuch${
           row.position_id ? `&position=${encodeURIComponent(String(row.position_id))}` : ''
         }`,
@@ -340,9 +350,10 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
         leadId,
         tab: auftragId ? 'leistungen' : null,
       })
-      const sub = [hw?.name?.trim(), gewerk?.name?.trim(), angebot?.angebotsnr?.trim()]
-        .filter(Boolean)
-        .join(' · ')
+      const hwName = hw?.name?.trim() || 'Handwerker'
+      const gewerkName = gewerk?.name?.trim()
+      const angebotsnr = angebot?.angebotsnr?.trim()
+      const sub = [gewerkName, angebotsnr].filter(Boolean).join(' · ')
 
       const antwortAt = (row.antwort_at as string | null)?.trim()
       const st = normalizeHwZuweisungStatus(row.status as string)
@@ -351,7 +362,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
           items.push({
             sourceKey: `handwerker_angenommen:${row.id}`,
             typ: 'handwerker_angenommen',
-            title: typLabel('handwerker_angenommen'),
+            title: `${hwName} hat zugesagt`,
             subtitle: sub || null,
             href,
             createdAt: antwortAt,
@@ -361,7 +372,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
           items.push({
             sourceKey: `handwerker_abgelehnt:${row.id}`,
             typ: 'handwerker_abgelehnt',
-            title: typLabel('handwerker_abgelehnt'),
+            title: `${hwName} hat abgelehnt`,
             subtitle: sub || null,
             href,
             createdAt: antwortAt,
@@ -375,7 +386,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
         items.push({
           sourceKey: `handwerker_einreichung:${row.id}`,
           typ: 'handwerker_einreichung',
-          title: typLabel('handwerker_einreichung'),
+          title: `${hwName} hat Angebot eingereicht`,
           subtitle: sub || null,
           href: hrefVorgang({ angebotId, leadId, auftragId: null }),
           createdAt: eingereichtAt,
@@ -405,14 +416,18 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
       const typ: CrmNotificationTyp =
         st === 'abgelehnt' ? 'vorgang_abgelehnt' : 'vorgang_angenommen'
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
+      const hwName = hw?.name?.trim() || 'Handwerker'
       const leistung = (row.leistung_name as string)?.trim()
       const at =
         (row.handwerker_angefragt_at as string | null)?.trim() || since
       items.push({
         sourceKey: `${typ}:${row.id}`,
         typ,
-        title: typLabel(typ),
-        subtitle: [hw?.name?.trim(), leistung].filter(Boolean).join(' · ') || null,
+        title:
+          typ === 'vorgang_abgelehnt'
+            ? `${hwName} hat Leistung abgelehnt`
+            : `${hwName} hat Leistung angenommen`,
+        subtitle: leistung || null,
         href: `/auftraege/${auftragId}?tab=leistungen`,
         createdAt: at,
         gelesen: false,
@@ -436,11 +451,13 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
     if (!auftragId || !at) continue
     const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
     const gewerk = one(row.gewerke as { name?: string | null } | { name?: string | null }[] | null)
+    const hwName = hw?.name?.trim() || 'Handwerker'
+    const gewerkName = gewerk?.name?.trim()
     items.push({
       sourceKey: `projektvertrag_bestaetigt:${row.id}`,
       typ: 'projektvertrag_bestaetigt',
-      title: typLabel('projektvertrag_bestaetigt'),
-      subtitle: [hw?.name?.trim(), gewerk?.name?.trim()].filter(Boolean).join(' · ') || null,
+      title: `${hwName}: Vertrag bestätigt`,
+      subtitle: gewerkName || null,
       href: `/auftraege/${auftragId}?tab=leistungen`,
       createdAt: at,
       gelesen: false,
@@ -462,7 +479,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
     items.push({
       sourceKey: `abnahme_bestaetigt:${row.id}`,
       typ: 'abnahme_bestaetigt',
-      title: typLabel('abnahme_bestaetigt'),
+      title: 'Abnahme bestätigt',
       subtitle: (row.beschreibung as string)?.trim() || null,
       href: `/auftraege/${auftragId}?tab=abnahme`,
       createdAt: row.created_at as string,
@@ -487,12 +504,13 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
     if (!auftragId) continue
     const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
     const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
+    const hwName = hw?.name?.trim()
+    const aufTitel = auf?.titel?.trim()
     items.push({
       sourceKey: `abnahme_freigabe_ausstehend:${row.id}`,
       typ: 'abnahme_freigabe_ausstehend',
-      title: typLabel('abnahme_freigabe_ausstehend'),
-      subtitle:
-        [hw?.name?.trim(), auf?.titel?.trim()].filter(Boolean).join(' · ') || 'Teilabnahme prüfen',
+      title: hwName ? `Abnahme wartet — ${hwName}` : 'Abnahme wartet auf Freigabe',
+      subtitle: aufTitel || 'Teilabnahme prüfen',
       href: `/auftraege/${auftragId}?tab=abnahme`,
       createdAt: (row.updated_at as string) || (row.created_at as string) || since,
       gelesen: false,
@@ -515,8 +533,8 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
     items.push({
       sourceKey: `auftrag_abgeschlossen:${row.id}`,
       typ: 'auftrag_abgeschlossen',
-      title: typLabel('auftrag_abgeschlossen'),
-      subtitle: [titel, kundeName].filter(Boolean).join(' · ') || null,
+      title: kundeName ? `Auftrag abgeschlossen — ${kundeName}` : 'Auftrag abgeschlossen',
+      subtitle: titel || null,
       href: `/auftraege/${row.id}`,
       createdAt: (row.updated_at as string) || since,
       gelesen: false,
@@ -546,14 +564,13 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
           | null
       )
       const projekt = auf?.titel?.trim() || auf?.projekt_name?.trim() || null
+      const hwName = hw?.name?.trim() || 'Handwerker'
+      const posTitel = (row.titel as string)?.trim()
       items.push({
         sourceKey: `partner_positions_meldung:${row.id}`,
         typ: 'partner_positions_meldung',
-        title: typLabel('partner_positions_meldung'),
-        subtitle:
-          [hw?.name?.trim(), (row.titel as string)?.trim(), projekt]
-            .filter(Boolean)
-            .join(' · ') || null,
+        title: `${hwName}: Nachtrag gemeldet`,
+        subtitle: [posTitel, projekt].filter(Boolean).join(' · ') || null,
         href: `/auftraege/${auftragId}?tab=leistungen`,
         createdAt: row.created_at as string,
         gelesen: false,
@@ -577,14 +594,13 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
+      const hwName = hw?.name?.trim() || 'Handwerker'
+      const leistung = (row.leistung_name as string)?.trim()
       items.push({
         sourceKey: `partner_weitere_arbeit:${row.id}`,
         typ: 'partner_weitere_arbeit',
-        title: typLabel('partner_weitere_arbeit'),
-        subtitle:
-          [hw?.name?.trim(), (row.leistung_name as string)?.trim()]
-            .filter(Boolean)
-            .join(' · ') || null,
+        title: `${hwName}: weitere Arbeit gemeldet`,
+        subtitle: leistung || null,
         href: `/auftraege/${auftragId}?tab=leistungen`,
         createdAt: (row.created_at as string) || since,
         gelesen: false,
@@ -629,7 +645,7 @@ function kundeLabelFromRow(row: {
   return composed || null
 }
 
-/** Zeile: nur Phasen-Titel (Anfrage/Angebot/Auftrag/Rechnung) + Kundenname. */
+/** Kundenname in Subzeile anreichern — Titel (Wer + Tat) bleibt erhalten. */
 async function applyUpdateZeilenAnzeige(
   supabase: ReturnType<typeof createClient>,
   items: CrmNotificationItem[]
@@ -769,11 +785,7 @@ async function applyUpdateZeilenAnzeige(
 
   for (const item of items) {
     const parsed = parseUpdateHref(item.href)
-    if (!parsed) {
-      item.subtitle = null
-      continue
-    }
-    item.title = parsed.phase
+    if (!parsed) continue
     const name =
       parsed.phase === 'Anfrage'
         ? kundeByLead.get(parsed.id)
@@ -782,7 +794,14 @@ async function applyUpdateZeilenAnzeige(
           : parsed.phase === 'Rechnung'
             ? kundeByRechnung.get(parsed.id)
             : kundeByAuftrag.get(parsed.id)
-    item.subtitle = name ?? null
+    if (!name) continue
+    // Abnahme bestätigt: Kunde in den Titel
+    if (item.typ === 'abnahme_bestaetigt' && !item.title.includes(name)) {
+      item.title = `Abnahme bestätigt — ${name}`
+    }
+    if (item.title.includes(name)) continue
+    if (item.subtitle?.includes(name)) continue
+    item.subtitle = item.subtitle ? `${item.subtitle} · ${name}` : name
   }
 }
 

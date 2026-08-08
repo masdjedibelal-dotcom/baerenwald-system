@@ -417,7 +417,7 @@
 @media (max-width: 767px) {
   .topbar {
     padding: 8px 12px;
-    padding-top: calc(8px + env(safe-area-inset-top, 0));
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
     height: auto;
     min-height: var(--topbar-h);
     gap: 4px;
@@ -492,7 +492,7 @@
     position: relative;
     z-index: 25;
     flex-shrink: 0;
-    background: var(--card-mobile, #fafbfa);
+    background: var(--bg-mobile, #f1f2f1);
     border-bottom: 0.5px solid var(--border);
     box-shadow: 0 1px 0 rgba(22, 32, 27, 0.06);
   }
@@ -507,11 +507,11 @@
   }
 
   /*
-   * Listbar sticky steckt im scrollenden `.page` — Topbar liegt außerhalb.
-   * Daher Offset 0 (nicht Topbar-Höhe mitrechnen).
+   * Listbar sticky: Topbar ist sticky top:0 — Listbar darunter andocken.
+   * ~52px Topbar-Inhalt + Safe-Area.
    */
   .main {
-    --mobile-sticky-offset: 0px;
+    --mobile-sticky-offset: calc(env(safe-area-inset-top, 0px) + 52px);
   }
 }
 /* Desktop: große Suchleiste in der Topbar-Mitte */
@@ -754,6 +754,11 @@
 }
 @media (max-width: 767px) {
   .page {
+    background: var(--bg-mobile, #f1f2f1);
+    overflow: visible;
+  }
+  html,
+  body {
     background: var(--bg-mobile, #f1f2f1);
   }
 }
@@ -3316,6 +3321,28 @@ button.wv-chip:hover {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+  .mkt-kpi-grid--2,
+  .mkt-kpi-grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mkt-kpi-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mkt-kpi-grid--2 .mkt-kpi,
+  .mkt-kpi-grid--3 .mkt-kpi {
+    padding: 8px 8px;
+  }
+  .mkt-kpi-grid--2 .mkt-kpi-label,
+  .mkt-kpi-grid--3 .mkt-kpi-label {
+    font-size: 10px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .mkt-kpi-grid--2 .mkt-kpi-val,
+  .mkt-kpi-grid--3 .mkt-kpi-val {
+    font-size: var(--fs-title, 1.05rem);
+  }
   .mkt-funnel-row {
     grid-template-columns: 1fr auto;
     grid-template-areas:
@@ -3331,6 +3358,12 @@ button.wv-chip:hover {
 @media (max-width: 420px) {
   .mkt-kpi-grid {
     grid-template-columns: 1fr;
+  }
+  .mkt-kpi-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mkt-kpi-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -7885,11 +7918,11 @@ a.hvk-chip-main:hover { text-decoration: underline; }
   
 .vg-row {
     display: grid !important;
-    /* Titel nimmt Rest → Status fest rechts (nicht direkt hinter dem Namen) */
+    /* Kunde primär oben, Vorgangstitel darunter */
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      "title  status  check   actions"
-      "kunde  kunde  kunde   kunde"
+      "kunde  status  check   actions"
+      "title  title  title   title"
       "wert   wert   datum    datum";
     column-gap: 8px;
     row-gap: 5px;
@@ -7967,8 +8000,8 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 .vg-selectmode .vg-row {
     grid-template-columns: 28px minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "check  title  status  actions"
-      "check  kunde  kunde   kunde"
+      "check  kunde  status  actions"
+      "check  title  title   title"
       "check  wert   datum   datum";
   }
 
@@ -7988,13 +8021,27 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 .vg-row > .vg-vorgang { grid-area: title; min-width: 0; overflow: hidden; }
 
   
-.vg-row > .vg-vorgang .t { font-size: var(--fs-title); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vg-row > .vg-vorgang .t {
+    font-size: var(--fs-text);
+    font-weight: 400;
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   
 .vg-row > .vg-actions { grid-area: actions; justify-self: end; align-self: start; }
 
   
-.vg-row > .vg-kunde { grid-area: kunde; color: var(--text-3); font-size: var(--fs-text); }
+.vg-row > .vg-kunde {
+    grid-area: kunde;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--fs-title);
+    font-weight: 600;
+  }
 
 .vg-row > .vg-kunde .vg-kunde__name {
   display: block;
@@ -8599,8 +8646,30 @@ a.hvk-chip-main:hover { text-decoration: underline; }
   
 .app, .app.sb-collapsed {
     grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr;
-    height: 100dvh;
+    grid-template-rows: auto;
+    /* Dokument scrollt → Browser darf URL-Leiste einklappen */
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    background: var(--bg-mobile, #f1f2f1);
+  }
+
+  .main {
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  .topbar-stack {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .page {
+    overflow: visible;
+    flex: 1 0 auto;
   }
 
   
@@ -8754,13 +8823,21 @@ body.has-editor-sheet .fab-wrap {
   
 .main {
   grid-row: 1;
-  /* auto: Topbar-Stack inkl. Screen-Titel — nicht auf --topbar-h clippen */
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow: visible;
   padding-bottom: calc(var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 8px);
 }
 
   
-.topbar { padding: 0 14px; position: static; background: transparent; border-bottom: none; }
+.topbar {
+    padding: 0 14px;
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    position: static;
+    background: transparent;
+    border-bottom: none;
+  }
 
   
 .topbar-actions { gap: 6px; }
