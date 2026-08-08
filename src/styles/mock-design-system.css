@@ -17684,6 +17684,30 @@ textarea.input:focus {
   gap: 14px;
   min-width: 0;
 }
+.zahlplan-editor-list--cards {
+  gap: 12px;
+}
+.zahlplan-editor-listcard {
+  margin: 0;
+}
+.zahlplan-editor-listcard .list-row.zahlplan-row--editor {
+  cursor: pointer;
+}
+.zahlplan-editor-listcard .list-row.zahlplan-row--editor.is-frozen {
+  opacity: 0.78;
+  cursor: default;
+}
+.zahlplan-editor-add {
+  align-self: flex-start;
+  border: none;
+  padding: 0;
+  width: auto;
+}
+.zahlplan-editor-summe-line {
+  display: flex;
+  align-items: center;
+  padding: 4px 2px 0;
+}
 .zahlplan-rate-card {
   border: 0.5px solid var(--border);
   border-radius: 12px;

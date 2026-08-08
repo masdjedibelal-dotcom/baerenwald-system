@@ -20,7 +20,6 @@ export function buildDashboardKpiSnapshot(input: {
   funnel: {
     stufen: FunnelStufe[]
     conversionGesamt: number
-    dropoffs: { after: string; lost: number; rate: number }[]
   }
   gewerk: { zeilen: GewerkUmsatzZeile[]; gesamt: number }
   rankingHandwerker: RankingZeile[]
@@ -52,9 +51,7 @@ export function buildDashboardKpiSnapshot(input: {
     const offen = Number(m?.offen) || 0
     const done = Number(m?.abgeschlossen) || 0
     const re = Number(m?.rechnungen) || 0
-    lines.push(
-      `- ${m.label}: ${formatEurBetrag(offen + done + re)} (aktiv ${formatEurBetrag(offen)}, erledigt ${formatEurBetrag(done)}, Rechnungen ${formatEurBetrag(re)})`
-    )
+    lines.push(`- ${m.label}: ${formatEurBetrag(offen + done + re)}`)
   }
 
   lines.push('', '## Vertriebs-Funnel')
@@ -62,15 +59,10 @@ export function buildDashboardKpiSnapshot(input: {
   for (const s of input.funnel.stufen ?? []) {
     lines.push(`- ${s.label}: ${s.count} (${s.rate}%)`)
   }
-  for (const d of input.funnel.dropoffs ?? []) {
-    if (d.lost > 0) {
-      lines.push(`- Drop nach ${d.after}: −${d.lost} (${d.rate}%)`)
-    }
-  }
 
   lines.push('', '## Umsatz nach Gewerk')
   lines.push(`- Gesamt: ${formatEurBetrag(input.gewerk.gesamt)}`)
-  for (const z of (input.gewerk.zeilen ?? []).slice(0, 12)) {
+  for (const z of (input.gewerk.zeilen ?? []).slice(0, 5)) {
     lines.push(`- ${z.name}: ${formatEurBetrag(z.netto)} (${z.anteil}%)`)
   }
 
@@ -127,7 +119,7 @@ Rolle: Business-Analyst für den Geschäftsführer von Bärenwald (Handwerk / Ba
 
 Strukturiere die Antwort so:
 1) **Lage in 3–5 Sätzen** — was die Zahlen insgesamt sagen
-2) **Auffälligkeiten** — was positiv/negativ heraussticht (Funnel-Drops, überfällige/offene Größen, Umsatz, Ranking, Marketing falls relevant)
+2) **Auffälligkeiten** — was positiv/negativ heraussticht (Funnel, überfällige/offene Größen, Umsatz, Ranking, Marketing falls relevant)
 3) **Wichtigste Kennzahlen** — max. 5 Bullet-Points mit konkreten Zahlen aus dem Snapshot
 4) **Handlungsempfehlungen** — 3–5 klare nächste Schritte / Entscheidungen (priorisiert)
 

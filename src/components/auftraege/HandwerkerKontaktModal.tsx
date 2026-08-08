@@ -229,7 +229,6 @@ export function HandwerkerKontaktModal({
                 setMailCc(v)
                 setDirty(true)
               }}
-              dokumentLabel="Handwerker-Anfrage"
             />
             <Input
               label="Betreff"

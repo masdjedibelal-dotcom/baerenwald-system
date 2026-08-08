@@ -19,6 +19,13 @@ async function assertAuftrag(auftragId: string) {
   return { ok: true as const, supabase }
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(v: string | null | undefined): boolean {
+  return Boolean(v && UUID_RE.test(v))
+}
+
 function slugFromGewerk(name: string): string {
   return (
     name
@@ -88,7 +95,8 @@ export async function replaceAuftragPositionenFromPosBoard(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const base = baseById.get(line.id) ?? null
+    // PosBoard-Client-IDs (`p-…`) sind keine UUIDs — nur echte DB-IDs updaten
+    const base = isUuid(line.id) ? baseById.get(line.id) ?? null : null
     const row = lineToRow(line, auftragId, i, base)
 
     if (base) {
@@ -99,10 +107,8 @@ export async function replaceAuftragPositionenFromPosBoard(
         .eq('auftrag_id', auftragId)
       if (error) return { ok: false, message: error.message }
     } else {
-      const { error } = await supabase.from('auftrag_positionen').insert({
-        id: line.id,
-        ...row,
-      })
+      // id weglassen → Postgres generiert UUID (Client-IDs wie `p-…` sind ungültig)
+      const { error } = await supabase.from('auftrag_positionen').insert(row)
       if (error) return { ok: false, message: error.message }
     }
   }

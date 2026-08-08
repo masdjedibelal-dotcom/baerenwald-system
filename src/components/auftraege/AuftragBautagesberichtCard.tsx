@@ -272,11 +272,6 @@ export function AuftragBautagesberichtCard({
 
   return (
     <div className="space-y-4">
-      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-        Ausführlicher Bautagesbericht für Bauprojekte — PDF im Bärenwald-Standardlayout (wie
-        Abschlussdokumentation).
-      </p>
-
       {rows.length === 0 ? (
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Bautagesberichte.</p>
       ) : (

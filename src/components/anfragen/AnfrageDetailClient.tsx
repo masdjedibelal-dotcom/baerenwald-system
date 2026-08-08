@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
@@ -515,16 +517,13 @@ export function AnfrageDetailClient({
   const kundeTitel = useMemo(() => kundenName(lead), [lead])
   const portalKundeId = useMemo(() => leadVertragsKundeId(lead), [lead])
 
-  const statusBadge = useMemo(() => {
-    const s = anfrageStatusDisplay(lead.status, {
-      orgFreigabeStatus: lead.org_freigabe_status,
-    })
-    const badge = <StatusBadge status={lead.status} label={s.label} />
+  const statusActions = useMemo(() => {
     const st = String(lead.status ?? '').trim().toLowerCase()
     const hasAngenommen = angeboteListe.some((a) =>
       isAngenommenesAngebotStatus(a.status, a.status_einfach)
     )
-    const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] = []
+    const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] =
+      []
     if (st === 'neu' || st === 'kontaktiert') {
       actions.push({
         id: 'termin',
@@ -548,12 +547,30 @@ export function AnfrageDetailClient({
         onClick: () => setStatusModalKind('verloren'),
       })
     }
+    return actions
+  }, [lead.status, angeboteListe])
+
+  const statusBadge = useMemo(() => {
+    const s = anfrageStatusDisplay(lead.status, {
+      orgFreigabeStatus: lead.org_freigabe_status,
+    })
+    const badge = <StatusBadge status={lead.status} label={s.label} />
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        <StatusBadgeActionPopover badge={badge} actions={actions} title="Status" />
+        <StatusBadgeActionPopover badge={badge} actions={statusActions} title="Status" />
       </span>
     )
-  }, [lead.status, lead.org_freigabe_status, angeboteListe])
+  }, [lead.status, lead.org_freigabe_status, statusActions])
+
+  const statusMenuItems = useMemo((): ActionsMenuItem[] => {
+    if (!statusActions.length) return []
+    return statusActions.map((a) => ({
+      label: a.label,
+      danger: a.danger,
+      icon: a.icon ? <MockIcon ctx="btn" n={a.icon} size={16} /> : undefined,
+      onClick: a.onClick,
+    }))
+  }, [statusActions])
 
   const noShowTerminHinweis = useMemo(
     () =>
@@ -594,18 +611,8 @@ export function AnfrageDetailClient({
       phase="anfrage"
       rows={leistungenFromAnfrage(lead.funnel_daten)}
       onOpenDokument={istAkut || !hatAuftrag ? openDirektBeauftragen : openAngebotErstellen}
-      dokumentHint={
-        istAkut
-          ? 'Bei Akut: Leistungen über Direkt beauftragen erfassen — danach Handwerker im Auftrag zuweisen.'
-          : 'Verbindliche Leistungen entstehen mit Angebot oder Direkt beauftragen — hier siehst du den Bedarf aus der Anfrage.'
-      }
       dokumentActionLabel={istAkut ? 'Direkt beauftragen' : 'Angebot erstellen'}
       emptyTitle="Noch keine Leistungen"
-      emptyHint={
-        istAkut
-          ? 'Leistungen über Direkt beauftragen anlegen.'
-          : 'Verbindliche Positionen entstehen mit dem Angebot.'
-      }
     />
   )
 
@@ -700,7 +707,7 @@ export function AnfrageDetailClient({
             sheetTitle="Anfrage"
             primary={detailPrimary}
             secondary={detailSecondary}
-            menuItems={[]}
+            menuItems={statusMenuItems}
           />
         ),
       }}

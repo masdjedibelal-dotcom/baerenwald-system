@@ -123,7 +123,6 @@ export function TagebuchAnfordernSheet({
       open={open}
       onClose={onClose}
       title="Tagebuch anfordern"
-      subtitle="Partner erhält nur die Aufforderung zum Tagebuch-Eintrag"
       context="detail"
       size="md"
       confirmBusy={pending}

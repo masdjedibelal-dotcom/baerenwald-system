@@ -870,9 +870,7 @@ export function AngebotWizardPositionen({
 
   const caption =
     untertitel ??
-    (isMobile
-      ? `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · tippen zum Bearbeiten`
-      : `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · klicke auf eine Zeile zum Bearbeiten`)
+    `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'}`
 
   const openIndex = openId ? listenZeilen.findIndex((z) => z.id === openId) : -1
   const openZeile = openIndex >= 0 ? listenZeilen[openIndex] : null
@@ -963,7 +961,6 @@ export function AngebotWizardPositionen({
         {listenZeilen.length === 0 ? (
           <div className="pos-empty">
             <p className="font-medium text-bw-text-mid">Noch keine Positionen</p>
-            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">Wähle unten eine Hinzufüge-Option</p>
           </div>
         ) : (
           listenZeilen.map((z, i) => (

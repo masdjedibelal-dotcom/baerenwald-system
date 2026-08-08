@@ -254,9 +254,6 @@ function ZuweisungCard({
           title={`Anderen Partner — ${z.gewerke?.name ?? 'Gewerk'}`}
           size="md"
         >
-          <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
-            Ersatzpartner erhält die Anfrage erneut (E-Mail / Partner-Portal).
-          </p>
           <ul className="max-h-64 space-y-2 overflow-y-auto">
             {hwListe.map((h) => (
               <li key={h.id}>
@@ -341,7 +338,7 @@ export function AngebotHandwerkerPartnerSection({
       <Card className="p-4 md:p-5">
         <h2 className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">Partner</h2>
         {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Partner zugewiesen — im Wizard zuweisen, dann unten anfragen.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Partner zugewiesen.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {rows.map((z) => (

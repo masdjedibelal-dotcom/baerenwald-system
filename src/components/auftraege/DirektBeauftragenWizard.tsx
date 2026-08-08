@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useLocalTransition } from '@/components/ui/action-busy'
-import { Check } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { createDirektauftragMitLeistungen } from '@/app/(dashboard)/auftraege/direktauftrag-leistungen-actions'
 import { parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
@@ -16,8 +14,6 @@ import {
 } from '@/lib/posboard/pos-board-line'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { cn } from '@/lib/utils'
 
 function vorhabenTitel(lead: LeadDetail): string {
   const sit = lead.situation?.trim()
@@ -50,7 +46,7 @@ function seedLinesFromLead(lead: LeadDetail): PosBoardLine[] {
 
 /**
  * Abgespeckter DocumentCanvas wie Angebot/Rechnung — nur PosBoard (Leistungen).
- * Speichern → Auftrag anlegen → Aufrufer öffnet Auftrag/Leistungen (HW dort zuweisen).
+ * Speichern (✓ oben rechts) → Auftrag anlegen → Aufrufer öffnet Auftrag/Leistungen.
  */
 export function DirektBeauftragenWizard({
   lead,
@@ -95,47 +91,25 @@ export function DirektBeauftragenWizard({
         toast.error(r.message)
         return
       }
-      toast.success('Direktauftrag angelegt — Handwerker unter Leistungen zuweisen')
+      toast.success('Direktauftrag angelegt')
       onDone(r.auftragId)
     })
   }
-
-  const headerEnd = (
-    <button
-      type="button"
-      className={cn('editor-sheet__confirm', pending && 'opacity-50')}
-      disabled={pending}
-      onClick={() => speichern()}
-      aria-label="Speichern"
-      title="Speichern"
-    >
-      <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-    </button>
-  )
 
   return (
     <DocumentCanvas
       portal
       manageHistory={false}
       title="Direkt beauftragen"
-      subtitle={
-        istAkut
-          ? `${titel} · Akut — nur Leistungen, danach Auftrag`
-          : `${titel} · nur Leistungen, danach Auftrag`
-      }
+      subtitle={istAkut ? `${titel} · Akut` : titel}
       onClose={onClose}
       onSave={() => speichern()}
       saveBusy={pending}
-      headerEnd={headerEnd}
       busy={pending}
       busyLabel="Auftrag wird angelegt…"
       className="wizard-flow direkt-beauftragen-canvas"
       document={
         <div className="dc-doc flex flex-col gap-4">
-          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Leistungen und Positionen erfassen — ohne Angebotskopf. Nach Speichern öffnet der Auftrag;
-            Handwerker dort unter Leistungen zuweisen.
-          </p>
           <PosBoard
             title={titel || 'Leistungen'}
             positionen={lines}
@@ -145,17 +119,6 @@ export function DirektBeauftragenWizard({
             gewerke={gewerkNamen}
             preislisten={preislisten}
           />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn primary"
-              disabled={pending}
-              onClick={() => speichern()}
-            >
-              <MockIcon ctx="btn" n="device-floppy" size={16} />
-              {pending ? 'Wird gespeichert…' : 'Speichern & Auftrag öffnen'}
-            </button>
-          </div>
         </div>
       }
     />

@@ -821,7 +821,6 @@ export function StaffFunnelWizard({
                       <div className="full">
                         <Toggle
                           label="Akut / Notfall"
-                          hint="Direkt beauftragen ohne Angebot — wie eingehende Akut-Meldungen"
                           checked={state.alsAkut}
                           onChange={(on) => patch({ alsAkut: on })}
                         />

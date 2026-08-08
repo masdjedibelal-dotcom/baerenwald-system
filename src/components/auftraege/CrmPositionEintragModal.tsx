@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Camera } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
@@ -112,16 +111,9 @@ export function CrmPositionEintragModal({
       title="Tagebuch-Eintrag"
       size="lg"
       dirty={dirty && !pending}
-      footer={
-        <div className="sheet-footer-actions ldr-cta">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </Button>
-        </div>
-      }
+      onConfirm={speichern}
+      confirmBusy={pending}
+      confirmDisabled={pending}
     >
       <div className="space-y-4">
         <label className="block">

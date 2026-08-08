@@ -183,10 +183,6 @@ export function AngebotWizardHandwerkerStep({
 
   return (
     <Card title="Handwerker — Angebot / Rechnung einholen">
-      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">
-        Pro Gewerk Partner auswählen und optional eine Notiz für die Anfrage hinterlegen. Erst nach
-        Partner-Einreichung und Bestätigung: danach sendest du das Angebot an den Kunden.
-      </p>
       <div className="space-y-4">
         {blocks.map((b) => (
           <GewerkHandwerkerBlock

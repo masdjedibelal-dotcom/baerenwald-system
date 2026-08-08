@@ -64,11 +64,7 @@ export function RechnungNeuKundeGate({
             }}
           />
         </DocumentSection>
-        <DocumentSection label="Kopf">
-          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Nr. · Datum · Fällig
-          </p>
-        </DocumentSection>
+        <DocumentSection label="Kopf">{null}</DocumentSection>
         <DocumentSection label="Positionen">
           <DashedAddCard
             label="Position hinzufügen"

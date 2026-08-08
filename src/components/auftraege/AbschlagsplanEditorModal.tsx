@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   berechneZahlungsplan,
   neueZahlungsplanZeile,
@@ -17,13 +17,21 @@ import {
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
-import { cn } from '@/lib/utils'
+import { cn, formatDatum } from '@/lib/utils'
 
 type EditorRate = {
   id: string
   label: string
   typ: ZahlungsplanAbschlagTyp
   /** Prozent (0–100) oder Festbetrag netto; bei rest 0 */
+  wert: number
+  faellig_am: string
+}
+
+type RateDraft = {
+  id: string | null
+  label: string
+  typ: ZahlungsplanAbschlagTyp
   wert: number
   faellig_am: string
 }
@@ -55,8 +63,6 @@ function ratesToPlan(
     if (frozen.has(r.id)) {
       const orig = initialById.get(r.id)
       if (orig) {
-        // Eingefroren: Betrag/Typ fest, Titel/Fällig dürfen bleiben wie im Editor nur wenn nicht eingefroren —
-        // Gates erlauben Titel-Änderung nicht am Server für typ/wert; Titel behalten wir aus orig.
         return {
           ...orig,
           titel: orig.titel,
@@ -90,7 +96,23 @@ function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
   })
 }
 
-/** Abschlagsplan-Editor: bestehenden Plan bearbeiten (IDs bleiben), % oder €. */
+function wertLabel(r: Pick<EditorRate, 'typ' | 'wert'>): string {
+  if (r.typ === 'rest') return 'Rest'
+  if (r.typ === 'prozent') return `${Number(r.wert) || 0} %`
+  return formatEurBetrag(Number(r.wert) || 0)
+}
+
+function emptyDraft(label: string): RateDraft {
+  return {
+    id: null,
+    label,
+    typ: 'prozent',
+    wert: 0,
+    faellig_am: '',
+  }
+}
+
+/** Abschlagsplan-Editor: Card-Liste + zweites Sheet zum Bearbeiten. */
 export function AbschlagsplanEditorModal({
   open,
   onClose,
@@ -104,7 +126,7 @@ export function AbschlagsplanEditorModal({
   open: boolean
   onClose: () => void
   gesamtNetto: number
-  /** Anzeige „Gesamt … €“ (Auftragswert brutto) */
+  /** Anzeige „Gesamt … €“ (Auftragswert brutto) — Desktop */
   gesamtBrutto?: number | null
   initial: Zahlungsplan | null
   onSave: (plan: Zahlungsplan) => void
@@ -112,6 +134,7 @@ export function AbschlagsplanEditorModal({
   /** Rate-IDs die gestellt/bezahlt sind — Betrag/Typ nicht änderbar/löschbar */
   frozenIds?: string[]
 }) {
+  const isMobile = useIsMobile()
   const frozen = new Set(frozenIds)
   const baseline = useMemo(
     () =>
@@ -121,10 +144,12 @@ export function AbschlagsplanEditorModal({
     [initial]
   )
   const [rates, setRates] = useState<EditorRate[]>(baseline)
+  const [draft, setDraft] = useState<RateDraft | null>(null)
 
   useEffect(() => {
     if (!open) return
     setRates(baseline)
+    setDraft(null)
   }, [open, baseline])
 
   const dirty = open && !ratesEqual(rates, baseline)
@@ -155,51 +180,24 @@ export function AbschlagsplanEditorModal({
   const hatRest = rates.some((r) => r.typ === 'rest')
   const alleProzent = rates.length > 0 && rates.every((r) => r.typ === 'prozent')
 
-  function upd(id: string, patch: Partial<EditorRate>) {
-    if (frozen.has(id)) {
-      // Eingefroren: nur Label erlauben? Nein — Gates frieren typ/wert; Label optional.
-      // Strikt: nichts ändern an eingefrorenen Zeilen im UI.
-      return
-    }
-    setRates((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r
-        const next = { ...r, ...patch }
-        if (patch.typ === 'rest') next.wert = 0
-        if (patch.typ === 'betrag' && r.typ === 'prozent' && gesamtNetto > 0) {
-          // % → € netto umrechnen
-          next.wert = Math.round(gesamtNetto * ((Number(r.wert) || 0) / 100) * 100) / 100
-        }
-        if (patch.typ === 'prozent' && r.typ === 'betrag' && gesamtNetto > 0) {
-          next.wert = Math.round(((Number(r.wert) || 0) / gesamtNetto) * 1000) / 10
-        }
-        return next
-      })
-    )
-  }
-
   function applyPreset(build: () => Zahlungsplan) {
     if (frozen.size > 0) return
     setRates(planToRates(build()))
   }
 
-  function add() {
-    setRates((prev) => {
-      const withoutTrailingRest = [...prev]
-      const last = withoutTrailingRest[withoutTrailingRest.length - 1]
-      // Neue Zeile vor Rest einfügen, falls letzte Rest ist
-      const neue: EditorRate = {
-        id: neueZahlungsplanZeile().id,
-        label: `${withoutTrailingRest.filter((x) => x.typ !== 'rest').length + 1}. Abschlag`,
-        typ: 'prozent',
-        wert: 0,
-        faellig_am: '',
-      }
-      if (last?.typ === 'rest') {
-        withoutTrailingRest.splice(withoutTrailingRest.length - 1, 0, neue)
-        return withoutTrailingRest
-      }
-      return [...prev, neue]
+  function openAdd() {
+    const n = rates.filter((x) => x.typ !== 'rest').length + 1
+    setDraft(emptyDraft(`${n}. Abschlag`))
+  }
+
+  function openEdit(r: EditorRate) {
+    if (frozen.has(r.id)) return
+    setDraft({
+      id: r.id,
+      label: r.label,
+      typ: r.typ,
+      wert: r.wert,
+      faellig_am: r.faellig_am,
     })
   }
 
@@ -208,198 +206,267 @@ export function AbschlagsplanEditorModal({
     setRates((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== id)))
   }
 
-  function setTyp(id: string, typ: ZahlungsplanAbschlagTyp) {
-    if (frozen.has(id)) return
-    if (typ === 'rest') {
-      // Nur eine Rest-Zeile
-      setRates((prev) =>
-        prev.map((r) => {
-          if (r.id === id) return { ...r, typ: 'rest', wert: 0 }
-          if (r.typ === 'rest') return { ...r, typ: 'prozent', wert: 0 }
-          return r
-        })
+  function commitDraft() {
+    if (!draft) return
+    const label = draft.label.trim() || 'Abschlag'
+    const typ = draft.typ
+    const wert = typ === 'rest' ? 0 : Number(draft.wert) || 0
+    const faellig_am = draft.faellig_am.trim()
+
+    setRates((prev) => {
+      if (draft.id) {
+        return prev.map((r) =>
+          r.id === draft.id
+            ? { ...r, label, typ, wert, faellig_am }
+            : typ === 'rest' && r.typ === 'rest'
+              ? { ...r, typ: 'prozent', wert: 0 }
+              : r
+        )
+      }
+
+      const neue: EditorRate = {
+        id: neueZahlungsplanZeile().id,
+        label,
+        typ,
+        wert,
+        faellig_am,
+      }
+      const next = prev.map((r) =>
+        typ === 'rest' && r.typ === 'rest' ? { ...r, typ: 'prozent' as const, wert: 0 } : r
       )
-      return
-    }
-    upd(id, { typ })
+      const last = next[next.length - 1]
+      if (last?.typ === 'rest' && typ !== 'rest') {
+        const copy = [...next]
+        copy.splice(copy.length - 1, 0, neue)
+        return copy
+      }
+      return [...next, neue]
+    })
+    setDraft(null)
   }
 
+  const summeText = alleProzent
+    ? `Summe ${summeProzent}%`
+    : hatRest
+      ? ok
+        ? 'Summe mit Rest'
+        : !gate.ok
+          ? gate.message
+          : 'Summe prüfen'
+      : ok
+        ? 'Plan gültig'
+        : !gate.ok
+          ? gate.message
+          : 'Summe prüfen'
+
   return (
-    <EditorSheet
-      open={open}
-      onClose={onClose}
-      title="Abschlagsplan"
-      crumb={`${formatEurBetrag(anzeigeGesamt)} aufteilen >`}
-      dirty={dirty}
-      size="lg"
-      footer={
-        <div className="zahlplan-editor-footer">
-          <MockBtn kind="ghost" onClick={onClose} disabled={saving}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="check"
-            disabled={!ok || saving}
-            onClick={() => onSave(ratesToPlan(rates, initial, frozenIds))}
-          >
-            {saving ? 'Speichern…' : 'Plan speichern'}
-          </MockBtn>
-        </div>
-      }
-    >
-      <div className="zahlplan-editor-presets">
-        {PRESETS.map((p) => (
-          <button
-            key={p.name}
-            type="button"
-            className="zahlplan-preset-chip"
-            disabled={frozen.size > 0}
-            title={
-              frozen.size > 0
-                ? 'Vorlagen gesperrt — gestellte/bezahlte Raten'
-                : 'Vorlage übernehmen und danach individuell anpassen'
-            }
-            onClick={() => applyPreset(p.build)}
-          >
-            {p.name}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <span className="zahlplan-editor-presets__gesamt">
-          Gesamt <b>{formatEurBetrag(anzeigeGesamt)}</b>
-        </span>
-      </div>
+    <>
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title="Abschlagsplan"
+        crumb={!isMobile ? `${formatEurBetrag(anzeigeGesamt)} aufteilen >` : undefined}
+        dirty={dirty}
+        size="lg"
+        onConfirm={() => onSave(ratesToPlan(rates, initial, frozenIds))}
+        confirmBusy={saving}
+        confirmDisabled={!ok || saving || Boolean(draft)}
+      >
+        {!isMobile ? (
+          <div className="zahlplan-editor-presets">
+            {PRESETS.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                className="zahlplan-preset-chip"
+                disabled={frozen.size > 0}
+                title={
+                  frozen.size > 0
+                    ? 'Vorlagen gesperrt — gestellte/bezahlte Raten'
+                    : 'Vorlage übernehmen'
+                }
+                onClick={() => applyPreset(p.build)}
+              >
+                {p.name}
+              </button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <span className="zahlplan-editor-presets__gesamt">
+              Gesamt <b>{formatEurBetrag(anzeigeGesamt)}</b>
+            </span>
+          </div>
+        ) : null}
 
-      <p className="zahlplan-editor-hint">
-        {frozen.size > 0
-          ? 'Gestellte/bezahlte Raten bleiben fest (IDs & Beträge). Offene Raten kannst du als % oder € anpassen.'
-          : 'Abschläge hinzufügen oder entfernen. Pro Zeile % oder Festbetrag (€ netto) — Rest deckt den Restbetrag automatisch.'}
-      </p>
-
-      <div className="zahlplan-editor-list">
-        {rates.map((r) => {
-          const betrag = bruttoById.get(r.id) ?? 0
-          const isFrozen = frozen.has(r.id)
-          return (
-            <article
-              key={r.id}
-              className={cn('zahlplan-rate-card', isFrozen && 'is-frozen')}
-            >
-              <div className="zahlplan-rate-card__head">
-                <label className="zahlplan-rate-card__field zahlplan-rate-card__field--grow">
-                  <span className="zahlplan-rate-card__lbl">Bezeichnung</span>
-                  <input
-                    className="txt"
-                    value={r.label}
-                    disabled={isFrozen}
-                    onChange={(e) => upd(r.id, { label: e.target.value })}
-                  />
-                </label>
-                {isFrozen ? (
-                  <span className="zahlplan-rate-card__badge" title="Eingefroren">
-                    fest
-                  </span>
-                ) : (
-                  <MockBtn
-                    sm
-                    kind="ghost"
-                    icon="trash"
-                    onClick={() => remove(r.id)}
-                    title="Entfernen"
-                  />
-                )}
-              </div>
-
-              <div className="zahlplan-rate-card__grid">
-                <label className="zahlplan-rate-card__field">
-                  <span className="zahlplan-rate-card__lbl">Art</span>
-                  <select
-                    className="sel"
-                    value={r.typ}
-                    disabled={isFrozen}
-                    onChange={(e) => setTyp(r.id, e.target.value as ZahlungsplanAbschlagTyp)}
-                  >
-                    <option value="prozent">%</option>
-                    <option value="betrag">€ netto</option>
-                    <option value="rest">Rest</option>
-                  </select>
-                </label>
-
-                <label className="zahlplan-rate-card__field">
-                  <span className="zahlplan-rate-card__lbl">Wert</span>
-                  {r.typ === 'rest' ? (
-                    <div className="zahlplan-rate-card__auto">auto</div>
-                  ) : (
-                    <div className="txt-prefix zahlplan-rate-card__wert">
-                      <ClearableNumberInput
-                        className="txt"
-                        min={0}
-                        max={r.typ === 'prozent' ? 100 : undefined}
-                        value={r.wert}
-                        disabled={isFrozen}
-                        onValueChange={(wert) => upd(r.id, { wert })}
-                        style={{ textAlign: 'right' }}
-                      />
-                      <span className="prefix" style={{ right: 8, left: 'auto' }}>
-                        {r.typ === 'prozent' ? '%' : '€'}
-                      </span>
-                    </div>
+        <div className="zahlplan-editor-list zahlplan-editor-list--cards">
+          <div className="listcard zahlplan-editor-listcard">
+            {rates.map((r) => {
+              const betrag = bruttoById.get(r.id) ?? 0
+              const isFrozen = frozen.has(r.id)
+              return (
+                <div
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  className={cn(
+                    'list-row zahlplan-row zahlplan-row--simple zahlplan-row--editor',
+                    isFrozen && 'is-frozen'
                   )}
-                </label>
-
-                <div className="zahlplan-rate-card__field">
-                  <span className="zahlplan-rate-card__lbl">Betrag (brutto)</span>
-                  <div className="zahlplan-editor-betrag zahlplan-rate-card__betrag">
-                    {formatEurBetrag(betrag)}
+                  onClick={() => openEdit(r)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openEdit(r)
+                    }
+                  }}
+                >
+                  <div className="zahlplan-row__label">
+                    <span className="zahlplan-row__title">
+                      <span className="zahlplan-row__name">{r.label.trim() || 'Abschlag'}</span>
+                      {isFrozen ? (
+                        <span className="zahlplan-rate-card__badge">fest</span>
+                      ) : null}
+                    </span>
+                    <div className="zahlplan-row__pct">
+                      {wertLabel(r)}
+                      {' · '}
+                      {formatEurBetrag(betrag)} brutto
+                    </div>
+                  </div>
+                  <div className="zahlplan-row__faellig">
+                    {r.faellig_am ? (
+                      <>
+                        <span className="zahlplan-row__faellig-label">Fällig</span>
+                        <span className="zahlplan-row__faellig-value">
+                          {formatDatum(r.faellig_am)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="zahlplan-row__faellig-value zahlplan-row__faellig-value--empty">
+                        —
+                      </span>
+                    )}
+                  </div>
+                  <div className="zahlplan-row__betrag">{formatEurBetrag(betrag)}</div>
+                  <div className="zahlplan-row__menu">
+                    {!isFrozen ? (
+                      <button
+                        type="button"
+                        className="zahlplan-row__detail"
+                        title="Entfernen"
+                        aria-label={`${r.label} entfernen`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          remove(r.id)
+                        }}
+                      >
+                        <MockIcon ctx="btn" n="trash" size={15} />
+                      </button>
+                    ) : (
+                      <MockIcon ctx="btn" n="chevron-right" size={15} />
+                    )}
                   </div>
                 </div>
+              )
+            })}
+          </div>
 
-                <label className="zahlplan-rate-card__field">
-                  <span className="zahlplan-rate-card__lbl">Fällig</span>
-                  <input
-                    className="txt"
-                    type="date"
-                    value={r.faellig_am}
-                    disabled={isFrozen}
-                    onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
-                  />
-                </label>
-              </div>
-            </article>
-          )
-        })}
-
-        <div className="zahlplan-editor-foot">
-          <button
-            type="button"
-            className="pt-add"
-            style={{ border: 'none', padding: 0, width: 'auto' }}
-            onClick={add}
-          >
+          <button type="button" className="pt-add zahlplan-editor-add" onClick={openAdd}>
             <MockIcon ctx="btn" n="plus" size={13} /> Abschlag hinzufügen
           </button>
-          <div style={{ flex: 1 }} />
-          <span
-            className={cn('zahlplan-editor-summe', ok ? 'is-ok' : 'is-bad')}
-            title={!gate.ok ? gate.message : undefined}
-          >
-            {alleProzent
-              ? `Summe ${summeProzent}%${summeProzent !== 100 ? ' · muss 100% sein' : ''}`
-              : hatRest
-                ? ok
-                  ? 'Rest deckt den Restbetrag'
-                  : !gate.ok
-                    ? gate.message
-                    : 'Prüfen…'
-                : ok
-                  ? 'Plan gültig'
-                  : !gate.ok
-                    ? gate.message
-                    : 'Prüfen…'}
-          </span>
+
+          <div className="zahlplan-editor-summe-line">
+            <span
+              className={cn('zahlplan-editor-summe', ok ? 'is-ok' : 'is-bad')}
+              title={!gate.ok ? gate.message : undefined}
+            >
+              {summeText}
+              {alleProzent && summeProzent !== 100 ? ' · muss 100% sein' : ''}
+            </span>
+          </div>
         </div>
-      </div>
-    </EditorSheet>
+      </EditorSheet>
+
+      <EditorSheet
+        open={Boolean(draft)}
+        onClose={() => setDraft(null)}
+        title={draft?.id ? 'Abschlag bearbeiten' : 'Abschlag hinzufügen'}
+        size="md"
+        dirty={false}
+        manageHistory={false}
+        onConfirm={commitDraft}
+        confirmDisabled={!draft?.label.trim() && draft?.typ !== 'rest'}
+      >
+        {draft ? (
+          <div className="zahlplan-rate-edit space-y-4">
+            <label className="zahlplan-rate-card__field">
+              <span className="zahlplan-rate-card__lbl">Bezeichnung</span>
+              <input
+                className="txt"
+                value={draft.label}
+                autoFocus
+                onChange={(e) => setDraft((d) => (d ? { ...d, label: e.target.value } : d))}
+              />
+            </label>
+
+            <label className="zahlplan-rate-card__field">
+              <span className="zahlplan-rate-card__lbl">Art</span>
+              <select
+                className="sel"
+                value={draft.typ}
+                onChange={(e) => {
+                  const typ = e.target.value as ZahlungsplanAbschlagTyp
+                  setDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          typ,
+                          wert: typ === 'rest' ? 0 : d.wert,
+                        }
+                      : d
+                  )
+                }}
+              >
+                <option value="prozent">%</option>
+                <option value="betrag">€ netto</option>
+                <option value="rest">Rest</option>
+              </select>
+            </label>
+
+            <label className="zahlplan-rate-card__field">
+              <span className="zahlplan-rate-card__lbl">Wert</span>
+              {draft.typ === 'rest' ? (
+                <div className="zahlplan-rate-card__auto">auto</div>
+              ) : (
+                <div className="txt-prefix zahlplan-rate-card__wert">
+                  <ClearableNumberInput
+                    className="txt"
+                    min={0}
+                    max={draft.typ === 'prozent' ? 100 : undefined}
+                    value={draft.wert}
+                    onValueChange={(wert) => setDraft((d) => (d ? { ...d, wert } : d))}
+                    style={{ textAlign: 'right' }}
+                  />
+                  <span className="prefix" style={{ right: 8, left: 'auto' }}>
+                    {draft.typ === 'prozent' ? '%' : '€'}
+                  </span>
+                </div>
+              )}
+            </label>
+
+            <label className="zahlplan-rate-card__field">
+              <span className="zahlplan-rate-card__lbl">Fällig</span>
+              <input
+                className="txt"
+                type="date"
+                value={draft.faellig_am}
+                onChange={(e) =>
+                  setDraft((d) => (d ? { ...d, faellig_am: e.target.value } : d))
+                }
+              />
+            </label>
+          </div>
+        ) : null}
+      </EditorSheet>
+    </>
   )
 }

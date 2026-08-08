@@ -9,14 +9,12 @@ export function AngebotWizardVersandEmpfaengerCard({
   mailCc,
   onMailCcChange,
   disabled,
-  dokumentLabel = 'Angebot',
 }: {
   mailTo: string[]
   onMailToChange: (emails: string[]) => void
   mailCc: string[]
   onMailCcChange: (emails: string[]) => void
   disabled?: boolean
-  dokumentLabel?: string
 }) {
   return (
     <Card
@@ -27,10 +25,6 @@ export function AngebotWizardVersandEmpfaengerCard({
         </>
       }
     >
-      <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed text-bw-text-muted">
-        Prüfe An und CC, bevor du das {dokumentLabel} versendest. Weitere Adressen per Eingabe
-        und Enter hinzufügen — entfernen per Klick auf das × in der Pille.
-      </p>
       <div className="space-y-3">
         <EmailPillsField
           label="An"

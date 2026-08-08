@@ -223,12 +223,7 @@ export function EntityProjektUebersichtCard({
                 checked={draft.istBauprojekt}
                 onChange={(e) => patch({ istBauprojekt: e.target.checked })}
               />
-              <span>
-                Bauprojekt / Bauauftrag
-                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                  Aktiviert Bautagebuch, Baustellen-Tab und Compliance.
-                </span>
-              </span>
+              <span>Bauprojekt / Bauauftrag</span>
             </label>
           </InlineEditField>
         ) : null}

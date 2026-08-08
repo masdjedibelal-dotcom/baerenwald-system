@@ -825,9 +825,6 @@ export function PosBoard({
               autoFocus
             />
           </div>
-          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 8 }}>
-            Benennt das Gewerk für alle Positionen dieser Gruppe um.
-          </div>
         </MockModal>
       ) : null}
       {gewerkAddOpen ? (
@@ -835,7 +832,6 @@ export function PosBoard({
           open
           context="canvas"
           title="Gewerk hinzufügen"
-          subtitle="Abschnitt aus Stammdaten oder freier Bezeichnung"
           onClose={() => {
             setGewerkAddOpen(false)
             setGewerkAddPick('')

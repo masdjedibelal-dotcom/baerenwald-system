@@ -481,18 +481,13 @@ export function buildVertriebsFunnel(input: {
   anfragen: number
   /** Erstellte Angebote (Lead-eindeutig empfohlen). */
   angebote: number
-  /** Aktive Aufträge (offen / in Arbeit / Abnahme). */
-  auftraegeAktiv: number
-  /** Abgeschlossene Aufträge. */
-  auftraegeErledigt: number
-}): { stufen: FunnelStufe[]; conversionGesamt: number; dropoffs: { after: string; lost: number; rate: number }[] } {
-  // Monoton bis Angebot; Aktiv/Erledigt jeweils gegen Angebot deckeln (parallel)
+  /** Aufträge gesamt (aktiv + erledigt, Lead-eindeutig empfohlen). */
+  auftraege: number
+}): { stufen: FunnelStufe[]; conversionGesamt: number } {
+  // Monoton: Anfragen ≥ Angebote ≥ Aufträge
   const a = Math.max(0, input.anfragen)
   const b = Math.min(Math.max(0, input.angebote), a)
-  const cRaw = Math.max(0, input.auftraegeAktiv)
-  const dRaw = Math.max(0, input.auftraegeErledigt)
-  const c = Math.min(cRaw, b)
-  const d = Math.min(dRaw, b)
+  const c = Math.min(Math.max(0, input.auftraege), b)
 
   const rateOf = (n: number) => (a > 0 ? Math.round((n / a) * 100) : 0)
 
@@ -506,38 +501,16 @@ export function buildVertriebsFunnel(input: {
       color: '#F59E0B',
     },
     {
-      key: 'auftrag_aktiv',
-      label: 'Aufträge aktiv',
+      key: 'auftrag',
+      label: 'Aufträge',
       count: c,
       rate: rateOf(c),
-      color: '#0D9488',
-    },
-    {
-      key: 'auftrag_erledigt',
-      label: 'Erledigt',
-      count: d,
-      rate: rateOf(d),
       color: '#2E7D52',
     },
   ]
 
-  const dropoffs: { after: string; lost: number; rate: number }[] = []
-  if (a > 0) {
-    const lost1 = Math.max(0, a - b)
-    dropoffs.push({ after: 'anfrage', lost: lost1, rate: Math.round((lost1 / a) * 100) })
-  }
-  if (b > 0) {
-    // Ohne Auftrag (weder aktiv noch erledigt) — Statusse sind disjunkt
-    const lost2 = Math.max(0, b - Math.min(b, cRaw + dRaw))
-    dropoffs.push({
-      after: 'angebot',
-      lost: lost2,
-      rate: Math.round((lost2 / b) * 100),
-    })
-  }
-
-  const conversionGesamt = a > 0 ? Math.round((d / a) * 100) : 0
-  return { stufen, conversionGesamt, dropoffs }
+  const conversionGesamt = a > 0 ? Math.round((c / a) * 100) : 0
+  return { stufen, conversionGesamt }
 }
 
 /** Zählt eindeutige Vorgänge (Lead-ID), Fallback ohne Lead = eigene ID. */

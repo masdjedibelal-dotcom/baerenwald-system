@@ -807,12 +807,7 @@ export function AnfrageNeuForm({
                 setIstBauprojekt(e.target.checked)
               }}
             />
-            <span>
-              <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
-              <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                Aktiviert Bautagesberichte, Leistungs-Compliance und Baustellen-Unterlagen.
-              </span>
-            </span>
+            <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
           </label>
 
           {!isBearbeiten ? (
@@ -822,12 +817,7 @@ export function AnfrageNeuForm({
                 checked={alsAkut}
                 onChange={(e) => setAlsAkut(e.target.checked)}
               />
-              <span>
-                <span className="font-medium text-bw-text">Akut / Notfall</span>
-                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                  Direkt beauftragen ohne Angebot — wie eingehende Akut-Meldungen.
-                </span>
-              </span>
+              <span className="font-medium text-bw-text">Akut / Notfall</span>
             </label>
           ) : null}
 

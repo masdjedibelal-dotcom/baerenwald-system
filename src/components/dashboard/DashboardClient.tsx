@@ -18,7 +18,6 @@ import {
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { cn } from '@/lib/utils'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import {
   buildDashboardKpiSnapshot,
@@ -32,11 +31,7 @@ export type DashboardKpi = {
   href: string
 }
 
-const UMSATZ_BAR = {
-  aktiv: '#94A3B8',
-  erledigt: '#2E7D52',
-  rechnungen: '#3B82F6',
-} as const
+const UMSATZ_BAR_FILL = '#2E7D52'
 
 function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const safeMonths = Array.isArray(months) ? months : []
@@ -94,37 +89,18 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
               />
             ))}
             {safeMonths.map((m, i) => {
-              const aktiv = Number(m.offen) || 0
-              const erledigt = Number(m.abgeschlossen) || 0
-              const rechnungen = Number(m.rechnungen) || 0
+              const gesamt = umsatzMonatGesamt(m)
               const cx = padL + slot * i + slot / 2
               const x = cx - barW / 2
-              let yCursor = padT + innerH
-              const segments = [
-                { v: aktiv, fill: UMSATZ_BAR.aktiv, label: 'Aktiv' },
-                { v: erledigt, fill: UMSATZ_BAR.erledigt, label: 'Erledigt' },
-                { v: rechnungen, fill: UMSATZ_BAR.rechnungen, label: 'Rechnungen' },
-              ]
+              const h = gesamt > 0 ? Math.max((gesamt / max) * innerH, 0.5) : 0
+              const y = padT + innerH - h
               return (
                 <g key={m.key}>
-                  {segments.map((seg) => {
-                    if (seg.v <= 0) return null
-                    const h = (seg.v / max) * innerH
-                    yCursor -= h
-                    return (
-                      <rect
-                        key={seg.label}
-                        x={x}
-                        y={yCursor}
-                        width={barW}
-                        height={Math.max(h, 0.5)}
-                        rx={2}
-                        fill={seg.fill}
-                      >
-                        <title>{`${m.label} ${seg.label}: ${formatEurBetrag(seg.v)}`}</title>
-                      </rect>
-                    )
-                  })}
+                  {gesamt > 0 ? (
+                    <rect x={x} y={y} width={barW} height={h} rx={2} fill={UMSATZ_BAR_FILL}>
+                      <title>{`${m.label}: ${formatEurBetrag(gesamt)}`}</title>
+                    </rect>
+                  ) : null}
                   <text
                     x={cx}
                     y={H - 8}
@@ -138,23 +114,6 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
               )
             })}
           </svg>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: UMSATZ_BAR.aktiv }} />
-            Aktiv
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: UMSATZ_BAR.erledigt }} />
-            Erledigt
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="inline-block h-2 w-2 rounded-sm"
-              style={{ background: UMSATZ_BAR.rechnungen }}
-            />
-            Rechnungen
-          </span>
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -173,40 +132,17 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
               </tr>
             </thead>
             <tbody>
-              {(
-                [
-                  { key: 'offen', label: 'Aktiv', get: (m: UmsatzMonat) => Number(m.offen) || 0 },
-                  {
-                    key: 'abgeschlossen',
-                    label: 'Erledigt',
-                    get: (m: UmsatzMonat) => Number(m.abgeschlossen) || 0,
-                  },
-                  {
-                    key: 'rechnungen',
-                    label: 'Rechnungen',
-                    get: (m: UmsatzMonat) => Number(m.rechnungen) || 0,
-                  },
-                  { key: 'gesamt', label: 'Gesamt', get: umsatzMonatGesamt },
-                ] as const
-              ).map((row) => (
-                <tr
-                  key={row.key}
-                  className={cn(
-                    'border-b border-[var(--border)] last:border-0',
-                    row.key === 'gesamt' && 'font-semibold'
-                  )}
-                >
-                  <td className="whitespace-nowrap px-1.5 py-1.5 text-[var(--text-2)]">{row.label}</td>
-                  {safeMonths.map((m) => (
-                    <td
-                      key={m.key}
-                      className="px-1.5 py-1.5 text-right tabular-nums text-[var(--text)]"
-                    >
-                      {formatEurBetrag(row.get(m))}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              <tr className="border-b border-[var(--border)] font-semibold last:border-0">
+                <td className="whitespace-nowrap px-1.5 py-1.5 text-[var(--text-2)]">Gesamt</td>
+                {safeMonths.map((m) => (
+                  <td
+                    key={m.key}
+                    className="px-1.5 py-1.5 text-right tabular-nums text-[var(--text)]"
+                  >
+                    {formatEurBetrag(umsatzMonatGesamt(m))}
+                  </td>
+                ))}
+              </tr>
             </tbody>
           </table>
         </div>
@@ -218,20 +154,13 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
 function VertriebsFunnel({
   stufen,
   conversionGesamt,
-  dropoffs,
 }: {
   stufen: FunnelStufe[]
   conversionGesamt: number
-  dropoffs: { after: string; lost: number; rate: number }[]
 }) {
   const isMobile = useIsMobile()
   const safeStufen = Array.isArray(stufen) ? stufen : []
-  const safeDropoffs = Array.isArray(dropoffs) ? dropoffs : []
   const maxCount = Math.max(1, ...safeStufen.map((s) => Number(s.count) || 0), 1)
-  const worst = safeDropoffs.reduce(
-    (best, d) => (d.rate > (best?.rate ?? -1) ? d : best),
-    null as (typeof safeDropoffs)[0] | null
-  )
 
   return (
     <div className="card">
@@ -246,11 +175,8 @@ function VertriebsFunnel({
         </div>
       </div>
       <div className="card-b space-y-2">
-        {safeStufen.map((s, i) => {
+        {safeStufen.map((s) => {
           const width = Math.max(28, Math.round((s.count / maxCount) * 100))
-          const drop = safeDropoffs.find((d) => d.after === s.key)
-          const showDrop = drop && drop.lost > 0 && i < safeStufen.length - 1
-          const isWorst = worst && drop && worst.after === drop.after && drop.rate === worst.rate
           return (
             <div key={s.key}>
               {isMobile ? (
@@ -286,20 +212,6 @@ function VertriebsFunnel({
                   </span>
                 </div>
               )}
-              {showDrop ? (
-                <div
-                  className={cn(
-                    'mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium',
-                    isMobile && 'vfunnel-drop',
-                    isWorst
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-[var(--bg-2)] text-[var(--text-3)]'
-                  )}
-                >
-                  ↓ −{drop.rate}% · {drop.lost} verloren
-                  {isWorst ? ' · größter Absprung' : ''}
-                </div>
-              ) : null}
             </div>
           )
         })}
@@ -333,7 +245,7 @@ function GewerkUmsatzCard({
           </p>
         ) : (
           <div className="space-y-3">
-            {(zeilen ?? []).map((z, i) => (
+            {(zeilen ?? []).slice(0, 5).map((z, i) => (
               <div key={z.name}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
                   <span className="text-[length:var(--fs-text)] font-medium">{z.name}</span>
@@ -500,7 +412,6 @@ export function DashboardClient({
   funnel: {
     stufen: FunnelStufe[]
     conversionGesamt: number
-    dropoffs: { after: string; lost: number; rate: number }[]
   }
   gewerk: { zeilen: GewerkUmsatzZeile[]; gesamt: number }
   rankingHandwerker: RankingZeile[]
@@ -613,7 +524,6 @@ export function DashboardClient({
             <VertriebsFunnel
               stufen={funnel.stufen}
               conversionGesamt={funnel.conversionGesamt}
-              dropoffs={funnel.dropoffs}
             />
           </DashboardLazyMount>
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>

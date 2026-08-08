@@ -180,13 +180,7 @@ export function LeistungenTab({
     return parts.join(' ')
   }, [allowBulk, deskCols])
 
-  const hint =
-    dokumentHint ??
-    (phase === 'angebot' || phase === 'rechnung'
-      ? 'Positionen änderst du im Dokument — nicht in dieser Tabelle.'
-      : phase === 'anfrage'
-        ? 'Leistungen stammen aus der Anfrage. Für verbindliche Positionen Angebot erstellen.'
-        : null)
+  const hint = dokumentHint?.trim() || null
 
   const dokLabel =
     dokumentActionLabel?.trim() ||

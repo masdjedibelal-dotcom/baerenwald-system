@@ -507,7 +507,6 @@ export function AngebotVersandSection({
           Gesamtbetrag (Brutto):{' '}
           <strong>{betragAnzeige(null, bruttoMin, bruttoMax)}</strong>
         </p>
-        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">PDF wird angehängt.</p>
       </Modal>
 
       <Modal

@@ -71,10 +71,7 @@ export function AngebotWizardVizBlock({
           </>
         }
       >
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Entwurf einmal speichern — dann kannst du Fotos visualisieren und die Ergebnisse ins Angebot
-          übernehmen.
-        </p>
+        {null}
       </Card>
     )
   }
@@ -115,7 +112,7 @@ export function AngebotWizardVizBlock({
 
       {!loading && sessions.length === 0 ? (
         <p className="mt-3 text-[length:var(--fs-text)] text-bw-text-muted">
-          Noch keine Visualisierung — bei einem Foto auf „Visualisieren“ klicken.
+          Noch keine Visualisierung.
         </p>
       ) : null}
 

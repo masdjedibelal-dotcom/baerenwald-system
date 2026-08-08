@@ -269,9 +269,10 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     6
   )
 
-  const auftraegeAktivZ = auftraegeZ.filter((a) => isAktiverAuftragStatus(a.status as string))
-  const auftraegeErledigtZ = auftraegeZ.filter(
-    (a) => String(a.status ?? '').toLowerCase() === 'abgeschlossen'
+  const auftraegeFunnelZ = auftraegeZ.filter(
+    (a) =>
+      isAktiverAuftragStatus(a.status as string) ||
+      String(a.status ?? '').toLowerCase() === 'abgeschlossen'
   )
 
   const funnel = buildVertriebsFunnel({
@@ -282,14 +283,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
         lead_id: (a.lead_id as string | null) ?? null,
       }))
     ),
-    auftraegeAktiv: countUniqueVorgaengeByLead(
-      auftraegeAktivZ.map((a) => ({
-        id: String(a.id ?? ''),
-        lead_id: (a.lead_id as string | null) ?? null,
-      }))
-    ),
-    auftraegeErledigt: countUniqueVorgaengeByLead(
-      auftraegeErledigtZ.map((a) => ({
+    auftraege: countUniqueVorgaengeByLead(
+      auftraegeFunnelZ.map((a) => ({
         id: String(a.id ?? ''),
         lead_id: (a.lead_id as string | null) ?? null,
       }))
