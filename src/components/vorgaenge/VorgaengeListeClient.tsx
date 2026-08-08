@@ -73,6 +73,30 @@ function phaseChipLabel(p: (typeof VORGANG_FILTERS)[number]): string {
   return PHASE_META[p as VorgangPhase].label
 }
 
+/** Empty-Hint außerhalb JSX, damit TS `filter` nicht über `showLifecycleToggle` einengt. */
+function vorgaengeEmptyHint(opts: {
+  showLifecycleToggle: boolean
+  lifecycle: 'offen' | 'erledigt'
+  filter: (typeof VORGANG_FILTERS)[number]
+}): string {
+  const { showLifecycleToggle, lifecycle, filter: phase } = opts
+  if (!showLifecycleToggle) {
+    if (phase === 'auftrag') {
+      return 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
+    }
+    if (phase === 'rechnung') return 'Keine Rechnungen in diesem Filter.'
+    return 'Filter zurücksetzen oder anderen Phasen-Chip wählen.'
+  }
+  if (lifecycle === 'erledigt') return 'Filter zurücksetzen oder zu „Offen“ wechseln'
+  if (phase === 'auftrag') {
+    return 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
+  }
+  if (phase === 'rechnung') {
+    return 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
+  }
+  return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
+}
+
 function isErsetzt(row: VorgangListeRow): boolean {
   return row.unterstatus.toLowerCase() === 'ersetzt' || Boolean(row.ersetzt_durch)
 }
@@ -1259,21 +1283,7 @@ export function VorgaengeListeClient({
                   ? 'Keine erledigten Vorgänge'
                   : 'Keine offenen Vorgänge'
             }
-            hint={
-              !showLifecycleToggle
-                ? filter === 'auftrag'
-                  ? 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
-                  : filter === 'rechnung'
-                    ? 'Keine Rechnungen in diesem Filter.'
-                    : 'Filter zurücksetzen oder anderen Phasen-Chip wählen.'
-                : lifecycle === 'erledigt'
-                  ? 'Filter zurücksetzen oder zu „Offen“ wechseln'
-                  : filter === 'auftrag'
-                    ? 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
-                    : filter === 'rechnung'
-                      ? 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
-                      : 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
-            }
+            hint={vorgaengeEmptyHint({ showLifecycleToggle, lifecycle, filter })}
             action={
               showLifecycleToggle && lifecycle !== 'offen' ? (
                 <MockBtn kind="ghost" onClick={() => setLifecycleFilter('offen')}>
