@@ -1,29 +1,31 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
+import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
   filterStandardComplianceTypen,
+  istEigeneUnterlageTyp,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
 import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
-import { MockDokumenteCard, MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
-import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -46,7 +48,6 @@ import {
   updateHandwerkerNotizen,
   getPartnerPortalLoginHint,
   setHandwerkerPortalGesperrt,
-  signPartnerDokumentUrl,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
@@ -55,6 +56,10 @@ import {
   normalizeHandwerkerNamen,
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
+import {
+  composeHandwerkerAdresse,
+  resolveHandwerkerAnschrift,
+} from '@/lib/handwerker-anschrift'
 import {
   getPartnerPortalMailDraft,
   previewPartnerPortalMail,
@@ -151,11 +156,6 @@ export function HandwerkerDetailClient({
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
   const hwGewerkSlugs = useMemo(() => gewerkSlugsFromField(hw.gewerke), [hw.gewerke])
-  const dokumenteAnzahl = useMemo(
-    () => standardDokumente(payload.dokumente).length,
-    [payload.dokumente]
-  )
-
   const [tab, setTab] = useState<HandwerkerDetailTab>('uebersicht')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const [notizDraft, setNotizDraft] = useState('')
@@ -167,7 +167,7 @@ export function HandwerkerDetailClient({
   const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
     useState<RahmenVertragWizardBootstrap | null>(null)
   const [rahmenWizardKey, setRahmenWizardKey] = useState(0)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [err, setErr] = useState<string | null>(null)
 
   const [portalModalOpen, setPortalModalOpen] = useState(false)
@@ -206,12 +206,16 @@ export function HandwerkerDetailClient({
   }
 
   const legacyKontakt = normalizeHandwerkerNamen(hw)
+  const initialAnschrift = resolveHandwerkerAnschrift(hw)
   const [formFirma, setFormFirma] = useState(legacyKontakt.firma)
   const [formVorname, setFormVorname] = useState(legacyKontakt.vorname)
   const [formNachname, setFormNachname] = useState(legacyKontakt.nachname)
   const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
   const [formEmail, setFormEmail] = useState(hw.email ?? '')
-  const [formAdresse, setFormAdresse] = useState(hw.adresse ?? '')
+  const [formStrasse, setFormStrasse] = useState(initialAnschrift.strasse)
+  const [formHausnummer, setFormHausnummer] = useState(initialAnschrift.hausnummer)
+  const [formPlz, setFormPlz] = useState(initialAnschrift.plz)
+  const [formOrt, setFormOrt] = useState(initialAnschrift.ort)
   const [formIban, setFormIban] = useState(hw.iban ?? '')
   const [formUstid, setFormUstid] = useState(hw.ustid ?? '')
   const [formSteuernummer, setFormSteuernummer] = useState(hw.steuernummer ?? '')
@@ -223,12 +227,16 @@ export function HandwerkerDetailClient({
   useEffect(() => {
     if (editingKontakt || editingBank) return
     const k = normalizeHandwerkerNamen(hw)
+    const a = resolveHandwerkerAnschrift(hw)
     setFormFirma(k.firma)
     setFormVorname(k.vorname)
     setFormNachname(k.nachname)
     setFormTelefon(hw.telefon ?? '')
     setFormEmail(hw.email ?? '')
-    setFormAdresse(hw.adresse ?? '')
+    setFormStrasse(a.strasse)
+    setFormHausnummer(a.hausnummer)
+    setFormPlz(a.plz)
+    setFormOrt(a.ort)
     setFormIban(hw.iban ?? '')
     setFormUstid(hw.ustid ?? '')
     setFormSteuernummer(hw.steuernummer ?? '')
@@ -236,12 +244,16 @@ export function HandwerkerDetailClient({
 
   function syncFormFromHw() {
     const k = normalizeHandwerkerNamen(hw)
+    const a = resolveHandwerkerAnschrift(hw)
     setFormFirma(k.firma)
     setFormVorname(k.vorname)
     setFormNachname(k.nachname)
     setFormTelefon(hw.telefon ?? '')
     setFormEmail(hw.email ?? '')
-    setFormAdresse(hw.adresse ?? '')
+    setFormStrasse(a.strasse)
+    setFormHausnummer(a.hausnummer)
+    setFormPlz(a.plz)
+    setFormOrt(a.ort)
     setFormIban(hw.iban ?? '')
     setFormUstid(hw.ustid ?? '')
     setFormSteuernummer(hw.steuernummer ?? '')
@@ -326,6 +338,12 @@ export function HandwerkerDetailClient({
       setErr(pflicht)
       return
     }
+    const anschrift = {
+      strasse: formStrasse.trim(),
+      hausnummer: formHausnummer.trim(),
+      plz: formPlz.trim(),
+      ort: formOrt.trim(),
+    }
     const input: HandwerkerFormInput = {
       firma: formFirma.trim() || null,
       vorname: formVorname.trim() || null,
@@ -334,7 +352,11 @@ export function HandwerkerDetailClient({
       telefon: formTelefon.trim() || null,
       whatsapp: hw.whatsapp?.trim() || null,
       webseite: hw.webseite?.trim() || null,
-      adresse: formAdresse.trim() || null,
+      adresse: composeHandwerkerAdresse(anschrift),
+      strasse: anschrift.strasse || null,
+      hausnummer: anschrift.hausnummer || null,
+      plz: anschrift.plz || null,
+      ort: anschrift.ort || null,
       gewerke: hw.gewerke ?? [],
       subkategorie: hw.subkategorie,
       ist_fachbetrieb: hw.ist_fachbetrieb,
@@ -364,7 +386,10 @@ export function HandwerkerDetailClient({
     formNachname,
     formEmail,
     formTelefon,
-    formAdresse,
+    formStrasse,
+    formHausnummer,
+    formPlz,
+    formOrt,
     formIban,
     formUstid,
     formSteuernummer,
@@ -426,17 +451,43 @@ export function HandwerkerDetailClient({
 
 
   const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
+  const anschriftView = resolveHandwerkerAnschrift(hw)
+  const adresseView =
+    [
+      [anschriftView.strasse, anschriftView.hausnummer].filter(Boolean).join(' '),
+      [anschriftView.plz, anschriftView.ort].filter(Boolean).join(' '),
+    ]
+      .filter(Boolean)
+      .join(', ') ||
+    hw.adresse?.trim() ||
+    '—'
 
   const uebersichtInhalt = (
     <div className="space-y-4">
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Stammdaten</div>
-        </div>
-        <div className="card-b">
-          {editingKontakt ? (
+      {editingKontakt ? (
+        <div className="card">
+          <div className="card-h">
+            <div className="card-title title">Stammdaten</div>
+            <div className="inline-edit-actions">
+              <MockBtn sm kind="ghost" onClick={cancelEditStamm} disabled={pending}>
+                Abbrechen
+              </MockBtn>
+              <MockBtn
+                sm
+                kind="primary"
+                icon="check"
+                onClick={saveHandwerkerStamm}
+                disabled={pending}
+              >
+                {pending ? 'Speichern…' : 'Speichern'}
+              </MockBtn>
+            </div>
+          </div>
+          <div className="card-b">
             <div className="props">
-              {err ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
+              {err ? (
+                <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
+              ) : null}
               <InlineEditField label="Betrieb" editing value={formFirma}>
                 <input
                   className="input"
@@ -476,61 +527,82 @@ export function HandwerkerDetailClient({
                   onChange={(e) => setFormEmail(e.target.value)}
                 />
               </InlineEditField>
-              <InlineEditField label="Einsatzgebiet" editing value={formAdresse}>
+              <InlineEditField label="Straße" editing value={formStrasse}>
                 <input
                   className="input"
-                  value={formAdresse}
-                  onChange={(e) => setFormAdresse(e.target.value)}
+                  value={formStrasse}
+                  onChange={(e) => setFormStrasse(e.target.value)}
                 />
               </InlineEditField>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'space-between' }}>
-                <button type="button" className="btn secondary sm" onClick={cancelEditStamm}>
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  className="btn primary sm"
-                  disabled={pending}
-                  onClick={saveHandwerkerStamm}
-                >
-                  Speichern
-                </button>
-              </div>
+              <InlineEditField label="Hausnummer" editing value={formHausnummer}>
+                <input
+                  className="input"
+                  value={formHausnummer}
+                  onChange={(e) => setFormHausnummer(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="PLZ" editing value={formPlz}>
+                <input
+                  className="input"
+                  value={formPlz}
+                  onChange={(e) => setFormPlz(e.target.value)}
+                />
+              </InlineEditField>
+              <InlineEditField label="Ort" editing value={formOrt}>
+                <input
+                  className="input"
+                  value={formOrt}
+                  onChange={(e) => setFormOrt(e.target.value)}
+                />
+              </InlineEditField>
             </div>
-          ) : (
-            <div className="vgid">
-              <div className="vgid-name">{handwerkerDisplayName(hw)}</div>
-              <div className="vgid-meta">
-                {[gewerkNamen.join(' · ') || kategorie, hw.adresse?.trim() || null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-              {(hw.telefon?.trim() || hw.email?.trim()) && (
-                <div className="vgid-chips">
-                  {hw.telefon?.trim() ? (
-                    <a className="vgid-chip" href={`tel:${String(hw.telefon).replace(/\s/g, '')}`}>
-                      <MockIcon ctx="default" n="phone" size={14} />
-                      {hw.telefon.trim()}
-                    </a>
-                  ) : null}
-                  {hw.email?.trim() ? (
-                    <a className="vgid-chip" href={`mailto:${hw.email.trim()}`}>
-                      <MockIcon ctx="default" n="mail" size={14} />
-                      {hw.email.trim()}
-                    </a>
-                  ) : null}
-                </div>
-              )}
-              <StammdatenPortalZeile
-                handwerkerId={hw.id}
-                fallbackEmail={hw.email}
-                gesperrt={istPortalGesperrt}
-                onInvite={() => void openPortalModal()}
-              />
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <EntityHandwerkerStammdatenCard
+          handwerkerId={hw.id}
+          initial={{
+            displayName: handwerkerDisplayName(hw),
+            firma: hw.firma ?? '',
+            geschaeftsfuehrer: handwerkerGfName(hw),
+            gewerkLabel: gewerkNamen.join(' · ') || kategorie,
+            telefon: hw.telefon ?? '',
+            email: hw.email ?? '',
+            adresse: adresseView === '—' ? '' : adresseView,
+          }}
+          portalGesperrt={istPortalGesperrt}
+          onInvite={() => void openPortalModal()}
+          onEdit={beginEditKontakt}
+        />
+      )}
+
+      <InlineEditSection
+        title="Bank & Steuer"
+        editing={editingBank}
+        onStartEdit={beginEditBank}
+        onCancel={cancelEditStamm}
+        onSave={saveHandwerkerStamm}
+        saving={pending}
+      >
+        {err && editingBank ? (
+          <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
+        ) : null}
+        <div className="props">
+          <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
+            <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
+          </InlineEditField>
+          <InlineEditField label="USt-ID" editing={editingBank} value={hw.ustid || '—'}>
+            <input className="input" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
+          </InlineEditField>
+          <InlineEditField label="Steuernummer" editing={editingBank} value={hw.steuernummer || '—'}>
+            <input
+              className="input"
+              value={formSteuernummer}
+              onChange={(e) => setFormSteuernummer(e.target.value)}
+            />
+          </InlineEditField>
+        </div>
+      </InlineEditSection>
 
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
@@ -620,12 +692,6 @@ export function HandwerkerDetailClient({
         onSave={saveHandwerkerStamm}
         saving={pending}
       >
-        {editingKontakt ? (
-          <p className="inline-edit-hint">
-            <MockIcon ctx="default" n="info-circle" size={14} />
-            Hervorgehobene Felder sind bearbeitbar.
-          </p>
-        ) : null}
         {err && editingKontakt ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField
@@ -707,14 +773,47 @@ export function HandwerkerDetailClient({
             />
           </InlineEditField>
           <InlineEditField
-            label="Einsatzgebiet"
+            label="Straße"
             editing={editingKontakt}
-            value={hw.adresse || '—'}
+            value={resolveHandwerkerAnschrift(hw).strasse || '—'}
           >
             <input
               className="input"
-              value={formAdresse}
-              onChange={(e) => setFormAdresse(e.target.value)}
+              value={formStrasse}
+              onChange={(e) => setFormStrasse(e.target.value)}
+            />
+          </InlineEditField>
+          <InlineEditField
+            label="Hausnummer"
+            editing={editingKontakt}
+            value={resolveHandwerkerAnschrift(hw).hausnummer || '—'}
+          >
+            <input
+              className="input"
+              value={formHausnummer}
+              onChange={(e) => setFormHausnummer(e.target.value)}
+            />
+          </InlineEditField>
+          <InlineEditField
+            label="PLZ"
+            editing={editingKontakt}
+            value={resolveHandwerkerAnschrift(hw).plz || '—'}
+          >
+            <input
+              className="input"
+              value={formPlz}
+              onChange={(e) => setFormPlz(e.target.value)}
+            />
+          </InlineEditField>
+          <InlineEditField
+            label="Ort"
+            editing={editingKontakt}
+            value={resolveHandwerkerAnschrift(hw).ort || '—'}
+          >
+            <input
+              className="input"
+              value={formOrt}
+              onChange={(e) => setFormOrt(e.target.value)}
             />
           </InlineEditField>
         </div>
@@ -728,12 +827,6 @@ export function HandwerkerDetailClient({
         onSave={saveHandwerkerStamm}
         saving={pending}
       >
-        {editingBank ? (
-          <p className="inline-edit-hint">
-            <MockIcon ctx="default" n="info-circle" size={14} />
-            Hervorgehobene Felder sind bearbeitbar.
-          </p>
-        ) : null}
         {err && editingBank ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
@@ -812,77 +905,7 @@ export function HandwerkerDetailClient({
   )
 
   const akteDateien = (
-    <MockDokumenteCard count={dokumenteAnzahl}>
-      {dokumenteAnzahl === 0 ? (
-        <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-          Noch keine Dokumente.
-        </p>
-      ) : isMobile ? (
-        <div className="dok-cards">
-          {standardDokumente(payload.dokumente).map((d) => {
-            const title = d.bezeichnung?.trim() || d.typ || 'Dokument'
-            const meta = d.gueltig_bis
-              ? `gültig bis ${String(d.gueltig_bis).slice(0, 10)}`
-              : null
-            return (
-              <DokMobileCard
-                key={d.id}
-                title={title}
-                meta={meta}
-                onClick={() => {
-                  void (async () => {
-                    const r = await signPartnerDokumentUrl(d.datei_url)
-                    if (!r.ok) {
-                      toast.error(r.message)
-                      return
-                    }
-                    window.open(r.url, '_blank', 'noopener,noreferrer')
-                  })()
-                }}
-              />
-            )
-          })}
-        </div>
-      ) : (
-        <div className="dok-list">
-          {standardDokumente(payload.dokumente).map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              className="list-row dok-list__row--openable w-full text-left"
-              style={{
-                gridTemplateColumns: 'minmax(0, 1fr) auto',
-                cursor: 'pointer',
-                alignItems: 'center',
-              }}
-              onClick={() => {
-                void (async () => {
-                  const r = await signPartnerDokumentUrl(d.datei_url)
-                  if (!r.ok) {
-                    toast.error(r.message)
-                    return
-                  }
-                  window.open(r.url, '_blank', 'noopener,noreferrer')
-                })()
-              }}
-            >
-              <span className="dok-list__main min-w-0">
-                <span className="dok-list__name">
-                  {d.bezeichnung?.trim() || d.typ || 'Dokument'}
-                  {d.gueltig_bis ? (
-                    <span className="dok-list__name-size">
-                      {' '}
-                      · gültig bis {String(d.gueltig_bis).slice(0, 10)}
-                    </span>
-                  ) : null}
-                </span>
-              </span>
-              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">Öffnen</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </MockDokumenteCard>
+    <HandwerkerAkteDokumente handwerkerId={hw.id} dokumente={payload.dokumente} />
   )
 
   const complianceInhalt = (
@@ -902,6 +925,17 @@ export function HandwerkerDetailClient({
     [vorgaengeRows, hw.id]
   )
 
+  const complianceAnzahl = useMemo(
+    () => standardDokumente(payload.dokumente).length,
+    [payload.dokumente]
+  )
+  const akteDocsAnzahl = useMemo(
+    () =>
+      standardDokumente(payload.dokumente).filter((d) => istEigeneUnterlageTyp(d.typ)).length,
+    [payload.dokumente]
+  )
+  const akteAnzahl = akteDocsAnzahl + (hw.notizen?.trim() ? 1 : 0)
+
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -920,15 +954,14 @@ export function HandwerkerDetailClient({
       id: 'compliance',
       label: 'Compliance',
       icon: 'shield-check',
-      count: dokumenteAnzahl || undefined,
+      count: complianceAnzahl || undefined,
       render: () => complianceInhalt,
     },
     {
       id: 'akte',
       label: 'Akte',
       icon: 'file-text',
-      count:
-        dokumenteAnzahl + (hw.notizen?.trim() ? 1 : 0) || undefined,
+      count: akteAnzahl || undefined,
       render: () => akteInhalt,
     },
   ]

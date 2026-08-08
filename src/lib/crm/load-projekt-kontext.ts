@@ -104,7 +104,7 @@ export async function loadProjektKontext(
   if (leadId) {
     const { data: lRow } = await supabase
       .from('leads')
-      .select('id, status, situation, bereiche, created_at')
+      .select('id, status, situation, bereiche, org_freigabe_status, created_at')
       .eq('id', leadId)
       .maybeSingle()
     if (lRow) {
@@ -112,6 +112,7 @@ export async function loadProjektKontext(
         id: lRow.id as string,
         label: leadLabel(lRow as { situation?: string | null; bereiche?: string[] | null; id: string }),
         status: String(lRow.status ?? ''),
+        org_freigabe_status: (lRow.org_freigabe_status as string | null) ?? null,
         created_at: (lRow.created_at as string | null) ?? null,
       }
     }

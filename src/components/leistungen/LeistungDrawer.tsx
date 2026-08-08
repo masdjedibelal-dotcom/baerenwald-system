@@ -86,9 +86,7 @@ export function LeistungDrawer({
       <Section title="Position" icon="file-text">
         <div className="props">
           {row.gewerkName ? <DetailProp label="Gewerk">{row.gewerkName}</DetailProp> : null}
-          {row.istRegie ? (
-            <DetailProp label="Vergütung">nach Aufwand — Final über Bautagebuch</DetailProp>
-          ) : null}
+          {row.istRegie ? <DetailProp label="Vergütung">nach Aufwand</DetailProp> : null}
           <DetailProp label={row.istRegie ? 'Schätzung' : 'Menge'}>{row.mengeLabel}</DetailProp>
           <DetailProp label={row.istRegie ? 'Stundensatz' : 'Einzelpreis'}>
             {row.einzelpreisLabel ?? row.preisLabel}
@@ -96,12 +94,6 @@ export function LeistungDrawer({
           <DetailProp label="Gesamt">
             <span className="ldr-gesamt">{row.preisLabel}</span>
           </DetailProp>
-          {row.istRegie ? (
-            <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-              Handwerker muss Start-/Ende-Fotos, Stunden sowie Titel und Beschreibung im Portal
-              führen (Pflicht).
-            </p>
-          ) : null}
         </div>
       </Section>
 

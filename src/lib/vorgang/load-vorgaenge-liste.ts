@@ -525,9 +525,12 @@ export async function loadVorgaengeListe(): Promise<{
 
     const listPhase: VorgangPhase = rechnungAusstehend ? 'rechnung' : resolved.phase
     const listUnterstatus = rechnungAusstehend ? 'ausstehend' : resolved.unterstatus
-    const listUnterstatusLabel = rechnungAusstehend
-      ? unterstatusLabel('rechnung', 'ausstehend')
-      : resolved.unterstatusLabel
+    const listUnterstatusLabel =
+      resolved.badges.wartet_freigabe
+        ? resolved.unterstatusLabel
+        : rechnungAusstehend
+          ? unterstatusLabel('rechnung', 'ausstehend')
+          : resolved.unterstatusLabel
     const listEntityType: VorgangPhase = rechnungAusstehend ? 'auftrag' : resolved.entityType
     const listDetailHref = rechnungAusstehend
       ? `/auftraege/${resolved.entityId}`

@@ -36,7 +36,13 @@ export type ProjektRechnungKurz = {
 
 export type ProjektKontext = {
   kunde: { id: string; name: string } | null
-  lead: { id: string; label: string; status: string; created_at?: string | null } | null
+  lead: {
+    id: string
+    label: string
+    status: string
+    org_freigabe_status?: string | null
+    created_at?: string | null
+  } | null
   angebote: ProjektAngebotKurz[]
   auftrag: {
     id: string

@@ -286,7 +286,6 @@ export function StatusModal({
                   placeholder="Vor-Ort begehen, Maße aufnehmen, Wünsche notieren…"
                   rows={3}
                 />
-                <p className="form-field-hint mt-1">Wird im Kalender und in der Timeline gespeichert.</p>
               </div>
               <div className="md:col-span-2 space-y-3">
                 {kontaktEmail ? (

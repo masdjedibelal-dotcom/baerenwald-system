@@ -92,10 +92,7 @@ export function AngebotWizardVizBlock({
         </>
       }
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-          Vorher/Nachher aus Fotodokumentation — erscheint im PDF wenn „Ins Angebot übernommen“.
-        </p>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           type="button"
           variant="secondary"

@@ -7,6 +7,7 @@ import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
+import { composeHandwerkerAdresse } from '@/lib/handwerker-anschrift'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -30,7 +31,8 @@ export function PartnerCreateSheet({
   const [gewerkSlug, setGewerkSlug] = useState('')
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
-  const [strasseNr, setStrasseNr] = useState('')
+  const [strasse, setStrasse] = useState('')
+  const [hausnummer, setHausnummer] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
   const [tel, setTel] = useState('')
@@ -45,7 +47,8 @@ export function PartnerCreateSheet({
     setGewerkSlug('')
     setVorname('')
     setNachname('')
-    setStrasseNr('')
+    setStrasse('')
+    setHausnummer('')
     setPlz('')
     setOrt('')
     setTel('')
@@ -75,11 +78,12 @@ export function PartnerCreateSheet({
       return
     }
 
-    const adresseParts = [
-      strasseNr.trim() || null,
-      [plz.trim(), ort.trim()].filter(Boolean).join(' ') || null,
-    ].filter(Boolean)
-    const adresse = adresseParts.length > 0 ? adresseParts.join(', ') : null
+    const adresse = composeHandwerkerAdresse({
+      strasse: strasse.trim(),
+      hausnummer: hausnummer.trim(),
+      plz: plz.trim(),
+      ort: ort.trim(),
+    })
 
     startTransition(async () => {
       const r = await createHandwerker({
@@ -91,6 +95,10 @@ export function PartnerCreateSheet({
         whatsapp: null,
         webseite: null,
         adresse,
+        strasse: strasse.trim() || null,
+        hausnummer: hausnummer.trim() || null,
+        plz: plz.trim() || null,
+        ort: ort.trim() || null,
         gewerke: [gewerkSlug],
         subkategorie: null,
         ist_fachbetrieb: true,
@@ -184,13 +192,22 @@ export function PartnerCreateSheet({
         </MockFormSection>
 
         <MockFormSection title="Anschrift" icon="map-pin" columns={2}>
-          <MockField label="Straße und Hausnummer" full>
+          <MockField label="Straße">
             <input
               className="input"
-              value={strasseNr}
-              onChange={(e) => mark(() => setStrasseNr(e.target.value))}
-              placeholder="Musterstraße 12"
-              autoComplete="street-address"
+              value={strasse}
+              onChange={(e) => mark(() => setStrasse(e.target.value))}
+              placeholder="Musterstraße"
+              autoComplete="address-line1"
+            />
+          </MockField>
+          <MockField label="Hausnummer">
+            <input
+              className="input"
+              value={hausnummer}
+              onChange={(e) => mark(() => setHausnummer(e.target.value))}
+              placeholder="12"
+              autoComplete="address-line2"
             />
           </MockField>
           <div className="kunde-create__plz-ort full">
@@ -240,11 +257,7 @@ export function PartnerCreateSheet({
         </MockFormSection>
 
         <MockFormSection title="Notiz" icon="messages">
-          <MockField
-            label="Interne Notiz"
-            full
-            hint="Stärken, Erfahrungen, Spezialgebiete"
-          >
+          <MockField label="Interne Notiz" full>
             <textarea
               className="input ta"
               rows={4}

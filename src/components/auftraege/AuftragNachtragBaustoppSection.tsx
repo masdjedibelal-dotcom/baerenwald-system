@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
@@ -77,7 +77,7 @@ export function AuftragNachtragBaustoppSection({
   vertragNachtragVerfuegbar?: boolean
   onVertragNachtragErstellen?: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [nachtragOpen, setNachtragOpen] = useState(false)
   const [grund, setGrund] = useState('')
   const [beschreibung, setBeschreibung] = useState('')

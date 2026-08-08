@@ -95,10 +95,7 @@ function KostenverteilungField({
   onChange: (next: KostenVerteilung) => void
 }) {
   return (
-    <WizardField
-      label="Kostenart"
-      hint="Allgemein = keine Aufteilung im PDF; Arbeits- bzw. Materialkosten = 100 % in eine Kategorie (wird im PDF ausgewiesen)"
-    >
+    <WizardField label="Kostenart">
       <select
         className="input w-full"
         value={value}
@@ -159,11 +156,7 @@ function FachbetriebHinweisCheckbox({
           </span>
           {hinweisText ? (
             <span className="mt-1 block text-[length:var(--fs-meta)] text-bw-text-muted">{hinweisText}</span>
-          ) : (
-            <span className="mt-1 block text-[length:var(--fs-meta)] text-bw-text-muted">
-              Zusätzlich der Standard-Hinweis unter der Leistung im PDF.
-            </span>
-          )}
+          ) : null}
         </span>
       </label>
     </div>
@@ -328,7 +321,7 @@ function PositionAccordionItem({
                 autoFocus={display === 'editor'}
               />
             </WizardField>
-            <WizardField label="Beschreibung" full hint="Erscheint unter der Überschrift auf dem Angebot">
+            <WizardField label="Beschreibung" full>
               <Textarea
                 rows={3}
                 value={z.text}
@@ -379,7 +372,7 @@ function PositionAccordionItem({
         ) : preislisteMode ? (
           <>
             {!lockGewerk ? (
-              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
+              <WizardField label="Gewerk">
                 <select
                   className="input w-full"
                   value={z.gewerk_id ?? ''}
@@ -406,11 +399,7 @@ function PositionAccordionItem({
                 </select>
               </WizardField>
             ) : null}
-            <WizardField
-              label="Leistung aus Liste"
-              required
-              hint="Name der Position im Angebot (PDF) — wird aus der Preisliste übernommen"
-            >
+            <WizardField label="Leistung aus Liste" required>
               <select
                 className="input w-full"
                 value={z.preisliste_id ?? ''}
@@ -427,11 +416,7 @@ function PositionAccordionItem({
                 ))}
               </select>
             </WizardField>
-            <WizardField
-              label="Beschreibung (optional)"
-              full
-              hint="Zusätzlicher Text unter der Leistung im PDF — z. B. Material, Umfang, Hinweise"
-            >
+            <WizardField label="Beschreibung (optional)" full>
               <Textarea
                 rows={3}
                 value={z.positionBeschreibung ?? ''}
@@ -469,14 +454,7 @@ function PositionAccordionItem({
                 </select>
               </div>
             </WizardField>
-            <WizardField
-              label="Einzelpreis netto"
-              hint={
-                z.preisliste_id
-                  ? 'Abweichung von der Liste wird als eigene Leistung gespeichert'
-                  : undefined
-              }
-            >
+            <WizardField label="Einzelpreis netto">
               <EuroNettoInput value={z.vkNetto} onChange={patchVkNetto} />
             </WizardField>
             <WizardField label="Zeilensumme">
@@ -497,12 +475,7 @@ function PositionAccordionItem({
           </>
         ) : (
           <>
-            <WizardField
-              label="Leistung"
-              required
-              full
-              hint="Positions-Überschrift im Angebot (PDF) — das sieht der Kunde fett über Menge und Preis"
-            >
+            <WizardField label="Leistung" required full>
               <input
                 className="input w-full"
                 value={z.bezeichnung}
@@ -512,7 +485,7 @@ function PositionAccordionItem({
               />
             </WizardField>
             {!lockGewerk ? (
-              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
+              <WizardField label="Gewerk">
                 <select
                   className="input w-full"
                   value={z.gewerk_id ?? ''}
@@ -551,11 +524,7 @@ function PositionAccordionItem({
                 onPatch={onPatch}
               />
             ) : null}
-            <WizardField
-              label="Beschreibung (optional)"
-              full
-              hint="Zusätzlicher Text unter der Leistung im PDF — sichtbar für den Kunden und auf der Rechnung"
-            >
+            <WizardField label="Beschreibung (optional)" full>
               <Textarea
                 rows={3}
                 value={z.positionBeschreibung ?? ''}

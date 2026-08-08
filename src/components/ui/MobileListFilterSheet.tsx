@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 export function MobileListFilterSheet({
@@ -22,6 +23,8 @@ export function MobileListFilterSheet({
   footer?: ReactNode
   className?: string
 }) {
+  useOverlayChromeLock(open)
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

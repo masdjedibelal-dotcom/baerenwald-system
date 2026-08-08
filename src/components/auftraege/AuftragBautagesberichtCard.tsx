@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
@@ -120,7 +120,7 @@ export function AuftragBautagesberichtCard({
   handwerker?: AuftragHandwerkerRow[]
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [rows, setRows] = useState(initial)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
   const [addOpen, setAddOpen] = useState(false)

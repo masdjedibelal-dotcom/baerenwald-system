@@ -28,6 +28,10 @@ export type HandwerkerFormInput = {
   whatsapp: string | null
   webseite: string | null
   adresse: string | null
+  strasse?: string | null
+  hausnummer?: string | null
+  plz?: string | null
+  ort?: string | null
   gewerke: string[]
   subkategorie: string | null
   ist_fachbetrieb: boolean
@@ -66,6 +70,10 @@ export async function createHandwerker(
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
+      strasse: input.strasse?.trim() || null,
+      hausnummer: input.hausnummer?.trim() || null,
+      plz: input.plz?.trim() || null,
+      ort: input.ort?.trim() || null,
       gewerke: input.gewerke,
       subkategorie: input.subkategorie?.trim() || null,
       ist_fachbetrieb: input.ist_fachbetrieb,
@@ -104,6 +112,10 @@ export async function updateHandwerker(
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
+      strasse: input.strasse?.trim() || null,
+      hausnummer: input.hausnummer?.trim() || null,
+      plz: input.plz?.trim() || null,
+      ort: input.ort?.trim() || null,
       gewerke: input.gewerke,
       subkategorie: input.subkategorie?.trim() || null,
       ist_fachbetrieb: input.ist_fachbetrieb,
@@ -144,7 +156,7 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
       `
       id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
       ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-      adresse, partner_kategorie_id,
+      adresse, strasse, hausnummer, plz, ort, partner_kategorie_id,
       partner_kategorien ( id, name, slug, sort_order )
     `
     )
@@ -202,7 +214,7 @@ export type HandwerkerDetailPayload = {
 const HANDWERKER_DETAIL_SELECT_BASE = `
   id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
   ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-  adresse, partner_kategorie_id, auth_user_id, ist_portal_gesperrt, portal_gesperrt_am,
+  adresse, strasse, hausnummer, plz, ort, partner_kategorie_id, auth_user_id, ist_portal_gesperrt, portal_gesperrt_am,
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
     id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
@@ -213,7 +225,7 @@ const HANDWERKER_DETAIL_SELECT_BASE = `
 const HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL = `
   id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
   ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-  adresse, partner_kategorie_id,
+  adresse, strasse, hausnummer, plz, ort, partner_kategorie_id,
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
     id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,

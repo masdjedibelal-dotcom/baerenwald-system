@@ -37,11 +37,24 @@ export function AnfrageStammdatenCard({
     : [melder?.strasse, melder?.hausnummer].filter(Boolean).join(' ').trim()
   const kundeTyp = isHv ? ag?.typ ?? 'hausverwaltung' : melder?.typ
 
+  const k = isHv ? ag : melder
+
   return (
     <EntityKundenStammdatenCard
       kundeId={kundeId}
       leadId={isHv ? null : lead.id}
-      initial={{ name, telefon, email, plz, ort, strasse }}
+      initial={{
+        name,
+        telefon,
+        email,
+        plz,
+        ort,
+        strasse,
+        vorname: k?.vorname ?? '',
+        nachname: k?.nachname ?? '',
+        ansprechpartner: k?.ansprechpartner ?? '',
+        webseite: k?.webseite ?? '',
+      }}
       kundeTyp={kundeTyp}
       onSaved={onSaved}
     />

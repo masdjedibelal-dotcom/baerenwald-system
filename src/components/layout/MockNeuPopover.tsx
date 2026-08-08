@@ -3,6 +3,7 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openFabCreate, type FabOverlayArt } from '@/components/neu/FabCreateHost'
 import { showOverlayBusy } from '@/components/ui/action-busy'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 
 type NeuItem = { ic: string; label: string; overlay: FabOverlayArt }
 
@@ -34,6 +35,8 @@ const BUSY_LABEL: Record<FabOverlayArt, string> = {
 }
 
 export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useOverlayChromeLock(open)
+
   if (!open) return null
 
   function go(item: NeuItem) {

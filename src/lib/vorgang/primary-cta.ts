@@ -32,6 +32,12 @@ export type PrimaryCtaContext = {
   ueberfaellig?: boolean
   /** Abschlagsplan aktiv → „Nächsten Abschlag senden“ statt „Rechnung erstellen“ */
   naechsterAbschlagSenden?: boolean
+  /**
+   * Auftrag fertig: nächste RE-Aktion (Abschlag oder Einzel).
+   * Hat Vorrang vor naechsterAbschlagSenden / pauschal „Rechnung erstellen“.
+   */
+  /** `null` = Zahlung abgeschlossen → Bewertung */
+  naechsteRechnungAktion?: 'versenden' | 'bezahlt' | 'erstellen' | null
 }
 
 function norm(status: string | null | undefined): string {
@@ -109,7 +115,21 @@ export function primaryCta(
       return { id: 'auftrag_abschliessen', label: 'Auftrag abschließen', icon: 'check' }
     }
     if (ui === 'fertig') {
-      if (ctx.rechnungBezahlt) {
+      if (ctx.naechsteRechnungAktion === 'bezahlt') {
+        return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
+      }
+      if (ctx.naechsteRechnungAktion === 'versenden') {
+        return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+      }
+      if (ctx.naechsteRechnungAktion === 'erstellen') {
+        return {
+          id: 'rechnung_erstellen',
+          label: ctx.naechsterAbschlagSenden ? 'Nächsten Abschlag erstellen' : 'Rechnung erstellen',
+          icon: 'file-invoice',
+        }
+      }
+      // null = alle Raten/RE bezahlt; undefined = Legacy nur über rechnungBezahlt
+      if (ctx.rechnungBezahlt || ctx.naechsteRechnungAktion === null) {
         return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
       }
       if (ctx.naechsterAbschlagSenden) {

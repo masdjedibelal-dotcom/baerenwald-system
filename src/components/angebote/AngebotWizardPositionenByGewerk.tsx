@@ -95,11 +95,6 @@ function defaultPendingGewerkSection(
   ]
 }
 
-const GEWERK_TITEL_HINT =
-  'Überschrift des Gewerk-Abschnitts im Angebot (PDF), z. B. „Malerarbeiten“ oder „Elektroarbeiten“'
-const GEWERK_BESCHREIBUNG_HINT =
-  'Optional: Fließtext direkt unter dem Gewerk-Titel im PDF — z. B. Umfang oder Hinweise zum Abschnitt'
-
 function GewerkBlockMeta({
   blockKey: _blockKey,
   displayTitle,
@@ -148,13 +143,11 @@ function GewerkBlockMeta({
           placeholder="z. B. Malerarbeiten"
           aria-label="Gewerk-Titel bearbeiten"
         />
-        <p className="wizard-field-hint mt-1">{GEWERK_TITEL_HINT}</p>
       </label>
       <KiAssistFieldLabel
         label="Beschreibung (optional)"
         value={blockBeschreibung}
         onApply={onBeschreibungChange}
-        extraHint={GEWERK_BESCHREIBUNG_HINT}
       >
         <textarea
           className="input min-h-[72px] w-full resize-y text-[length:var(--fs-meta)] leading-relaxed"
@@ -163,7 +156,6 @@ function GewerkBlockMeta({
           placeholder="z. B. Wände und Decke inkl. Grundierung"
           aria-label={`Beschreibung für ${displayTitle}`}
         />
-        <p className="wizard-field-hint mt-1">{GEWERK_BESCHREIBUNG_HINT}</p>
       </KiAssistFieldLabel>
     </div>
   )
@@ -533,12 +525,6 @@ export function AngebotWizardPositionenByGewerk({
         {displayBlocks.length === 0 ? (
           <div className="pos-empty rounded-lg border border-bw-border">
             <p className="font-medium text-bw-text-mid">Noch kein Gewerk angelegt</p>
-            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
-              Unten ein Gewerk hinzufügen und Positionen erfassen.
-            </p>
-            <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-              Pro Gewerk-Abschnitt kannst du unten eigene Anfahrtskosten aktivieren.
-            </p>
           </div>
         ) : (
           displayBlocks.map((block, blockIndex) => {

@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
@@ -30,7 +30,7 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
   const [monate, setMonate] = useState('')
   const [pflicht, setPflicht] = useState(true)
   const [kategorieNeu, setKategorieNeu] = useState('')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   async function patchRow(id: string, patch: Partial<ComplianceTypRow>) {
     const r = await updateComplianceTyp(id, patch)

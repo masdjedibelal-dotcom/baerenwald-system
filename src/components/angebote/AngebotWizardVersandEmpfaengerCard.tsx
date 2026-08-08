@@ -3,8 +3,6 @@
 import { Mail } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
-
 export function AngebotWizardVersandEmpfaengerCard({
   mailTo,
   onMailToChange,
@@ -48,7 +46,6 @@ export function AngebotWizardVersandEmpfaengerCard({
           emails={mailCc}
           onChange={onMailCcChange}
           placeholder="weitere@beispiel.de"
-          hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
           disabled={disabled}
         />
       </div>

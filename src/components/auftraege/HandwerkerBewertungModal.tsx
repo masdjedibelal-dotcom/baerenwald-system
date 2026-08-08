@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
@@ -56,7 +56,7 @@ export function HandwerkerBewertungModal({
   ziele: HandwerkerBewertungZiel[]
   onSaved: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [loading, setLoading] = useState(false)
   const [formulare, setFormulare] = useState<Record<string, BewertungFormular>>({})
 

@@ -6,6 +6,7 @@ import { Check, Trash2, X } from 'lucide-react'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { trapFocus } from '@/lib/a11y/focus-trap'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
 
@@ -142,6 +143,8 @@ export function DocumentCanvas({
     }
   }, [open, mounted, portal, manageHistory])
 
+  useOverlayChromeLock(Boolean(open && mounted))
+
   /* Body scroll lock + focus trap — Escape schließt nicht, solange ein EditorSheet offen ist.
    * handleClose absichtlich per Ref: sonst re-init bei jedem Parent-Rerender → Fokus klauen → iOS-Tastatur zu. */
   useEffect(() => {
@@ -186,15 +189,22 @@ export function DocumentCanvas({
     }
 
     const sync = () => {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      // URL-Bar ≠ Soft-Keyboard — sonst Lücke / peekt Dashboard unten durch
+      const kb = rawKb > 100 ? rawKb : 0
+      const coverH = Math.max(
+        window.innerHeight,
+        document.documentElement.clientHeight || 0,
+        vv.height + vv.offsetTop
+      )
       // Immer Layout-Viewport abdecken — nie auf vv.height schrumpfen (iOS-Lücke)
       root.style.top = '0'
       root.style.left = '0'
       root.style.right = '0'
       root.style.bottom = '0'
       root.style.width = '100%'
-      root.style.height = `${Math.max(window.innerHeight, vv.height + vv.offsetTop)}px`
-      root.style.minHeight = `${window.innerHeight}px`
+      root.style.height = `${coverH}px`
+      root.style.minHeight = `${coverH}px`
       root.style.setProperty('--keyboard-inset', `${kb}px`)
       document.body.classList.toggle('kb-open', kb > 40)
     }

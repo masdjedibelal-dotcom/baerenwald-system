@@ -266,14 +266,15 @@ export function PreislistenClient({
         </span>
         <div style={{ flex: 1 }} />
         <MockBtn sm kind="ghost" icon="upload" title="CSV Import" onClick={() => setCsvOpen(true)} />
-        <button
-          type="button"
-          className="btn ghost sm"
+        <MockBtn
+          sm
+          kind="primary"
+          icon="plus"
           disabled={!activeGewerkId}
           onClick={openNeuModal}
         >
-          + Leistung
-        </button>
+          Leistung
+        </MockBtn>
       </div>
 
       <div className="chiprow" style={{ marginBottom: 16 }}>
@@ -289,12 +290,14 @@ export function PreislistenClient({
           Kein aktives Gewerk. Bitte zuerst Gewerke anlegen und aktivieren.
         </p>
       ) : filtered.length === 0 ? (
-        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
-          Noch keine Leistungen in {activeGewerkName}.{' '}
-          <button type="button" className="btn ghost sm" onClick={openNeuModal}>
-            Leistung anlegen
-          </button>
-        </p>
+        <div>
+          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
+            Noch keine Leistungen in {activeGewerkName}.
+          </p>
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeuModal}>
+            Leistung
+          </MockBtn>
+        </div>
       ) : (
         <>
           <div className="listcard">
@@ -415,7 +418,6 @@ export function PreislistenClient({
                 onChange={(e) => markForm({ preisText: e.target.value })}
                 placeholder="800–1.400 €"
               />
-              <div className="field-hint">Festpreis oder Spanne, z.B. 800–1.400 €</div>
             </MockField>
             <MockField label="Beschreibung" full>
               <textarea
@@ -426,7 +428,6 @@ export function PreislistenClient({
                 placeholder="Was ist enthalten…"
                 style={{ resize: 'vertical', minHeight: 72 }}
               />
-              <div className="field-hint">erscheint im Angebot unter der Position</div>
             </MockField>
           </MockFormSection>
         </div>

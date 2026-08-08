@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
@@ -72,7 +72,7 @@ export function KundeInformierenModal({
   defaultNachricht: string
   kundeName: string
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [anrede, setAnrede] = useState<'du' | 'sie'>('sie')
   const [betreff, setBetreff] = useState(defaultBetreff)
   const [nachricht, setNachricht] = useState(defaultNachricht)

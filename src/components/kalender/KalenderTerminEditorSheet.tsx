@@ -365,7 +365,6 @@ export function KalenderTerminEditorSheet({
             onChange={onVorgangChange}
             placeholder="Anfrage oder Auftrag…"
             emptyLabel="Kein Vorgang"
-            hint="Übernimmt die Anschrift vom verknüpften Kunden bzw. Vorgang."
           />
         </div>
 

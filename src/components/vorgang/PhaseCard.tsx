@@ -76,7 +76,10 @@ export function PhaseCardsBlock({
       cards.push({
         title: 'Anfrage',
         line1: kontext.lead.label || 'Anfrage',
-        line2: anfrageStatusKurz(kontext.lead.status),
+        line2: anfrageStatusKurz(
+          kontext.lead.status,
+          kontext.lead.org_freigabe_status
+        ),
         href: withFrom(`/anfragen/${kontext.lead.id}`),
       })
     }

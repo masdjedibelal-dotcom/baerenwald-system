@@ -22,7 +22,7 @@ interface TopBarProps {
 type Crumb = { label: string; href?: string }
 
 const NEW_SUB = 'neu'
-const PROFIL_HREF = '/einstellungen/profil'
+const EINSTELLUNGEN_HREF = '/einstellungen/firma'
 
 function userDisplay(user: User): { name: string; email: string } {
   const meta = user.user_metadata as { full_name?: string; name?: string } | undefined
@@ -140,9 +140,9 @@ export function TopBar({ user }: TopBarProps) {
     setLogoutLoading(false)
   }
 
-  function goProfil() {
+  function goEinstellungen() {
     setMenuOpen(false)
-    router.push(PROFIL_HREF)
+    router.push(EINSTELLUNGEN_HREF)
   }
 
   return (
@@ -198,7 +198,7 @@ export function TopBar({ user }: TopBarProps) {
               ref={avatarRef}
               type="button"
               className={cn('topbar-avatar', menuOpen && 'is-open')}
-              aria-label="Profilmenü"
+              aria-label="Konto"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
@@ -221,11 +221,7 @@ export function TopBar({ user }: TopBarProps) {
                 </div>
               </div>
               <div className="pop-sep" />
-              <button type="button" className="pop-item" onClick={goProfil}>
-                <MockIcon ctx="btn" n="user" size={16} />
-                <span>Profil</span>
-              </button>
-              <button type="button" className="pop-item" onClick={goProfil}>
+              <button type="button" className="pop-item" onClick={goEinstellungen}>
                 <MockIcon ctx="btn" n="settings" size={16} />
                 <span>Einstellungen</span>
               </button>

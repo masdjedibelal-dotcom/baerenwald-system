@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -101,7 +101,7 @@ export function AuftragFinanzenClient({
     summeEinbehaltBrutto: number
   }
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [erModal, setErModal] = useState(false)
   const [ebModal, setEbModal] = useState(false)
   const [buModal, setBuModal] = useState<Einbehalt | null>(null)

@@ -15,7 +15,7 @@ import {
   type AbnahmeProtokollMeta,
 } from '@/lib/auftraege/abnahme-protokoll-meta'
 import type { AbnahmeProtokollHtmlInput } from '@/lib/templates/abnahme-protokoll-template'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { AuftragDetail, Kunde } from '@/lib/types'
 
 /** Alte CRM-Platzhalter — gelten als „leer“ und weichen Stammdaten/KI. */
@@ -34,9 +34,6 @@ function pickMetaField(preferred: string, fallback: string): string {
   return fallback.trim()
 }
 
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join('\n')
-}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean).join(' · ')

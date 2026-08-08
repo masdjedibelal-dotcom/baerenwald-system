@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
@@ -39,7 +39,6 @@ import {
   recordKundeAbgelehntMitDetails,
   schliesseLeadNachAngebotVerlust,
 } from '@/app/(dashboard)/angebote/actions'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
@@ -169,7 +168,7 @@ export function AngebotDetailPageClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [mainTab, setMainTab] = useState<AngebotDetailTab>(ANGEBOT_DETAIL_DEFAULT_TAB)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [aufStart, setAufStart] = useState(() => addDaysYmd(heuteYmd(), 7))
@@ -735,14 +734,12 @@ export function AngebotDetailPageClient({
                   emails={aufTo}
                   onChange={setAufTo}
                   placeholder="kunde@beispiel.de"
-                  hint="Empfänger wie im Angebotsversand — kann ergänzt oder reduziert werden."
                 />
                 <EmailPillsField
                   label="CC"
                   emails={aufCc}
                   onChange={setAufCc}
                   placeholder="weitere@beispiel.de"
-                  hint={KUNDE_MAIL_BCC_HINT}
                 />
                 <p className="mb-1 mt-4 inline-flex items-center gap-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
                   <MockIcon ctx="btn" n="mail" size={14} />

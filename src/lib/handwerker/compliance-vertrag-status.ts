@@ -154,5 +154,7 @@ export function complianceStatusLabel(status: ComplianceDokumentStatus): string 
   if (status === 'ok') return 'Vorhanden'
   if (status === 'warnung') return 'Läuft ab'
   if (status === 'abgelaufen') return 'Abgelaufen'
+  if (status === 'in_pruefung') return 'In Prüfung'
+  if (status === 'abgelehnt') return 'Abgelehnt'
   return 'Fehlt'
 }

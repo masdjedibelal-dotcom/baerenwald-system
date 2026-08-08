@@ -30,8 +30,6 @@ import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -686,10 +684,7 @@ export function AngebotWizard({
       }
 
       const manageBusy = opts?.manageBusy !== false
-      if (manageBusy) {
-        setSaving(true)
-        actionBusy.show('Wird gespeichert…')
-      }
+      if (manageBusy) setSaving(true)
       try {
         const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
         const res = await saveAngebotWizardDraft({
@@ -738,10 +733,7 @@ export function AngebotWizard({
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
       } finally {
-        if (manageBusy) {
-          setSaving(false)
-          actionBusy.hide()
-        }
+        if (manageBusy) setSaving(false)
       }
     },
     [
@@ -847,6 +839,17 @@ export function AngebotWizard({
     void handleCanvasClose()
   }
 
+  async function handleFinishSpeichern() {
+    const id = await persistDraft({ notify: true })
+    if (!id) return
+    onDone?.(id, {
+      mode: 'saved',
+      auftragKorrektur: istAuftragKorrektur || undefined,
+    })
+    onClose()
+    router.refresh()
+  }
+
   async function handleFinishVersenden() {
     const recipients =
       mailTo.length > 0
@@ -859,42 +862,40 @@ export function AngebotWizard({
       setSheet('versand')
       return
     }
-    await actionBusy.run('Wird gesendet…', async () => {
-      setSaving(true)
-      try {
-        const id = await persistDraft({ notify: false, manageBusy: false })
-        if (!id) return
-        const leadId = await ensureLeadId()
-        if (!leadId) return
-        const res = await sendAngebotWizard({
-          angebotId: id,
-          lead_id: leadId,
-          mailTo: recipients,
-          mailCc,
-          betreff: mailBetreff.trim() || undefined,
-          auftragKorrektur: istAuftragKorrektur,
-        })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        toast.success(
-          istAuftragKorrektur
-            ? 'Korrektur gespeichert und an den Kunden versendet'
-            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
-        )
-        onDone?.(id, {
-          mode: 'sent',
-          auftragKorrektur: istAuftragKorrektur || undefined,
-        })
-        onClose()
-        router.refresh()
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
-      } finally {
-        setSaving(false)
+    setSaving(true)
+    try {
+      const id = await persistDraft({ notify: false, manageBusy: false })
+      if (!id) return
+      const leadId = await ensureLeadId()
+      if (!leadId) return
+      const res = await sendAngebotWizard({
+        angebotId: id,
+        lead_id: leadId,
+        mailTo: recipients,
+        mailCc,
+        betreff: mailBetreff.trim() || undefined,
+        auftragKorrektur: istAuftragKorrektur,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
       }
-    })
+      toast.success(
+        istAuftragKorrektur
+          ? 'Korrektur gespeichert und an den Kunden versendet'
+          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+      )
+      onDone?.(id, {
+        mode: 'sent',
+        auftragKorrektur: istAuftragKorrektur || undefined,
+      })
+      onClose()
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function patchProjektTitel(v: string) {
@@ -969,15 +970,16 @@ export function AngebotWizard({
           {
             label: saving ? 'Speichern…' : 'Speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
+            hint: 'Speichert und schließt',
             onClick: () => {
               if (saving) return
-              void persistDraft({ notify: true })
+              void handleFinishSpeichern()
             },
           },
           {
             label: saving ? 'Senden…' : 'Senden',
             icon: <MockIcon ctx="btn" n="send" size={16} />,
-            hint: 'Speichert und versendet',
+            hint: 'Versendet und schließt',
             onClick: () => {
               if (saving) return
               void handleFinishVersenden()
@@ -1304,7 +1306,7 @@ export function AngebotWizard({
               />
             </MockField>
           </div>
-          <MockField label="Zahlfrist" full hint="Zahlungsziel nach Rechnungsstellung">
+          <MockField label="Zahlfrist" full>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <MockZahlfristSeg value={zahlfristSeg} onChange={(v) => applyZahlfrist(v)} />
               {zahlfristSeg === 'datum' ? (
@@ -1364,7 +1366,6 @@ export function AngebotWizard({
             emails={mailCc}
             onChange={setMailCc}
             placeholder="optional"
-            hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={saving}
           />
           <SheetEditableField

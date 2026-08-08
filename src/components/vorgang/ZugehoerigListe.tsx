@@ -58,7 +58,10 @@ export function ZugehoerigListe({
       key: `anfrage-${kontext.lead.id}`,
       icon: 'an',
       label: kontext.lead.label || 'Anfrage',
-      meta: anfrageStatusKurz(kontext.lead.status),
+      meta: anfrageStatusKurz(
+        kontext.lead.status,
+        kontext.lead.org_freigabe_status
+      ),
       href: withFrom(`/anfragen/${kontext.lead.id}`),
       active: false,
     })

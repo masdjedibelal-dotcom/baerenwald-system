@@ -3,6 +3,7 @@ export const EINSTELLUNG_KEYS = {
   firmenname: 'firmenname',
   rechtsform: 'rechtsform',
   strasse: 'strasse',
+  hausnummer: 'hausnummer',
   plz: 'plz',
   ort: 'ort',
   telefon: 'telefon',
@@ -36,7 +37,8 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
   return {
     firmenname: 'Bärenwald München',
     rechtsform: '',
-    strasse: 'Bärenwaldstraße 20',
+    strasse: 'Bärenwaldstraße',
+    hausnummer: '20',
     plz: '81737',
     ort: 'München',
     telefon: '089 8095 5726',
@@ -58,4 +60,16 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
     anfahrt_leistung_text: 'Anfahrtskosten (Pauschale)',
     lohn_anteil_standard_prozent: '75',
   }
+}
+
+/** Straße + Hausnummer für Anzeige / PDF. */
+export function firmenStrasseMitNr(f: Pick<FirmenEinstellungen, 'strasse' | 'hausnummer'>): string {
+  return [f.strasse?.trim(), f.hausnummer?.trim()].filter(Boolean).join(' ')
+}
+
+/** Einzeilige Firmenadresse: Straße Nr, PLZ Ort */
+export function firmZeileAdresse(f: FirmenEinstellungen): string {
+  return [firmenStrasseMitNr(f), [f.plz?.trim(), f.ort?.trim()].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ')
 }

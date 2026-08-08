@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { Mail, Send, Upload, X } from 'lucide-react'
@@ -25,7 +25,7 @@ export function AuftragKundenUpdatePanel({
   leadStatus?: LeadStatus | null
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotos, setFotos] = useState<string[]>([])

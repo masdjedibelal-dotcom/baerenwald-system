@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -13,7 +13,6 @@ import { toast } from '@/components/ui/app-toast'
 import {
   initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
-  splitStrasseHausnummer,
 } from '@/lib/kunde-stammdaten'
 import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
@@ -55,14 +54,15 @@ export function KundeModal({
   manageHistory?: boolean
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [typ, setTyp] = useState('privat')
   const [firmaName, setFirmaName] = useState('')
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
-  const [strasseNr, setStrasseNr] = useState('')
+  const [strasse, setStrasse] = useState('')
+  const [hausnummer, setHausnummer] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
   const [notizen, setNotizen] = useState('')
@@ -99,7 +99,8 @@ export function KundeModal({
       setTelefon(editKunde.telefon ?? '')
       setEmail(editKunde.email ?? '')
       const addr = initKundeStammEditFelder(editKunde)
-      setStrasseNr([addr.strasse, addr.hausnummer].filter(Boolean).join(' ').trim())
+      setStrasse(addr.strasse)
+      setHausnummer(addr.hausnummer)
       setPlz(editKunde.plz ?? '')
       setOrt(editKunde.ort ?? '')
       setNotizen(editKunde.notizen ?? '')
@@ -110,7 +111,8 @@ export function KundeModal({
       setNachname('')
       setTelefon('')
       setEmail('')
-      setStrasseNr('')
+      setStrasse('')
+      setHausnummer('')
       setPlz('')
       setOrt('')
       setNotizen('')
@@ -124,13 +126,22 @@ export function KundeModal({
 
   useEffect(() => {
     if (!open) return
+    const tel = telefon.trim()
+    const mail = email.trim()
+    if (!tel && !mail) {
+      setDupes([])
+      return
+    }
+    let cancelled = false
     const t = setTimeout(() => {
-      startTransition(async () => {
-        const d = await findKundenDuplikate(telefon || null, email || null, editKunde?.id)
-        setDupes(d)
+      void findKundenDuplikate(tel || null, mail || null, editKunde?.id).then((d) => {
+        if (!cancelled) setDupes(d)
       })
     }, 400)
-    return () => clearTimeout(t)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
   }, [open, editKunde, telefon, email])
 
   function mark(fn: () => void) {
@@ -177,13 +188,12 @@ export function KundeModal({
       setErr('Telefon ist Pflicht.')
       return
     }
-    const splitAddr = splitStrasseHausnummer(strasseNr)
-    if (!splitAddr.strasse.trim()) {
-      setErr('Straße + Nr. ist Pflicht.')
+    if (!strasse.trim()) {
+      setErr('Straße ist Pflicht.')
       return
     }
-    if (!splitAddr.hausnummer?.trim()) {
-      setErr('Bitte Straße und Hausnummer angeben (z. B. Leopoldstr. 42).')
+    if (!hausnummer.trim()) {
+      setErr('Hausnummer ist Pflicht.')
       return
     }
     if (!plz.trim() || !ort.trim()) {
@@ -198,8 +208,8 @@ export function KundeModal({
           name: firmaPflicht ? firmaName.trim() : null,
           vorname: vorname.trim() || null,
           nachname: nachname.trim() || null,
-          strasse: splitAddr.strasse,
-          hausnummer: splitAddr.hausnummer,
+          strasse: strasse.trim(),
+          hausnummer: hausnummer.trim(),
           plz,
           ort,
           telefon: telefon || null,
@@ -388,18 +398,27 @@ export function KundeModal({
           </MockField>
         </MockFormSection>
 
-        <MockFormSection title="Adresse" icon="map-pin">
-          <MockField label="Straße + Nr." full>
+        <MockFormSection title="Adresse" icon="map-pin" columns={2}>
+          <MockField label="Straße" required>
             <input
               className="input"
-              value={strasseNr}
-              onChange={(e) => mark(() => setStrasseNr(e.target.value))}
-              placeholder="Leopoldstr. 42"
-              autoComplete="street-address"
+              value={strasse}
+              onChange={(e) => mark(() => setStrasse(e.target.value))}
+              placeholder="Leopoldstraße"
+              autoComplete="address-line1"
             />
           </MockField>
-          <div className="kunde-create__plz-ort">
-            <MockField label="PLZ">
+          <MockField label="Hausnummer" required>
+            <input
+              className="input"
+              value={hausnummer}
+              onChange={(e) => mark(() => setHausnummer(e.target.value))}
+              placeholder="42"
+              autoComplete="address-line2"
+            />
+          </MockField>
+          <div className="kunde-create__plz-ort full">
+            <MockField label="PLZ" required>
               <input
                 className="input"
                 value={plz}
@@ -409,7 +428,7 @@ export function KundeModal({
                 inputMode="numeric"
               />
             </MockField>
-            <MockField label="Stadt">
+            <MockField label="Stadt" required>
               <input
                 className="input"
                 value={ort}

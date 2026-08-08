@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
@@ -19,7 +19,7 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
   const router = useRouter()
   const [name, setName] = useState(initial.name)
   const [telefon, setTelefon] = useState(initial.telefon)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   function save() {
     startTransition(async () => {
@@ -59,7 +59,6 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
             value={telefon}
             onChange={(e) => setTelefon(e.target.value)}
             placeholder="+49 …"
-            hint="Wird Kunden im Portal und in Termin-Mails angezeigt."
           />
         </div>
         <div className="mt-6 flex justify-end">

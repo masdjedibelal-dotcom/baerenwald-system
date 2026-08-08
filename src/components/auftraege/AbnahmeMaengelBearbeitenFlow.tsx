@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Wrench } from 'lucide-react'
@@ -33,7 +33,7 @@ export function AbnahmeMaengelBearbeitenFlow({
   onClose: () => void
   onDone: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [loading, setLoading] = useState(true)
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [maengel, setMaengel] = useState<AbnahmeMangel[]>([])

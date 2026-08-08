@@ -164,9 +164,6 @@ export function KundenObjekteCard({
   if (variant === 'select') {
     return (
       <MockCard title="Objekt" icon="building" className={className}>
-        <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
-          Ausführungsort für das Angebot (erscheint im PDF unter „Durchführung in:“).
-        </p>
         {selectBlock}
         {modal}
       </MockCard>

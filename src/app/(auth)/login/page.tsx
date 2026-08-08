@@ -123,8 +123,27 @@ function LoginPageContent() {
     setInfo(null)
   }
 
+  const loginBusy = loading && mode === 'login'
+
   return (
-    <div className="crm-login">
+    <div className={cn('crm-login', loginBusy && 'crm-login--busy')}>
+      {loginBusy ? (
+        <div
+          className="crm-login__busy"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Anmeldung läuft"
+        >
+          <div className="crm-login__busy-card">
+            <div className="crm-login__brand-mark" aria-hidden>
+              <BrandLogo variant="green" height={22} priority />
+            </div>
+            <span className="crm-login__busy-spinner" aria-hidden />
+            <span className="crm-login__busy-label">Anmeldung läuft…</span>
+          </div>
+        </div>
+      ) : null}
       <aside className="crm-login__brand">
         <div className="crm-login__brand-head">
           <div className="crm-login__brand-mark" aria-hidden>
@@ -326,9 +345,13 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="crm-login crm-login--loading">
-          <div className="crm-login__brand-mark" aria-hidden>
-            <BrandLogo variant="green" height={22} priority />
+        <div className="crm-login crm-login--loading" role="status" aria-busy="true">
+          <div className="crm-login__busy-card">
+            <div className="crm-login__brand-mark" aria-hidden>
+              <BrandLogo variant="green" height={22} priority />
+            </div>
+            <span className="crm-login__busy-spinner" aria-hidden />
+            <span className="crm-login__busy-label">Wird geladen…</span>
           </div>
         </div>
       }

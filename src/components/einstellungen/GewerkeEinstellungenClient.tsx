@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import {
@@ -167,7 +167,7 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   const [rows, setRows] = useState(initial)
   const [neuOpen, setNeuOpen] = useState(false)
   const [neuName, setNeuName] = useState('')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   async function onDragEnd(e: DragEndEvent) {

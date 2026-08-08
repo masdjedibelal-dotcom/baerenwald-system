@@ -101,117 +101,139 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     })
   }
 
+  const inviteBtn = (
+    <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
+      Einladen
+    </MockBtn>
+  )
+
+  const empty = (
+    <p className="m-0 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
+      Noch keine Benutzer.
+    </p>
+  )
+
+  const mobileList =
+    rows.length === 0 ? (
+      empty
+    ) : (
+      <div className="dok-cards">
+        {rows.map((u, i) => {
+          const initials = initialsFromName(u.name, u.email)
+          const color = avatarColor(u, i)
+          return (
+            <DokMobileCard
+              key={u.id}
+              title={u.name}
+              meta={
+                [u.email || null, !u.aktiv ? 'deaktiviert' : null].filter(Boolean).join(' · ') ||
+                null
+              }
+              onClick={() => openEdit(u)}
+              badge={<MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>}
+              className={!u.aktiv ? 'opacity-55' : undefined}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <div className={`avatar ${color}`.trim()} aria-hidden>
+                  {initials}
+                </div>
+              </div>
+            </DokMobileCard>
+          )
+        })}
+      </div>
+    )
+
+  const desktopList =
+    rows.length === 0 ? (
+      empty
+    ) : (
+      <div style={{ margin: 0 }}>
+        <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
+          <div />
+          <div>Name</div>
+          <div>E-Mail</div>
+          <div>Rolle</div>
+        </div>
+        {rows.map((u, i) => {
+          const initials = initialsFromName(u.name, u.email)
+          const color = avatarColor(u, i)
+          return (
+            <div
+              key={u.id}
+              role="button"
+              tabIndex={0}
+              className="list-row"
+              style={{
+                gridTemplateColumns: COLS,
+                cursor: 'pointer',
+                alignItems: 'center',
+                opacity: u.aktiv ? 1 : 0.55,
+              }}
+              onClick={() => openEdit(u)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openEdit(u)
+                }
+              }}
+            >
+              <div className={`avatar ${color}`.trim()} aria-hidden>
+                {initials}
+              </div>
+              <div
+                style={{
+                  fontSize: 'var(--fs-text)',
+                  fontWeight: 500,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {u.name}
+                {!u.aktiv ? (
+                  <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
+                ) : null}
+              </div>
+              <div
+                style={{
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--text-3)',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {u.email || '—'}
+              </div>
+              <div>
+                <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+
   return (
     <>
-      <MockCard
-        title="Teammitglieder"
-        icon="users"
-        actions={
-          <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
-            Einladen
-          </MockBtn>
-        }
-      >
-        {rows.length === 0 ? (
-          <p className="m-0 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
-            Noch keine Benutzer.
-          </p>
-        ) : isMobile ? (
-          <div className="dok-cards">
-            {rows.map((u, i) => {
-              const initials = initialsFromName(u.name, u.email)
-              const color = avatarColor(u, i)
-              return (
-                <DokMobileCard
-                  key={u.id}
-                  title={u.name}
-                  meta={
-                    [u.email || null, !u.aktiv ? 'deaktiviert' : null].filter(Boolean).join(' · ') ||
-                    null
-                  }
-                  onClick={() => openEdit(u)}
-                  badge={<MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>}
-                  className={!u.aktiv ? 'opacity-55' : undefined}
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className={`avatar ${color}`.trim()} aria-hidden>
-                      {initials}
-                    </div>
-                  </div>
-                </DokMobileCard>
-              )
-            })}
+      {isMobile ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="m-0 text-[length:var(--fs-text)] font-semibold text-[var(--text)]">
+              Teammitglieder
+            </h2>
+            {inviteBtn}
           </div>
-        ) : (
-          <div style={{ margin: 0 }}>
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
-              <div />
-              <div>Name</div>
-              <div>E-Mail</div>
-              <div>Rolle</div>
-            </div>
-            {rows.map((u, i) => {
-              const initials = initialsFromName(u.name, u.email)
-              const color = avatarColor(u, i)
-              return (
-                <div
-                  key={u.id}
-                  role="button"
-                  tabIndex={0}
-                  className="list-row"
-                  style={{
-                    gridTemplateColumns: COLS,
-                    cursor: 'pointer',
-                    alignItems: 'center',
-                    opacity: u.aktiv ? 1 : 0.55,
-                  }}
-                  onClick={() => openEdit(u)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      openEdit(u)
-                    }
-                  }}
-                >
-                  <div className={`avatar ${color}`.trim()} aria-hidden>
-                    {initials}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 'var(--fs-text)',
-                      fontWeight: 500,
-                      minWidth: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {u.name}
-                    {!u.aktiv ? (
-                      <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
-                    ) : null}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 'var(--fs-meta)',
-                      color: 'var(--text-3)',
-                      minWidth: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {u.email || '—'}
-                  </div>
-                  <div>
-                    <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </MockCard>
+          {mobileList}
+        </div>
+      ) : (
+        <MockCard title="Teammitglieder" icon="users" actions={inviteBtn}>
+          {desktopList}
+        </MockCard>
+      )}
 
       <EditorSheet
         open={inviteOpen}

@@ -119,7 +119,6 @@ function FotoBeschreibungField({
       >
         <RichTextContent html={foto.beschreibung} />
       </button>
-      <p className="wizard-projekt-field-hint">Klicken zum Bearbeiten</p>
     </div>
   )
 }
@@ -331,10 +330,6 @@ export function AngebotWizardFotodokumentation({
             }}
           />
         </label>
-        <p className="wizard-projekt-field-hint mt-1">
-          Optional — per Klick oder Drag & Drop; erscheint im PDF unter dem Foto. Pro Foto kannst du
-          eine KI-Visualisierung starten.
-        </p>
       </div>
 
       {fotos.length > 0 ? (

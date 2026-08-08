@@ -611,7 +611,6 @@ export function PositionAddSheet({
             <Toggle
               checked={Boolean(frei.regie)}
               label={REGIE_BADGE_LABEL}
-              hint="Nur Schätzung — Final kommt vom Handwerker (Bautagebuch Pflicht)"
               onChange={(on) =>
                 setFrei((f) => ({
                   ...f,
@@ -717,7 +716,7 @@ export function PositionAddSheet({
             onSave={(beschreibung) => setFreitext((f) => ({ ...f, beschreibung }))}
             multiline
             rows={3}
-            placeholder="Erscheint ohne Preis auf dem Dokument"
+            placeholder="z. B. Hinweis zu Ablauf oder Garantie"
             sheetContext="detail"
           />
         </div>

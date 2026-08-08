@@ -103,11 +103,7 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
       purpose={purpose}
     >
       <MockFormSection>
-        <MockField
-          label="Automatisch beauftragen bis"
-          full
-          hint="Gilt für alle Objekte ohne eigene Ausnahme. Immer zuerst Angebot — darunter Auto-Auftrag."
-        >
+        <MockField label="Automatisch beauftragen bis" full>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <div style={{ position: 'relative', width: 140 }}>
               <input

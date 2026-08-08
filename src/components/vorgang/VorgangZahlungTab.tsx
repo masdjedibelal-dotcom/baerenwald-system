@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -163,7 +163,7 @@ export function VorgangZahlungTab({
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const initial = useMemo(
     () => parseZahlungsplan(zahlungsplanRaw) ?? emptyZahlungsplan(),
     [zahlungsplanRaw]

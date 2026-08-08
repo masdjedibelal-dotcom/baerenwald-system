@@ -17,7 +17,7 @@ import {
   disponiereHavarieNotmassnahme,
   schlageKostentraegerVor,
 } from '@/lib/org/hv-lead-actions'
-import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
+import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import {
   ANLASS_LABELS,
@@ -43,7 +43,15 @@ function orgFreigabeBadgeStatus(
   return 'order'
 }
 
-export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
+export function LeadOrgKontextBlock({
+  lead,
+  wizardGewerke = [],
+  wizardPreislisten = [],
+}: {
+  lead: LeadDetail
+  wizardGewerke?: import('@/lib/types').Gewerk[]
+  wizardPreislisten?: import('@/lib/types').Preisliste[]
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [notfallModal, setNotfallModal] = useState(false)
@@ -438,20 +446,18 @@ export function LeadOrgKontextBlock({ lead }: { lead: LeadDetail }) {
         </Card>
       ) : null}
 
-      <NotfallDirektBeauftragenModal
-        open={notfallModal}
-        onClose={() => setNotfallModal(false)}
-        leadId={lead.id}
-        variant="anfrage"
-        gewerkName={
-          Array.isArray(lead.bereiche) && lead.bereiche[0]
-            ? String(lead.bereiche[0])
-            : 'Allgemein'
-        }
-        onDone={(auftragId) => {
-          router.push(`/auftraege/${auftragId}`)
-        }}
-      />
+      {notfallModal ? (
+        <DirektBeauftragenWizard
+          lead={lead}
+          gewerke={wizardGewerke}
+          preislisten={wizardPreislisten}
+          onClose={() => setNotfallModal(false)}
+          onDone={(auftragId) => {
+            setNotfallModal(false)
+            router.push(`/auftraege/${auftragId}?tab=leistungen`)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

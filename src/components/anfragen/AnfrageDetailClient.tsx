@@ -34,7 +34,8 @@ import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { NotfallDirektBeauftragenModal } from '@/components/auftraege/NotfallDirektBeauftragenModal'
+import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
+import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
 import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
@@ -216,7 +217,7 @@ export function AnfrageDetailClient({
   const kopieQueryHandledRef = useRef(false)
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
-  const [notfallModalOpen, setNotfallModalOpen] = useState(false)
+  const [direktWizardOpen, setDirektWizardOpen] = useState(false)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
 
@@ -424,9 +425,11 @@ export function AnfrageDetailClient({
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
   const matrixCta = primaryCta('anfrage', lead.status)
+  const istAkut = leadIstAkut(lead)
+  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
 
   const openDirektBeauftragen = useCallback(() => {
-    setNotfallModalOpen(true)
+    setDirektWizardOpen(true)
   }, [])
 
   const primaryCtaAction = useCallback(() => {
@@ -437,6 +440,15 @@ export function AnfrageDetailClient({
   }, [matrixCta, openAngebotErstellen])
 
   const detailPrimary = useMemo(() => {
+    if (hatAuftrag) return null
+    if (istAkut) {
+      return {
+        label: 'Direkt beauftragen',
+        icon: 'alert-triangle',
+        onClick: openDirektBeauftragen,
+        disabled: pending,
+      }
+    }
     if (!matrixCta) return null
     return {
       label: matrixCta.label,
@@ -444,9 +456,17 @@ export function AnfrageDetailClient({
       onClick: primaryCtaAction,
       disabled: pending,
     }
-  }, [matrixCta, pending, primaryCtaAction])
+  }, [
+    hatAuftrag,
+    istAkut,
+    matrixCta,
+    openDirektBeauftragen,
+    pending,
+    primaryCtaAction,
+  ])
 
   const detailSecondary = useMemo(() => {
+    if (hatAuftrag || istAkut) return null
     if (matrixCta?.id !== 'angebot_erstellen') return null
     return {
       label: 'Direkt beauftragen',
@@ -454,7 +474,7 @@ export function AnfrageDetailClient({
       onClick: openDirektBeauftragen,
       disabled: pending,
     }
-  }, [matrixCta, openDirektBeauftragen, pending])
+  }, [hatAuftrag, istAkut, matrixCta, openDirektBeauftragen, pending])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
@@ -543,11 +563,19 @@ export function AnfrageDetailClient({
     <LeistungenTab
       phase="anfrage"
       rows={leistungenFromAnfrage(lead.funnel_daten)}
-      onOpenDokument={openAngebotErstellen}
-      dokumentHint="Verbindliche Leistungen entstehen erst mit dem Angebot — hier siehst du nur den Bedarf aus der Anfrage."
-      dokumentActionLabel="Angebot erstellen"
+      onOpenDokument={istAkut || !hatAuftrag ? openDirektBeauftragen : openAngebotErstellen}
+      dokumentHint={
+        istAkut
+          ? 'Bei Akut: Leistungen über Direkt beauftragen erfassen — danach Handwerker im Auftrag zuweisen.'
+          : 'Verbindliche Leistungen entstehen mit Angebot oder Direkt beauftragen — hier siehst du den Bedarf aus der Anfrage.'
+      }
+      dokumentActionLabel={istAkut ? 'Direkt beauftragen' : 'Angebot erstellen'}
       emptyTitle="Noch keine Leistungen"
-      emptyHint="Verbindliche Positionen entstehen mit dem Angebot."
+      emptyHint={
+        istAkut
+          ? 'Leistungen über Direkt beauftragen anlegen.'
+          : 'Verbindliche Positionen entstehen mit dem Angebot.'
+      }
     />
   )
 
@@ -749,21 +777,19 @@ export function AnfrageDetailClient({
         }}
       />
 
-      <NotfallDirektBeauftragenModal
-        open={notfallModalOpen}
-        onClose={() => setNotfallModalOpen(false)}
-        leadId={lead.id}
-        variant="anfrage"
-        gewerkName={
-          Array.isArray(lead.bereiche) && lead.bereiche[0]
-            ? String(lead.bereiche[0])
-            : 'Allgemein'
-        }
-        onDone={(auftragId) => {
-          setNotfallModalOpen(false)
-          router.push(`/auftraege/${auftragId}`)
-        }}
-      />
+      {direktWizardOpen ? (
+        <DirektBeauftragenWizard
+          lead={lead}
+          gewerke={wizardGewerke}
+          preislisten={wizardPreislisten}
+          firm={wizardFirm}
+          onClose={() => setDirektWizardOpen(false)}
+          onDone={(auftragId) => {
+            setDirektWizardOpen(false)
+            router.push(`/auftraege/${auftragId}?tab=leistungen`)
+          }}
+        />
+      ) : null}
 
       {quickActionSheets}
       </div>

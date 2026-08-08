@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
@@ -45,7 +45,7 @@ export function MailUebersicht({
   emailLog: EmailLogRow[]
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [showQr, setShowQr] = useState(false)
 
   const projektUrl = useMemo(() => {

@@ -14,6 +14,8 @@ export function RechnungStammdatenCard({
 }) {
   const name = detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || ''
 
+  const k = detail.kunden
+
   return (
     <EntityKundenStammdatenCard
       kundeId={detail.kunde_id ?? detail.kunden?.id}
@@ -25,7 +27,14 @@ export function RechnungStammdatenCard({
         email: detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || '',
         plz: detail.kunden?.plz?.trim() || lead?.plz?.trim() || '',
         ort: detail.kunden?.ort?.trim() || '',
-        strasse: detail.kunden?.adresse?.trim() || '',
+        strasse:
+          [detail.kunden?.strasse, detail.kunden?.hausnummer].filter(Boolean).join(' ').trim() ||
+          detail.kunden?.adresse?.trim() ||
+          '',
+        vorname: k?.vorname ?? '',
+        nachname: k?.nachname ?? '',
+        ansprechpartner: k?.ansprechpartner ?? '',
+        webseite: k?.webseite ?? '',
       }}
       kundeTyp={detail.kunden?.typ}
       onSaved={onSaved}

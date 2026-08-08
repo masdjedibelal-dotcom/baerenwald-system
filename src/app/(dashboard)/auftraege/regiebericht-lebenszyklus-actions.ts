@@ -9,7 +9,7 @@ import {
 import { loadBerichtDatenquelle } from '@/lib/auftraege/load-bericht-datenquelle'
 import { istRegiePosition } from '@/lib/auftraege/regie-display'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import {
@@ -19,11 +19,6 @@ import {
 } from '@/lib/templates/regiebericht-lebenszyklus-template'
 import { kundeZeigt35a } from '@/lib/rechnung-berechnung'
 
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join(
-    '\n'
-  )
-}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? '']

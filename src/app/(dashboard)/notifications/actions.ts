@@ -593,7 +593,197 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  await applyUpdateZeilenAnzeige(supabase, items)
   return items
+}
+
+type UpdatePhase = 'Anfrage' | 'Angebot' | 'Auftrag' | 'Rechnung'
+
+function parseUpdateHref(
+  href: string
+): { phase: UpdatePhase; id: string } | null {
+  const path = href.split('?')[0] ?? href
+  const m = path.match(/^\/(anfragen|angebote|auftraege|rechnungen)\/([0-9a-f-]{8,})/i)
+  if (!m?.[1] || !m[2]) return null
+  const kind = m[1].toLowerCase()
+  const phase: UpdatePhase =
+    kind === 'anfragen'
+      ? 'Anfrage'
+      : kind === 'angebote'
+        ? 'Angebot'
+        : kind === 'rechnungen'
+          ? 'Rechnung'
+          : 'Auftrag'
+  return { phase, id: m[2] }
+}
+
+function kundeLabelFromRow(row: {
+  name?: string | null
+  vorname?: string | null
+  nachname?: string | null
+} | null | undefined): string | null {
+  if (!row) return null
+  const firma = row.name?.trim()
+  if (firma) return firma
+  const composed = [row.vorname?.trim(), row.nachname?.trim()].filter(Boolean).join(' ')
+  return composed || null
+}
+
+/** Zeile: nur Phasen-Titel (Anfrage/Angebot/Auftrag/Rechnung) + Kundenname. */
+async function applyUpdateZeilenAnzeige(
+  supabase: ReturnType<typeof createClient>,
+  items: CrmNotificationItem[]
+): Promise<void> {
+  const leadIds = new Set<string>()
+  const angebotIds = new Set<string>()
+  const auftragIds = new Set<string>()
+  const rechnungIds = new Set<string>()
+
+  for (const item of items) {
+    const parsed = parseUpdateHref(item.href)
+    if (!parsed) continue
+    if (parsed.phase === 'Anfrage') leadIds.add(parsed.id)
+    else if (parsed.phase === 'Angebot') angebotIds.add(parsed.id)
+    else if (parsed.phase === 'Rechnung') rechnungIds.add(parsed.id)
+    else auftragIds.add(parsed.id)
+  }
+
+  const kundeByLead = new Map<string, string>()
+  const kundeByAngebot = new Map<string, string>()
+  const kundeByAuftrag = new Map<string, string>()
+  const kundeByRechnung = new Map<string, string>()
+
+  await Promise.all([
+    leadIds.size
+      ? supabase
+          .from('leads')
+          .select('id, kontakt_name, kunden:kunde_id(name, vorname, nachname)')
+          .in('id', Array.from(leadIds))
+          .then(({ data }) => {
+            for (const row of data ?? []) {
+              const k = one(
+                row.kunden as
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                  | null
+              )
+              const name =
+                kundeLabelFromRow(k) || (row.kontakt_name as string | null)?.trim() || null
+              if (name) kundeByLead.set(String(row.id), name)
+            }
+          })
+      : Promise.resolve(),
+    angebotIds.size
+      ? supabase
+          .from('angebote')
+          .select(
+            'id, kunden:kunde_id(name, vorname, nachname), leads:lead_id(kontakt_name, kunden:kunde_id(name, vorname, nachname))'
+          )
+          .in('id', Array.from(angebotIds))
+          .then(({ data }) => {
+            for (const row of data ?? []) {
+              const k = one(
+                row.kunden as
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                  | null
+              )
+              const lead = one(
+                row.leads as
+                  | {
+                      kontakt_name?: string | null
+                      kunden?:
+                        | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                        | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                        | null
+                    }
+                  | {
+                      kontakt_name?: string | null
+                      kunden?:
+                        | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                        | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                        | null
+                    }[]
+                  | null
+              )
+              const leadKunde = one(
+                lead?.kunden as
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                  | null
+              )
+              const name =
+                kundeLabelFromRow(k) ||
+                kundeLabelFromRow(leadKunde) ||
+                lead?.kontakt_name?.trim() ||
+                null
+              if (name) kundeByAngebot.set(String(row.id), name)
+            }
+          })
+      : Promise.resolve(),
+    auftragIds.size
+      ? supabase
+          .from('auftraege')
+          .select(
+            'id, kunden:kunde_id(name, vorname, nachname), leads:lead_id(kontakt_name)'
+          )
+          .in('id', Array.from(auftragIds))
+          .then(({ data }) => {
+            for (const row of data ?? []) {
+              const k = one(
+                row.kunden as
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                  | null
+              )
+              const lead = one(
+                row.leads as
+                  | { kontakt_name?: string | null }
+                  | { kontakt_name?: string | null }[]
+                  | null
+              )
+              const name = kundeLabelFromRow(k) || lead?.kontakt_name?.trim() || null
+              if (name) kundeByAuftrag.set(String(row.id), name)
+            }
+          })
+      : Promise.resolve(),
+    rechnungIds.size
+      ? supabase
+          .from('rechnungen')
+          .select('id, kunden:kunde_id(name, vorname, nachname)')
+          .in('id', Array.from(rechnungIds))
+          .then(({ data }) => {
+            for (const row of data ?? []) {
+              const k = one(
+                row.kunden as
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }
+                  | { name?: string | null; vorname?: string | null; nachname?: string | null }[]
+                  | null
+              )
+              const name = kundeLabelFromRow(k)
+              if (name) kundeByRechnung.set(String(row.id), name)
+            }
+          })
+      : Promise.resolve(),
+  ])
+
+  for (const item of items) {
+    const parsed = parseUpdateHref(item.href)
+    if (!parsed) {
+      item.subtitle = null
+      continue
+    }
+    item.title = parsed.phase
+    const name =
+      parsed.phase === 'Anfrage'
+        ? kundeByLead.get(parsed.id)
+        : parsed.phase === 'Angebot'
+          ? kundeByAngebot.get(parsed.id)
+          : parsed.phase === 'Rechnung'
+            ? kundeByRechnung.get(parsed.id)
+            : kundeByAuftrag.get(parsed.id)
+    item.subtitle = name ?? null
+  }
 }
 
 /** Inbox der letzten 7 Tage: Anfragen + Portal-Aktionen + Abschluss. */

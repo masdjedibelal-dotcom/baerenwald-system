@@ -39,7 +39,10 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
-import { rechnungStatusDisplay } from '@/lib/status/status-display'
+import {
+  ANFRAGE_WARTE_AUF_HV_LABEL,
+  rechnungStatusDisplay,
+} from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import { HwEingangsrechnungenListe } from '@/components/rechnungen/HwEingangsrechnungenListe'
@@ -128,8 +131,15 @@ function statusKind(row: VorgangListeRow): string {
   return 'aktiv'
 }
 
+const STATUS_FILTER_WARTET_FREIGABE = 'wartet_freigabe'
+
+function statusFilterKey(row: VorgangListeRow): string {
+  if (row.badges.wartet_freigabe) return STATUS_FILTER_WARTET_FREIGABE
+  return row.unterstatus
+}
+
 function statusLabel(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return 'Warte auf Hausverwaltung'
+  if (row.badges.wartet_freigabe) return ANFRAGE_WARTE_AUF_HV_LABEL
   return row.unterstatusLabel
 }
 
@@ -404,17 +414,31 @@ export function VorgaengeListeClient({
 
   const statusOptions = useMemo(() => {
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
+    const phaseRows =
+      filter === 'alle' || filter === 'bestand'
+        ? lifecycleRows
+        : lifecycleRows.filter((v) => v.phase === filter)
+    const hatWartetFreigabe = phaseRows.some((v) => v.badges.wartet_freigabe)
+
     if (filter !== 'alle' && filter !== 'bestand' && filter in PHASE_UNTERSTATUS_VALUES) {
       const phase = filter as VorgangPhase
-      return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
+      const opts = PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
         value: u,
         label: unterstatusLabel(phase, u),
       }))
+      if (hatWartetFreigabe) {
+        opts.unshift({
+          value: STATUS_FILTER_WARTET_FREIGABE,
+          label: ANFRAGE_WARTE_AUF_HV_LABEL,
+        })
+      }
+      return opts
     }
     const byKey = new Map<string, string>()
     for (const v of lifecycleRows) {
       if (filter === 'bestand' && !v.ist_wiederkehrend) continue
-      if (!byKey.has(v.unterstatus)) byKey.set(v.unterstatus, v.unterstatusLabel)
+      const key = statusFilterKey(v)
+      if (!byKey.has(key)) byKey.set(key, statusLabel(v))
     }
     return Array.from(byKey.entries())
       .sort((a, b) => a[1].localeCompare(b[1], 'de'))
@@ -442,7 +466,7 @@ export function VorgaengeListeClient({
       } else if (filter !== 'alle' && v.phase !== filter) {
         return false
       }
-      if (statusFilter.length && !statusFilter.includes(v.unterstatus)) return false
+      if (statusFilter.length && !statusFilter.includes(statusFilterKey(v))) return false
       if (
         query &&
         !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId)
@@ -816,142 +840,171 @@ export function VorgaengeListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Filter">
-          <div className="listbar-lifecycle-chips">
-            <MockChip
-              active={lifecycle === 'offen'}
-              count={effectiveLifecycleCounts.offen}
-              onClick={() => setLifecycleFilter('offen')}
-            >
-              Offen
-            </MockChip>
-            <MockChip
-              active={lifecycle === 'erledigt'}
-              count={effectiveLifecycleCounts.erledigt}
-              onClick={() => setLifecycleFilter('erledigt')}
-            >
-              Erledigt
-            </MockChip>
-            <span className="listbar-chips-sep" aria-hidden />
+        <div className="listbar-main">
+          <div className="listbar-chips" role="group" aria-label="Phase">
+            {VORGANG_FILTERS.map((p) => (
+              <MockChip
+                key={p}
+                active={filter === p}
+                onClick={() => setPhaseFilter(p)}
+                count={counts[p]}
+                title={p === 'bestand' ? fachbegriff('bestand') : undefined}
+                icon={
+                  p === 'bestand'
+                    ? 'refresh'
+                    : p !== 'alle'
+                      ? PHASE_META[p as VorgangPhase].icon
+                      : undefined
+                }
+              >
+                {phaseChipLabel(p)}
+              </MockChip>
+            ))}
+            {filter === 'rechnung' ? (
+              <>
+                <span className="listbar-chips-sep" aria-hidden />
+                <MockChip
+                  active={rechnungRichtung === 'ausgehend'}
+                  count={lifecycle === 'erledigt' ? undefined : counts.rechnung}
+                  onClick={() => setRechnungRichtungFilter('ausgehend')}
+                >
+                  Ausgehend
+                </MockChip>
+                <MockChip
+                  active={rechnungRichtung === 'eingehend'}
+                  count={
+                    lifecycle === 'offen'
+                      ? hwLifecycleCounts.offen
+                      : hwLifecycleCounts.erledigt
+                  }
+                  onClick={() => setRechnungRichtungFilter('eingehend')}
+                >
+                  Eingehend
+                </MockChip>
+              </>
+            ) : null}
           </div>
-          {VORGANG_FILTERS.map((p) => (
-            <MockChip
-              key={p}
-              active={filter === p}
-              onClick={() => setPhaseFilter(p)}
-              count={counts[p]}
-              title={p === 'bestand' ? fachbegriff('bestand') : undefined}
-              icon={
-                p === 'bestand'
-                  ? 'refresh'
-                  : p !== 'alle'
-                    ? PHASE_META[p as VorgangPhase].icon
-                    : undefined
-              }
-            >
-              {phaseChipLabel(p)}
-            </MockChip>
-          ))}
-          {filter === 'rechnung' ? (
-            <>
-              <span className="listbar-chips-sep" aria-hidden />
-              <MockChip
-                active={rechnungRichtung === 'ausgehend'}
-                count={lifecycle === 'erledigt' ? undefined : counts.rechnung}
-                onClick={() => setRechnungRichtungFilter('ausgehend')}
-              >
-                Ausgehend
-              </MockChip>
-              <MockChip
-                active={rechnungRichtung === 'eingehend'}
-                count={
-                  lifecycle === 'offen'
-                    ? hwLifecycleCounts.offen
-                    : hwLifecycleCounts.erledigt
-                }
-                onClick={() => setRechnungRichtungFilter('eingehend')}
-              >
-                Eingehend
-              </MockChip>
-            </>
-          ) : null}
-        </div>
-        <ListbarActionsMenu
-          title="Listen-Aktionen"
-          activeHint={activeFilterCount}
-          directOpen={() => setFilterOpen(true)}
-          items={[
-            {
-              icon: 'filter',
-              label: 'Filter & Suchen',
-              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
-              active: activeFilterCount > 0,
-              onSelect: () => setFilterOpen(true),
-            },
-            {
-              icon: 'download',
-              label: 'CSV exportieren',
-              onSelect: () =>
-                runMockListExport(
-                  exportToCSV,
-                  (filtered.length ? filtered : baseRows).map(toExportRow),
-                  EXPORT_FIELDS,
-                  'vorgaenge'
-                ),
-            },
-          ]}
-          desktop={
-            <>
-              <div className="segment-toggle" role="group" aria-label="Lebenszyklus">
-                <button
-                  type="button"
-                  className={cn(
-                    'segment-toggle-btn',
-                    lifecycle === 'offen' && 'segment-toggle-btn--active'
-                  )}
-                  onClick={() => setLifecycleFilter('offen')}
-                >
-                  Offen {effectiveLifecycleCounts.offen}
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'segment-toggle-btn',
-                    lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                  )}
-                  onClick={() => setLifecycleFilter('erledigt')}
-                >
-                  Erledigt {effectiveLifecycleCounts.erledigt}
-                </button>
-              </div>
-              <MockBtn
-                icon="filter"
-                kind={activeFilterCount ? 'primary' : 'ghost'}
-                sm
-                title={
-                  activeFilterCount
-                    ? `Filter & Suchen (${activeFilterCount})`
-                    : 'Filter & Suchen'
-                }
-                onClick={() => setFilterOpen(true)}
-              />
-              <MockBtn
-                icon="download"
-                kind="ghost"
-                sm
-                title="CSV exportieren"
-                onClick={() =>
+          <ListbarActionsMenu
+            title="Listen-Aktionen"
+            activeHint={activeFilterCount}
+            directOpen={() => setFilterOpen(true)}
+            items={[
+              {
+                icon: 'filter',
+                label: 'Filter & Suchen',
+                hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+                active: activeFilterCount > 0,
+                onSelect: () => setFilterOpen(true),
+              },
+              {
+                icon: 'download',
+                label: 'CSV exportieren',
+                onSelect: () =>
                   runMockListExport(
                     exportToCSV,
                     (filtered.length ? filtered : baseRows).map(toExportRow),
                     EXPORT_FIELDS,
                     'vorgaenge'
-                  )
-                }
-              />
-            </>
-          }
-        />
+                  ),
+              },
+            ]}
+            desktop={
+              <>
+                <div
+                  className="segment-toggle segment-toggle--listbar"
+                  role="group"
+                  aria-label="Lebenszyklus"
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      'segment-toggle-btn',
+                      lifecycle === 'offen' && 'segment-toggle-btn--active'
+                    )}
+                    onClick={() => setLifecycleFilter('offen')}
+                  >
+                    Offen{' '}
+                    <span className="segment-toggle-count">
+                      {effectiveLifecycleCounts.offen}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      'segment-toggle-btn',
+                      lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+                    )}
+                    onClick={() => setLifecycleFilter('erledigt')}
+                  >
+                    Erledigt{' '}
+                    <span className="segment-toggle-count">
+                      {effectiveLifecycleCounts.erledigt}
+                    </span>
+                  </button>
+                </div>
+                <MockBtn
+                  icon="filter"
+                  kind={activeFilterCount ? 'primary' : 'ghost'}
+                  sm
+                  title={
+                    activeFilterCount
+                      ? `Filter & Suchen (${activeFilterCount})`
+                      : 'Filter & Suchen'
+                  }
+                  onClick={() => setFilterOpen(true)}
+                />
+                <MockBtn
+                  icon="download"
+                  kind="ghost"
+                  sm
+                  title="CSV exportieren"
+                  onClick={() =>
+                    runMockListExport(
+                      exportToCSV,
+                      (filtered.length ? filtered : baseRows).map(toExportRow),
+                      EXPORT_FIELDS,
+                      'vorgaenge'
+                    )
+                  }
+                />
+              </>
+            }
+          />
+        </div>
+        <div
+          className="listbar-lifecycle"
+          role="group"
+          aria-label="Lebenszyklus"
+        >
+          <div className="segment-toggle segment-toggle--listbar segment-toggle--stack">
+            <button
+              type="button"
+              className={cn(
+                'segment-toggle-btn',
+                lifecycle === 'offen' && 'segment-toggle-btn--active'
+              )}
+              onClick={() => setLifecycleFilter('offen')}
+            >
+              Offen{' '}
+              <span className="segment-toggle-count">
+                {effectiveLifecycleCounts.offen}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'segment-toggle-btn',
+                lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+              )}
+              onClick={() => setLifecycleFilter('erledigt')}
+            >
+              Erledigt{' '}
+              <span className="segment-toggle-count">
+                {effectiveLifecycleCounts.erledigt}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {isMobile ? (

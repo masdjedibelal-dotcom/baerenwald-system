@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -54,7 +54,7 @@ export function HwEingangsrechnungenListe({
   lifecycle: 'offen' | 'erledigt'
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [statusFilter, setStatusFilter] = useState<HwRechnungStatus | 'alle'>('alle')
   const [query, setQuery] = useState('')
   const [active, setActive] = useState<HwEingangsrechnungListeRow | null>(null)

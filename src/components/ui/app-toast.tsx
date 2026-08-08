@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle, XCircle, Info, X, Loader2 } from 'lucide-react'
 import { actionBusy } from '@/components/ui/action-busy'
 import { cn } from '@/lib/utils'
@@ -89,6 +90,7 @@ const icons = {
 
 export function ToastProvider() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const [mounted, setMounted] = useState(false)
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -121,55 +123,64 @@ export function ToastProvider() {
     }
   }, [push, dismiss])
 
-  return (
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
     <div
-      className="pointer-events-none fixed left-1/2 top-14 z-toast flex w-[min(100%-2rem,28rem)] -translate-x-1/2 flex-col items-stretch gap-2 md:top-16"
-      style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      className="pointer-events-none fixed inset-x-0 top-0 z-toast flex justify-center px-4 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-4"
+      aria-live="polite"
     >
-      {toasts.map((t) => {
-        const Icon = icons[t.type]
-        return (
-          <div
-            key={t.id}
-            className={cn(
-              'app-toast pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
-              t.type === 'success' && 'app-toast--success',
-              t.type === 'error' && 'app-toast--error',
-              (t.type === 'info' || t.type === 'loading') && 'app-toast--info'
-            )}
-            role="status"
-            aria-live={t.type === 'loading' ? 'polite' : 'assertive'}
-          >
-            <Icon
-              className={cn('h-5 w-5 shrink-0', t.type === 'loading' && 'animate-spin')}
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1">{t.message}</span>
-            {t.action ? (
-              <button
-                type="button"
-                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline"
-                onClick={() => {
-                  t.action?.onClick()
-                  dismiss(t.id)
-                }}
-              >
-                {t.action.label}
-              </button>
-            ) : null}
-            {t.type !== 'loading' ? (
-              <button
-                type="button"
-                onClick={() => dismiss(t.id)}
-                className="text-current opacity-60 hover:opacity-100"
-                aria-label="Schließen"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-        )
-      })}
-    </div>
+      <div className="flex w-[min(100%,28rem)] flex-col items-stretch gap-2">
+        {toasts.map((t) => {
+          const Icon = icons[t.type]
+          return (
+            <div
+              key={t.id}
+              className={cn(
+                'app-toast pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
+                t.type === 'success' && 'app-toast--success',
+                t.type === 'error' && 'app-toast--error',
+                (t.type === 'info' || t.type === 'loading') && 'app-toast--info'
+              )}
+              role="status"
+              aria-live={t.type === 'loading' ? 'polite' : 'assertive'}
+            >
+              <Icon
+                className={cn('h-5 w-5 shrink-0', t.type === 'loading' && 'animate-spin')}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1">{t.message}</span>
+              {t.action ? (
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline"
+                  onClick={() => {
+                    t.action?.onClick()
+                    dismiss(t.id)
+                  }}
+                >
+                  {t.action.label}
+                </button>
+              ) : null}
+              {t.type !== 'loading' ? (
+                <button
+                  type="button"
+                  onClick={() => dismiss(t.id)}
+                  className="text-current opacity-60 hover:opacity-100"
+                  aria-label="Schließen"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>,
+    document.body
   )
 }

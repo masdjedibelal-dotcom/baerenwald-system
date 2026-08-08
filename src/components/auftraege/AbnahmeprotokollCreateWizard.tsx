@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -104,7 +104,7 @@ export function AbnahmeprotokollCreateWizard({
 }) {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
-  const [pending, startTransition] = useTransition('Wird gespeichert…')
+  const [pending, startTransition] = useLocalTransition('Wird gespeichert…')
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)

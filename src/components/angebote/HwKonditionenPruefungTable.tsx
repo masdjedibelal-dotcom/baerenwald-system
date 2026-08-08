@@ -130,7 +130,6 @@ export function HwKonditionenPruefungTable({
       </div>
 
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-        Nach Übernahme gilt je Leistung ein vereinbarter Netto-Preis (Einkaufspreis = Vergütung).
         Summe brutto: {betragAnzeige(summeBrutto, null, null)}
       </p>
     </div>

@@ -5,7 +5,7 @@ import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import { loadBerichtDatenquelle } from '@/lib/auftraege/load-bericht-datenquelle'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import {
@@ -13,11 +13,6 @@ import {
   buildBautagebuchLebenszyklusPdfFooterTemplate,
 } from '@/lib/templates/bautagebuch-lebenszyklus-template'
 
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join(
-    '\n'
-  )
-}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? '']

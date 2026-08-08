@@ -2,7 +2,7 @@
  * Musterdaten (Max Mustermann) für PDF-Dokumentvorlagen in Einstellungen · Formulare.
  */
 
-import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { defaultFirmenEinstellungen, firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { buildAbnahmeProtokollHtml } from '@/lib/templates/abnahme-protokoll-template'
 import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import { buildAbschlussdokumentationHtml } from '@/lib/templates/abschlussdokumentation-template'
@@ -37,7 +37,7 @@ export type DokumentPdfMusterEintrag = {
 }
 
 function firmAdresse(f: FirmenEinstellungen): string {
-  return `${f.strasse?.trim() || 'Bärenwaldstraße 20'}, ${f.plz?.trim() || '81737'} ${f.ort?.trim() || 'München'}`
+  return firmZeileAdresse(f) || 'Bärenwaldstraße 20, 81737 München'
 }
 
 function firmKontakt(f: FirmenEinstellungen): string {

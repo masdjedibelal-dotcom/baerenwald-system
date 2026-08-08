@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
@@ -33,7 +33,7 @@ export function NotfallDirektBeauftragenModal({
   variant?: 'auftrag' | 'anfrage'
   onDone?: (auftragId: string) => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [handwerker, setHandwerker] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [hwId, setHwId] = useState('')
   const [stundensatz, setStundensatz] = useState('')
@@ -42,8 +42,6 @@ export function NotfallDirektBeauftragenModal({
 
   const fromAnfrage = variant === 'anfrage'
   const title = 'Direkt beauftragen'
-  const gewerkLabel = gewerkName?.trim() || 'Gewerk'
-
   useEffect(() => {
     if (!open) return
     setStundensatz('')
@@ -107,12 +105,6 @@ export function NotfallDirektBeauftragenModal({
   return (
     <Modal open={open} onClose={onClose} title={title} size="md">
       <div className="space-y-4 p-1">
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          {fromAnfrage
-            ? `Direktauftrag ohne Angebot: Einsatz [${gewerkLabel}] als Position nach Aufwand. Stunden später über Bautagebuch → Rechnung.`
-            : `Direktauftrag ohne Angebot mit Position nach Aufwand („Einsatz [${gewerkLabel}]“). Festpreis läuft über Angebot annehmen.`}
-        </p>
-
         <label className="block text-[length:var(--fs-meta)] font-medium text-bw-text">
           Handwerker zuordnen
           <select

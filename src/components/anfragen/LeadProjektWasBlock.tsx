@@ -310,7 +310,6 @@ function ProjektLeistungAccordion({
               <>
                 <WizardField
                   label="Gewerk"
-                  hint="nur intern · erscheint nicht auf der Rechnung"
                 >
                   <select
                     className="input w-full"
@@ -370,7 +369,6 @@ function ProjektLeistungAccordion({
                 </WizardField>
                 <WizardField
                   label="Gewerk"
-                  hint="nur intern · erscheint nicht auf der Rechnung"
                 >
                   <select
                     className="input w-full"
@@ -402,11 +400,7 @@ function ProjektLeistungAccordion({
               </>
             )}
 
-            <WizardField
-              label="Beschreibung"
-              hint="Details für Kunden & spätere Rechnung"
-              full
-            >
+            <WizardField label="Beschreibung" full>
               <Textarea
                 rows={3}
                 disabled={pending}

@@ -12,12 +12,11 @@ import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
   typHint,
-  typIcon,
   typLabel,
   type CrmNotificationFilter,
   type CrmNotificationItem,
 } from '@/app/(dashboard)/notifications/actions'
-import { formatRelativeDate, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 /**
  * TopBar-Glocke: Unread-Badge · Liste · Klick öffnet direkt den Vorgang.
@@ -207,22 +206,13 @@ export function CrmNotificationsBell() {
                     openDetail(item)
                   }}
                 >
-                  <span className="crm-notif-row__ico" aria-hidden>
-                    <MockIcon ctx="default" n={typIcon(item.typ)} size={16} />
-                  </span>
                   <span className="crm-notif-row__body">
                     <span className="crm-notif-row__title">{item.title}</span>
                     {item.subtitle ? (
                       <span className="crm-notif-row__sub">{item.subtitle}</span>
                     ) : null}
-                    <span className="crm-notif-row__meta">
-                      {formatRelativeDate(item.createdAt)}
-                    </span>
                   </span>
                   {!item.gelesen ? <span className="crm-notif-row__dot" aria-hidden /> : null}
-                  <span className="crm-notif-row__chev" aria-hidden>
-                    <MockIcon ctx="default" n="chevron-right" size={14} />
-                  </span>
                 </button>
               </li>
             ))}
@@ -246,7 +236,6 @@ export function CrmNotificationsBell() {
             {detail.subtitle ? (
               <p className="crm-notif-detail__sub">{detail.subtitle}</p>
             ) : null}
-            <p className="crm-notif-detail__meta">{formatRelativeDate(detail.createdAt)}</p>
             <p className="crm-notif-detail__hint">{typHint(detail.typ)}</p>
             <div className="crm-notif-detail__actions">
               <MockBtn kind="primary" icon="arrow-right" onClick={() => goToVorgang(detail)}>

@@ -1037,6 +1037,10 @@ export type Handwerker = {
   iban: string | null
   partner_kategorie_id: string | null
   adresse: string | null
+  strasse?: string | null
+  hausnummer?: string | null
+  plz?: string | null
+  ort?: string | null
   aktiv: boolean
   notizen: string | null
   created_at: string

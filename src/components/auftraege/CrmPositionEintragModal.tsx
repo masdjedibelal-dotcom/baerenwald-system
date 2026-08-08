@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Camera } from 'lucide-react'
@@ -26,7 +26,7 @@ export function CrmPositionEintragModal({
   initialPositionId?: string | null
   onSaved?: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [positionId, setPositionId] = useState('')
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')

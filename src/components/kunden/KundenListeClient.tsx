@@ -611,7 +611,7 @@ export function KundenListeClient({
               <div
                 role="button"
                 tabIndex={0}
-                className={cn('vg-row', selected[k.id] && 'sel')}
+                className={cn('vg-row vg-row--kontakt', selected[k.id] && 'sel')}
                 onClick={() => openDetail(k.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -639,13 +639,9 @@ export function KundenListeClient({
                 <div className="vg-status">
                   <TypBadge typ={k.typ ?? 'privat'} />
                 </div>
-                <div className="vg-kunde">
-                  <span className="vg-kunde__name" title={tel || undefined}>
-                    {tel || '—'}
-                  </span>
-                </div>
-                <div className="vg-datum" title={mail || undefined}>
-                  {mail || '—'}
+                <div className="vg-kontakt">
+                  <span title={tel || undefined}>{tel || '—'}</span>
+                  <span title={mail || undefined}>{mail || '—'}</span>
                 </div>
               </div>
             ) : (

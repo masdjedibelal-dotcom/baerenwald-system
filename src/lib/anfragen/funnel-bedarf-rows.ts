@@ -19,6 +19,8 @@ import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { STAFF_ANLIEGEN, STAFF_ANLIEGEN_LABELS } from '@/lib/anfragen/staff-funnel-types'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
+import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
+import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import { BEREICH_LABELS, formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
 
 export type FunnelBedarfLeadPick = {
@@ -226,14 +228,47 @@ const ORG_FREIGABE_KURZ: Record<string, string> = {
   nicht_noetig: 'Nicht nötig',
 }
 
+/** Objekt-Zeile: Titel nur wenn er sich von der Straße unterscheidet. */
+function formatAnfragePhaseObjektZeile(o: {
+  titel?: string | null
+  strasse?: string | null
+  hausnummer?: string | null
+  plz?: string | null
+  ort?: string | null
+}): string | null {
+  const titel = o.titel?.trim() || ''
+  const strasseOnly = o.strasse?.trim() || ''
+  const strasse =
+    kundenObjektStrasseZeile({
+      strasse: o.strasse ?? null,
+      hausnummer: o.hausnummer ?? null,
+    }) || ''
+  const ort = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
+  const t = titel.toLowerCase()
+  const s = strasse.toLowerCase()
+  const so = strasseOnly.toLowerCase()
+  // Titel nur wenn er nicht schon die Straße (mit/ohne Nr.) wiederholt
+  const titelEigenstaendig =
+    Boolean(t) &&
+    t !== s &&
+    t !== so &&
+    !s.startsWith(`${t} `) &&
+    !so.startsWith(`${t} `) &&
+    !(so && t.includes(so))
+  const parts = [titelEigenstaendig ? titel : null, strasse || null, ort || null].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
 /**
- * Prop-Zeilen für Anfrage-Phase-Sheet (Verlauf Split-over) —
- * alle mitgegebenen Funnel-/Kontakt-/Stammdaten als Strings.
+ * Prop-Zeilen für Anfrage-Phase-Sheet (Verlauf Split-over).
+ * HV-Meldung: Kunde = Hausverwaltung, Melder = Mieter, Ort/Adresse über Objekt.
+ * Privat: Kunde + Tel + E-Mail, ohne Melder/Objekt-Block.
  */
 export function buildAnfragePhaseSheetProps(lead: {
   id: string
   status?: string | null
   kanal?: string | null
+  anlass?: string | null
   situation?: string | null
   bereiche?: string[] | null
   kundentyp?: string | null
@@ -256,6 +291,7 @@ export function buildAnfragePhaseSheetProps(lead: {
   melder_email?: string | null
   melder_einheit?: string | null
   org_freigabe_status?: string | null
+  auftraggeber_kunde_id?: string | null
   kunden?: {
     name?: string | null
     email?: string | null
@@ -284,6 +320,32 @@ export function buildAnfragePhaseSheetProps(lead: {
     out.push({ k, v: t })
   }
 
+  const isHv =
+    resolvePipelineKontext({
+      kanal: lead.kanal,
+      auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
+      anlass: lead.anlass,
+    }) === 'hv_meldung' ||
+    Boolean(lead.auftraggeber || lead.auftraggeber_kunde_id || lead.melder_name?.trim())
+
+  const hatObjekt = Boolean(lead.kunden_objekte)
+  /** Bei HV mit Objekt: keine doppelten Ort/Adresse/Melder-Spiegel aus Funnel/Dump */
+  const skipLabels = new Set<string>(
+    isHv
+      ? [
+          'Auftraggeber',
+          ...(hatObjekt ? ['Ort', 'Adresse'] : []),
+          'Kunde',
+          'Telefon',
+          'E-Mail',
+          'Melder',
+          'Melder-Kontakt',
+          'Einheit',
+          'Objekt',
+        ]
+      : ['Auftraggeber', 'Melder', 'Melder-Kontakt', 'Einheit', 'Objekt']
+  )
+
   const fd =
     lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
       ? (lead.funnel_daten as Record<string, unknown>)
@@ -305,13 +367,13 @@ export function buildAnfragePhaseSheetProps(lead: {
   push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
   push('Vorhaben', strFromFunnel(fd, 'vorhaben'))
 
-  // Strukturierte Funnel-/Website-Felder vor Kontakt (kein Freitext-Dump)
   const { extraRows } = buildFunnelBedarfExtraRows(lead)
   for (const row of extraRows) {
-    if (typeof row.children === 'string') push(row.label, row.children)
+    if (typeof row.children !== 'string') continue
+    if (skipLabels.has(row.label)) continue
+    push(row.label, row.children)
   }
 
-  // Fallback: Website-Dump in kontakt_nachricht / formattedSummary → einzelne Props
   const dumpSources = [
     lead.kontakt_nachricht,
     typeof fd.formattedSummary === 'string' ? fd.formattedSummary : null,
@@ -319,6 +381,7 @@ export function buildAnfragePhaseSheetProps(lead: {
   ]
   for (const src of dumpSources) {
     for (const row of parseWebsiteAnfrageDump(src)) {
+      if (skipLabels.has(row.k)) continue
       push(row.k, row.v)
     }
   }
@@ -333,27 +396,37 @@ export function buildAnfragePhaseSheetProps(lead: {
     push('Beschreibung', body || beschreibung)
   }
 
-  push('Kunde', lead.kontakt_name?.trim() || lead.kunden?.name?.trim() || null)
-  push('Telefon', lead.kontakt_telefon?.trim() || lead.kunden?.telefon?.trim() || null)
-  push('E-Mail', lead.kontakt_email?.trim() || lead.kunden?.email?.trim() || null)
+  if (isHv) {
+    const agName =
+      lead.auftraggeber?.org_anzeigename?.trim() || lead.auftraggeber?.name?.trim() || null
+    push('Kunde', agName)
 
-  const agName =
-    lead.auftraggeber?.org_anzeigename?.trim() || lead.auftraggeber?.name?.trim() || null
-  push('Auftraggeber', agName)
+    if (lead.kunden_objekte) {
+      push('Objekt', formatAnfragePhaseObjektZeile(lead.kunden_objekte))
+    }
 
-  if (lead.kunden_objekte) {
-    const o = lead.kunden_objekte
-    const strasse = [o.strasse, o.hausnummer].filter(Boolean).join(' ')
-    const ort = [o.plz, o.ort].filter(Boolean).join(' ')
-    push('Objekt', [o.titel?.trim(), strasse, ort].filter(Boolean).join(' · ') || null)
+    push('Einheit', lead.melder_einheit)
+    push('Melder', lead.melder_name)
+    push(
+      'Melder-Kontakt',
+      [lead.melder_telefon, lead.melder_email].filter(Boolean).join(' · ') || null
+    )
+  } else {
+    push('Kunde', lead.kontakt_name?.trim() || lead.kunden?.name?.trim() || null)
+    push('Telefon', lead.kontakt_telefon?.trim() || lead.kunden?.telefon?.trim() || null)
+    push('E-Mail', lead.kontakt_email?.trim() || lead.kunden?.email?.trim() || null)
+
+    if (!seen.has('Adresse')) {
+      const strasse = [lead.kunden?.strasse, lead.kunden?.hausnummer].filter(Boolean).join(' ')
+      push('Adresse', strasse || null)
+    }
+    if (!seen.has('Ort')) {
+      const ortZeile = [lead.plz || lead.kunden?.plz, lead.kunden?.ort]
+        .filter(Boolean)
+        .join(' ')
+      push('Ort', ortZeile || null)
+    }
   }
-
-  push('Melder', lead.melder_name)
-  push(
-    'Melder-Kontakt',
-    [lead.melder_telefon, lead.melder_email].filter(Boolean).join(' · ') || null
-  )
-  push('Einheit', lead.melder_einheit)
 
   const freigabe = (lead.org_freigabe_status ?? '').trim()
   if (freigabe && freigabe !== 'nicht_noetig') {
@@ -369,18 +442,6 @@ export function buildAnfragePhaseSheetProps(lead: {
   )
   push('Budgetrahmen', budget === '—' ? null : budget)
   push('Budget-Hinweis', strFromFunnel(fd, 'budget_hinweis', 'budgetHinweis'))
-
-  // Adresse aus Kunde, falls Funnel nichts hatte
-  if (!seen.has('Adresse')) {
-    const strasse = [lead.kunden?.strasse, lead.kunden?.hausnummer].filter(Boolean).join(' ')
-    push('Adresse', strasse || null)
-  }
-  if (!seen.has('Ort')) {
-    const ortZeile = [lead.plz || lead.kunden?.plz, lead.kunden?.ort]
-      .filter(Boolean)
-      .join(' ')
-    push('Ort', ortZeile || null)
-  }
 
   push('Interne Notiz', lead.notizen)
 

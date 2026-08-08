@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
@@ -106,7 +106,7 @@ export function AngebotVersandSection({
     to: string[]
     cc: string[]
   } | null>(null)
-  const [pending, startTransition] = useTransition('Wird gesendet…')
+  const [pending, startTransition] = useLocalTransition('Wird gesendet…')
 
   const kunde = detail.kunden
   const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, detail.leads?.kundentyp)
@@ -548,7 +548,6 @@ export function AngebotVersandSection({
               emails={hwModal.cc}
               onChange={(emails) => setHwModal((prev) => (prev ? { ...prev, cc: emails } : prev))}
               placeholder="weitere@beispiel.de"
-              hint="Optional — nur für zusätzliche Empfänger sichtbar."
             />
             <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">

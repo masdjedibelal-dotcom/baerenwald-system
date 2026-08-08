@@ -17,6 +17,7 @@ import {
 } from '@/lib/email/meldung-mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
+import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type { Kunde, Lead, LeadAnlass, LeadErfassungVon, OrgFreigabeStatus } from '@/lib/types'
 
 type OrgKundePick = Pick<
@@ -43,18 +44,10 @@ type ObjektFreigabePick = {
   notfall_direkt?: boolean | null
 }
 
-function funnelKategorie(funnelDaten: unknown): string | null {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return null
-  const kat = (funnelDaten as { melde_kategorie?: unknown }).melde_kategorie
-  return typeof kat === 'string' ? kat : null
-}
-
 export function leadIstNotfall(
   lead: Pick<Lead, 'situation' | 'funnel_daten' | 'freigabe_bypass_grund'>
 ): boolean {
-  if ((lead.freigabe_bypass_grund ?? '').trim() === 'akut') return true
-  if (lead.situation === 'notfall') return true
-  return funnelKategorie(lead.funnel_daten) === 'notfall'
+  return leadIstHavarie(lead)
 }
 
 /** Org-Freigabe nur bei Mieter-Schadenmeldung (Meldeformular), nicht HV/CRM. */

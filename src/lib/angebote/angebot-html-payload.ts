@@ -6,6 +6,7 @@ import {
   type AngebotVariantenPersistJson,
 } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
   normalizeAngebotPositionen,
   summenAusPositionen,
@@ -71,11 +72,6 @@ function firmenFusszeilen(firm: FirmenEinstellungen): {
     bankverbindung: bank.length ? bank.join('\n') : null,
     impressum,
   }
-}
-
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  const parts = [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')]
-  return parts.filter(Boolean).join('\n')
 }
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {

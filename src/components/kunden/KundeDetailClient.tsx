@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
@@ -35,11 +35,12 @@ import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import type { Kunde, KundenObjekt } from '@/lib/types'
-import { FabVorgangStartModal } from '@/components/neu/FabVorgangStartModal'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { createAngebotHref, createRechnungHref } from '@/lib/crm/create-entry'
+import { showRouteBusy } from '@/components/ui/action-busy'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
@@ -137,7 +138,7 @@ export function KundeDetailClient({
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [editingKontakt, setEditingKontakt] = useState(false)
@@ -155,7 +156,6 @@ export function KundeDetailClient({
 
   const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
   const [spamPending, setSpamPending] = useState(false)
-  const [rechnungModalOpen, setRechnungModalOpen] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
   const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
     null
@@ -453,14 +453,7 @@ export function KundeDetailClient({
       onCancel={cancelEditKontakt}
       onSave={saveKundeStamm}
       saving={pending}
-      hideEditTrigger
     >
-      {editingKontakt ? (
-        <p className="inline-edit-hint">
-          <MockIcon ctx="default" n="info-circle" size={14} />
-          Hervorgehobene Felder sind bearbeitbar.
-        </p>
-      ) : null}
       {editErr ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{editErr}</p> : null}
       {kundenStamm.fehlendeRechnungsfelder.length > 0 && !editingKontakt ? (
         <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
@@ -631,23 +624,35 @@ export function KundeDetailClient({
 
   const fixedOverview = (
     <div className="space-y-4">
-      <EntityKundenStammdatenCard
-        kundeId={kunde.id}
-        kundeTyp={kunde.typ}
-        hideKundeLink
-        initial={{
-          name: kundeDisplayName(kunde),
-          telefon: kunde.telefon ?? '',
-          email: kunde.email ?? '',
-          plz: kunde.plz ?? '',
-          ort: kunde.ort ?? '',
-          strasse:
-            [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
-            kunde.adresse ||
-            '',
-        }}
-        onSaved={() => refresh()}
-      />
+      {editingKontakt ? (
+        kontaktCard
+      ) : (
+        <EntityKundenStammdatenCard
+          kundeId={kunde.id}
+          kundeTyp={kunde.typ}
+          hideKundeLink
+          initial={{
+            name: kundeDisplayName(kunde),
+            telefon: kunde.telefon ?? '',
+            email: kunde.email ?? '',
+            plz: kunde.plz ?? '',
+            ort: kunde.ort ?? '',
+            strasse:
+              [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
+              kunde.adresse ||
+              '',
+            vorname: kunde.vorname ?? '',
+            nachname: kunde.nachname ?? '',
+            ansprechpartner: kunde.ansprechpartner ?? '',
+            webseite: kunde.webseite ?? '',
+            quelleLabel: kunde.quelle
+              ? (QUELLE_LABELS[kunde.quelle] ?? kunde.quelle)
+              : '',
+          }}
+          onSaved={() => refresh()}
+          onEdit={beginEditKontakt}
+        />
+      )}
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
@@ -673,11 +678,6 @@ export function KundeDetailClient({
       ) : null}
       {zusatzfelderCard}
       <KundeWirtschaftlicheUebersicht kunde={kunde} />
-      {editingKontakt ? (
-        <div className="card">
-          <div className="card-b">{kontaktCard}</div>
-        </div>
-      ) : null}
     </div>
   )
 
@@ -807,7 +807,28 @@ export function KundeDetailClient({
           </>
         ),
         badges: kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null,
-        actions: <DetailActionsBar sheetTitle="Kunde" menuItems={[]} />,
+        actions: (
+          <DetailActionsBar
+            sheetTitle="Kunde"
+            primary={{
+              label: 'Angebot erstellen',
+              icon: 'file-text',
+              onClick: () => {
+                showRouteBusy('Angebot wird geöffnet…')
+                router.push(createAngebotHref(kunde.id))
+              },
+            }}
+            secondary={{
+              label: 'Rechnung erstellen',
+              icon: 'receipt',
+              onClick: () => {
+                showRouteBusy('Rechnung wird geöffnet…')
+                router.push(createRechnungHref(kunde.id))
+              },
+            }}
+            menuItems={[]}
+          />
+        ),
       }}
     >
       {zeigtOrganisationTab && tab === 'organisation' ? (
@@ -915,13 +936,6 @@ export function KundeDetailClient({
       </Modal>
 
       {mailCompose.modal}
-
-      <FabVorgangStartModal
-        open={rechnungModalOpen}
-        art={rechnungModalOpen ? 'rechnung' : null}
-        initialKundeId={kunde.id}
-        onClose={() => setRechnungModalOpen(false)}
-      />
 
       <KundePickerSheet
         open={mergePickerOpen}

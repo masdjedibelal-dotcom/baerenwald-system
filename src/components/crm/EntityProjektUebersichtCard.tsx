@@ -1,9 +1,8 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
@@ -68,7 +67,7 @@ export function EntityProjektUebersichtCard({
   const canEdit = Boolean(onSave) && editableFields.length > 0 && !disabled
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initial)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   useEffect(() => {
     if (!editing) setDraft(initial)
@@ -122,12 +121,6 @@ export function EntityProjektUebersichtCard({
       saving={pending}
       disabled={!canEdit}
     >
-      {editing ? (
-        <p className="inline-edit-hint">
-          <MockIcon ctx="default" n="info-circle" size={14} />
-          Hervorgehobene Felder sind bearbeitbar.
-        </p>
-      ) : null}
       <div className="props">
         <InlineEditField
           label={titelLabel}

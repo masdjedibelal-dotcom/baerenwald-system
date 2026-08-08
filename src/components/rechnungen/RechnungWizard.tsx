@@ -22,7 +22,6 @@ import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import {
@@ -32,6 +31,7 @@ import {
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
+  previewNaechsteRechnungsnummer,
   saveRechnungWizardDraft,
   sendRechnungWizard,
   syncRechnungWizardMetaToEntwurf,
@@ -57,7 +57,6 @@ import {
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -100,6 +99,7 @@ import {
   type ZahlfristSeg,
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
+import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 
@@ -279,8 +279,8 @@ export function RechnungWizard({
   const [planEditorOpen, setPlanEditorOpen] = useState(false)
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
-  const zahlfrist: ZahlfristSeg = zahlfristInit.seg
-  const zahlfristDatum = zahlfristInit.datum
+  const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
+  const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
@@ -304,6 +304,25 @@ export function RechnungWizard({
     }
   }, [])
 
+  useEffect(() => {
+    if (rechnungsnummer.trim()) return
+    let cancelled = false
+    void previewNaechsteRechnungsnummer().then((r) => {
+      if (cancelled || !r.ok) return
+      setRechnungsnummer((cur) => cur.trim() || r.nummer)
+    })
+    return () => {
+      cancelled = true
+    }
+    // einmalig beim Öffnen ohne Nummer
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
+    setZahlfrist(seg)
+    if (seg === 'datum') setZahlfristDatum(datum)
+    setDraftDirty(true)
+  }
   useEffect(() => {
     const aid = bootstrap.auftragId?.trim()
     if (!aid || istDirektrechnung) {
@@ -501,8 +520,11 @@ export function RechnungWizard({
         plan,
         einleitung,
         mailBetreff,
+        rechnungsnummer,
+        zahlfrist,
+        zahlfristDatum,
       }),
-    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff]
+    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, rechnungsnummer, zahlfrist, zahlfristDatum]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -589,10 +611,7 @@ export function RechnungWizard({
       const nextMeta = buildMetaForSave()
       const sel = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
       const manageBusy = opts?.manageBusy !== false
-      if (manageBusy) {
-        setSaving(true)
-        actionBusy.show('Wird gespeichert…')
-      }
+      if (manageBusy) setSaving(true)
       try {
         const res = await saveRechnungWizardDraft({
           rechnungId,
@@ -601,6 +620,7 @@ export function RechnungWizard({
           kunde_id: kundeId,
           positionen: positionenBerechnet,
           meta: nextMeta,
+          rechnungsnummer: rechnungsnummer.trim() || null,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
           abschlag:
             planAktiv && sel
@@ -635,10 +655,7 @@ export function RechnungWizard({
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
         return null
       } finally {
-        if (manageBusy) {
-          setSaving(false)
-          actionBusy.hide()
-        }
+        if (manageBusy) setSaving(false)
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildMeta uses current closure
@@ -659,6 +676,9 @@ export function RechnungWizard({
       plan,
       planKontext.zeilen,
       rFaellig,
+      rechnungsnummer,
+      zahlfrist,
+      zahlfristDatum,
       rechnungsart,
       defaultBetreff,
       wiederkehr,
@@ -681,10 +701,7 @@ export function RechnungWizard({
     }
     const nextMeta = buildMetaForSave()
     const manageBusy = opts?.manageBusy !== false
-    if (manageBusy) {
-      setSaving(true)
-      actionBusy.show('Wird gespeichert…')
-    }
+    if (manageBusy) setSaving(true)
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
       if (!planSave.ok) {
@@ -719,10 +736,7 @@ export function RechnungWizard({
       toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
       return null
     } finally {
-      if (manageBusy) {
-        setSaving(false)
-        actionBusy.hide()
-      }
+      if (manageBusy) setSaving(false)
     }
   }, [
     bootstrap.auftragId,
@@ -767,67 +781,65 @@ export function RechnungWizard({
         return
       }
     }
-    await actionBusy.run(sendMail ? 'Wird gesendet…' : 'Rechnung wird erstellt…', async () => {
-      setSaving(true)
-      try {
-        const id = await persistDraft({ manageBusy: false })
-        if (!id) return
+    setSaving(true)
+    try {
+      const id = await persistDraft({ manageBusy: false })
+      if (!id) return
 
-        const nextMeta = buildMetaForSave()
-        const nrLabel = () =>
-          abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
-          (id === activeVersandId ? rechnungsnummer.trim() : '') ||
-          previewNr
+      const nextMeta = buildMetaForSave()
+      const nrLabel = () =>
+        abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
+        (id === activeVersandId ? rechnungsnummer.trim() : '') ||
+        previewNr
 
-        const sync = await syncRechnungWizardMetaToEntwurf(id, {
-          kunde_id: kundeId,
-          meta: nextMeta,
-        })
-        if (!sync.ok) {
-          toast.error(sync.message)
-          return
-        }
+      const sync = await syncRechnungWizardMetaToEntwurf(id, {
+        kunde_id: kundeId,
+        meta: nextMeta,
+      })
+      if (!sync.ok) {
+        toast.error(sync.message)
+        return
+      }
 
-        if (!sendMail) {
-          const res = await finalizeRechnungWizardWithoutMail(id)
-          if (!res.ok) {
-            toast.error(res.message)
-            return
-          }
-          toast.success(
-            `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
-          )
-          onDone?.(id)
-          onClose()
-          router.refresh()
-          return
-        }
-
-        const to = mailTo.filter((e) => isValidEmail(e))
-        const res = await sendRechnungWizard({
-          rechnungId: id,
-          mailTo: to,
-          mailCc: mailCc.filter((e) => isValidEmail(e)),
-          mitAbschlussbericht: Boolean(
-            abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
-          ),
-        })
+      if (!sendMail) {
+        const res = await finalizeRechnungWizardWithoutMail(id)
         if (!res.ok) {
           toast.error(res.message)
           return
         }
         toast.success(
-          `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
         )
         onDone?.(id)
         onClose()
         router.refresh()
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
-      } finally {
-        setSaving(false)
+        return
       }
-    })
+
+      const to = mailTo.filter((e) => isValidEmail(e))
+      const res = await sendRechnungWizard({
+        rechnungId: id,
+        mailTo: to,
+        mailCc: mailCc.filter((e) => isValidEmail(e)),
+        mitAbschlussbericht: Boolean(
+          abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
+        ),
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(
+        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+      )
+      onDone?.(id)
+      onClose()
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleCanvasClose() {
@@ -880,13 +892,16 @@ export function RechnungWizard({
       : `MwSt ${berechnung.mwst_satz}%`
 
   const dokumentCrowValue = [
-    rechnungTitel.trim() || rechnungsnummer.trim() || 'Entwurf',
+    rechnungsnummer.trim() || 'Nummer folgt',
+    rechnungTitel.trim() || null,
     selBerechnet?.istSchluss || rechnungsart === 'schluss'
       ? 'Schlussrechnung'
       : hasPlan || rechnungsart === 'abschlag'
         ? 'Abschlag'
         : 'Rechnung',
-  ].join(' · ')
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const zahlplanCrowValue = hasPlan
     ? [
@@ -1090,17 +1105,16 @@ export function RechnungWizard({
           {
             label: saving ? 'Speichern…' : 'Speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
+            hint: 'Speichert und schließt',
             onClick: () => {
               if (saving || (hasPlan && !planOk)) return
-              void persistDraft().then((id) => {
-                if (id) toast.success('Entwurf gespeichert')
-              })
+              void handleFinish(false)
             },
           },
           {
             label: saving ? 'Senden…' : 'Senden',
             icon: <MockIcon ctx="btn" n="send" size={16} />,
-            hint: 'Speichert und versendet',
+            hint: 'Versendet und schließt',
             onClick: () => {
               if (saving) return
               void handleFinish(true)
@@ -1203,6 +1217,19 @@ export function RechnungWizard({
       >
         <div className="form-grid form-grid--sheet">
           <SheetEditableField
+            label="Rechnungsnummer"
+            value={rechnungsnummer}
+            placeholder="RE2026-2069"
+            sheetContext="detail"
+            onSave={(v) => {
+              setRechnungsnummer(v.trim())
+              setDraftDirty(true)
+            }}
+          />
+          <p className="full m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+            Ändern setzt die nächste Rechnung fortlaufend darüber (z.&nbsp;B. 2070 → danach 2071).
+          </p>
+          <SheetEditableField
             label="Rechnungstitel"
             value={rechnungTitel}
             placeholder="z.B. Badsanierung München"
@@ -1222,12 +1249,29 @@ export function RechnungWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
+          <div className="full">
+            <MockField label="Zahlungsziel" full>
+              <div className="space-y-2">
+                <MockZahlfristSeg value={zahlfrist} onChange={(v) => applyZahlfrist(v)} />
+                {zahlfrist === 'datum' ? (
+                  <DateInput
+                    size="sm"
+                    value={zahlfristDatum}
+                    onChange={(e) => applyZahlfrist('datum', e.target.value)}
+                  />
+                ) : null}
+              </div>
+            </MockField>
+          </div>
           <div className="full wizard-zahlung-dates">
             <MockField label="Rechnungsdatum">
               <DateInput
                 size="sm"
                 value={meta.rechnungsdatum}
-                onChange={(e) => setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))}
+                onChange={(e) => {
+                  setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))
+                  setDraftDirty(true)
+                }}
               />
             </MockField>
             <MockField label="Leistungszeitraum von">

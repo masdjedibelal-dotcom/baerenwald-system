@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -47,7 +47,7 @@ export function AuftragAbschliessenSheet({
   /** Nach Abschluss ohne Abnahme — z. B. Rechnung öffnen */
   onNachRechnung?: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
   const [step, setStep] = useState<Step>('frage')
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])

@@ -7,6 +7,7 @@ import { searchKundenGlobal } from '@/app/actions/kunden'
 import { kundeDisplayName, type KundeListenNamePick } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase'
 import type { Kunde } from '@/lib/types'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { resolveMockIcon, type MockIconName } from '@/lib/mock-icons'
 
 type SearchResultType = 'anfrage' | 'angebot' | 'auftrag' | 'handwerker' | 'rechnung' | 'kunde'
@@ -52,6 +53,7 @@ function sanitizeTerm(raw: string) {
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false)
+  useOverlayChromeLock(open)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)

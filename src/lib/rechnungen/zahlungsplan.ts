@@ -861,6 +861,79 @@ export function naechsteAbschlagZumVersenden(
   return null
 }
 
+function rechnungStatusNorm(status: string | null | undefined): string {
+  return String(status ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+function istAktiveRechnungLink(r: RechnungAbschlagLink): boolean {
+  const st = rechnungStatusNorm(r.status)
+  if (st === 'storniert') return false
+  if (String(r.beleg_typ ?? '').toLowerCase() === 'gutschrift') return false
+  return true
+}
+
+function istUnbezahltGestellt(status: string | null | undefined): boolean {
+  const st = rechnungStatusNorm(status)
+  return st === 'gesendet' || st === 'versendet' || st === 'ueberfaellig' || st === 'überfällig'
+}
+
+export type NaechsteAuftragRechnungAktion = {
+  /** Versenden (Entwurf) → Bezahlt (gestellt) → Erstellen (nächste Rate ohne Entwurf) */
+  art: 'versenden' | 'bezahlt' | 'erstellen'
+  rechnungId: string | null
+  abschlag: boolean
+}
+
+/**
+ * Nächste Rechnungs-Aktion am Auftrag (Abschlagsplan oder Einzel-RE).
+ * Reihenfolge je Rate: erst „als bezahlt“, dann „versenden“, dann „erstellen“.
+ * `null` = alle Raten/Rechnungen bezahlt (→ Bewertung).
+ */
+export function naechsteAuftragRechnungAktion(
+  kontext: AuftragAbrechnungKontext | null,
+  rechnungen: RechnungAbschlagLink[],
+  hatPlan: boolean
+): NaechsteAuftragRechnungAktion | null {
+  const aktiv = rechnungen.filter(istAktiveRechnungLink)
+
+  if (hatPlan && kontext?.zeilen?.length) {
+    for (const z of kontext.zeilen) {
+      const forZ = aktiv.filter(
+        (r) =>
+          r.zahlungsplan_abschlag_id === z.id &&
+          (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
+      )
+      const gestellt = forZ.find((r) => istUnbezahltGestellt(r.status))
+      if (gestellt) {
+        return { art: 'bezahlt', rechnungId: gestellt.id, abschlag: true }
+      }
+      if (forZ.some((r) => rechnungStatusNorm(r.status) === 'bezahlt')) continue
+
+      const draft = forZ.find((r) => rechnungStatusNorm(r.status) === 'entwurf')
+      if (draft) {
+        return { art: 'versenden', rechnungId: draft.id, abschlag: true }
+      }
+      return { art: 'erstellen', rechnungId: null, abschlag: true }
+    }
+    return null
+  }
+
+  const gestellt = aktiv.find((r) => istUnbezahltGestellt(r.status))
+  if (gestellt) {
+    return { art: 'bezahlt', rechnungId: gestellt.id, abschlag: false }
+  }
+  const draft = aktiv.find((r) => rechnungStatusNorm(r.status) === 'entwurf')
+  if (draft) {
+    return { art: 'versenden', rechnungId: draft.id, abschlag: false }
+  }
+  if (aktiv.length > 0 && aktiv.every((r) => rechnungStatusNorm(r.status) === 'bezahlt')) {
+    return null
+  }
+  return { art: 'erstellen', rechnungId: null, abschlag: false }
+}
+
 /** Aktiver Abschlagsplan (mind. eine Zeile). */
 export function hatAktivenAbschlagsplan(plan: Zahlungsplan | null | undefined): boolean {
   return Boolean(plan?.zeilen?.length)

@@ -20,8 +20,11 @@ export function angebotNrAnzeige(
   return `AG-${id.slice(0, 8).toUpperCase()}`
 }
 
-export function anfrageStatusKurz(status: string): string {
-  return anfrageStatusDisplay(status).label
+export function anfrageStatusKurz(
+  status: string,
+  orgFreigabeStatus?: string | null
+): string {
+  return anfrageStatusDisplay(status, { orgFreigabeStatus }).label
 }
 
 export function angebotStatusKurz(
@@ -50,11 +53,12 @@ export function rechnungStatusKurz(status: string): string {
 export function phaseStatusKurz(
   phase: 'anfrage' | 'angebot' | 'auftrag' | 'rechnung',
   status: string,
-  statusEinfach?: string | null
+  statusEinfach?: string | null,
+  orgFreigabeStatus?: string | null
 ): string {
   switch (phase) {
     case 'anfrage':
-      return anfrageStatusKurz(status)
+      return anfrageStatusKurz(status, orgFreigabeStatus)
     case 'angebot':
       return angebotStatusKurz(status, statusEinfach)
     case 'auftrag':

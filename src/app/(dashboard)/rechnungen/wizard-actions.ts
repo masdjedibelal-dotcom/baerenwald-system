@@ -66,12 +66,30 @@ import {
   type ZahlungsplanZeileBerechnet,
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import { maybeUpgradeLegacyRechnungsnummer } from '@/lib/rechnungen/next-rechnungsnummer'
+import {
+  maybeUpgradeLegacyRechnungsnummer,
+  nextRechnungsnummerAusDb,
+} from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
+
+/** Vorschau der nächsten fortlaufenden Nummer (für neuen Wizard ohne Entwurf). */
+export async function previewNaechsteRechnungsnummer(): Promise<
+  { ok: true; nummer: string } | { ok: false; message: string }
+> {
+  try {
+    const nummer = await nextRechnungsnummerAusDb(supabaseAdmin)
+    return { ok: true, nummer }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Nummer nicht ermittelbar',
+    }
+  }
+}
 
 export type SaveRechnungWizardDraftPayload = {
   rechnungId?: string | null
@@ -91,6 +109,8 @@ export type SaveRechnungWizardDraftPayload = {
   versandZeileId?: string | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** Manuell gesetzte Nummer (RE2026-… oder Suffix); fortlaufend ab dort. */
+  rechnungsnummer?: string | null
 }
 
 function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterialSnapshot {
@@ -1106,6 +1126,7 @@ export async function saveRechnungWizardDraft(
         : null),
     zahlungsplan_abschlag_id: input.abschlag?.zeileId ?? abschlagZeileId,
     liste_berechnung,
+    rechnungsnummer: input.rechnungsnummer?.trim() || null,
   }
 
   if (input.rechnungId) {

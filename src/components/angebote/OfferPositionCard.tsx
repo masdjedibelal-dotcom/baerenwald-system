@@ -186,10 +186,8 @@ export function OfferPositionCard({
             label="Beschreibung (Kundentext)"
             value={row.beschreibung}
             onApply={(text) => onPatch({ beschreibung: text })}
-            extraHint="Leistungsbeschreibung auf Angebot/PDF."
           >
             <Textarea
-              hint="Wird im Angebot / PDF angezeigt"
               value={row.beschreibung}
               onChange={(e) => onPatch({ beschreibung: e.target.value })}
               rows={2}

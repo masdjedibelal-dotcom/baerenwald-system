@@ -11,6 +11,7 @@ import {
   REFRESH_MIN_INTERVAL_MS,
   SESSION_PING_MS,
 } from '@/lib/auth/session-guard-config'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ export function SessionGuard() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [modal, setModal] = useState<ModalState | null>(null)
+  useOverlayChromeLock(Boolean(mounted && modal))
 
   const lastActivityRef = useRef(Date.now())
   const lastRefreshRef = useRef(0)

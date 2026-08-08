@@ -1,4 +1,5 @@
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import { resolveBrandLogoUrl } from '@/lib/brand'
 import { FESTNETZ_TELEFON_DEFAULT, telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
 
@@ -29,7 +30,7 @@ export function envMailBranding(): MailBranding {
 /** Für Client-Vorschauen mit `defaultFirmenEinstellungen()` o. Ä. */
 export function firmenEinstellungenToMailBranding(f: FirmenEinstellungen): MailBranding {
   const fb = envMailBranding()
-  const adresseZeile = [f.strasse, f.plz, f.ort].filter(Boolean).join(', ').trim() || fb.adresseZeile
+  const adresseZeile = firmZeileAdresse(f).trim() || fb.adresseZeile
   return {
     firmenname: f.firmenname?.trim() || fb.firmenname,
     telefon: telefonFuerKundenMail(f.telefon?.trim() || fb.telefon) || FESTNETZ_TELEFON_DEFAULT,

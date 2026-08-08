@@ -585,9 +585,6 @@ export function AngebotNeuForm({
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Positionen</h2>
-            <p className="text-[length:var(--fs-text)] text-muted">
-              Festpreise pro Einheit; Handwerker pro Position zuordnen.
-            </p>
           </div>
         </div>
         <div className="space-y-5">

@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
 import {
   finalizeHandwerkerAcceptWizard,
   finalizeNachtragVertrag,
@@ -126,10 +125,7 @@ export function ProjektVertragWizard({
         return null
       }
       const manageBusy = opts?.manageBusy !== false
-      if (manageBusy) {
-        setSaving(true)
-        actionBusy.show('Wird gespeichert…')
-      }
+      if (manageBusy) setSaving(true)
       try {
         const res = nachtragMode
           ? await saveNachtragDraft({
@@ -152,10 +148,7 @@ export function ProjektVertragWizard({
         if (opts?.notify) toast.success('Entwurf gespeichert')
         return res.vertrag_id
       } finally {
-        if (manageBusy) {
-          setSaving(false)
-          actionBusy.hide()
-        }
+        if (manageBusy) setSaving(false)
       }
     },
     [bootstrap.auftrag_id, meta, nachtragMode, vertragId]
@@ -192,55 +185,53 @@ export function ProjektVertragWizard({
   }
 
   const handlePdfErzeugen = async () => {
-    await actionBusy.run('PDF wird erzeugt…', async () => {
-      setSaving(true)
-      try {
-        const res = acceptMode
-          ? await finalizeHandwerkerAcceptWizard({
+    setSaving(true)
+    try {
+      const res = acceptMode
+        ? await finalizeHandwerkerAcceptWizard({
+            vertrag_id: vertragId,
+            auftrag_id: bootstrap.auftrag_id,
+            handwerker_id: meta.handwerker_id,
+            meta,
+            compliance_slugs: complianceSlugs,
+          })
+        : nachtragMode
+          ? await finalizeNachtragVertrag({
               vertrag_id: vertragId,
               auftrag_id: bootstrap.auftrag_id,
-              handwerker_id: meta.handwerker_id,
+              parent_vertrag_id: nachtragMode.parent_vertrag_id,
               meta,
-              compliance_slugs: complianceSlugs,
+              positionen_auftrag_speichern: positionenAuftragSpeichern,
             })
-          : nachtragMode
-            ? await finalizeNachtragVertrag({
-                vertrag_id: vertragId,
-                auftrag_id: bootstrap.auftrag_id,
-                parent_vertrag_id: nachtragMode.parent_vertrag_id,
-                meta,
-                positionen_auftrag_speichern: positionenAuftragSpeichern,
-              })
-            : await finalizeProjektVertrag({
-                vertrag_id: vertragId,
-                auftrag_id: bootstrap.auftrag_id,
-                meta,
-              })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        setVertragId(res.vertrag_id)
-        setVertragsNr(res.vertrags_nr)
-        setPdfUrl(res.pdf_url)
-        if (acceptMode) {
-          toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
-        } else if (nachtragMode) {
-          const mailTeil =
-            'mailGesendet' in res && res.mailGesendet
-              ? ' Partner per E-Mail informiert (Neue Änderungsanfrage).'
-              : 'mailHinweis' in res && res.mailHinweis
-                ? ` (${res.mailHinweis})`
-                : ''
-          toast.success(`Ergänzungsvereinbarung erzeugt.${mailTeil}`)
-        } else {
-          toast.success('Vertrag als PDF erzeugt und hochgeladen')
-        }
-        onDone?.()
-      } finally {
-        setSaving(false)
+          : await finalizeProjektVertrag({
+              vertrag_id: vertragId,
+              auftrag_id: bootstrap.auftrag_id,
+              meta,
+            })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
       }
-    })
+      setVertragId(res.vertrag_id)
+      setVertragsNr(res.vertrags_nr)
+      setPdfUrl(res.pdf_url)
+      if (acceptMode) {
+        toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
+      } else if (nachtragMode) {
+        const mailTeil =
+          'mailGesendet' in res && res.mailGesendet
+            ? ' Partner per E-Mail informiert (Neue Änderungsanfrage).'
+            : 'mailHinweis' in res && res.mailHinweis
+              ? ` (${res.mailHinweis})`
+              : ''
+        toast.success(`Ergänzungsvereinbarung erzeugt.${mailTeil}`)
+      } else {
+        toast.success('Vertrag als PDF erzeugt und hochgeladen')
+      }
+      onDone?.()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const gewerkOptions = [

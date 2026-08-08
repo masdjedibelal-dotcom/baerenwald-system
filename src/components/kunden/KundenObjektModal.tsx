@@ -16,18 +16,6 @@ type DraftEinheit = {
   flaeche: string
 }
 
-function parseStrasseNr(raw: string): { strasse: string; hausnummer: string } {
-  const t = raw.trim()
-  if (!t) return { strasse: '', hausnummer: '' }
-  const m = t.match(/^(.*?)[,\s]+(\d+\s*[a-zA-Z]?)$/)
-  if (m) return { strasse: m[1]!.trim(), hausnummer: m[2]!.trim() }
-  return { strasse: t, hausnummer: '' }
-}
-
-function formatStrasseNr(strasse: string | null | undefined, nr: string | null | undefined): string {
-  return [strasse?.trim(), nr?.trim()].filter(Boolean).join(' ')
-}
-
 /** Mock-Parität: Objekt anlegen — Objektdaten + Wohneinheiten. */
 export function KundenObjektModal({
   open,
@@ -47,7 +35,8 @@ export function KundenObjektModal({
 }) {
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
-  const [strasseNr, setStrasseNr] = useState('')
+  const [strasse, setStrasse] = useState('')
+  const [hausnummer, setHausnummer] = useState('')
   const [plz, setPlz] = useState('')
   const [ort, setOrt] = useState('')
   const [baujahr, setBaujahr] = useState('')
@@ -62,7 +51,8 @@ export function KundenObjektModal({
     if (!open) return
     if (editObjekt) {
       setTitel(editObjekt.titel ?? '')
-      setStrasseNr(formatStrasseNr(editObjekt.strasse, editObjekt.hausnummer))
+      setStrasse(editObjekt.strasse ?? '')
+      setHausnummer(editObjekt.hausnummer ?? '')
       setPlz(editObjekt.plz ?? '')
       setOrt(editObjekt.ort ?? '')
       setBaujahr('')
@@ -70,7 +60,8 @@ export function KundenObjektModal({
       setEinheiten([])
     } else {
       setTitel('')
-      setStrasseNr('')
+      setStrasse('')
+      setHausnummer('')
       setPlz('')
       setOrt('')
       setBaujahr('')
@@ -120,15 +111,22 @@ export function KundenObjektModal({
 
   function speichern() {
     setErr(null)
-    const { strasse, hausnummer } = parseStrasseNr(strasseNr)
+    if (!strasse.trim()) {
+      setErr('Straße ist Pflicht.')
+      return
+    }
+    if (!hausnummer.trim()) {
+      setErr('Hausnummer ist Pflicht.')
+      return
+    }
     const hinweisParts: string[] = []
     if (baujahr.trim()) hinweisParts.push(`Baujahr: ${baujahr.trim()}`)
     if (gesamtflaeche.trim()) hinweisParts.push(`Gesamtfläche: ${gesamtflaeche.trim()} m²`)
 
     const payload = {
       titel,
-      strasse,
-      hausnummer: hausnummer || null,
+      strasse: strasse.trim(),
+      hausnummer: hausnummer.trim() || null,
       plz,
       ort,
       melde_slug: editObjekt?.melde_slug ?? null,
@@ -188,7 +186,8 @@ export function KundenObjektModal({
   }
 
   const canSave =
-    Boolean(titel.trim() && strasseNr.trim() && plz.trim() && ort.trim()) && !pending
+    Boolean(titel.trim() && strasse.trim() && hausnummer.trim() && plz.trim() && ort.trim()) &&
+    !pending
 
   return (
     <EditorSheet
@@ -216,12 +215,20 @@ export function KundenObjektModal({
               placeholder="z.B. Wohnanlage Lindenhof"
             />
           </MockField>
-          <MockField label="Straße & Nr." required full>
+          <MockField label="Straße" required>
             <input
               className="input"
-              value={strasseNr}
-              onChange={(e) => mark(setStrasseNr, e.target.value)}
-              placeholder="Lindenstraße 14"
+              value={strasse}
+              onChange={(e) => mark(setStrasse, e.target.value)}
+              placeholder="Lindenstraße"
+            />
+          </MockField>
+          <MockField label="Hausnummer" required>
+            <input
+              className="input"
+              value={hausnummer}
+              onChange={(e) => mark(setHausnummer, e.target.value)}
+              placeholder="14"
             />
           </MockField>
           <MockField label="PLZ" required>

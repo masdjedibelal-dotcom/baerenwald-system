@@ -1,148 +1,118 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { useMemo, useState } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import {
+  firmZeileAdresse,
+  type FirmenEinstellungen,
+} from '@/lib/einstellungen-keys'
+import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 
-function formatAdresse(v: FirmenEinstellungen): string {
-  return [v.strasse, [v.plz, v.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+/** IBAN lesbar mit Leerzeichen (DE12 3456 …), Speichern ohne. */
+function formatIbanAnzeige(iban: string): string {
+  const clean = iban.replace(/\s+/g, '').toUpperCase()
+  if (!clean) return ''
+  return clean.replace(/(.{4})/g, '$1 ').trim()
 }
 
-function formatBank(v: FirmenEinstellungen): string {
-  const iban = v.iban?.trim()
-  const short =
-    iban && iban.length > 8 ? `IBAN …${iban.slice(-4)}` : iban ? `IBAN ${iban}` : ''
-  return [v.bank_name?.trim(), short].filter(Boolean).join(' · ') || '—'
+function normalizeIban(iban: string): string {
+  return iban.replace(/\s+/g, '').toUpperCase()
 }
 
-function parseAdresse(text: string, base: FirmenEinstellungen): FirmenEinstellungen {
-  const next = { ...base }
-  const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
-  if (parts.length === 0) {
-    next.strasse = text
-    return next
-  }
-  next.strasse = parts[0] ?? text
-  if (parts.length >= 2) {
-    const m = parts[1]!.match(/^(\d{4,5})\s+(.+)$/)
-    if (m) {
-      next.plz = m[1]!
-      next.ort = m[2]!
-    } else {
-      next.ort = parts[1]!
-    }
-  }
-  return next
+function normalizeBic(bic: string): string {
+  return bic.replace(/\s+/g, '').toUpperCase()
 }
 
-function parseBank(text: string, base: FirmenEinstellungen): FirmenEinstellungen {
-  const next = { ...base }
-  const ibanMatch = text.match(/IBAN\s*[.…]*\s*([A-Z0-9]+)/i)
-  if (ibanMatch) {
-    const raw = ibanMatch[1]!.replace(/[.…]/g, '')
-    if (raw.length >= 8) next.iban = raw
-  } else {
-    const bare = text.match(/\b([A-Z]{2}\d{2}[A-Z0-9]{10,30})\b/i)
-    if (bare) next.iban = bare[1]!.toUpperCase()
-  }
-  const namePart = text.split(/[·•|]/)[0]?.replace(/\s*IBAN.*/i, '').trim()
-  if (namePart) next.bank_name = namePart
-  return next
+/** Legacy: Hausnummer steckte oft in `strasse` — beim Öffnen trennen. */
+function resolveFirmaAnschrift(v: FirmenEinstellungen): { strasse: string; hausnummer: string } {
+  const nr = v.hausnummer?.trim() || ''
+  if (nr) return { strasse: v.strasse?.trim() || '', hausnummer: nr }
+  const split = splitStrasseHausnummer(v.strasse?.trim() || '')
+  return { strasse: split.strasse, hausnummer: split.hausnummer ?? '' }
 }
 
 type EditDraft = {
   firmenname: string
   geschaeftsfuehrer: string
-  adresse: string
+  strasse: string
+  hausnummer: string
+  plz: string
+  ort: string
   ust_id: string
   steuernummer: string
   handelsregister: string
   telefon: string
   email: string
-  bank: string
+  bank_name: string
+  iban: string
+  bic: string
 }
 
-/** Firma: Stammdaten-, Brand- und Rechnungs-Cards. */
-export function FirmaBrandingForm({
-  initial,
-  naechsteRechnungsnummer,
-}: {
-  initial: FirmenEinstellungen
-  naechsteRechnungsnummer?: string | null
-}) {
+function draftFromFirm(v: FirmenEinstellungen): EditDraft {
+  const addr = resolveFirmaAnschrift(v)
+  return {
+    firmenname: v.firmenname,
+    geschaeftsfuehrer: v.geschaeftsfuehrer,
+    strasse: addr.strasse,
+    hausnummer: addr.hausnummer,
+    plz: v.plz ?? '',
+    ort: v.ort ?? '',
+    ust_id: v.ust_id,
+    steuernummer: v.steuernummer,
+    handelsregister: v.pdf_fusszeile,
+    telefon: v.telefon,
+    email: v.email,
+    bank_name: v.bank_name ?? '',
+    iban: formatIbanAnzeige(v.iban ?? ''),
+    bic: (v.bic ?? '').toUpperCase(),
+  }
+}
+
+/** Firma: nur Stammdaten. Logo/Brand/Rechnung bleiben System-Defaults (Wizard). */
+export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen }) {
   const [v, setV] = useState(initial)
   const [pending, startTransition] = useTransition()
-  const [uploading, setUploading] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [draft, setDraft] = useState<EditDraft>(() => ({
-    firmenname: initial.firmenname,
-    geschaeftsfuehrer: initial.geschaeftsfuehrer,
-    adresse: formatAdresse(initial),
-    ust_id: initial.ust_id,
-    steuernummer: initial.steuernummer,
-    handelsregister: initial.pdf_fusszeile,
-    telefon: initial.telefon,
-    email: initial.email,
-    bank: formatBank(initial) === '—' ? '' : formatBank(initial),
-  }))
-  const [editZahlungsziel, setEditZahlungsziel] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const zahlungszielLabel = useMemo(() => {
-    const n = Number(v.zahlungsziel_tage) || 14
-    return `${n} Tage`
-  }, [v.zahlungsziel_tage])
-
-  const reNrSub = useMemo(() => {
-    const base = 'Format: RE-{JAHR}-{NNNN}'
-    const nr = naechsteRechnungsnummer?.trim()
-    return nr ? `${base} · aktuell ${nr}` : base
-  }, [naechsteRechnungsnummer])
+  const [draft, setDraft] = useState<EditDraft>(() => draftFromFirm(initial))
 
   const metaLine = useMemo(() => {
     const parts = [
-      formatAdresse(v) || null,
+      firmZeileAdresse(v) || null,
       v.geschaeftsfuehrer?.trim() ? `Inhaber ${v.geschaeftsfuehrer.trim()}` : null,
     ].filter(Boolean)
     return parts.join(' · ')
   }, [v])
 
   function openEdit() {
-    setDraft({
-      firmenname: v.firmenname,
-      geschaeftsfuehrer: v.geschaeftsfuehrer,
-      adresse: formatAdresse(v),
-      ust_id: v.ust_id,
-      steuernummer: v.steuernummer,
-      handelsregister: v.pdf_fusszeile,
-      telefon: v.telefon,
-      email: v.email,
-      bank: formatBank(v) === '—' ? '' : formatBank(v),
-    })
+    setDraft(draftFromFirm(v))
     setSheetOpen(true)
   }
 
   function saveStamm() {
     startTransition(async () => {
-      let next: FirmenEinstellungen = {
+      const next: FirmenEinstellungen = {
         ...v,
         firmenname: draft.firmenname,
         geschaeftsfuehrer: draft.geschaeftsfuehrer,
+        strasse: draft.strasse.trim(),
+        hausnummer: draft.hausnummer.trim(),
+        plz: draft.plz.trim(),
+        ort: draft.ort.trim(),
         ust_id: draft.ust_id,
         steuernummer: draft.steuernummer,
         pdf_fusszeile: draft.handelsregister,
         telefon: draft.telefon,
         email: draft.email,
+        bank_name: draft.bank_name.trim(),
+        iban: normalizeIban(draft.iban),
+        bic: normalizeBic(draft.bic),
       }
-      next = parseAdresse(draft.adresse, next)
-      next = parseBank(draft.bank, next)
       const r = await saveEinstellungen(next)
       if (!r.ok) {
         toast.error(r.message)
@@ -154,55 +124,14 @@ export function FirmaBrandingForm({
     })
   }
 
-  async function onLogoFile(f: File | null) {
-    if (!f) return
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      fd.set('file', f)
-      fd.set('filename', f.name)
-      const res = await fetch('/api/einstellungen/logo', { method: 'POST', body: fd })
-      const j = (await res.json()) as { url?: string; error?: string }
-      if (!res.ok) {
-        toast.error(j.error ?? 'Upload fehlgeschlagen')
-        return
-      }
-      if (j.url) {
-        const next = { ...v, logo_url: j.url }
-        setV(next)
-        const r = await saveEinstellungen(next)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        toast.success('Logo gespeichert')
-      }
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
-  function saveZahlungsziel(tage: string) {
-    const cleaned = String(Math.max(1, Number(tage) || 14))
-    const next = { ...v, zahlungsziel_tage: cleaned }
-    setV(next)
-    setEditZahlungsziel(false)
-    startTransition(async () => {
-      const r = await saveEinstellungen(next)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Zahlungsziel gespeichert')
-    })
-  }
-
   const detailRows: { label: string; value: string }[] = [
+    { label: 'Adresse', value: firmZeileAdresse(v) || '—' },
     { label: 'USt-IdNr.', value: v.ust_id?.trim() || '—' },
     { label: 'Steuernummer', value: v.steuernummer?.trim() || '—' },
     { label: 'Handelsregister', value: v.pdf_fusszeile?.trim() || '—' },
-    { label: 'Bankverbindung', value: formatBank(v) },
+    { label: 'Bankname', value: v.bank_name?.trim() || '—' },
+    { label: 'IBAN', value: formatIbanAnzeige(v.iban ?? '') || '—' },
+    { label: 'BIC', value: v.bic?.trim() || '—' },
   ]
 
   return (
@@ -218,35 +147,17 @@ export function FirmaBrandingForm({
             aria-label="Stammdaten bearbeiten"
             onClick={openEdit}
           >
-            <MockIcon ctx="default" n="pencil" size={14} />
+            <MockIcon ctx="btn" n="pencil" size={16} />
           </button>
         }
       >
-        <div className="vgid" style={{ marginBottom: 16 }}>
-          <div className="vgid-name" style={{ fontSize: 'var(--fs-head)' }}>
-            {v.firmenname?.trim() || '—'}
+        <div className="mb-3">
+          <div className="text-[length:var(--fs-head)] font-semibold text-[var(--text)]">
+            {v.firmenname?.trim() || 'Firma'}
           </div>
           {metaLine ? (
-            <div className="vgid-meta" style={{ marginTop: 4 }}>
-              {metaLine}
-            </div>
+            <div className="mt-1 text-[length:var(--fs-meta)] text-[var(--text-3)]">{metaLine}</div>
           ) : null}
-          {(v.telefon?.trim() || v.email?.trim()) && (
-            <div className="vgid-chips" style={{ marginTop: 12 }}>
-              {v.telefon?.trim() ? (
-                <a className="vgid-chip" href={`tel:${v.telefon.replace(/\s/g, '')}`}>
-                  <MockIcon ctx="default" n="phone" size={14} />
-                  {v.telefon.trim()}
-                </a>
-              ) : null}
-              {v.email?.trim() ? (
-                <a className="vgid-chip" href={`mailto:${v.email.trim()}`}>
-                  <MockIcon ctx="default" n="mail" size={14} />
-                  {v.email.trim()}
-                </a>
-              ) : null}
-            </div>
-          )}
         </div>
 
         <div className="props">
@@ -256,110 +167,6 @@ export function FirmaBrandingForm({
               <div className="prop-v">{r.value}</div>
             </div>
           ))}
-        </div>
-      </MockCard>
-
-      <MockCard title="Brand" icon="photo">
-        <div className="setting-row">
-          <div>
-            <div className="lbl">Logo</div>
-            <div className="sub">Wird auf Rechnungen und Angeboten verwendet.</div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {v.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={v.logo_url}
-                alt=""
-                style={{
-                  height: 28,
-                  maxWidth: 72,
-                  objectFit: 'contain',
-                  borderRadius: 4,
-                  border: '0.5px solid var(--border)',
-                  background: '#fff',
-                }}
-              />
-            ) : null}
-            <MockBtn sm icon="upload" disabled={uploading || pending} onClick={() => fileRef.current?.click()}>
-              {uploading ? '…' : 'Hochladen'}
-            </MockBtn>
-          </div>
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/svg+xml"
-          className="hidden"
-          onChange={(e) => void onLogoFile(e.target.files?.[0] ?? null)}
-        />
-
-        <div className="setting-row">
-          <div>
-            <div className="lbl">Primärfarbe</div>
-            <div className="sub">Akzentfarbe in PDF-Vorlagen.</div>
-          </div>
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 6,
-              background: 'var(--green)',
-              border: '0.5px solid var(--border)',
-            }}
-            title="Markengrün"
-          />
-        </div>
-      </MockCard>
-
-      <MockCard title="Rechnung" icon="file-invoice">
-        <div className="setting-row">
-          <div>
-            <div className="lbl">Rechnungsnummern</div>
-            <div className="sub">{reNrSub}</div>
-          </div>
-          <MockBtn sm kind="ghost" onClick={() => toast.message('Rechnungsnummern: Anpassung folgt')}>
-            Anpassen
-          </MockBtn>
-        </div>
-
-        <div className="setting-row">
-          <div>
-            <div className="lbl">Zahlungsziel</div>
-            <div className="sub">Standardfrist nach Rechnungsversand.</div>
-          </div>
-          {editZahlungsziel ? (
-            <input
-              className="txt"
-              type="number"
-              min={1}
-              autoFocus
-              defaultValue={v.zahlungsziel_tage || '14'}
-              onBlur={(e) => saveZahlungsziel(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveZahlungsziel((e.target as HTMLInputElement).value)
-                if (e.key === 'Escape') setEditZahlungsziel(false)
-              }}
-              style={{ width: 72, height: 30, textAlign: 'right' }}
-              aria-label="Zahlungsziel in Tagen"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditZahlungsziel(true)}
-              style={{
-                fontSize: 'var(--fs-text)',
-                fontWeight: 500,
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                color: 'var(--text)',
-              }}
-            >
-              {zahlungszielLabel}
-            </button>
-          )}
         </div>
       </MockCard>
 
@@ -374,7 +181,7 @@ export function FirmaBrandingForm({
         confirmBusy={pending}
       >
         <div className="kunde-create">
-          <MockFormSection title="Firma" icon="building">
+          <MockFormSection title="Firma" icon="building" columns={2}>
             <MockField label="Firma" required full>
               <input
                 className="input"
@@ -389,14 +196,45 @@ export function FirmaBrandingForm({
                 onChange={(e) => setDraft((d) => ({ ...d, geschaeftsfuehrer: e.target.value }))}
               />
             </MockField>
-            <MockField label="Adresse" full>
+            <MockField label="Straße">
               <input
                 className="input"
-                value={draft.adresse}
-                onChange={(e) => setDraft((d) => ({ ...d, adresse: e.target.value }))}
-                placeholder="Straße, PLZ Ort"
+                value={draft.strasse}
+                onChange={(e) => setDraft((d) => ({ ...d, strasse: e.target.value }))}
+                placeholder="Bärenwaldstraße"
+                autoComplete="address-line1"
               />
             </MockField>
+            <MockField label="Hausnummer">
+              <input
+                className="input"
+                value={draft.hausnummer}
+                onChange={(e) => setDraft((d) => ({ ...d, hausnummer: e.target.value }))}
+                placeholder="20"
+                autoComplete="address-line2"
+              />
+            </MockField>
+            <div className="kunde-create__plz-ort full">
+              <MockField label="PLZ">
+                <input
+                  className="input"
+                  value={draft.plz}
+                  onChange={(e) => setDraft((d) => ({ ...d, plz: e.target.value }))}
+                  placeholder="81737"
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                />
+              </MockField>
+              <MockField label="Ort">
+                <input
+                  className="input"
+                  value={draft.ort}
+                  onChange={(e) => setDraft((d) => ({ ...d, ort: e.target.value }))}
+                  placeholder="München"
+                  autoComplete="address-level2"
+                />
+              </MockField>
+            </div>
             <MockField label="Telefon">
               <input
                 className="input"
@@ -433,12 +271,40 @@ export function FirmaBrandingForm({
                 placeholder="HRB … · AG …"
               />
             </MockField>
-            <MockField label="Bankverbindung" full>
+          </MockFormSection>
+
+          <MockFormSection title="Bankverbindung" icon="building">
+            <MockField label="Bankname" full>
               <input
                 className="input"
-                value={draft.bank}
-                onChange={(e) => setDraft((d) => ({ ...d, bank: e.target.value }))}
-                placeholder="Bank · IBAN …"
+                value={draft.bank_name}
+                onChange={(e) => setDraft((d) => ({ ...d, bank_name: e.target.value }))}
+                placeholder="z. B. Postbank"
+                autoComplete="off"
+              />
+            </MockField>
+            <MockField label="IBAN" full>
+              <input
+                className="input"
+                value={draft.iban}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, iban: formatIbanAnzeige(e.target.value) }))
+                }
+                placeholder="DE00 0000 0000 0000 0000 00"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </MockField>
+            <MockField label="BIC" full>
+              <input
+                className="input"
+                value={draft.bic}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, bic: normalizeBic(e.target.value) }))
+                }
+                placeholder="z. B. PBNKDEFF"
+                autoComplete="off"
+                spellCheck={false}
               />
             </MockField>
           </MockFormSection>

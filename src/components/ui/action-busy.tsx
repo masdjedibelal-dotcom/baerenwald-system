@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 
 type BusyState = { depth: number; label: string }
 
@@ -139,26 +140,44 @@ export function useActionBusy(): BusyApi {
   return useContext(ActionBusyContext)
 }
 
+export type UseBusyTransitionOptions = {
+  /**
+   * true (Default): Vollbild-Overlay (`action-busy`).
+   * false: nur `pending` — wenn lokal schon Busy da ist (Button `loading`, DocumentCanvas, …).
+   */
+  global?: boolean
+}
+
 /**
- * Drop-in für React `useTransition`: globales Loading, solange die Transition läuft
- * (typisch Server Actions / Supabase).
+ * Drop-in für React `useTransition`.
+ * Regel: lokaler Busy gewinnt → `global: false` / `useLocalTransition`.
+ * Ohne lokalen Busy → Default (`global: true`).
  */
 export function useBusyTransition(
-  label = DEFAULT_LABEL
+  label = DEFAULT_LABEL,
+  options?: UseBusyTransitionOptions
 ): [boolean, TransitionStartFunction] {
   const [pending, startTransition] = useReactTransition()
+  const showGlobal = options?.global !== false
 
   useEffect(() => {
-    if (!pending) return
+    if (!showGlobal || !pending) return
     actionBusy.show(label)
     return () => actionBusy.hide()
-  }, [pending, label])
+  }, [pending, label, showGlobal])
 
   return [pending, startTransition]
 }
 
 /** Alias — `import { useTransition } from '@/components/ui/action-busy'` */
 export const useTransition = useBusyTransition
+
+/** Transition ohne Vollbild — lokaler Busy (Button/Canvas/Sheet) übernimmt. */
+export function useLocalTransition(
+  label = DEFAULT_LABEL
+): [boolean, TransitionStartFunction] {
+  return useBusyTransition(label, { global: false })
+}
 
 export function ActionBusyProvider({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState<BusyState>(state)
@@ -174,6 +193,7 @@ export function ActionBusyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const open = snap.depth > 0
+  useOverlayChromeLock(mounted && open)
 
   return (
     <ActionBusyContext.Provider value={actionBusy}>

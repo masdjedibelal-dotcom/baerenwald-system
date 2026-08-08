@@ -16,6 +16,7 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import {
@@ -192,6 +193,8 @@ export function EditorSheet({
     setMounted(true)
   }, [])
 
+  useOverlayChromeLock(open && mounted)
+
   /* S10: History-Entry — Stack, damit Split-over → Split-over kein Fremd-Discard auslöst */
   useEffect(() => {
     if (!open || !mounted || !manageHistory) return
@@ -236,21 +239,28 @@ export function EditorSheet({
   }, [open, mounted, pauseFocusTrap])
 
   /* S7: iOS-Tastatur — Overlay bleibt Vollfläche (sonst Lücke → Seite darunter sichtbar).
-   * Nur --keyboard-inset setzen; Bottom-Sheet per Padding über der Tastatur. */
+   * URL-Bar-Schwankungen ≠ Keyboard (Threshold); sonst peekt Nav/CTA unten durch. */
   useEffect(() => {
     if (!open || !isMobile) return
     const overlay = overlayRef.current
     const vv = window.visualViewport
     if (!overlay || !vv) return
     const sync = () => {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      // ~URL-Bar / Browser-Chrome ignorieren; echte Soft-Keyboard liegt deutlich höher
+      const kb = rawKb > 100 ? rawKb : 0
+      const coverH = Math.max(
+        window.innerHeight,
+        document.documentElement.clientHeight || 0,
+        vv.height + vv.offsetTop
+      )
       overlay.style.top = '0'
       overlay.style.left = '0'
       overlay.style.right = '0'
       overlay.style.bottom = '0'
       overlay.style.width = '100%'
-      overlay.style.height = `${Math.max(window.innerHeight, vv.height + vv.offsetTop)}px`
-      overlay.style.minHeight = `${window.innerHeight}px`
+      overlay.style.height = `${coverH}px`
+      overlay.style.minHeight = `${coverH}px`
       overlay.style.setProperty('--keyboard-inset', `${kb}px`)
       document.body.classList.toggle('kb-open', kb > 40)
     }

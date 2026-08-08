@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +53,8 @@ export function Modal({
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useOverlayChromeLock(open && mounted)
 
   useEffect(() => {
     if (!open || !mounted) return

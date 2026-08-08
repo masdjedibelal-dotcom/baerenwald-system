@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
@@ -125,7 +125,7 @@ function TerminNotizFormModal({
   onReload: () => void
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [existingUrls, setExistingUrls] = useState<string[]>([])
@@ -356,7 +356,7 @@ function TerminNotizZeile({
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   async function loeschen() {
     if (!window.confirm('Notiz löschen?')) return

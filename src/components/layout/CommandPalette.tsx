@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 const RECENT_KEY = 'bw-crm-recent-search'
@@ -26,6 +27,7 @@ const NAV_HITS: SearchHit[] = [
 ]
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useOverlayChromeLock(open)
   const router = useRouter()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)

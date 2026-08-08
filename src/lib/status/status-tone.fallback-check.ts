@@ -16,6 +16,23 @@ if (unknown.tone !== 'blau') {
 if (primaryCta('anfrage', 'neu')?.id !== 'angebot_erstellen') throw new Error('anfrage neu')
 if (primaryCta('angebot', 'entwurf')?.id !== 'angebot_versenden') throw new Error('angebot entwurf')
 if (primaryCta('auftrag', 'offen')?.id !== 'auftrag_abschliessen') throw new Error('auftrag offen')
+if (
+  primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: 'versenden' })?.id !==
+  'rechnung_versenden'
+) {
+  throw new Error('auftrag fertig versenden')
+}
+if (
+  primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: 'bezahlt' })?.id !== 'als_bezahlt'
+) {
+  throw new Error('auftrag fertig bezahlt')
+}
+if (
+  primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: null })?.id !==
+  'bewertung_einholen'
+) {
+  throw new Error('auftrag fertig bewertung')
+}
 if (primaryCta('rechnung', 'entwurf')?.id !== 'rechnung_versenden') throw new Error('rechnung entwurf')
 if (primaryCta('anfrage', 'abgebrochen') !== null) throw new Error('anfrage verloren')
 

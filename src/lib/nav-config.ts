@@ -161,7 +161,7 @@ export const SECTION_LABELS: Record<string, string> = {
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {
   einstellungen: {
-    profil: 'Profil',
+    profil: 'Firma',
     firma: 'Firma & Branding',
     benutzer: 'Team',
     preise: 'Preislisten',

@@ -11,7 +11,6 @@ import {
   previewKundenPortalMail,
   sendKundenPortalLinkMail,
 } from '@/app/actions/mails'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { parseEmailTokens } from '@/lib/email-recipients'
 
 /**
@@ -161,7 +160,6 @@ export function KundenportalLinkVersendenModal({
             emails={mailCc}
             onChange={setMailCc}
             placeholder="weitere@beispiel.de"
-            hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={sending}
           />
           <KiAssistFieldLabel

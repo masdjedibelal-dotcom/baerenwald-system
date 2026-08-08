@@ -131,6 +131,7 @@ const config: Config = {
         'sidepanel-pop': '45',
         modal: '500',
         search: '100',
+        toast: '1100',
       },
       boxShadow: {
         sm: '0 1px 2px rgba(0,0,0,0.05)',

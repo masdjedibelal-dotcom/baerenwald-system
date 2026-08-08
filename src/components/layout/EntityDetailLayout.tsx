@@ -1,6 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
 import {
   VorgangResolverBanner,
@@ -13,6 +15,7 @@ import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorl
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
+import { parseAkteFromParam } from '@/lib/vorgang/akte-from'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -66,6 +69,11 @@ export function EntityDetailLayout({
   className,
 }: EntityDetailLayoutProps) {
   const isMobile = useIsMobile()
+  const searchParams = useSearchParams()
+  const fromRef = useMemo(
+    () => parseAkteFromParam(searchParams.get('from')),
+    [searchParams]
+  )
 
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
@@ -74,7 +82,9 @@ export function EntityDetailLayout({
     <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
       <div className="detail-entity-hero">
         <div className="detail-entity-toprow">
-          {crumbBackHref ? (
+          {fromRef ? (
+            <AkteRueckwegChip />
+          ) : crumbBackHref ? (
             <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
           ) : (
             <span className="detail-entity-toprow__spacer" aria-hidden />
@@ -83,7 +93,6 @@ export function EntityDetailLayout({
             <span id="detail-entity-top-overflow" className="detail-entity-top-overflow" />
           </div>
         </div>
-        <AkteRueckwegChip />
         {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
         <DetailHead
           title={head.title}

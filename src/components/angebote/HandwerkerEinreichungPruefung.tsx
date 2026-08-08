@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 /**
  * @deprecated Gegenvorschlag-Prüfung — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
@@ -96,7 +96,7 @@ export function HandwerkerEinreichungPruefung({
     )
   }
 
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
   const [crmNotiz, setCrmNotiz] = useState('')
   const [mailModal, setMailModal] = useState<AntwortModal | null>(null)

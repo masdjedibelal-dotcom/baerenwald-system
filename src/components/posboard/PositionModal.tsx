@@ -97,7 +97,6 @@ export function PositionModal({
           </Field>
           <SheetEditableField
             label="Text"
-            hint="Erscheint ohne Preis auf dem Dokument"
             value={richTextToEditablePlain(p.beschreibung)}
             onSave={(beschreibung) => onChange({ beschreibung })}
             multiline
@@ -173,7 +172,6 @@ export function PositionModal({
           </Field>
           <SheetEditableField
             label="Beschreibung"
-            hint="Erscheint beim Kunden"
             value={richTextToEditablePlain(p.beschreibung)}
             onSave={(beschreibung) => onChange({ beschreibung })}
             multiline
@@ -181,11 +179,7 @@ export function PositionModal({
             placeholder="Details zur Leistung…"
             sheetContext="detail"
           />
-          <Field
-            label="Kostenart"
-            full
-            hint="Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung"
-          >
+          <Field label="Kostenart" full>
             <div className="seg" role="group" aria-label="Kostenart">
               {KOSTENART_OPTIONS.map((opt) => {
                 const active = (p.kostenverteilung ?? 'allgemein') === opt.value
@@ -202,19 +196,10 @@ export function PositionModal({
               })}
             </div>
           </Field>
-          <Field
-            label="Vergütung"
-            full
-            hint={
-              p.regieSchein
-                ? 'Im Angebot nur Schätzung (Stunden × Satz). Finaler Aufwand kommt vom Handwerker über Bautagebuch (Start-/Ende-Fotos, Stunden, Titel, Beschreibung — Pflicht).'
-                : 'Festpreis: Menge × Einzelpreis. Für Aufwand/Regie Schalter aktivieren.'
-            }
-          >
+          <Field label="Vergütung" full>
             <Toggle
               checked={Boolean(p.regieSchein)}
               label={REGIE_BADGE_LABEL}
-              hint="Stunden & Stundensatz statt Festpreis"
               onChange={(on) => {
                 if (on) {
                   const einheit =

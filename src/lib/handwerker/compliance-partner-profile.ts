@@ -166,10 +166,12 @@ export function filterLeistungComplianceTypen(
 
 /** Hinweis für Portal: Ablauf / Neu-Upload. */
 export function complianceAblaufHinweis(
-  status: 'fehlend' | 'ok' | 'warnung' | 'abgelaufen',
+  status: 'fehlend' | 'ok' | 'warnung' | 'abgelaufen' | 'in_pruefung' | 'abgelehnt',
   gueltigBis: string | null | undefined
 ): string | null {
   if (status === 'fehlend') return 'Bitte hochladen'
+  if (status === 'abgelehnt') return 'Abgelehnt — bitte neu hochladen'
+  if (status === 'in_pruefung') return 'Wird geprüft'
   if (status === 'abgelaufen') return 'Abgelaufen — bitte neu hochladen'
   if (status === 'warnung' && gueltigBis) {
     try {
@@ -179,6 +181,6 @@ export function complianceAblaufHinweis(
       return 'Läuft bald ab — bitte neu hochladen'
     }
   }
-  if (status === 'warnung') return 'In Prüfung oder läuft bald ab'
+  if (status === 'warnung') return 'Läuft bald ab — bitte neu hochladen'
   return null
 }

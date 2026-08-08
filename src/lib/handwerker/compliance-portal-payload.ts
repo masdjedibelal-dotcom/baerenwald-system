@@ -9,7 +9,13 @@ import {
   partnerHatMeisterGewerke,
   partnerLeistetBauleistung,
 } from '@/lib/handwerker/compliance-partner-profile'
-import { complianceDokumentStatus, dokumentFuerTyp, dokumenteFuerProjekt } from '@/lib/handwerker/compliance-katalog'
+import {
+  complianceDokumentStatus,
+  dokumentFuerTyp,
+  dokumenteFuerProjekt,
+  istEigeneUnterlageTyp,
+  INDIVIDUELL_TYP_SLUG,
+} from '@/lib/handwerker/compliance-katalog'
 import { normalizeComplianceEbene } from '@/lib/handwerker/compliance-partner-profile'
 import { partnerDokumentStatusLabel, partnerDokumentIstFreigegeben } from '@/lib/handwerker/partner-dokument-status'
 import { RAHMENVERTRAG_TYP_SLUG, rahmenvertragErfuellt } from '@/lib/handwerker/compliance-vertrag-status'
@@ -22,7 +28,7 @@ export type PortalComplianceDokumentZeile = {
   beschreibung: string | null
   ebene: 'allgemein' | 'meister' | 'leistung'
   pflicht: boolean
-  status: 'fehlend' | 'ok' | 'warnung' | 'abgelaufen'
+  status: 'fehlend' | 'ok' | 'warnung' | 'abgelaufen' | 'in_pruefung' | 'abgelehnt'
   status_label: string
   gueltig_bis: string | null
   ablauf_hinweis: string | null
@@ -65,11 +71,12 @@ function zeileFuerTyp(
 
   let statusLabel = 'Fehlt'
   if (rvOk) statusLabel = 'Rahmenvertrag im CRM'
-  else if (workflow && partnerDokumentIstFreigegeben(workflow)) statusLabel = 'Bestätigt'
-  else if (workflow && workflow !== 'freigegeben' && workflow !== 'genehmigt') {
-    statusLabel = partnerDokumentStatusLabel(workflow)
+  else if (status === 'abgelehnt') statusLabel = 'Abgelehnt'
+  else if (status === 'in_pruefung') statusLabel = partnerDokumentStatusLabel(workflow)
+  else if (workflow && partnerDokumentIstFreigegeben(workflow)) {
+    statusLabel = status === 'warnung' ? 'Bald fällig' : status === 'abgelaufen' ? 'Abgelaufen' : 'Bestätigt'
   } else if (status === 'ok') statusLabel = 'Vorhanden'
-  else if (status === 'warnung') statusLabel = 'Läuft bald ab / In Prüfung'
+  else if (status === 'warnung') statusLabel = 'Bald fällig'
   else if (status === 'abgelaufen') statusLabel = 'Abgelaufen'
 
   return {
@@ -110,9 +117,31 @@ export function buildPortalComplianceStamm(opts: {
       )
     )
 
+  const allgemein = mapEbene('allgemein')
+  const meister = mapEbene('meister')
+  const katalogSlugs = new Set([...allgemein, ...meister].map((z) => z.slug))
+
+  /** Freie Uploads + Altbestand (`individuell`) — sonst unsichtbar im Portal. */
+  const eigene = stammDocs
+    .filter((d) => d.datei_url?.trim())
+    .filter((d) => istEigeneUnterlageTyp(d.typ) || !katalogSlugs.has(d.typ))
+    .map((d) => {
+      const typ: ComplianceDokumentTyp = {
+        id: `eigene-${d.id}`,
+        slug: istEigeneUnterlageTyp(d.typ) ? INDIVIDUELL_TYP_SLUG : d.typ,
+        bezeichnung: d.bezeichnung?.trim() || 'Eigene Unterlage',
+        beschreibung: null,
+        pflicht_fuer_fachbetriebe: false,
+        erneuerung_monate: null,
+        sort_order: 9999,
+        mehrfach_erlaubt: true,
+      }
+      return zeileFuerTyp(typ, d, false)
+    })
+
   return {
-    allgemein: mapEbene('allgemein'),
-    meister: mapEbene('meister'),
+    allgemein: [...allgemein, ...eigene],
+    meister,
     profil: {
       leistet_bauleistung: partnerLeistetBauleistung(hwGewerke, opts.alleGewerke),
       hat_meister_gewerke: partnerHatMeisterGewerke(hwGewerke, opts.alleGewerke),

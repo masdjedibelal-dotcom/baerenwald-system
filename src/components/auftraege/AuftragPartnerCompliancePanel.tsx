@@ -28,11 +28,10 @@ import { createClient } from '@/lib/supabase'
 import {
   complianceDokumentStatus,
   dokumenteFuerProjekt,
-  dokumenteFuerTyp,
   dokumentFuerTyp,
   filterProjektComplianceTypen,
-  INDIVIDUELL_TYP_SLUG,
   individuellTyp,
+  istEigeneUnterlageTyp,
   istPflichtTyp,
   projektChecklisteFortschritt,
   type ComplianceDokumentStatus,
@@ -47,8 +46,12 @@ function safeFileName(name: string): string {
 
 function complianceStatusPill(status: ComplianceDokumentStatus): string {
   if (status === 'ok') return 'bg-emerald-50 text-emerald-800 border-emerald-200'
-  if (status === 'warnung') return 'bg-amber-50 text-amber-900 border-amber-200'
-  if (status === 'abgelaufen') return 'bg-red-50 text-red-800 border-red-200'
+  if (status === 'warnung' || status === 'in_pruefung') {
+    return 'bg-amber-50 text-amber-900 border-amber-200'
+  }
+  if (status === 'abgelaufen' || status === 'abgelehnt') {
+    return 'bg-red-50 text-red-800 border-red-200'
+  }
   return 'bg-bw-bg-soft text-bw-text-muted border-bw-border'
 }
 
@@ -140,13 +143,20 @@ export function AuftragPartnerCompliancePanel({
 
   const indTyp = useMemo(() => individuellTyp(complianceTypen), [complianceTypen])
   const individuelleDocs = useMemo(
-    () => dokumenteFuerTyp(projektDocs, INDIVIDUELL_TYP_SLUG, handwerkerId, auftragId),
+    () =>
+      projektDocs.filter(
+        (d) =>
+          istEigeneUnterlageTyp(d.typ) &&
+          d.handwerker_id === handwerkerId &&
+          d.auftrag_id === auftragId &&
+          d.datei_url?.trim()
+      ),
     [projektDocs, handwerkerId, auftragId]
   )
 
   const offeneTypen = useMemo(() => {
     return projektTypen.filter((typ) => {
-      if (typ.slug === INDIVIDUELL_TYP_SLUG) return false
+      if (istEigeneUnterlageTyp(typ.slug)) return false
       const doc = dokumentFuerTyp(projektDocs, typ.slug)
       const st = complianceDokumentStatus(typ, doc)
       return st === 'fehlend' || st === 'abgelaufen' || (doc && !partnerDokumentIstFreigegeben(doc.status))
@@ -155,7 +165,7 @@ export function AuftragPartnerCompliancePanel({
 
   const hochgeladeneZeilen = useMemo(() => {
     const standard = projektTypen
-      .filter((t) => t.slug !== INDIVIDUELL_TYP_SLUG)
+      .filter((t) => !istEigeneUnterlageTyp(t.slug))
       .map((typ) => {
         const doc = dokumentFuerTyp(projektDocs, typ.slug)
         if (!doc) return null
@@ -501,7 +511,7 @@ export function AuftragPartnerCompliancePanel({
                     <tr key={key}>
                       <td className="font-medium text-bw-text">
                         {titel}
-                        {typ?.slug !== INDIVIDUELL_TYP_SLUG && typ ? (
+                        {typ && !istEigeneUnterlageTyp(typ.slug) ? (
                           <span className="mt-0.5 block text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
                             {typ.bezeichnung}
                           </span>

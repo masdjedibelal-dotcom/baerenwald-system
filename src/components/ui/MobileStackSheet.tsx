@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { ChevronLeft, X } from 'lucide-react'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 /** Bottom Sheet mit Zurück-Navigation (Mobil, gestapelte Ansichten). */
@@ -25,6 +26,8 @@ export function MobileStackSheet({
   footer?: ReactNode
   className?: string
 }) {
+  useOverlayChromeLock(open)
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
@@ -33,7 +33,7 @@ export function HandwerkerDetailsModal({
   onSaved: () => void
 }) {
   const isMobile = useIsMobile()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [preis, setPreis] = useState('')
   const [absprachen, setAbsprachen] = useState('')
   const [notizen, setNotizen] = useState('')

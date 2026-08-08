@@ -23,6 +23,8 @@ export function AngebotStammdatenCard({
     ? lead?.auftraggeber_kunde_id ?? ag?.id ?? detail.kunde_id ?? detail.kunden?.id
     : detail.kunde_id ?? detail.kunden?.id
 
+  const k = isHv ? ag : detail.kunden
+
   return (
     <EntityKundenStammdatenCard
       kundeId={kundeId}
@@ -44,7 +46,11 @@ export function AngebotStammdatenCard({
           : [detail.kunden?.strasse, detail.kunden?.hausnummer]
               .filter(Boolean)
               .join(' ')
-              .trim(),
+              .trim() || detail.kunden?.adresse?.trim() || '',
+        vorname: k?.vorname ?? '',
+        nachname: k?.nachname ?? '',
+        ansprechpartner: k?.ansprechpartner ?? '',
+        webseite: k?.webseite ?? '',
       }}
       kundeTyp={isHv ? ag?.typ ?? 'hausverwaltung' : detail.kunden?.typ}
       onSaved={onSaved}

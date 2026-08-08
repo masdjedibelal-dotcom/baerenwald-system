@@ -35,9 +35,8 @@ export function createAnfrageHref(kundeId?: string | null): string {
 }
 
 /**
- * Angebot: direkt `/angebote/neu` — Kundenschritt im Gate (wie Anfrage-Funnel).
- * Rechnung: Kundenschritt über FAB-Overlay (`openFabCreate('rechnung')`);
- * Deep-Link bleibt `/neu?art=rechnung`.
+ * Angebot: mit kunde_id → Wizard direkt; ohne → Gate auf `/angebote/neu`.
+ * Rechnung: mit kunde_id → Wizard direkt; ohne → FAB-Overlay `/neu?art=rechnung`.
  */
 export function createAngebotHref(kundeId?: string | null): string {
   const kid = kundeId?.trim()
@@ -49,7 +48,7 @@ export function createAngebotHref(kundeId?: string | null): string {
 export function createRechnungHref(kundeId?: string | null): string {
   const kid = kundeId?.trim()
   return kid
-    ? `/neu?art=rechnung&kunde_id=${encodeURIComponent(kid)}`
+    ? `/rechnungen/neu?kunde_id=${encodeURIComponent(kid)}`
     : '/neu?art=rechnung'
 }
 

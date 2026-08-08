@@ -9,7 +9,7 @@ import type {
   AbschlussdokuHtmlInput,
   AbschlussdokuSummen,
 } from '@/lib/templates/abschlussdokumentation-template'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
@@ -76,9 +76,6 @@ export function formatLeistungszeitraumText(
   return `${a} – ${b}`
 }
 
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join('\n')
-}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean).join(' · ')

@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -174,7 +174,7 @@ export function FormularTemplateForm({
   )
   const [aktiv, setAktiv] = useState(initial?.aktiv ?? true)
   const [felder, setFelder] = useState<FormularFeld[]>(initial?.felder ?? [])
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [err, setErr] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [vorschauView, setVorschauView] = useState<'phone' | 'desktop'>('phone')

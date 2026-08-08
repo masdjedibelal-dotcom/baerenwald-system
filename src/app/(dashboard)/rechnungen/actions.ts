@@ -42,6 +42,8 @@ import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
 import {
   allocateRechnungsnummer,
   maybeUpgradeLegacyRechnungsnummer,
+  normalizeRechnungsnummerInput,
+  rechnungsnummerIstFrei,
 } from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
@@ -65,6 +67,8 @@ export type RechnungEntwurfPayload = {
   liste_berechnung?: RechnungBerechnung | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
+  /** Optional: manuell gewählte Nummer (sonst fortlaufend vergeben). */
+  rechnungsnummer?: string | null
 }
 
 async function validateVorSpeichern(
@@ -117,9 +121,17 @@ export async function createRechnungEntwurf(input: {
   )
   const berechnung = input.liste_berechnung ?? berechnungVoll
 
-  const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
-  if (!numRes.ok) return { ok: false, message: numRes.message }
-  const rechnungsnummer = numRes.nummer
+  let rechnungsnummer: string
+  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
+  if (manual) {
+    const frei = await rechnungsnummerIstFrei(supabase, manual)
+    if (!frei.ok) return frei
+    rechnungsnummer = manual
+  } else {
+    const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
+    if (!numRes.ok) return { ok: false, message: numRes.message }
+    rechnungsnummer = numRes.nummer
+  }
 
   const {
     data: { user },
@@ -193,6 +205,25 @@ export async function updateRechnungEntwurf(
   const rechnungsdatum =
     (input.rechnungsdatum && input.rechnungsdatum.trim()) || undefined
 
+  let rechnungsnummerPatch: { rechnungsnummer: string } | Record<string, never> = {}
+  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
+  if (manual) {
+    const { data: cur } = await supabase
+      .from('rechnungen')
+      .select('status, rechnungsnummer')
+      .eq('id', id)
+      .maybeSingle()
+    const st = String(cur?.status ?? '').toLowerCase()
+    if (st === 'entwurf') {
+      const current = String(cur?.rechnungsnummer ?? '').trim()
+      if (manual !== current) {
+        const frei = await rechnungsnummerIstFrei(supabase, manual, id)
+        if (!frei.ok) return frei
+        rechnungsnummerPatch = { rechnungsnummer: manual }
+      }
+    }
+  }
+
   const { error } = await rechnungUpdateMitSchemaFallback(
     supabase,
     id,
@@ -207,6 +238,7 @@ export async function updateRechnungEntwurf(
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
       hinweis_35a: input.hinweis_35a ?? null,
+      ...rechnungsnummerPatch,
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id

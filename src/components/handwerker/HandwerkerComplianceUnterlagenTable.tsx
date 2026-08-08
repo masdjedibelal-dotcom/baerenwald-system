@@ -7,25 +7,15 @@ import { Button } from '@/components/ui/Button'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
   complianceDokumentStatus,
+  complianceDokumentStatusLabel,
+  complianceDokumentStatusTone,
+  istEigeneUnterlageTyp,
   standardDokumente,
-  type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
-import { signPartnerDokumentUrl } from '@/app/(dashboard)/handwerker/actions'
-import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
-
-function statusMeta(status: ComplianceDokumentStatus): {
-  label: string
-  tone: 'ok' | 'warn' | 'bad'
-} {
-  if (status === 'ok') return { label: 'Gültig', tone: 'ok' }
-  if (status === 'warnung') return { label: 'Bald fällig', tone: 'warn' }
-  if (status === 'abgelaufen') return { label: 'Abgelaufen', tone: 'bad' }
-  return { label: 'Fehlt', tone: 'bad' }
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
@@ -61,15 +51,6 @@ export function HandwerkerComplianceUnterlagenTable({
     setSheetOpen(true)
   }
 
-  async function openDatei(stored: string | null | undefined) {
-    const r = await signPartnerDokumentUrl(stored)
-    if (!r.ok) {
-      toast.error(r.message)
-      return
-    }
-    window.open(r.url, '_blank', 'noopener,noreferrer')
-  }
-
   const editTyp =
     editDoc != null
       ? typen.find((t) => t.slug === editDoc.typ) ?? {
@@ -80,7 +61,7 @@ export function HandwerkerComplianceUnterlagenTable({
           pflicht_fuer_fachbetriebe: false,
           erneuerung_monate: null,
           sort_order: 9999,
-          mehrfach_erlaubt: editDoc.typ === 'individuell',
+          mehrfach_erlaubt: istEigeneUnterlageTyp(editDoc.typ),
         }
       : null
 
@@ -98,7 +79,10 @@ export function HandwerkerComplianceUnterlagenTable({
       },
       doc
     )
-    const status = statusMeta(st)
+    const status = {
+      label: complianceDokumentStatusLabel(st),
+      tone: complianceDokumentStatusTone(st),
+    }
     const title = doc.bezeichnung || typMeta?.bezeichnung || doc.typ
     const meta = [
       doc.hochgeladen_am ? `Hochgeladen ${formatDate(doc.hochgeladen_am)}` : null,
@@ -124,7 +108,7 @@ export function HandwerkerComplianceUnterlagenTable({
             Unterlagen
           </h2>
           <p className="mt-1 mb-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Hochgeladene Nachweise und Dokumente dieses Handwerkers.
+            Tippen zum Prüfen — Bestätigen oder Ablehnen. Partner sieht den Status im Portal.
           </p>
         </div>
         {uploadBtn}
@@ -155,7 +139,7 @@ export function HandwerkerComplianceUnterlagenTable({
                     className={cn(
                       'dok-card__tag',
                       status.tone === 'ok' && 'is-kunde',
-                      status.tone === 'warn' && 'is-warn',
+                      (status.tone === 'warn' || status.tone === 'neutral') && 'is-warn',
                       status.tone === 'bad' && 'is-bad'
                     )}
                   >
@@ -175,7 +159,7 @@ export function HandwerkerComplianceUnterlagenTable({
                 key={doc.id}
                 className="list-row dok-list__row--openable"
                 style={{
-                  gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+                  gridTemplateColumns: 'minmax(0, 1fr) auto',
                   cursor: 'pointer',
                   alignItems: 'center',
                 }}
@@ -199,35 +183,12 @@ export function HandwerkerComplianceUnterlagenTable({
                   className={cn(
                     'dok-card__tag',
                     status.tone === 'ok' && 'is-kunde',
-                    status.tone === 'warn' && 'is-warn',
+                    (status.tone === 'warn' || status.tone === 'neutral') && 'is-warn',
                     status.tone === 'bad' && 'is-bad'
                   )}
                 >
                   {status.label}
                 </span>
-                <div
-                  className="dok-list__actions inline-flex justify-end gap-0.5"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {doc.datei_url ? (
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      title="Ansehen"
-                      onClick={() => void openDatei(doc.datei_url)}
-                    >
-                      <MockIcon ctx="btn" n="eye" size={15} />
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    title="Bearbeiten"
-                    onClick={() => openEdit(doc)}
-                  >
-                    <MockIcon ctx="btn" n="pencil" size={15} />
-                  </button>
-                </div>
               </div>
             )
           })}

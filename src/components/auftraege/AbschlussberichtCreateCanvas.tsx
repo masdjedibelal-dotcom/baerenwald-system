@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -54,7 +54,7 @@ export function AbschlussberichtCreateCanvas({
   abschlussUrl,
 }: AbschlussberichtCreateCanvasProps) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   const subtitle = useMemo(
     () => [auftragsLabel, kundeName].filter(Boolean).join(' · '),

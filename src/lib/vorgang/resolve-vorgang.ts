@@ -1,3 +1,4 @@
+import { ANFRAGE_WARTE_AUF_HV_LABEL } from '@/lib/status/status-display'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
@@ -129,10 +130,17 @@ function funnelKategorie(funnelDaten: unknown): string | null {
   return typeof kat === 'string' ? kat : null
 }
 
+function funnelIstAkut(funnelDaten: unknown): boolean {
+  if (!funnelDaten || typeof funnelDaten !== 'object') return false
+  const fd = funnelDaten as { notfall?: unknown; havarie?: unknown }
+  return fd.notfall === true || fd.havarie === true
+}
+
 function isNotfall(input: ResolveVorgangInput): boolean {
   const lead = input.lead
   if ((lead.hv_meldung_status ?? '').trim() === 'notmassnahme') return true
   if (lead.situation === 'notfall') return true
+  if (funnelIstAkut(lead.funnel_daten)) return true
   return funnelKategorie(lead.funnel_daten) === 'notfall'
 }
 
@@ -332,7 +340,8 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const badges: ResolvedVorgangBadges = {}
   if (isNotfall(input)) badges.notfall = true
-  if ((lead.org_freigabe_status ?? '').trim() === 'ausstehend') {
+  const wartetFreigabe = (lead.org_freigabe_status ?? '').trim() === 'ausstehend'
+  if (wartetFreigabe) {
     badges.wartet_freigabe = true
   }
 
@@ -354,7 +363,10 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
   return {
     phase: pick.phase,
     unterstatus,
-    unterstatusLabel: unterstatusLabel(pick.phase, unterstatus),
+    // Status-Spalte: Freigabe sichtbar, Pipeline-Key (unterstatus) bleibt unverändert
+    unterstatusLabel: wartetFreigabe
+      ? ANFRAGE_WARTE_AUF_HV_LABEL
+      : unterstatusLabel(pick.phase, unterstatus),
     needsAction,
     actor,
     badges,

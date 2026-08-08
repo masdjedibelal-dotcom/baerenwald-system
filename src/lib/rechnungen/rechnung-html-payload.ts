@@ -16,6 +16,7 @@ import { resolveRechnungEinleitung } from '@/lib/rechnungen/rechnung-texte'
 import { angebotPdfBegruessung } from '@/lib/templates/angebot-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
   formatKundeEmpfaengerFuerDokument,
   kundeAnredeKontextFromEmpfaenger,
@@ -57,12 +58,6 @@ function formatLeistungszeitraum(von: string | null, bis: string | null): string
   if (a === '—' && b === '—') return '—'
   if (a === b) return a
   return `${a} – ${b}`
-}
-
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')]
-    .filter(Boolean)
-    .join('\n')
 }
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {

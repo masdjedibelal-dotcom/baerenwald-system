@@ -7,7 +7,6 @@ import { DocActionBar } from '@/components/surfaces/primitives'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
 import { finalizeRahmenVertrag } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
 import type { RahmenVertragWizardBootstrap } from '@/lib/vertraege/types'
@@ -30,27 +29,25 @@ export function RahmenvertragWizard({
   const hw = bootstrap.handwerker
 
   const handlePdfErzeugen = useCallback(async () => {
-    await actionBusy.run('PDF wird erzeugt…', async () => {
-      setSaving(true)
-      try {
-        const res = await finalizeRahmenVertrag({
-          vertrag_id: vertragId,
-          handwerker_id: bootstrap.handwerker_id,
-          notizen,
-        })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        setVertragId(res.vertrag_id)
-        setVertragsNr(res.vertrags_nr)
-        setPdfUrl(res.pdf_url)
-        toast.success('Rahmenvertrag als PDF erzeugt und hochgeladen')
-        onDone?.()
-      } finally {
-        setSaving(false)
+    setSaving(true)
+    try {
+      const res = await finalizeRahmenVertrag({
+        vertrag_id: vertragId,
+        handwerker_id: bootstrap.handwerker_id,
+        notizen,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
       }
-    })
+      setVertragId(res.vertrag_id)
+      setVertragsNr(res.vertrags_nr)
+      setPdfUrl(res.pdf_url)
+      toast.success('Rahmenvertrag als PDF erzeugt und hochgeladen')
+      onDone?.()
+    } finally {
+      setSaving(false)
+    }
   }, [vertragId, bootstrap.handwerker_id, notizen, onDone])
 
   const scrollTo = (id: string) => {

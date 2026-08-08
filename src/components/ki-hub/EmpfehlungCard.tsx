@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react'
 import { useState } from 'react'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { crmHref, KI_DEPTH_ANCHOR, parseAktionPayload } from '@/lib/ki-hub/deep-links'
 import type { KiEmpfehlungRow } from '@/lib/ki-hub/types'
 
@@ -34,6 +35,7 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
     betreff: string
     text_vorschau: string
   } | null>(null)
+  useOverlayChromeLock(mailOpen)
 
   const border = PRIO_STYLES[empfehlung.prioritaet] ?? PRIO_STYLES.mittel
   const contentText = empfehlung.content?.text?.trim()
@@ -231,7 +233,7 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
       </article>
 
       {mailOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="z-modal fixed inset-0 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl border border-bw-border bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-semibold text-bw-text">Mail-Vorschau</h3>

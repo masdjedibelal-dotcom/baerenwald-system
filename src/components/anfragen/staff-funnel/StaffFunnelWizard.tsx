@@ -66,14 +66,6 @@ function FunnelIcon({ name }: { name: string }) {
   )
 }
 
-function splitStrasseHausnummer(raw: string): { strasse: string; hausnummer: string } {
-  const m = raw.match(/^(.*?)(?:\s+(\d+\S*))?$/)
-  return {
-    strasse: (m?.[1] ?? raw).trim(),
-    hausnummer: (m?.[2] ?? '').trim(),
-  }
-}
-
 /** Kundenadresse — immer sichtbar im Kunde-Block. */
 function KundenAdresseFields({
   state,
@@ -84,19 +76,26 @@ function KundenAdresseFields({
 }) {
   return (
     <>
-      <MockField label="Straße" full className="min-w-0">
-        <input
-          className="input"
-          value={
-            state.hausnummer.trim()
-              ? `${state.strasse} ${state.hausnummer}`.trim()
-              : state.strasse
-          }
-          onChange={(e) => patch(splitStrasseHausnummer(e.target.value))}
-          placeholder="z.B. Lindenstr. 24"
-          autoComplete="street-address"
-        />
-      </MockField>
+      <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
+        <MockField label="Straße" className="min-w-0">
+          <input
+            className="input"
+            value={state.strasse}
+            onChange={(e) => patch({ strasse: e.target.value })}
+            placeholder="z.B. Lindenstraße"
+            autoComplete="address-line1"
+          />
+        </MockField>
+        <MockField label="Nr." className="min-w-0">
+          <input
+            className="input"
+            value={state.hausnummer}
+            onChange={(e) => patch({ hausnummer: e.target.value })}
+            placeholder="24"
+            autoComplete="address-line2"
+          />
+        </MockField>
+      </div>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="PLZ" className="min-w-0">
           <input
@@ -133,25 +132,36 @@ function MeldeadresseFields({
 }) {
   return (
     <>
-      <MockField label="Straße (Objekt / Leistung)" full className="min-w-0">
-        <input
-          className="input"
-          value={
-            state.objektHausnummer.trim()
-              ? `${state.objektStrasse} ${state.objektHausnummer}`.trim()
-              : state.objektStrasse
-          }
-          onChange={(e) => {
-            const s = splitStrasseHausnummer(e.target.value)
-            patch({
-              kundeObjektId: null,
-              objektStrasse: s.strasse,
-              objektHausnummer: s.hausnummer,
-            })
-          }}
-          placeholder="z.B. Baustellenstr. 12"
-        />
-      </MockField>
+      <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
+        <MockField label="Straße (Objekt / Leistung)" className="min-w-0">
+          <input
+            className="input"
+            value={state.objektStrasse}
+            onChange={(e) =>
+              patch({
+                kundeObjektId: null,
+                objektStrasse: e.target.value,
+              })
+            }
+            placeholder="z.B. Baustellenstraße"
+            autoComplete="address-line1"
+          />
+        </MockField>
+        <MockField label="Nr." className="min-w-0">
+          <input
+            className="input"
+            value={state.objektHausnummer}
+            onChange={(e) =>
+              patch({
+                kundeObjektId: null,
+                objektHausnummer: e.target.value,
+              })
+            }
+            placeholder="12"
+            autoComplete="address-line2"
+          />
+        </MockField>
+      </div>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="PLZ (Objekt)" className="min-w-0">
           <input
@@ -790,7 +800,6 @@ export function StaffFunnelWizard({
                   {dyn.beratung ? (
                     <SheetEditableField
                       label="Beratung / Hinweis"
-                      hint="Kurz was im Gespräch geklärt werden soll"
                       value={state.beratungText}
                       onSave={(beratungText) => patch({ beratungText })}
                       multiline
@@ -814,7 +823,6 @@ export function StaffFunnelWizard({
               />
               <SheetEditableField
                 label="Beschreibung"
-                hint="Wortlaut des Kunden"
                 value={state.freitext}
                 onSave={(freitext) => patch({ freitext })}
                 multiline

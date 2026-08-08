@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
+import { hideRouteBusy, showRouteBusy } from '@/components/ui/action-busy'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
@@ -86,13 +86,13 @@ export function VorgangPhasenVerlauf({
 }) {
   void _onSaved
   const router = useRouter()
+  const pathname = usePathname() ?? ''
   const isMobile = useIsMobile()
   const [readKind, setReadKind] = useState<PhaseKind | null>(null)
   const [showEarlier, setShowEarlier] = useState(false)
   const [navBusy, setNavBusy] = useState(false)
   const stripRef = useRef<HTMLDivElement>(null)
   const currentCardRef = useRef<HTMLDivElement>(null)
-  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const withFrom = (pathname: string, extra?: Record<string, string>) => {
     if (fromRef) return hrefWithAkteFrom(pathname, fromRef, extra)
@@ -148,31 +148,34 @@ export function VorgangPhasenVerlauf({
       toast.error(`${label} ist noch nicht verfügbar.`)
       return
     }
+    // Sheet ohne History-Back schließen, sonst frisst history.back() die Navigation
+    setReadKind(null)
+
+    const targetPath = target.split('?')[0] || target
+    const alreadyOnTarget =
+      pathname === targetPath ||
+      pathname === target ||
+      (targetPath.length > 1 && pathname.startsWith(`${targetPath}/`))
+    if (alreadyOnTarget) {
+      return
+    }
+
     setNavBusy(true)
-    actionBusy.show('Phase wird geladen…')
-    if (navTimerRef.current) clearTimeout(navTimerRef.current)
-    navTimerRef.current = setTimeout(() => {
-      setNavBusy(false)
-      actionBusy.hide()
-      toast.error('Laden dauert zu lange — bitte erneut versuchen.')
-    }, 10000)
+    showRouteBusy('Phase wird geladen…')
     try {
-      // Sheet ohne History-Back schließen, sonst frisst history.back() die Navigation
-      setReadKind(null)
       router.push(target)
     } catch (e) {
       setNavBusy(false)
-      actionBusy.hide()
-      if (navTimerRef.current) clearTimeout(navTimerRef.current)
+      hideRouteBusy()
       toast.error(e instanceof Error ? e.message : 'Navigation fehlgeschlagen.')
     }
   }
 
+  /* Overlay/Button-Busy zurücksetzen, sobald die Route gewechselt hat */
   useEffect(() => {
-    return () => {
-      if (navTimerRef.current) clearTimeout(navTimerRef.current)
-    }
-  }, [])
+    if (!navBusy) return
+    setNavBusy(false)
+  }, [pathname])
 
   function onZurPhase() {
     navigateFromPhaseSheet(active?.href, active?.label ?? 'Phase')

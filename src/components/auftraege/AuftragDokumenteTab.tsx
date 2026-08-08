@@ -1,5 +1,5 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -58,7 +58,7 @@ export function AuftragDokumenteTab({
   vertraege?: HandwerkerVertragRow[]
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [editRow, setEditRow] = useState<AuftragDokumentZeile | null>(null)

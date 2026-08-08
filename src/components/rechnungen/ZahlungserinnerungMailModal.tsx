@@ -11,7 +11,6 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { toast } from '@/components/ui/app-toast'
-import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { cn, formatDatum } from '@/lib/utils'
 import {
   previewZahlungserinnerungMail,
@@ -240,7 +239,6 @@ export function ZahlungserinnerungMailModal({
               setMail((prev) => (prev ? { ...prev, cc: emails } : prev))
             }}
             placeholder="weitere@beispiel.de"
-            hint={KUNDE_MAIL_BCC_HINT}
           />
           <p className="inline-flex items-center gap-1.5 text-[length:var(--fs-meta)] text-bw-text-muted">
             <Paperclip className="h-3.5 w-3.5 shrink-0" aria-hidden />

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +33,7 @@ export function ActionSheet({
   })
 
   useEffect(() => setMounted(true), [])
+  useOverlayChromeLock(open && mounted)
 
   if (!open || !mounted) return null
 

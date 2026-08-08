@@ -76,10 +76,11 @@ import {
   auftragSummenAusPositionen,
   berechneZahlungsplan,
   hatAktivenAbschlagsplan,
-  naechsteAbschlagZumVersenden,
+  naechsteAuftragRechnungAktion,
   parseZahlungsplan,
   zahlplanAbgerechnetAusLinks,
 } from '@/lib/rechnungen/zahlungsplan'
+import { sendRechnung, updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -874,40 +875,36 @@ export function AuftragDetailClient({
     )
   }, [detail.angebote])
 
-  /** Nächste Abschlags-Rate zum Versenden (Entwurf bevorzugt). */
-  const naechsterAbschlagVersand = useMemo(() => {
-    if (!hatAktivenAbschlagsplan(zahlungsplanParsed) || !zahlungsplanParsed) return null
-    const links = rechnungenListe.map((r) => ({
-      id: r.id,
-      status: String(r.status),
-      zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
-      rechnung_art: r.rechnung_art ?? null,
-      brutto: r.brutto,
-      beleg_typ: r.beleg_typ ?? null,
-    }))
-    const kontext = berechneZahlungsplan(
+  const rechnungLinks = useMemo(
+    () =>
+      rechnungenListe.map((r) => ({
+        id: r.id,
+        status: String(r.status),
+        zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
+        rechnung_art: r.rechnung_art ?? null,
+        brutto: r.brutto,
+        beleg_typ: r.beleg_typ ?? null,
+      })),
+    [rechnungenListe]
+  )
+
+  const hatAbschlagsplan = hatAktivenAbschlagsplan(zahlungsplanParsed)
+
+  const abrechnungKontext = useMemo(() => {
+    if (!hatAbschlagsplan || !zahlungsplanParsed) return null
+    return berechneZahlungsplan(
       zahlungsplanParsed,
       auftragNettoSumme,
       19,
-      zahlplanAbgerechnetAusLinks(links)
+      zahlplanAbgerechnetAusLinks(rechnungLinks)
     )
-    return naechsteAbschlagZumVersenden(kontext, links)
-  }, [zahlungsplanParsed, rechnungenListe, auftragNettoSumme])
+  }, [hatAbschlagsplan, zahlungsplanParsed, auftragNettoSumme, rechnungLinks])
 
-  /** Offener RE-Entwurf → Primary „Senden/Bearbeiten“ statt erneut „Erstellen“. */
-  const offenerRechnungEntwurfId = useMemo(() => {
-    if (naechsterAbschlagVersand?.rechnungId) return naechsterAbschlagVersand.rechnungId
-    const draft = rechnungenListe.find((r) => {
-      if (String(r.status) !== 'entwurf') return false
-      if (String(r.beleg_typ ?? '') === 'gutschrift') return false
-      return true
-    })
-    return draft?.id ?? null
-  }, [rechnungenListe, naechsterAbschlagVersand])
-
-  const hatAbschlagZumSenden = Boolean(
-    naechsterAbschlagVersand && !zahlungOffen && detail.status === 'abgeschlossen'
-  )
+  /** Nächste RE-Aktion am Auftrag (Versenden → Bezahlt → Erstellen). */
+  const naechsteRechnungAktion = useMemo(() => {
+    if (detail.status !== 'abgeschlossen') return undefined
+    return naechsteAuftragRechnungAktion(abrechnungKontext, rechnungLinks, hatAbschlagsplan)
+  }, [detail.status, abrechnungKontext, rechnungLinks, hatAbschlagsplan])
 
   const openRechnungBearbeiten = useCallback(
     (rechnungId: string) => {
@@ -924,6 +921,42 @@ export function AuftragDetailClient({
       })
     },
     [detail.id, openRechnungWizard]
+  )
+
+  const versendeNaechsteRechnung = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const r = await sendRechnung(rechnungId)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success('Rechnung gesendet')
+        refresh()
+      })
+    },
+    [refresh]
+  )
+
+  const markiereNaechsteRechnungBezahlt = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const r = await updateRechnungStatus(rechnungId, 'bezahlt', {
+          notifyKunde: Boolean(kundeEmail),
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(
+          r.zahlungsbestaetigungGesendet
+            ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
+            : 'Als bezahlt markiert'
+        )
+        refresh()
+      })
+    },
+    [kundeEmail, refresh]
   )
 
   useEffect(() => {
@@ -1104,33 +1137,56 @@ export function AuftragDetailClient({
               if (istStorniert) return null
               const cta = primaryCta('auftrag', detail.status, {
                 abnahmeFaellig: detail.status === 'abnahme',
-                rechnungBezahlt: !zahlungOffen && detail.status === 'abgeschlossen',
-                naechsterAbschlagSenden: hatAbschlagZumSenden,
+                rechnungBezahlt:
+                  detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
+                naechsterAbschlagSenden: Boolean(
+                  hatAbschlagsplan && naechsteRechnungAktion?.art === 'erstellen'
+                ),
+                naechsteRechnungAktion:
+                  detail.status === 'abgeschlossen'
+                    ? naechsteRechnungAktion === null
+                      ? null
+                      : naechsteRechnungAktion?.art
+                    : undefined,
               })
               if (!cta) return null
-              if (cta.id === 'rechnung_erstellen' && offenerRechnungEntwurfId) {
-                return {
-                  label: hatAbschlagZumSenden
-                    ? 'Nächsten Abschlag senden'
-                    : 'Rechnung bearbeiten',
-                  icon: hatAbschlagZumSenden ? 'send' : 'pencil',
-                  onClick: () => openRechnungBearbeiten(offenerRechnungEntwurfId),
-                }
-              }
               const onClick = () => {
                 if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
                   openAuftragAbschliessen()
                   return
                 }
+                if (cta.id === 'rechnung_versenden') {
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    versendeNaechsteRechnung(naechsteRechnungAktion.rechnungId)
+                    return
+                  }
+                  openRechnungErstellen({ naechsterAbschlag: hatAbschlagsplan })
+                  return
+                }
+                if (cta.id === 'als_bezahlt') {
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    markiereNaechsteRechnungBezahlt(naechsteRechnungAktion.rechnungId)
+                  }
+                  return
+                }
                 if (cta.id === 'rechnung_erstellen') {
-                  openRechnungErstellen({ naechsterAbschlag: true })
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    openRechnungBearbeiten(naechsteRechnungAktion.rechnungId)
+                    return
+                  }
+                  openRechnungErstellen({ naechsterAbschlag: hatAbschlagsplan })
                   return
                 }
                 if (cta.id === 'bewertung_einholen') {
                   setBewertungOpen(true)
                 }
               }
-              return { label: cta.label, icon: cta.icon, onClick }
+              return {
+                label: cta.label,
+                icon: cta.icon,
+                onClick,
+                disabled: pending,
+              }
             })()}
             secondary={
               !istStorniert && detail.angebot_id

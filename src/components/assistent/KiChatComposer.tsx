@@ -17,7 +17,7 @@ const LINE_PX = 22
 /** Max. Zeichen für Tippen und Sprachergebnis. */
 const MAX_CHARS = 500
 /** Max. Aufnahmedauer Sprachnotiz. */
-const VOICE_MAX_SEC = 30
+const VOICE_MAX_SEC = 60
 
 function clampText(s: string) {
   return s.length <= MAX_CHARS ? s : s.slice(0, MAX_CHARS)
@@ -131,7 +131,7 @@ export function KiChatComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.listening, speech.error, voicePhase])
 
-  // 30-Sekunden-Limit Sprachnotiz
+  // 60-Sekunden-Limit Sprachnotiz
   useEffect(() => {
     if (voicePhase !== 'listening') return
     setVoiceLeft(VOICE_MAX_SEC)

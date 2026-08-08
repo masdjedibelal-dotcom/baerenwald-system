@@ -136,12 +136,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         </p>
 
         <MockFormSection title="Organisation" icon="building">
-          <MockField
-            label="Org-Kennung (URL-Slug)"
-            required
-            hint="Wird in Melde-Links verwendet: /melden/{org_kennung}"
-            full
-          >
+          <MockField label="Org-Kennung (URL-Slug)" required full>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 className="txt"
@@ -167,7 +162,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             />
           </MockField>
 
-          <MockField label="Logo" full hint="Wird im Auftraggeber-Portal und auf Melde-Seiten gezeigt.">
+          <MockField label="Logo" full>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div
                 style={{

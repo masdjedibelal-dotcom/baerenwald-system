@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +37,7 @@ export function ConfirmPopup({
   onCloseRef.current = onClose
 
   useEffect(() => setMounted(true), [])
+  useOverlayChromeLock(open && mounted)
 
   useEffect(() => {
     if (!open || !mounted) return
