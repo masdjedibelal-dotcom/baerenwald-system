@@ -39,15 +39,22 @@ export function buildDashboardKpiSnapshot(input: {
 
   const months = input.umsatzMonate ?? []
   const umsatzTotal = months.reduce(
-    (s, m) => s + (Number(m?.offen) || 0) + (Number(m?.abgeschlossen) || 0),
+    (s, m) =>
+      s +
+      (Number(m?.offen) || 0) +
+      (Number(m?.abgeschlossen) || 0) +
+      (Number(m?.rechnungen) || 0),
     0
   )
-  lines.push('', '## Umsatzverlauf (letzte 6 Monate, Auftragssummen netto)')
+  lines.push('', '## Umsatzverlauf (letzte 6 Monate)')
   lines.push(`- Summe gesamt: ${formatEurBetrag(umsatzTotal)}`)
   for (const m of months) {
     const offen = Number(m?.offen) || 0
     const done = Number(m?.abgeschlossen) || 0
-    lines.push(`- ${m.label}: ${formatEurBetrag(offen + done)} (offen ${formatEurBetrag(offen)}, abgeschlossen ${formatEurBetrag(done)})`)
+    const re = Number(m?.rechnungen) || 0
+    lines.push(
+      `- ${m.label}: ${formatEurBetrag(offen + done + re)} (aktiv ${formatEurBetrag(offen)}, erledigt ${formatEurBetrag(done)}, Rechnungen ${formatEurBetrag(re)})`
+    )
   }
 
   lines.push('', '## Vertriebs-Funnel')

@@ -9,15 +9,54 @@ type ScrollChrome = {
   hideChrome: boolean
 }
 
-/** App-Shell scrollt in `main.page`, nicht auf `window`. */
-function resolvePageScroller(): HTMLElement | null {
-  if (typeof document === 'undefined') return null
-  return document.querySelector<HTMLElement>('main.page')
+type ScrollSource = {
+  getY: () => number
+  target: EventTarget
+}
+
+/**
+ * Mobil: Dokument-Scroll (window) oder Innen-Scroll in `main.page`.
+ * Früher immer `page.scrollTop` → bei overflow:visible immer 0 → Hybrid Nav/CTA kaputt.
+ */
+function resolveScrollSource(): ScrollSource {
+  if (typeof document === 'undefined') {
+    return { getY: () => 0, target: window }
+  }
+  const page = document.querySelector<HTMLElement>('main.page')
+  if (page) {
+    const style = window.getComputedStyle(page)
+    const oy = style.overflowY
+    const scrollsInside =
+      (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+      page.scrollHeight > page.clientHeight + 1
+    if (scrollsInside) {
+      return { getY: () => page.scrollTop, target: page }
+    }
+  }
+  return {
+    getY: () =>
+      window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0,
+    target: window,
+  }
+}
+
+function chromeFrozen(): boolean {
+  if (typeof document === 'undefined') return false
+  const b = document.body
+  return (
+    b.classList.contains('has-blocking-overlay') ||
+    b.classList.contains('has-body-scroll-lock') ||
+    b.classList.contains('has-document-canvas')
+  )
 }
 
 /**
  * Mobil-Chrome: scrolled ab ~36px (Detail Hybrid: Nav ↔ CTA).
  * hideChrome = Scroll-Richtung (Legacy).
+ * Während Overlay/Scroll-Lock: Zustand einfrieren (body position:fixed → scrollY=0).
  */
 export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
   const [scrolled, setScrolled] = useState(false)
@@ -32,13 +71,13 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
       return
     }
 
-    const page = resolvePageScroller()
-    const getY = () => (page ? page.scrollTop : window.scrollY || 0)
-
+    const { getY, target } = resolveScrollSource()
     lastY.current = getY()
 
     const update = () => {
       ticking.current = false
+      if (chromeFrozen()) return
+
       const y = getY()
       const prev = lastY.current
       const delta = y - prev
@@ -63,9 +102,13 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
     }
 
     update()
-    const target: EventTarget = page ?? window
     target.addEventListener('scroll', onScroll, { passive: true })
-    return () => target.removeEventListener('scroll', onScroll)
+    // Nach Overlay-Close: Lock restored scroll — einmal nachziehen
+    window.addEventListener('bw:scroll-chrome-sync', onScroll)
+    return () => {
+      target.removeEventListener('scroll', onScroll)
+      window.removeEventListener('bw:scroll-chrome-sync', onScroll)
+    }
   }, [enabled])
 
   return { scrolled, hideChrome }

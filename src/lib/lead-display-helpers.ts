@@ -1,7 +1,7 @@
 import type { Kunde, LeadKanal } from '@/lib/types'
 import { kundeDisplayName, type KundeListenNamePick } from '@/lib/kunde-stammdaten'
 import { funnelPositionenGesamt, parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
-import { formatAnfragePreisAnzeige, formatWebsiteLeadPreis } from '@/lib/utils'
+import { formatAnfragePreisAnzeige, formatWebsiteLeadPreis, isCrmStaffFunnel } from '@/lib/utils'
 
 /** Lesbare Labels & Freitext-Erkennung für Lead-/Funnel-Anzeige. */
 
@@ -229,6 +229,9 @@ export function resolveLeadPreisAnzeige(
     const ausPositionen = formatWebsiteLeadPreis(null, gesamtMin || null, gesamtMax || null, funnel)
     if (ausPositionen !== '—') return ausPositionen
   }
+
+  // Selbst erstellt: kein Preishinweis als Preis-Ersatz
+  if (isCrmStaffFunnel(funnel)) return '—'
 
   const erk = fd.gpt_erklaerung
   if (erk && typeof erk === 'object') {

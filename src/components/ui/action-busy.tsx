@@ -14,6 +14,7 @@ import {
 import { createPortal } from 'react-dom'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
+import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 
 type BusyState = { depth: number; label: string }
 
@@ -40,6 +41,7 @@ function emit() {
 }
 
 function showBusy(label?: string) {
+  if (state.depth === 0) dismissSoftKeyboard()
   const nextLabel = (label ?? '').trim()
   state = {
     depth: state.depth + 1,

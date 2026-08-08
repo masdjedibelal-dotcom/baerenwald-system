@@ -469,6 +469,7 @@ export function StaffFunnelWizard({
 
   function selectAnliegen(id: StaffAnliegenId) {
     const sit = anliegenToSituation(id) as SituationValue
+    const istReparatur = id === 'kaputt'
     patch({
       anliegen: id,
       situation: sit,
@@ -478,6 +479,9 @@ export function StaffFunnelWizard({
       groessenEinheiten: {},
       kundentyp: id === 'gewerbe' ? 'gewerbe' : state.kundentyp === 'gewerbe' ? '' : state.kundentyp,
       preisModus: id === 'gewerbe' ? 'komplex' : 'rahmen',
+      zeitraum: istReparatur ? '' : state.zeitraum,
+      dringlichkeit: istReparatur ? state.dringlichkeit : '',
+      alsAkut: istReparatur ? state.alsAkut : false,
     })
   }
 
@@ -786,15 +790,43 @@ export function StaffFunnelWizard({
                       })
                     : null}
 
-                  {dyn.dringlichkeit ? (
-                    <MockField label="Dringlichkeit" full>
-                      <StaffChoiceGrid
-                        columns={2}
-                        options={DRINGLICHKEIT_OPTIONS}
-                        value={state.dringlichkeit}
-                        onChange={(v) => patch({ dringlichkeit: v })}
-                      />
+                  {dyn.umsetzungsZeitraum ? (
+                    <MockField label="Umsetzung in welchem Zeitraum?" full>
+                      <select
+                        className="input"
+                        value={state.zeitraum}
+                        onChange={(e) => patch({ zeitraum: e.target.value })}
+                        aria-label="Umsetzung in welchem Zeitraum"
+                      >
+                        <option value="">Bitte wählen</option>
+                        {ZEITRAUM_ERNEUERN_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
                     </MockField>
+                  ) : null}
+
+                  {dyn.dringlichkeit ? (
+                    <>
+                      <MockField label="Dringlichkeit" full>
+                        <StaffChoiceGrid
+                          columns={2}
+                          options={DRINGLICHKEIT_OPTIONS}
+                          value={state.dringlichkeit}
+                          onChange={(v) => patch({ dringlichkeit: v })}
+                        />
+                      </MockField>
+                      <div className="full">
+                        <Toggle
+                          label="Akut / Notfall"
+                          hint="Direkt beauftragen ohne Angebot — wie eingehende Akut-Meldungen"
+                          checked={state.alsAkut}
+                          onChange={(on) => patch({ alsAkut: on })}
+                        />
+                      </div>
+                    </>
                   ) : null}
 
                   {dyn.beratung ? (
@@ -962,29 +994,14 @@ export function StaffFunnelWizard({
         </section>
 
         <section className="sf-sec">
-          <Card title="Anfragedaten" collapsible defaultOpen>
+          <Card title="Herkunft Anfrage" collapsible defaultOpen>
             <MockFormSection>
-            <MockField label="Zeitraum" full>
-              <select
-                className="input"
-                value={state.zeitraum}
-                onChange={(e) => patch({ zeitraum: e.target.value })}
-                aria-label="Zeitraum"
-              >
-                <option value="">Bitte wählen</option>
-                {ZEITRAUM_ERNEUERN_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </MockField>
             <MockField label="Herkunft" full>
               <select
                 className="input"
                 value={state.kanal}
                 onChange={(e) => patch({ kanal: e.target.value as LeadKanal })}
-                aria-label="Herkunft"
+                aria-label="Herkunft Anfrage"
               >
                 {STAFF_KANAL.map((k) => (
                   <option key={k} value={k}>

@@ -21,7 +21,14 @@ import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
-import { BEREICH_LABELS, formatDatum, formatDatumZeit, kanalLabel } from '@/lib/utils'
+import {
+  BEREICH_LABELS,
+  anfragePreisDetailLabel,
+  formatDatum,
+  formatDatumZeit,
+  isCrmStaffFunnel,
+  kanalLabel,
+} from '@/lib/utils'
 
 export type FunnelBedarfLeadPick = {
   situation?: string | null
@@ -91,27 +98,32 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
   )
   const extraRows: ProjektUebersichtExtraRow[] = []
 
-  const anfrageTyp =
-    anfrageTypAnzeige(norm, {
-      situation: lead.situation,
-      bereiche: lead.bereiche ?? undefined,
-      kanal: lead.kanal ?? undefined,
-    }) || (norm.preis_modus === 'komplex' ? 'Individuell / Komplex' : null)
-  if (anfrageTyp) extraRows.push({ label: 'Anfrageart', children: anfrageTyp })
+  const staffSelbst = isCrmStaffFunnel(lead.funnel_daten)
 
-  const sitLabel = (norm.labels.situation || leadSituationDisplay(lead.situation) || '').trim()
-  if (sitLabel && sitLabel !== '—') {
-    extraRows.push({ label: 'Situation', children: sitLabel })
-  }
+  // Selbst erstellt: Anfrageart/Situation/Bereiche stecken schon im Vorhaben
+  if (!staffSelbst) {
+    const anfrageTyp =
+      anfrageTypAnzeige(norm, {
+        situation: lead.situation,
+        bereiche: lead.bereiche ?? undefined,
+        kanal: lead.kanal ?? undefined,
+      }) || (norm.preis_modus === 'komplex' ? 'Individuell / Komplex' : null)
+    if (anfrageTyp) extraRows.push({ label: 'Anfrageart', children: anfrageTyp })
 
-  const bereicheAnzeige =
-    norm.labels.bereiche.length > 0
-      ? norm.labels.bereiche.join(', ')
-      : bereiche.length > 0
-        ? bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-        : ''
-  if (bereicheAnzeige) {
-    extraRows.push({ label: 'Bereiche', children: bereicheAnzeige })
+    const sitLabel = (norm.labels.situation || leadSituationDisplay(lead.situation) || '').trim()
+    if (sitLabel && sitLabel !== '—') {
+      extraRows.push({ label: 'Situation', children: sitLabel })
+    }
+
+    const bereicheAnzeige =
+      norm.labels.bereiche.length > 0
+        ? norm.labels.bereiche.join(', ')
+        : bereiche.length > 0
+          ? bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
+          : ''
+    if (bereicheAnzeige) {
+      extraRows.push({ label: 'Bereiche', children: bereicheAnzeige })
+    }
   }
 
   const groessenEntries = Object.entries(norm.groessen)
@@ -207,8 +219,10 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
   const ortZeile = [plz, ort].filter(Boolean).join(' ')
   if (ortZeile) extraRows.push({ label: 'Ort', children: ortZeile })
 
-  const preisHinweis = strFromFunnel(fdRaw, 'preis_hinweis', 'preisHinweis')
-  if (preisHinweis) extraRows.push({ label: 'Preis-Hinweis', children: preisHinweis })
+  if (!staffSelbst) {
+    const preisHinweis = strFromFunnel(fdRaw, 'preis_hinweis', 'preisHinweis')
+    if (preisHinweis) extraRows.push({ label: 'Preis-Hinweis', children: preisHinweis })
+  }
 
   const beratung = strFromFunnel(fdRaw, 'beratung_text', 'beratungText')
   if (beratung) extraRows.push({ label: 'Beratung', children: beratung })
@@ -328,13 +342,19 @@ export function buildAnfragePhaseSheetProps(lead: {
     }) === 'hv_meldung' ||
     Boolean(lead.auftraggeber || lead.auftraggeber_kunde_id || lead.melder_name?.trim())
 
+  const staffSelbst = isCrmStaffFunnel(lead.funnel_daten)
   const hatObjekt = Boolean(lead.kunden_objekte)
   /** Bei HV mit Objekt: keine doppelten Ort/Adresse/Melder-Spiegel aus Funnel/Dump */
   const skipLabels = new Set<string>(
-    isHv
+    staffSelbst
       ? [
           'Auftraggeber',
-          ...(hatObjekt ? ['Ort', 'Adresse'] : []),
+          'Anliegen',
+          'Anfrageart',
+          'Situation',
+          'Bereiche',
+          'Preis-Hinweis',
+          'Budget-Hinweis',
           'Kunde',
           'Telefon',
           'E-Mail',
@@ -342,8 +362,22 @@ export function buildAnfragePhaseSheetProps(lead: {
           'Melder-Kontakt',
           'Einheit',
           'Objekt',
+          'Ort',
+          'Adresse',
         ]
-      : ['Auftraggeber', 'Melder', 'Melder-Kontakt', 'Einheit', 'Objekt']
+      : isHv
+        ? [
+            'Auftraggeber',
+            ...(hatObjekt ? ['Ort', 'Adresse'] : []),
+            'Kunde',
+            'Telefon',
+            'E-Mail',
+            'Melder',
+            'Melder-Kontakt',
+            'Einheit',
+            'Objekt',
+          ]
+        : ['Auftraggeber', 'Melder', 'Melder-Kontakt', 'Einheit', 'Objekt']
   )
 
   const fd =
@@ -360,12 +394,25 @@ export function buildAnfragePhaseSheetProps(lead: {
   )
   push('Quelle', kanalLabel(lead.kanal ?? ''))
 
-  const anliegenId = typeof fd.anliegen === 'string' ? fd.anliegen.trim() : ''
-  const anliegenLabel =
-    STAFF_ANLIEGEN.find((a) => a.id === anliegenId)?.label ??
-    STAFF_ANLIEGEN_LABELS[anliegenId]
-  push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
-  push('Vorhaben', strFromFunnel(fd, 'vorhaben'))
+  const vorhaben = strFromFunnel(fd, 'vorhaben')
+  if (!staffSelbst) {
+    const anliegenId = typeof fd.anliegen === 'string' ? fd.anliegen.trim() : ''
+    const anliegenLabel =
+      STAFF_ANLIEGEN.find((a) => a.id === anliegenId)?.label ??
+      STAFF_ANLIEGEN_LABELS[anliegenId]
+    push('Anliegen', anliegenLabel || leadSituationDisplay(lead.situation) || null)
+  }
+  push('Vorhaben', vorhaben)
+  // Fallback: Vorhaben aus Situation · Bereiche (wie Anzeige-Titel)
+  if (!seen.has('Vorhaben')) {
+    const sit = leadSituationDisplay(lead.situation)
+    const ber = (lead.bereiche ?? [])
+      .map((b) => BEREICH_LABELS[b] ?? b)
+      .filter(Boolean)
+      .join(', ')
+    const parts = [sit, ber].filter(Boolean)
+    push('Vorhaben', parts.length ? parts.join(' · ') : null)
+  }
 
   const { extraRows } = buildFunnelBedarfExtraRows(lead)
   for (const row of extraRows) {
@@ -374,57 +421,67 @@ export function buildAnfragePhaseSheetProps(lead: {
     push(row.label, row.children)
   }
 
-  const dumpSources = [
-    lead.kontakt_nachricht,
-    typeof fd.formattedSummary === 'string' ? fd.formattedSummary : null,
-    typeof fd.technicalDetails === 'string' ? fd.technicalDetails : null,
-  ]
-  for (const src of dumpSources) {
-    for (const row of parseWebsiteAnfrageDump(src)) {
-      if (skipLabels.has(row.k)) continue
-      push(row.k, row.v)
+  if (!staffSelbst) {
+    const dumpSources = [
+      lead.kontakt_nachricht,
+      typeof fd.formattedSummary === 'string' ? fd.formattedSummary : null,
+      typeof fd.technicalDetails === 'string' ? fd.technicalDetails : null,
+    ]
+    for (const src of dumpSources) {
+      for (const row of parseWebsiteAnfrageDump(src)) {
+        if (skipLabels.has(row.k)) continue
+        push(row.k, row.v)
+      }
     }
   }
 
   const beschreibung = (lead.kontakt_nachricht ?? '').trim()
   if (isEchterFreitext(beschreibung)) {
-    const vorhaben = strFromFunnel(fd, 'vorhaben')
     const body =
       vorhaben && beschreibung.startsWith(vorhaben)
         ? beschreibung.slice(vorhaben.length).replace(/^\n+/, '').trim()
         : beschreibung
-    push('Beschreibung', body || beschreibung)
+    const text = (body || beschreibung).trim()
+    const sameAsVorhaben =
+      Boolean(vorhaben) &&
+      (text.toLowerCase() === vorhaben!.toLowerCase() ||
+        beschreibung.toLowerCase() === vorhaben!.toLowerCase())
+    if (text && !(staffSelbst && sameAsVorhaben)) {
+      push('Beschreibung', text)
+    }
   }
 
-  if (isHv) {
-    const agName =
-      lead.auftraggeber?.org_anzeigename?.trim() || lead.auftraggeber?.name?.trim() || null
-    push('Kunde', agName)
+  if (!staffSelbst) {
+    if (isHv) {
+      const agName =
+        lead.auftraggeber?.org_anzeigename?.trim() || lead.auftraggeber?.name?.trim() || null
+      push('Kunde', agName)
 
-    if (lead.kunden_objekte) {
-      push('Objekt', formatAnfragePhaseObjektZeile(lead.kunden_objekte))
-    }
+      if (lead.kunden_objekte) {
+        push('Objekt', formatAnfragePhaseObjektZeile(lead.kunden_objekte))
+      }
 
-    push('Einheit', lead.melder_einheit)
-    push('Melder', lead.melder_name)
-    push(
-      'Melder-Kontakt',
-      [lead.melder_telefon, lead.melder_email].filter(Boolean).join(' · ') || null
-    )
-  } else {
-    push('Kunde', lead.kontakt_name?.trim() || lead.kunden?.name?.trim() || null)
-    push('Telefon', lead.kontakt_telefon?.trim() || lead.kunden?.telefon?.trim() || null)
-    push('E-Mail', lead.kontakt_email?.trim() || lead.kunden?.email?.trim() || null)
+      push('Einheit', lead.melder_einheit)
+      push('Melder', lead.melder_name)
+      push(
+        'Melder-Kontakt',
+        [lead.melder_telefon, lead.melder_email].filter(Boolean).join(' · ') || null
+      )
+    } else {
+      push('Kunde', lead.kontakt_name?.trim() || lead.kunden?.name?.trim() || null)
+      push('Telefon', lead.kontakt_telefon?.trim() || lead.kunden?.telefon?.trim() || null)
+      push('E-Mail', lead.kontakt_email?.trim() || lead.kunden?.email?.trim() || null)
 
-    if (!seen.has('Adresse')) {
-      const strasse = [lead.kunden?.strasse, lead.kunden?.hausnummer].filter(Boolean).join(' ')
-      push('Adresse', strasse || null)
-    }
-    if (!seen.has('Ort')) {
-      const ortZeile = [lead.plz || lead.kunden?.plz, lead.kunden?.ort]
-        .filter(Boolean)
-        .join(' ')
-      push('Ort', ortZeile || null)
+      if (!seen.has('Adresse')) {
+        const strasse = [lead.kunden?.strasse, lead.kunden?.hausnummer].filter(Boolean).join(' ')
+        push('Adresse', strasse || null)
+      }
+      if (!seen.has('Ort')) {
+        const ortZeile = [lead.plz || lead.kunden?.plz, lead.kunden?.ort]
+          .filter(Boolean)
+          .join(' ')
+        push('Ort', ortZeile || null)
+      }
     }
   }
 
@@ -433,6 +490,9 @@ export function buildAnfragePhaseSheetProps(lead: {
     push('HV-Freigabe', ORG_FREIGABE_KURZ[freigabe] ?? freigabe)
   }
 
+  push('Interne Notiz', lead.notizen)
+
+  // Preiseinschätzung / Preisrahmen zuletzt
   const budget = resolveLeadPreisAnzeige(
     (lead.kanal ?? 'sonstiges') as import('@/lib/types').LeadKanal,
     lead.budget_ca,
@@ -440,10 +500,14 @@ export function buildAnfragePhaseSheetProps(lead: {
     lead.preis_max,
     lead.funnel_daten
   )
-  push('Budgetrahmen', budget === '—' ? null : budget)
-  push('Budget-Hinweis', strFromFunnel(fd, 'budget_hinweis', 'budgetHinweis'))
-
-  push('Interne Notiz', lead.notizen)
+  const preisLabel = anfragePreisDetailLabel(
+    (lead.kanal ?? 'sonstiges') as import('@/lib/types').LeadKanal,
+    lead.funnel_daten
+  )
+  push(preisLabel, budget === '—' ? null : budget)
+  if (!staffSelbst) {
+    push('Budget-Hinweis', strFromFunnel(fd, 'budget_hinweis', 'budgetHinweis'))
+  }
 
   return out
 }

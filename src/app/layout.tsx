@@ -25,7 +25,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   viewportFit: 'cover',
   /** Mobiler Seitenhintergrund — Statusleiste/Safe-Area ohne dunklen Bruch */
-  themeColor: '#f1f2f1',
+  themeColor: '#eef1ee',
 }
 
 export default function RootLayout({

@@ -13,6 +13,7 @@ import {
   CRM_LOGIN_INVALID_MESSAGE,
   CRM_LOGIN_PORTAL_ONLY_MESSAGE,
 } from '@/lib/auth/crm-access'
+import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { cn } from '@/lib/utils'
 
 const BENEFITS: { icon: string; text: string }[] = [
@@ -73,6 +74,7 @@ function LoginPageContent() {
   }, [router, supabase, urlError])
 
   async function handleLogin() {
+    dismissSoftKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -103,6 +105,7 @@ function LoginPageContent() {
   }
 
   async function handleForgot() {
+    dismissSoftKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)

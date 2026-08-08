@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Check, Trash2, X } from 'lucide-react'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
+import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
@@ -92,6 +93,12 @@ export function DocumentCanvas({
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  /* Speichern/Laden: Soft-Keyboard zu — sonst bleibt Fokus im Feld unter dem Overlay */
+  useEffect(() => {
+    if (!open) return
+    if (busy || saveBusy) dismissSoftKeyboard()
+  }, [open, busy, saveBusy])
 
   const handleClose = useCallback(() => {
     onClose()

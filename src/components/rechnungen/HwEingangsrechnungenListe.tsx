@@ -1,15 +1,13 @@
 'use client'
 
 import { useLocalTransition } from '@/components/ui/action-busy'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   MockBadge,
   MockBtn,
-  MockChip,
   MockEmpty,
-  MockIcon,
   MockPager,
 } from '@/components/mock-ui'
 import { useListPage } from '@/hooks/useListPage'
@@ -22,12 +20,11 @@ import {
   setHwEingangsrechnungStatus,
 } from '@/app/(dashboard)/rechnungen/hw-eingang-actions'
 import {
-  hwRechnungIstErledigt,
   hwRechnungStatusLabel,
   type HwEingangsrechnungListeRow,
   type HwRechnungStatus,
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
-import { cn, formatDatum } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 
 function statusKind(status: HwRechnungStatus): 'done' | 'offer' | 'cancel' | 'order' {
   if (status === 'bezahlt') return 'done'
@@ -46,63 +43,24 @@ function formatIban(iban: string | null): string {
   return clean.replace(/(.{4})/g, '$1 ').trim()
 }
 
+/** Liste ohne eigene Filter-UI — Filter kommt vom globalen Vorgänge-Filter. */
 export function HwEingangsrechnungenListe({
   rows,
-  lifecycle,
+  filterKey = '',
 }: {
   rows: HwEingangsrechnungListeRow[]
-  lifecycle: 'offen' | 'erledigt'
+  /** Pagination zurücksetzen wenn Eltern-Filter wechseln */
+  filterKey?: string
 }) {
   const router = useRouter()
   const [pending, startTransition] = useLocalTransition()
-  const [statusFilter, setStatusFilter] = useState<HwRechnungStatus | 'alle'>('alle')
-  const [query, setQuery] = useState('')
   const [active, setActive] = useState<HwEingangsrechnungListeRow | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
 
-  const lifecycleRows = useMemo(
-    () =>
-      rows.filter((r) =>
-        lifecycle === 'erledigt' ? hwRechnungIstErledigt(r.status) : !hwRechnungIstErledigt(r.status)
-      ),
-    [rows, lifecycle]
-  )
-
-  const statusCounts = useMemo(() => {
-    const c: Record<HwRechnungStatus | 'alle', number> = {
-      alle: lifecycleRows.length,
-      eingereicht: 0,
-      bezahlt: 0,
-      abgelehnt: 0,
-    }
-    for (const r of lifecycleRows) c[r.status] += 1
-    return c
-  }, [lifecycleRows])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return lifecycleRows.filter((r) => {
-      if (statusFilter !== 'alle' && r.status !== statusFilter) return false
-      if (!q) return true
-      const hay = [
-        r.handwerkerName,
-        r.kundeName,
-        r.auftragTitel,
-        r.gewerkName,
-        r.angebotsnr,
-        r.iban,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return hay.includes(q)
-    })
-  }, [lifecycleRows, statusFilter, query])
-
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
-    filtered,
+    rows,
     40,
-    `${lifecycle}|${statusFilter}|${query}`
+    filterKey
   )
 
   function runStatus(id: string, status: HwRechnungStatus) {
@@ -119,7 +77,11 @@ export function HwEingangsrechnungenListe({
             ? 'Als abgelehnt markiert'
             : 'Wieder auf offen gesetzt'
       )
-      setActive((prev) => (prev && prev.zuweisungId === id ? { ...prev, status, bezahltAt: status === 'bezahlt' ? new Date().toISOString() : null } : prev))
+      setActive((prev) =>
+        prev && prev.zuweisungId === id
+          ? { ...prev, status, bezahltAt: status === 'bezahlt' ? new Date().toISOString() : null }
+          : prev
+      )
       router.refresh()
     })
   }
@@ -153,44 +115,6 @@ export function HwEingangsrechnungenListe({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <MockChip
-          active={statusFilter === 'alle'}
-          count={statusCounts.alle}
-          onClick={() => setStatusFilter('alle')}
-        >
-          Alle
-        </MockChip>
-        <MockChip
-          active={statusFilter === 'eingereicht'}
-          count={statusCounts.eingereicht}
-          onClick={() => setStatusFilter('eingereicht')}
-        >
-          Offen
-        </MockChip>
-        <MockChip
-          active={statusFilter === 'bezahlt'}
-          count={statusCounts.bezahlt}
-          onClick={() => setStatusFilter('bezahlt')}
-        >
-          Bezahlt
-        </MockChip>
-        <MockChip
-          active={statusFilter === 'abgelehnt'}
-          count={statusCounts.abgelehnt}
-          onClick={() => setStatusFilter('abgelehnt')}
-        >
-          Abgelehnt
-        </MockChip>
-        <input
-          type="search"
-          className="ml-auto min-w-[180px] flex-1 rounded-md border border-bw-border bg-white px-3 py-1.5 text-[length:var(--fs-text)] sm:max-w-xs"
-          placeholder="Partner, Auftrag, IBAN …"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-
       <div
         className="listcard listcard--cols"
         style={{
@@ -212,8 +136,8 @@ export function HwEingangsrechnungenListe({
         {pageItems.length === 0 ? (
           <MockEmpty
             icon="receipt"
-            title={lifecycle === 'erledigt' ? 'Keine erledigten Eingangsrechnungen' : 'Keine offenen Eingangsrechnungen'}
-            hint="Partner laden Rechnungs-PDFs über das Portal — sie erscheinen hier nach Upload."
+            title="Keine Eingangsrechnungen"
+            hint="Filter zurücksetzen oder Partner-Upload abwarten."
           />
         ) : (
           pageItems.map((r) => (
@@ -235,7 +159,9 @@ export function HwEingangsrechnungenListe({
                   {r.handwerkerName}
                 </span>
                 {r.gewerkName ? (
-                  <span className="block text-[length:var(--fs-meta)] text-bw-text-muted">{r.gewerkName}</span>
+                  <span className="block text-[length:var(--fs-meta)] text-bw-text-muted">
+                    {r.gewerkName}
+                  </span>
                 ) : null}
               </div>
               <div className="vg-vorgang">
@@ -243,8 +169,9 @@ export function HwEingangsrechnungenListe({
                   {r.auftragTitel || 'Handwerker · Rechnung'}
                 </div>
                 <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-                  {[r.kundeName, r.angebotsnr ? `Angebot ${r.angebotsnr}` : null].filter(Boolean).join(' · ') ||
-                    '—'}
+                  {[r.kundeName, r.angebotsnr ? `Angebot ${r.angebotsnr}` : null]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
                 </span>
               </div>
               <div className="vg-wert text-right font-medium">{formatEur(r.betragBrutto)}</div>
@@ -288,142 +215,116 @@ export function HwEingangsrechnungenListe({
         size="md"
       >
         {active ? (
-          <div className="space-y-4 p-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <MockBadge kind={statusKind(active.status)}>{hwRechnungStatusLabel(active.status)}</MockBadge>
-              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-                Eingereicht {active.eingereichtAt ? formatDatum(active.eingereichtAt) : '—'}
-              </span>
-            </div>
-
-            <dl className="grid gap-3 text-[length:var(--fs-text)] sm:grid-cols-2">
+          <div className="space-y-4 text-[length:var(--fs-text)]">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <dt className="text-bw-text-muted">Partner</dt>
-                <dd className="font-medium">
-                  <Link href={`/handwerker/${active.handwerkerId}`} className="text-bw-primary hover:underline">
-                    {active.handwerkerName}
-                  </Link>
-                </dd>
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Partner</div>
+                <div className="font-medium">{active.handwerkerName}</div>
+                {active.gewerkName ? (
+                  <div className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                    {active.gewerkName}
+                  </div>
+                ) : null}
               </div>
               <div>
-                <dt className="text-bw-text-muted">Betrag brutto</dt>
-                <dd className="font-medium">{formatEur(active.betragBrutto)}</dd>
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Status</div>
+                <MockBadge kind={statusKind(active.status)}>
+                  {hwRechnungStatusLabel(active.status)}
+                </MockBadge>
+              </div>
+              <div>
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Auftrag</div>
+                <div>{active.auftragTitel || '—'}</div>
+                {active.kundeName ? (
+                  <div className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                    {active.kundeName}
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Betrag</div>
+                <div className="font-medium">{formatEur(active.betragBrutto)}</div>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-bw-text-muted">Überweisung an (IBAN)</dt>
-                <dd className="flex flex-wrap items-center gap-2 font-mono text-[length:var(--fs-text)]">
-                  {formatIban(active.iban)}
+                <div className="text-[length:var(--fs-meta)] text-bw-text-muted">IBAN</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono">{formatIban(active.iban)}</span>
                   {active.iban ? (
-                    <button
-                      type="button"
-                      className="btn ghost sm"
-                      onClick={() => void copyIban(active.iban)}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => void copyIban(active.iban)}>
                       Kopieren
-                    </button>
-                  ) : (
-                    <span className="font-sans text-bw-text-muted">— bitte im Partnerstamm hinterlegen</span>
-                  )}
-                </dd>
-              </div>
-              {active.ustid || active.steuernummer ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-bw-text-muted">Steuer</dt>
-                  <dd>
-                    {[active.ustid ? `USt-ID ${active.ustid}` : null, active.steuernummer ? `St.-Nr. ${active.steuernummer}` : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </dd>
+                    </Button>
+                  ) : null}
                 </div>
-              ) : null}
-              <div>
-                <dt className="text-bw-text-muted">Kunde</dt>
-                <dd>{active.kundeName || '—'}</dd>
               </div>
-              <div>
-                <dt className="text-bw-text-muted">Gewerk</dt>
-                <dd>{active.gewerkName || '—'}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-bw-text-muted">Auftrag</dt>
-                <dd>
-                  {active.auftragHref ? (
-                    <Link href={active.auftragHref} className="text-bw-primary hover:underline">
-                      {active.auftragTitel || 'Auftrag öffnen'}
-                    </Link>
-                  ) : (
-                    <Link href={active.angebotHref} className="text-bw-primary hover:underline">
-                      Angebot öffnen (noch kein Auftrag)
-                    </Link>
-                  )}
-                </dd>
-              </div>
-              {(active.handwerkerEmail || active.handwerkerTelefon) && (
-                <div className="sm:col-span-2">
-                  <dt className="text-bw-text-muted">Kontakt</dt>
-                  <dd className="flex flex-wrap gap-3">
-                    {active.handwerkerTelefon ? (
-                      <a className="text-bw-primary hover:underline" href={`tel:${active.handwerkerTelefon.replace(/\s/g, '')}`}>
-                        {active.handwerkerTelefon}
-                      </a>
-                    ) : null}
-                    {active.handwerkerEmail ? (
-                      <a className="text-bw-primary hover:underline" href={`mailto:${active.handwerkerEmail}`}>
-                        {active.handwerkerEmail}
-                      </a>
-                    ) : null}
-                  </dd>
-                </div>
-              )}
-            </dl>
-
+            </div>
             <div className="flex flex-wrap gap-2 border-t border-bw-border pt-3">
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
-                loading={pdfBusy}
+                disabled={pdfBusy}
                 onClick={() => void openPdf(active)}
               >
-                <MockIcon ctx="row" n="file" size={14} className="mr-1.5" />
                 PDF öffnen
               </Button>
-              {active.status !== 'bezahlt' ? (
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  loading={pending}
-                  onClick={() => runStatus(active.zuweisungId, 'bezahlt')}
-                >
-                  Als bezahlt markieren
-                </Button>
+              {active.auftragHref ? (
+                <Link href={active.auftragHref} className="btn secondary">
+                  Zum Auftrag
+                </Link>
               ) : (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  loading={pending}
-                  onClick={() => void markHwEingangsrechnungBezahlt(active.zuweisungId, false).then((r) => {
-                    if (!r.ok) toast.error(r.message)
-                    else {
-                      toast.success('Bezahlt-Markierung entfernt')
-                      router.refresh()
-                    }
-                  })}
-                >
-                  Bezahlt aufheben
-                </Button>
+                <Link href={active.angebotHref} className="btn secondary">
+                  Zum Angebot
+                </Link>
               )}
               {active.status === 'eingereicht' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={pending}
+                    onClick={() => runStatus(active.zuweisungId, 'bezahlt')}
+                  >
+                    Als bezahlt
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={pending}
+                    onClick={() => runStatus(active.zuweisungId, 'abgelehnt')}
+                  >
+                    Ablehnen
+                  </Button>
+                </>
+              ) : null}
+              {active.status === 'bezahlt' ? (
                 <Button
                   type="button"
                   variant="secondary"
-                  size="sm"
-                  loading={pending}
-                  onClick={() => runStatus(active.zuweisungId, 'abgelehnt')}
+                  disabled={pending}
+                  onClick={() =>
+                    void markHwEingangsrechnungBezahlt(active.zuweisungId, false).then((r) => {
+                      if (!r.ok) {
+                        toast.error(r.message)
+                        return
+                      }
+                      toast.success('Wieder auf offen gesetzt')
+                      setActive((prev) =>
+                        prev ? { ...prev, status: 'eingereicht', bezahltAt: null } : prev
+                      )
+                      router.refresh()
+                    })
+                  }
                 >
-                  Ablehnen
+                  Zurück auf offen
+                </Button>
+              ) : null}
+              {active.status === 'abgelehnt' ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={pending}
+                  onClick={() => runStatus(active.zuweisungId, 'eingereicht')}
+                >
+                  Wieder öffnen
                 </Button>
               ) : null}
             </div>

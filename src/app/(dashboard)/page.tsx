@@ -5,8 +5,6 @@ import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
   isAktiverAuftragStatus,
-  isAngenommenesAngebotStatus,
-  isFunnelAuftragStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
 } from '@/lib/dashboard-mock-mapping'
@@ -82,8 +80,15 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       )
     : null
 
-  const [leadsRaw, angeboteRaw, auftraegeRaw, rechnungenRaw, zuweisungenRaw, marketing] =
-    await Promise.all([
+  const [
+    leadsRaw,
+    angeboteRaw,
+    auftraegeRaw,
+    rechnungenRaw,
+    rechnungenGewerkRaw,
+    zuweisungenRaw,
+    marketing,
+  ] = await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
@@ -129,9 +134,25 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, faellig_am')
+          .select(
+            `
+            id, status, created_at, faellig_am, kunde_id, netto, brutto,
+            kunden(id, name, vorname, nachname)
+          `
+          )
           .order('created_at', { ascending: false })
           .limit(2000)
+      )
+    ),
+    /* Separat + limitiert: positionen sind groß — nicht in der Haupt-Query (sonst Netlify „Connection closed“) */
+    safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db
+          .from('rechnungen')
+          .select('id, status, created_at, positionen')
+          .neq('status', 'storniert')
+          .order('created_at', { ascending: false })
+          .limit(800)
       )
     ),
     safeRows(() =>
@@ -170,6 +191,19 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     status: string
     created_at: string
     faellig_am?: string | null
+    kunde_id?: string | null
+    netto?: number | null
+    brutto?: number | null
+    kunden?:
+      | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }
+      | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }[]
+      | null
+  }>
+  const rechnungenGewerk = rechnungenGewerkRaw as Array<{
+    id: string
+    status: string
+    created_at: string
+    positionen?: unknown
   }>
 
   const leadsZ = leads.filter((l) => {
@@ -220,49 +254,60 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     },
   ]
 
-  // Umsatzverlauf: immer letzte 6 Monate (unabhängig vom KPI-Filter), Auftragssummen
+  // Umsatzverlauf: letzte 6 Monate — aktive/abgeschlossene Aufträge + Rechnungen
   const umsatzMonate = buildUmsatzverlauf(
     auftraege.map((a) => ({
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
       angebote: a.angebote as never,
     })),
+    rechnungen.map((r) => ({
+      status: r.status,
+      created_at: r.created_at,
+      netto: r.netto,
+    })),
     6
   )
 
-  const angeboteAngenommen = angeboteZ.filter((a) => {
-    if (!isAngenommenesAngebotStatus(a.status as string, a.status_einfach as string | null)) {
-      return false
-    }
-    // Nur angenommene Angebote, die zu einem Auftrag gehören
-    if (a.auftrag_id) return true
-    const aufs = a.auftraege
-    if (Array.isArray(aufs)) return aufs.length > 0
-    return Boolean(aufs)
-  })
-  const auftraegeFunnel = auftraegeZ.filter((a) => isFunnelAuftragStatus(a.status as string))
+  const auftraegeAktivZ = auftraegeZ.filter((a) => isAktiverAuftragStatus(a.status as string))
+  const auftraegeErledigtZ = auftraegeZ.filter(
+    (a) => String(a.status ?? '').toLowerCase() === 'abgeschlossen'
+  )
 
   const funnel = buildVertriebsFunnel({
     anfragen: leadsZ.length,
     angebote: countUniqueVorgaengeByLead(
-      angeboteAngenommen.map((a) => ({
+      angeboteZ.map((a) => ({
         id: String(a.id ?? ''),
         lead_id: (a.lead_id as string | null) ?? null,
       }))
     ),
-    auftraege: countUniqueVorgaengeByLead(
-      auftraegeFunnel.map((a) => ({
+    auftraegeAktiv: countUniqueVorgaengeByLead(
+      auftraegeAktivZ.map((a) => ({
+        id: String(a.id ?? ''),
+        lead_id: (a.lead_id as string | null) ?? null,
+      }))
+    ),
+    auftraegeErledigt: countUniqueVorgaengeByLead(
+      auftraegeErledigtZ.map((a) => ({
         id: String(a.id ?? ''),
         lead_id: (a.lead_id as string | null) ?? null,
       }))
     ),
   })
 
+  const rechnungenGewerkZ = rechnungenGewerk.filter((r) =>
+    inZeitraum(r.created_at, zeitraumRange)
+  )
   const gewerk = buildGewerkUmsatz(
     angeboteZ.map((a) => ({
       positionen: a.positionen,
       leads: a.leads as never,
       auftraege: a.auftraege as never,
+    })),
+    rechnungenGewerkZ.map((r) => ({
+      positionen: r.positionen,
+      status: r.status,
     }))
   )
 
@@ -336,56 +381,33 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const rankingHandwerker = buildHandwerkerRanking(hwRows.filter((r) => r.auftrag_id || r.angebot_id || r.lead_id))
 
   const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
-  for (const l of leadsZ) {
-    const kid = (l as { kunde_id?: string | null }).kunde_id
-    if (!kid) continue
-    kundenRows.push({
-      kunde_id: kid,
-      kunde_name: 'Kunde',
-      lead_id: l.id,
-      angebot_id: null,
-      auftrag_id: null,
-      auftrag_netto: 0,
-    })
-  }
-  for (const a of angeboteZ) {
-    const kid = a.kunde_id as string | null
-    if (!kid) continue
-    kundenRows.push({
-      kunde_id: kid,
-      kunde_name: 'Kunde',
-      lead_id: (a.lead_id as string | null) ?? null,
-      angebot_id: String(a.id),
-      auftrag_id: null,
-      auftrag_netto: 0,
-    })
-  }
   for (const a of auftraegeZ) {
     const kid = a.kunde_id as string | null
     if (!kid) continue
+    if (String(a.status ?? '') === 'storniert') continue
     const k = Array.isArray(a.kunden) ? a.kunden[0] : a.kunden
     const name = k ? kundeDisplayName(k as never) : 'Kunde'
     kundenRows.push({
       kunde_id: kid,
       kunde_name: name,
-      lead_id: (a.lead_id as string | null) ?? null,
-      angebot_id: (a.angebot_id as string | null) ?? null,
       auftrag_id: String(a.id),
       auftrag_netto: auftragNetto({ angebote: a.angebote as never }),
     })
   }
-
-  // Namen für Kunden nachziehen aus Aufträgen
-  const nameByKunde = new Map<string, string>()
-  for (const r of kundenRows) {
-    if (r.kunde_name !== 'Kunde') nameByKunde.set(r.kunde_id, r.kunde_name)
+  for (const r of rechnungenZ) {
+    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
+    const kid = (r.kunde_id ?? '').trim()
+    if (!kid) continue
+    const k = Array.isArray(r.kunden) ? r.kunden[0] : r.kunden
+    const name = k ? kundeDisplayName(k as never) : 'Kunde'
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: name,
+      rechnung_id: r.id,
+      rechnung_netto: Number(r.netto) || 0,
+    })
   }
-  const rankingKunden = buildKundenRanking(
-    kundenRows.map((r) => ({
-      ...r,
-      kunde_name: nameByKunde.get(r.kunde_id) ?? r.kunde_name,
-    }))
-  )
+  const rankingKunden = buildKundenRanking(kundenRows)
 
   return (
     <DashboardClient

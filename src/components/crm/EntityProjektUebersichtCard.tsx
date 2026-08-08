@@ -38,6 +38,7 @@ export function EntityProjektUebersichtCard({
   preisMin,
   preisMax,
   preisrahmenLabel,
+  preisLabel = 'Preisrahmen',
   quelle,
   fortschritt,
   extraRows,
@@ -57,6 +58,8 @@ export function EntityProjektUebersichtCard({
   preisMin?: number | null
   preisMax?: number | null
   preisrahmenLabel?: string | null
+  /** Label über dem Preis (z. B. Preiseinschätzung bei Staff-Anfragen). */
+  preisLabel?: string
   quelle?: string | null
   fortschritt?: number | null
   extraRows?: ProjektUebersichtExtraRow[]
@@ -170,14 +173,6 @@ export function EntityProjektUebersichtCard({
           <InlineEditField label="Region" editing={false} value={region} />
         ) : null}
 
-        {preisrahmen ? (
-          <InlineEditField
-            label="Preisrahmen"
-            editing={false}
-            value={<span style={{ color: 'var(--green)', fontWeight: 600 }}>{preisrahmen}</span>}
-          />
-        ) : null}
-
         {quelle ? <InlineEditField label="Quelle" editing={false} value={quelle} /> : null}
 
         {editableFields.includes('startDatum') || editableFields.includes('endDatum') ? (
@@ -244,6 +239,14 @@ export function EntityProjektUebersichtCard({
             <div className="v">{row.children}</div>
           </div>
         ))}
+
+        {preisrahmen ? (
+          <InlineEditField
+            label={preisLabel}
+            editing={false}
+            value={<span style={{ color: 'var(--green)', fontWeight: 600 }}>{preisrahmen}</span>}
+          />
+        ) : null}
       </div>
       {belowContent ? <div className="mt-4">{belowContent}</div> : null}
     </InlineEditSection>

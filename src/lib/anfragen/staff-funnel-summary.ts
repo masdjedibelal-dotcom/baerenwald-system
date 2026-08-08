@@ -86,7 +86,10 @@ export function buildStaffFunnelSummaryRows(state: StaffFunnelState): StaffFunne
   }
 
   push('Dringlichkeit', optLabel(DRINGLICHKEIT_OPTIONS, state.dringlichkeit))
-  push('Zeitraum', optLabel(ZEITRAUM_ERNEUERN_OPTIONS, state.zeitraum))
+  push(
+    'Umsetzung Zeitraum',
+    optLabel(ZEITRAUM_ERNEUERN_OPTIONS, state.zeitraum)
+  )
   push(
     'Kundentyp',
     KUNDENTYP_OPTIONS.find((k) => k.value === state.kundentyp)?.label ?? state.kundentyp
@@ -123,6 +126,7 @@ export function buildStaffFunnelSummaryRows(state: StaffFunnelState): StaffFunne
   push('Freitext', state.freitext)
   push('Interne Notiz', state.interneNotiz)
   if (state.istBauprojekt) push('Bauprojekt', 'Ja')
+  if (state.alsAkut) push('Akut / Notfall', 'Direkt beauftragen ohne Angebot')
 
   return rows
 }

@@ -977,10 +977,25 @@ div.input input::placeholder {
   border-top: 0.5px solid var(--border);
 }
 @media (max-width: 767px) {
+  /* 5) Cards als Ruheflächen — hell vs. Page, dezent */
   .card {
-    background: var(--card-mobile, #fafbfa);
-    border: 1px solid var(--border-strong, #d6d3ce);
+    background: var(--card-mobile, #ffffff);
+    border: 0.5px solid var(--border);
     box-shadow: var(--shadow-mobile);
+  }
+
+  /* 4) Badges kompakter, weniger Rauschen */
+  .badge,
+  .pill-tag {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 1px 6px;
+    line-height: 1.35;
+    border-radius: 4px;
+  }
+  .pill-tag {
+    border-color: transparent;
+    background: var(--bg-soft);
   }
 }
 .card-h {
@@ -1413,7 +1428,18 @@ div.input input::placeholder {
 @media (max-width: 767px) {
   .listcard {
     box-shadow: var(--shadow-mobile);
-    border-color: rgba(22, 32, 27, 0.06);
+    border-color: var(--border);
+  }
+
+  /* 2) Mehr Luft in flachen Listen-Zeilen */
+  .list-row {
+    padding: 14px 16px;
+    min-height: 52px;
+    line-height: 1.45;
+    border-bottom-color: var(--border);
+  }
+  .list-row.head {
+    padding: 10px 16px;
   }
 }
 .list-row {
@@ -4153,30 +4179,22 @@ button.wv-chip:hover {
     margin-bottom: 10px;
   }
 
+  /* Untereinander — kein Horizontal-Carousel (bläht auf iOS die Dokument-Scrollhöhe auf) */
   .dash-zahlen {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 0;
-    scrollbar-width: none;
-    margin-right: -4px;
-    padding-right: 24px;
-  }
-
-  .dash-zahlen::-webkit-scrollbar {
-    display: none;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    margin-right: 0;
+    padding-right: 0;
   }
 
   .dash-zahlen > .dash-lazy {
-    flex: 0 0 calc(100% - 28px);
-    width: calc(100% - 28px);
-    max-width: calc(100% - 28px);
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .dash-lazy-skel {
@@ -4769,6 +4787,8 @@ select.sel option {
   position: fixed;
   inset: 0;
   background: rgba(20, 24, 31, 0.4);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   /* Über .wizard / .app-flow-screen (400) — Modal portaliert auf document.body */
   z-index: 500;
   display: flex;
@@ -7906,7 +7926,7 @@ a.hvk-chip-main:hover { text-decoration: underline; }
   overflow: visible;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -7925,11 +7945,12 @@ a.hvk-chip-main:hover { text-decoration: underline; }
       "title  title  title   title"
       "wert   wert   datum    datum";
     column-gap: 8px;
-    row-gap: 5px;
+    row-gap: 7px;
     align-items: center;
     width: 100%;
-    padding: 13px 14px;
-    background: var(--card);
+    padding: 16px 16px;
+    line-height: 1.4;
+    background: var(--card-mobile, var(--card));
     border: 0.5px solid var(--border);
     border-radius: var(--r-lg, 16px);
     box-shadow: var(--shadow-mobile, none);
@@ -8021,19 +8042,31 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 .vg-row > .vg-vorgang { grid-area: title; min-width: 0; overflow: hidden; }
 
   
+/* 3) Hierarchie: Vorgangstitel sekundär unter Kundename */
 .vg-row > .vg-vorgang .t {
-    font-size: var(--fs-text);
+    font-size: var(--fs-meta);
     font-weight: 400;
     color: var(--text-3);
+    line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Kunden / Handwerker: Name steht in .vg-vorgang .t → primär wie vg-kunde */
+  .vg-row--kontakt > .vg-vorgang .t {
+    font-size: var(--fs-title);
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
   }
 
   
 .vg-row > .vg-actions { grid-area: actions; justify-self: end; align-self: start; }
 
   
+/* 3) Primärzeile: Kunde fett + dunkel */
 .vg-row > .vg-kunde {
     grid-area: kunde;
     min-width: 0;
@@ -8041,6 +8074,8 @@ a.hvk-chip-main:hover { text-decoration: underline; }
     color: var(--text);
     font-size: var(--fs-title);
     font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
   }
 
 .vg-row > .vg-kunde .vg-kunde__name {
@@ -8058,23 +8093,27 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 
 .vg-row > .vg-status .pill-tag,
 .vg-row > .vg-status .badge {
-  max-width: 9.5rem;
+  max-width: 8.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   display: inline-block;
   vertical-align: top;
+  font-size: 12px;
+  padding: 1px 6px;
+  opacity: 0.92;
 }
 
+/* 3) Sekundärzeile: Wert/Datum ruhiger als Kunde */
 .vg-row > .vg-wert {
   grid-area: wert;
   display: block !important;
   justify-self: start;
   text-align: left !important;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-text);
-  color: var(--text);
+  font-size: var(--fs-meta);
+  color: var(--text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -8083,7 +8122,14 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 /* Betrag auf Mobil in der Card-Zeile mit Datum */
 
   
-.vg-row > .vg-datum { grid-area: datum; font-size: var(--fs-meta); color: var(--text-3); justify-self: end; }
+.vg-row > .vg-datum {
+  grid-area: datum;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--text-3);
+  justify-self: end;
+  line-height: 1.35;
+}
 
 
 }
@@ -8692,13 +8738,15 @@ a.hvk-chip-main:hover { text-decoration: underline; }
 .bottomnav {
     position: fixed;
     left: 0; right: 0; bottom: 0;
+    /* Höhe = Icon-Zeile + Safe-Area (nicht 48px inkl. Padding wegrechnen) */
+    box-sizing: content-box;
     height: 48px;
     display: flex;
     align-items: stretch;
     background: var(--green-dark);
     z-index: 90;
     border-top: 0.5px solid rgba(255,255,255,0.1);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
     transform: translateY(0);
     opacity: 1;
@@ -8722,6 +8770,11 @@ body.has-editor-sheet .detail-mobile-action-bar,
 body.has-editor-sheet .bottomnav,
 body.has-editor-sheet .fab-wrap {
   visibility: hidden !important;
+  pointer-events: none !important;
+}
+body.has-blocking-overlay .detail-mobile-action-bar *,
+body.has-document-canvas .detail-mobile-action-bar *,
+body.has-editor-sheet .detail-mobile-action-bar * {
   pointer-events: none !important;
 }
 
@@ -9006,10 +9059,11 @@ body.has-editor-sheet .fab-wrap {
       "sub   sub";
     align-items: start;
     column-gap: 8px;
-    row-gap: 4px;
+    row-gap: 6px;
     position: relative;
     min-width: 0;
-    padding: 13px 44px 13px 14px;
+    padding: 16px 44px 16px 16px;
+    line-height: 1.4;
     background: var(--card-mobile, var(--card));
     border: 0.5px solid var(--border);
     border-radius: var(--r-lg, 16px);
@@ -9034,6 +9088,8 @@ body.has-editor-sheet .fab-wrap {
     font-weight: 600;
     font-size: var(--fs-title);
     color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -9054,7 +9110,9 @@ body.has-editor-sheet .fab-wrap {
 .listcard .list-row > .lc-sub {
     grid-area: sub;
     font-size: var(--fs-meta);
-    color: var(--text-2);
+    font-weight: 400;
+    color: var(--text-3);
+    line-height: 1.35;
   }
 
   
@@ -9110,26 +9168,26 @@ body.has-editor-sheet .fab-wrap {
 .einst-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .einst-list-item {
-  padding: 13px 14px;
+  padding: 16px;
   margin: 0;
   border: 0.5px solid var(--border);
   border-radius: var(--r-lg, 16px);
-  background: var(--card-mobile, #fafbfa);
+  background: var(--card-mobile, #ffffff);
   box-shadow: var(--shadow-mobile);
 }
 
 .einst-list-item:first-child,
 .einst-list-item:last-child {
-  padding-top: 13px;
-  padding-bottom: 13px;
+  padding-top: 16px;
+  padding-bottom: 16px;
 }
 
 .einst-list-item--stack {
-  padding: 14px;
+  padding: 16px;
 }
 
 .einst-list-chevron {
@@ -10677,7 +10735,13 @@ body.has-editor-sheet .fab-wrap {
 .detail-mobile-action-bar--hidden {
   transform: translateY(110%);
   opacity: 0;
-  pointer-events: none;
+  visibility: hidden;
+  pointer-events: none !important;
+}
+/* Wichtig: Child mit pointer-events:auto darf unsichtbare CTAs nicht über der Nav klickbar machen */
+.detail-mobile-action-bar--hidden .detail-mobile-action-bar__inner,
+.detail-mobile-action-bar--hidden .detail-mobile-action-bar__inner * {
+  pointer-events: none !important;
 }
 .detail-mobile-action-bar__inner {
   display: flex;
@@ -10685,6 +10749,9 @@ body.has-editor-sheet .fab-wrap {
   gap: 8px;
   max-width: 1400px;
   margin: 0 auto;
+  pointer-events: none;
+}
+.detail-mobile-action-bar:not(.detail-mobile-action-bar--hidden) .detail-mobile-action-bar__inner {
   pointer-events: auto;
 }
 .detail-mobile-action-bar__inner--solo {
@@ -15875,6 +15942,8 @@ textarea.input:focus {
   display: grid;
   place-items: center;
   padding: 24px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   background: rgba(20, 24, 31, 0.45);
   animation: fadein 120ms ease;
 }
@@ -16618,6 +16687,9 @@ textarea.input:focus {
 
 .mobile-filter-sheet__backdrop {
   @apply absolute inset-0 bg-black/40;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  touch-action: none;
 }
 
 .mobile-filter-sheet__panel {
@@ -18299,10 +18371,29 @@ select:focus-visible {
 .editor-sheet-overlay {
   @apply fixed inset-0 z-[320] flex;
   background: rgba(20, 24, 31, 0.4);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   /* iOS: Layout-Viewport voll abdecken — keine Lücke unter dem Overlay */
   width: 100%;
   min-height: 100%;
   min-height: 100dvh;
+}
+.editor-sheet-overlay:not(.editor-sheet-overlay--recessed) {
+  touch-action: none;
+}
+.editor-sheet-overlay .editor-sheet__body,
+.editor-sheet-overlay .editor-sheet {
+  touch-action: pan-y;
+}
+
+/* Hintergrund hinter Overlay: kein Scroll / kein Gummiband */
+body.has-body-scroll-lock,
+body.has-blocking-overlay {
+  overscroll-behavior: none;
+}
+body.has-body-scroll-lock .app,
+body.has-blocking-overlay .app {
+  overscroll-behavior: none;
 }
 .editor-sheet-overlay--bottom {
   @apply items-end justify-stretch p-0;

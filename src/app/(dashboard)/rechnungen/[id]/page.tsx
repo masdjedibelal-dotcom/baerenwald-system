@@ -5,12 +5,12 @@ import { RechnungDetailClient } from '@/components/rechnungen/RechnungDetailClie
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
-import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import { loadAngebotDetail } from '@/lib/angebote/load-angebot-detail'
 import {
   loadAuftragDetail,
   loadRechnungenForAuftrag,
 } from '@/app/(dashboard)/auftraege/auftraege-data'
+import { loadWizardContext } from '@/lib/wizard-context'
 import {
   findeNachfolgerRechnungId,
   rechnungDarfStornoZurueckgenommenWerden,
@@ -21,10 +21,9 @@ import type { Gewerk, LeadDetail, LeadTimelineRow, Preisliste, Rechnung } from '
 
 export default async function RechnungDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const [firm, gwRes, plRes, mahnRes, { data, error }] = await Promise.all([
+  const [firm, wizardCtx, mahnRes, { data, error }] = await Promise.all([
     fetchFirmenEinstellungen(supabase),
-    supabase.from('gewerke').select('id, name, slug').eq('aktiv', true).order('name'),
-    supabase.from('preislisten').select('*').order('gewerk_id'),
+    loadWizardContext(supabase),
     supabase
       .from('email_log')
       .select('id, betreff, created_at')
@@ -41,6 +40,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
         .maybeSingle()
     ),
   ])
+  const gwRes = { data: wizardCtx.gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug })) }
+  const plRes = { data: wizardCtx.preislisten as Preisliste[] }
 
   if (error || !data) notFound()
 
@@ -79,21 +80,28 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     await Promise.all([
       leadId
         ? Promise.all([
-            loadAnfrageDetail(supabase, leadId),
+            supabase
+              .from('leads')
+              .select(
+                'id, status, kanal, anlass, situation, bereiche, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, auftraggeber_kunde_id, org_freigabe_status, kundentyp, created_at, plz, notizen, budget_ca, preis_min, preis_max'
+              )
+              .eq('id', leadId)
+              .maybeSingle(),
             supabase
               .from('lead_timeline')
               .select('*')
               .eq('lead_id', leadId)
               .order('created_at', { ascending: true }),
-            supabase
-              .from('leads')
-              .select('kanal, auftraggeber_kunde_id, anlass')
-              .eq('id', leadId)
-              .maybeSingle(),
-          ]).then(([leadDetail, tlRes, leadPipe]) => ({
-            lead: leadDetail as LeadDetail | null,
+          ]).then(([leadRes, tlRes]) => ({
+            lead: (leadRes.data as LeadDetail | null) ?? null,
             timeline: (tlRes.data ?? []) as LeadTimelineRow[],
-            pipelineLead: leadPipe.data ?? null,
+            pipelineLead: leadRes.data
+              ? {
+                  kanal: leadRes.data.kanal as string | null,
+                  auftraggeber_kunde_id: leadRes.data.auftraggeber_kunde_id as string | null,
+                  anlass: leadRes.data.anlass as string | null,
+                }
+              : null,
           }))
         : Promise.resolve({
             lead: null as LeadDetail | null,
@@ -105,7 +113,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
             } | null,
           }),
       angebotId ? loadAngebotDetail(supabase, angebotId) : Promise.resolve(null),
-      auftragId ? loadAuftragDetail(auftragId) : Promise.resolve(null),
+      // Rechnung braucht keinen Full-Auftrag mit Bautagebuch/Baustelle
+      auftragId ? loadAuftragDetail(auftragId, { mode: 'shell' }) : Promise.resolve(null),
       auftragId ? loadRechnungenForAuftrag(auftragId) : Promise.resolve([]),
       auftragId
         ? supabase

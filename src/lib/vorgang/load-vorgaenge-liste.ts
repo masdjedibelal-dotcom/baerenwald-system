@@ -54,7 +54,67 @@ const VORGAENGE_LEAD_SELECT = `
   ${leadAuftraggeberEmbed('id, name, vorname, nachname, typ, org_anzeigename')}
 `
 
-export async function loadVorgaengeListe(): Promise<{
+export type LoadVorgaengeListeOpts = {
+  /** Nur Vorgänge dieses Kunden (statt globale Liste). */
+  kundeId?: string
+  /** Nur Vorgänge mit diesem Handwerker (über Auftragspositionen / Zuweisungen). */
+  handwerkerId?: string
+}
+
+async function resolveLeadIdsForHandwerker(
+  handwerkerId: string
+): Promise<string[]> {
+  const ids = new Set<string>()
+  const [posRes, zuwRes] = await Promise.all([
+    withCrmReadFallback(async (db) =>
+      db
+        .from('auftrag_positionen')
+        .select('auftrag_id')
+        .eq('handwerker_id', handwerkerId)
+        .limit(300)
+    ),
+    withCrmReadFallback(async (db) =>
+      db
+        .from('angebot_handwerker')
+        .select('angebot_id')
+        .eq('handwerker_id', handwerkerId)
+        .limit(200)
+    ),
+  ])
+  const auftragIds = Array.from(
+    new Set(
+      (posRes.data ?? [])
+        .map((r) => String((r as { auftrag_id?: string }).auftrag_id ?? ''))
+        .filter(Boolean)
+    )
+  )
+  const angebotIds = Array.from(
+    new Set(
+      (zuwRes.data ?? [])
+        .map((r) => String((r as { angebot_id?: string }).angebot_id ?? ''))
+        .filter(Boolean)
+    )
+  )
+  const [aufLeads, angLeads] = await Promise.all([
+    auftragIds.length
+      ? withCrmReadFallback(async (db) =>
+          db.from('auftraege').select('lead_id').in('id', auftragIds)
+        )
+      : Promise.resolve({ data: [] as { lead_id?: string }[] }),
+    angebotIds.length
+      ? withCrmReadFallback(async (db) =>
+          db.from('angebote').select('lead_id').in('id', angebotIds)
+        )
+      : Promise.resolve({ data: [] as { lead_id?: string }[] }),
+  ])
+  for (const row of [...(aufLeads.data ?? []), ...(angLeads.data ?? [])]) {
+    const lid = String((row as { lead_id?: string }).lead_id ?? '')
+    if (lid) ids.add(lid)
+  }
+  return Array.from(ids)
+}
+
+export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise<{
   rows: VorgangListeRow[]
   error: string | null
 }> {
@@ -66,17 +126,37 @@ export async function loadVorgaengeListe(): Promise<{
     return { rows: [], error: 'Sitzung abgelaufen — bitte erneut anmelden.' }
   }
 
+  const kundeId = opts?.kundeId?.trim() || null
+  const handwerkerId = opts?.handwerkerId?.trim() || null
+  const scoped = Boolean(kundeId || handwerkerId)
+  const leadLimit = scoped ? 80 : 200
+
   const RECHNUNG_SELECT =
     'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ)'
 
-  const leadsRes = await withCrmReadFallback(async (db) =>
-    db
+  let handwerkerLeadIds: string[] | null = null
+  if (handwerkerId) {
+    handwerkerLeadIds = await resolveLeadIdsForHandwerker(handwerkerId)
+    if (!handwerkerLeadIds.length) {
+      return { rows: [], error: null }
+    }
+  }
+
+  const leadsRes = await withCrmReadFallback(async (db) => {
+    let q = db
       .from('leads')
       .select(VORGAENGE_LEAD_SELECT)
       .is('geloescht_am', null)
       .order('updated_at', { ascending: false })
-      .limit(200)
-  )
+      .limit(leadLimit)
+    if (kundeId) {
+      q = q.or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
+    }
+    if (handwerkerLeadIds?.length) {
+      q = q.in('id', handwerkerLeadIds)
+    }
+    return q
+  })
 
   if (leadsRes.error || !leadsRes.data) {
     return { rows: [], error: leadsRes.error?.message ?? 'Leads konnten nicht geladen werden.' }
@@ -141,7 +221,7 @@ export async function loadVorgaengeListe(): Promise<{
             .from('rechnungen')
             .select(RECHNUNG_SELECT)
             .order('created_at', { ascending: false })
-            .limit(500)
+            .limit(scoped ? 200 : 500)
           if (auftragIds.length && angebotIds.length) {
             q = q.or(
               `auftrag_id.in.(${auftragIds.join(',')}),angebot_id.in.(${angebotIds.join(',')})`
@@ -154,16 +234,18 @@ export async function loadVorgaengeListe(): Promise<{
           return q
         })
       : Promise.resolve(emptySatellites),
-    // Direktrechnungen ohne Lead-Bezug (begrenzt)
-    withCrmReadFallback(async (db) =>
-      db
-        .from('rechnungen')
-        .select(RECHNUNG_SELECT)
-        .is('auftrag_id', null)
-        .is('angebot_id', null)
-        .order('created_at', { ascending: false })
-        .limit(100)
-    ),
+    // Globale Liste: Direktrechnungen ohne Lead. Scoped (Kunde/HW): überspringen.
+    scoped
+      ? Promise.resolve(emptySatellites)
+      : withCrmReadFallback(async (db) =>
+          db
+            .from('rechnungen')
+            .select(RECHNUNG_SELECT)
+            .is('auftrag_id', null)
+            .is('angebot_id', null)
+            .order('created_at', { ascending: false })
+            .limit(100)
+        ),
     auftragIds.length
       ? withCrmReadFallback(async (db) =>
           db
@@ -171,7 +253,7 @@ export async function loadVorgaengeListe(): Promise<{
             .select('auftrag_id, handwerker_id, handwerker_status')
             .in('auftrag_id', auftragIds)
             .order('created_at', { ascending: false })
-            .limit(2000)
+            .limit(scoped ? 800 : 2000)
         )
       : Promise.resolve(emptySatellites),
   ])

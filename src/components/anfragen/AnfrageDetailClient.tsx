@@ -55,6 +55,7 @@ const AngebotWizard = dynamic(
 import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
+import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
@@ -214,6 +215,10 @@ export function AnfrageDetailClient({
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
+  const [liveGewerke, setLiveGewerke] = useState(wizardGewerke)
+  const [livePreislisten, setLivePreislisten] = useState(wizardPreislisten)
+  const [liveFirm, setLiveFirm] = useState(wizardFirm)
+  const [liveHandwerker, setLiveHandwerker] = useState(wizardHandwerker)
   const kopieQueryHandledRef = useRef(false)
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
@@ -356,11 +361,32 @@ export function AnfrageDetailClient({
     onSaved: () => refresh(),
   })
 
-  const openAngebotWizard = useCallback((bootstrap: AngebotWizardBootstrap | null) => {
-    setAngebotWizardBootstrap(bootstrap)
-    setWizardSessionKey((k) => k + 1)
-    setAngebotWizardOpen(true)
-  }, [])
+  const ensureWizardData = useCallback(async () => {
+    if (liveGewerke.length > 0 && liveHandwerker.length > 0 && liveFirm) return true
+    const res = await loadAnfrageWizardBootstrap()
+    if (!res.ok) {
+      toast.error(res.message)
+      return false
+    }
+    setLiveGewerke(res.gewerke)
+    setLivePreislisten(res.preislisten)
+    setLiveFirm(res.firm)
+    setLiveHandwerker(res.handwerker)
+    return true
+  }, [liveFirm, liveGewerke.length, liveHandwerker.length])
+
+  const openAngebotWizard = useCallback(
+    (bootstrap: AngebotWizardBootstrap | null) => {
+      void (async () => {
+        const ok = await ensureWizardData()
+        if (!ok) return
+        setAngebotWizardBootstrap(bootstrap)
+        setWizardSessionKey((k) => k + 1)
+        setAngebotWizardOpen(true)
+      })()
+    },
+    [ensureWizardData]
+  )
 
   useEffect(() => {
     const kopieId = angebotKopieVonQuelleId?.trim()
@@ -429,8 +455,12 @@ export function AnfrageDetailClient({
   const hatAuftrag = Boolean(leadStatusData.auftrag_id)
 
   const openDirektBeauftragen = useCallback(() => {
-    setDirektWizardOpen(true)
-  }, [])
+    void (async () => {
+      const ok = await ensureWizardData()
+      if (!ok) return
+      setDirektWizardOpen(true)
+    })()
+  }, [ensureWizardData])
 
   const primaryCtaAction = useCallback(() => {
     if (!matrixCta) return
@@ -711,10 +741,10 @@ export function AnfrageDetailClient({
         <AngebotWizard
           key={wizardSessionKey}
           lead={lead}
-          gewerke={wizardGewerke}
-          preislisten={wizardPreislisten}
-          handwerker={wizardHandwerker}
-          firm={wizardFirm}
+          gewerke={liveGewerke}
+          preislisten={livePreislisten}
+          handwerker={liveHandwerker}
+          firm={liveFirm}
           kundenObjekte={kundenObjekte}
           bootstrap={angebotWizardBootstrap}
           initialStep={angebotWizardInitialStep}
@@ -780,9 +810,9 @@ export function AnfrageDetailClient({
       {direktWizardOpen ? (
         <DirektBeauftragenWizard
           lead={lead}
-          gewerke={wizardGewerke}
-          preislisten={wizardPreislisten}
-          firm={wizardFirm}
+          gewerke={liveGewerke}
+          preislisten={livePreislisten}
+          firm={liveFirm}
           onClose={() => setDirektWizardOpen(false)}
           onDone={(auftragId) => {
             setDirektWizardOpen(false)

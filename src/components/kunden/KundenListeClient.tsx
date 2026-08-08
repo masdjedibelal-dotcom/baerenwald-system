@@ -331,28 +331,30 @@ export function KundenListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Kundentyp">
-          {(
-            [
-              ['alle', 'Alle', typCounts.alle],
-              ['privat', 'Privat', typCounts.privat],
-              ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
-              ['gewerbe', 'Gewerbe', typCounts.gewerbe],
-            ] as const
-          ).map(([value, label, count]) => (
-            <MockChip
-              key={value}
-              active={typFilter === value}
-              count={count}
-              onClick={() => setTypFilter(value)}
-            >
-              {label}
-            </MockChip>
-          ))}
-        </div>
-        <ListbarActionsMenu
+        <div className="listbar-main">
+          <div className="listbar-chips" role="group" aria-label="Kundentyp">
+            {(
+              [
+                ['alle', 'Alle', typCounts.alle],
+                ['privat', 'Privat', typCounts.privat],
+                ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
+                ['gewerbe', 'Gewerbe', typCounts.gewerbe],
+              ] as const
+            ).map(([value, label, count]) => (
+              <MockChip
+                key={value}
+                active={typFilter === value}
+                count={count}
+                onClick={() => setTypFilter(value)}
+              >
+                {label}
+              </MockChip>
+            ))}
+          </div>
+          <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
+          directOpen={() => setFilterOpen(true)}
           items={[
             {
               icon: 'filter',
@@ -441,6 +443,7 @@ export function KundenListeClient({
             </>
           }
         />
+        </div>
       </div>
 
       {isMobile ? (

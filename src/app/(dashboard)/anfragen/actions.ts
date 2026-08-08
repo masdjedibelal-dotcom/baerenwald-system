@@ -287,6 +287,11 @@ export type NeueAnfragePayload = {
   wiederkehr_turnus?: string | null
   /** Manuell im CRM: Bestätigungsmail an Kund:in (Standard: aus) */
   bestaetigungsmail_senden?: boolean
+  /**
+   * CRM: Als Akut/Notfall anlegen → Direktbeauftragung ohne Angebot
+   * (situation=notfall + freigabe_bypass_grund=akut).
+   */
+  als_akut?: boolean
 }
 
 export async function createAnfrage(
@@ -344,7 +349,21 @@ export async function createAnfrage(
 
   const bereicheMerged = bereicheMergedEarly
   const bereicheFinal = bereicheMerged.length ? bereicheMerged : null
-  const situationFinal = situationOhneGewerbe(payload.situation)
+  let situationFinal = situationOhneGewerbe(payload.situation)
+  const funnelDaten: Record<string, unknown> =
+    payload.funnel_daten && typeof payload.funnel_daten === 'object' && !Array.isArray(payload.funnel_daten)
+      ? { ...(payload.funnel_daten as Record<string, unknown>) }
+      : {}
+  let freigabeBypassGrund: string | null = null
+  if (payload.als_akut) {
+    if (situationFinal && situationFinal !== 'notfall') {
+      funnelDaten._akut_prev_situation = situationFinal
+    }
+    funnelDaten.melde_kategorie = 'notfall'
+    funnelDaten.notfall = true
+    situationFinal = 'notfall'
+    freigabeBypassGrund = 'akut'
+  }
   const istGewerbe = leadHatGewerbeKontext(bereicheMerged, payload.situation)
   const kundentyp =
     payload.kundentyp?.trim() ||
@@ -354,7 +373,7 @@ export async function createAnfrage(
     name: istKundeHausverwaltungTyp(kundentyp) || istKundeNurGewerbeTyp(kundentyp) ? name : undefined,
     vorname: payload.vorname,
     nachname: payload.nachname,
-    funnelDaten: payload.funnel_daten,
+    funnelDaten: funnelDaten,
     kontaktName: name,
   })
 
@@ -363,7 +382,7 @@ export async function createAnfrage(
     strasse: payload.strasse,
     hausnummer: payload.hausnummer,
     ort: payload.ort,
-    funnel_daten: payload.funnel_daten,
+    funnel_daten: funnelDaten,
   })
   const adresseDb = kundeAdresseDbFelder(adresseFelder)
   const plzFinal = plz || adresseDb.plz || null
@@ -431,7 +450,8 @@ export async function createAnfrage(
       kontakt_telefon: telefon || null,
       kontakt_nachricht: payload.kontakt_nachricht?.trim() || null,
       notizen: payload.notizen.trim() || null,
-      funnel_daten: payload.funnel_daten && typeof payload.funnel_daten === 'object' ? payload.funnel_daten : {},
+      funnel_daten: funnelDaten,
+      freigabe_bypass_grund: freigabeBypassGrund,
       ist_bauprojekt: payload.ist_bauprojekt === true,
       ist_wiederkehrend: payload.ist_wiederkehrend === true,
       wiederkehr_turnus:

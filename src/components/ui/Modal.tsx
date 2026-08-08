@@ -58,14 +58,9 @@ export function Modal({
 
   useEffect(() => {
     if (!open || !mounted) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const dialog = dialogRef.current
-    const release = dialog ? trapFocus(dialog, () => onCloseRef.current()) : undefined
-    return () => {
-      document.body.style.overflow = prev
-      release?.()
-    }
+    if (!dialog) return
+    return trapFocus(dialog, () => onCloseRef.current())
   }, [open, mounted])
 
   if (!open || !mounted) return null

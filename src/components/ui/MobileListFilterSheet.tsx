@@ -26,17 +26,12 @@ export function MobileListFilterSheet({
   useOverlayChromeLock(open)
 
   useEffect(() => {
+    if (!open) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    if (open) {
-      document.addEventListener('keydown', handler)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
-    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
 
   if (!open) return null

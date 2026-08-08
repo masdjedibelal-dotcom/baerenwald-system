@@ -11,6 +11,7 @@ import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { isEchterFreitext, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { anfragePreisDetailLabel, isCrmStaffFunnel } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
 
 function vorhabenTitel(lead: LeadDetail): string {
@@ -57,6 +58,14 @@ export function AnfrageDetailsTab({
 
   const bedarfUi = useMemo(() => buildFunnelBedarfExtraRows(lead), [lead])
   const showKi = leadHatKiVertriebsDaten(lead) || Boolean(lead.ki_zusammenfassung?.trim())
+  const staffSelbst = isCrmStaffFunnel(lead.funnel_daten)
+  const titel = vorhabenTitel(lead)
+  const beschreibungRaw = (beschreibungFromLead(lead) ?? '').trim()
+  const beschreibungGleich =
+    staffSelbst &&
+    Boolean(beschreibungRaw) &&
+    (beschreibungRaw.toLowerCase() === titel.trim().toLowerCase() ||
+      beschreibungRaw.toLowerCase().startsWith(`${titel.trim().toLowerCase()}\n`))
 
   return (
     <EntityProjektUebersichtCard
@@ -64,8 +73,9 @@ export function AnfrageDetailsTab({
       icon="inbox"
       titelLabel="Vorhaben"
       initial={{
-        titel: vorhabenTitel(lead),
-        beschreibung: beschreibungFromLead(lead) ?? '',
+        titel,
+        // Identisch mit Vorhaben → nicht nochmal anzeigen
+        beschreibung: beschreibungGleich ? '' : beschreibungRaw,
         startDatum: '',
         endDatum: '',
         istBauprojekt: false,
@@ -77,6 +87,7 @@ export function AnfrageDetailsTab({
         return r
       }}
       preisrahmenLabel={preisrahmen === '—' ? null : preisrahmen}
+      preisLabel={anfragePreisDetailLabel(lead.kanal, lead.funnel_daten)}
       extraRows={bedarfUi.extraRows}
       footerRows={bedarfUi.footerRows}
       belowContent={showKi ? <LeadGptStudioBlock lead={lead} /> : null}

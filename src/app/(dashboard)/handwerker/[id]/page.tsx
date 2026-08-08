@@ -31,7 +31,7 @@ export default async function HandwerkerDetailPage({ params }: { params: Promise
     loadGewerkeAusfuehrung(supabase),
     loadRahmenVertragForHandwerker(id),
     loadComplianceTypen(),
-    loadVorgaengeListe(),
+    loadVorgaengeListe({ handwerkerId: id }),
   ])
 
   if (!detail.handwerker) {

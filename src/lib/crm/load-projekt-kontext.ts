@@ -20,6 +20,14 @@ type LoadProjektKontextInput = {
   rechnungId?: string | null
 }
 
+const ANGEBOT_KURZ_SELECT =
+  'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max'
+
+const RECHNUNG_KURZ_SELECT =
+  'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
+
+const AUFTRAG_KURZ_SELECT = 'id, titel, status, created_at'
+
 function leadLabel(row: {
   situation?: string | null
   bereiche?: string[] | null
@@ -31,6 +39,10 @@ function leadLabel(row: {
   )
 }
 
+/**
+ * Pipeline-Kontext für Phasen-UI.
+ * IDs sequentiell auflösen (Abhängigkeiten), Entity-Reads parallel.
+ */
 export async function loadProjektKontext(
   supabase: SupabaseClient,
   input: LoadProjektKontextInput
@@ -41,7 +53,8 @@ export async function loadProjektKontext(
   let auftragId = input.auftragId?.trim() || null
   const rechnungId = input.rechnungId?.trim() || null
 
-  if (rechnungId && (!leadId || !kundeId || !auftragId)) {
+  // ── Phase 1: fehlende IDs auflösen (nur nötige Schritte) ──
+  if (rechnungId && (!leadId || !kundeId || !auftragId || !angebotId)) {
     const { data: rec } = await supabase
       .from('rechnungen')
       .select('id, kunde_id, auftrag_id, angebot_id')
@@ -54,7 +67,7 @@ export async function loadProjektKontext(
     }
   }
 
-  if (auftragId && !leadId) {
+  if (auftragId && (!leadId || !kundeId || !angebotId)) {
     const { data: auf } = await supabase
       .from('auftraege')
       .select('lead_id, kunde_id, angebot_id')
@@ -88,123 +101,103 @@ export async function loadProjektKontext(
     kundeId = leadVertragsKundeId(leadRow ?? {}) ?? null
   }
 
+  // ── Phase 2: Entity-Reads parallel ──
+  const [kundeRes, leadRes, angeboteRes, auftragRes] = await Promise.all([
+    kundeId
+      ? supabase
+          .from('kunden')
+          .select('id, name, vorname, nachname, typ')
+          .eq('id', kundeId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    leadId
+      ? supabase
+          .from('leads')
+          .select('id, status, situation, bereiche, org_freigabe_status, created_at')
+          .eq('id', leadId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    leadId
+      ? supabase
+          .from('angebote')
+          .select(ANGEBOT_KURZ_SELECT)
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: false })
+      : kundeId
+        ? supabase
+            .from('angebote')
+            .select(ANGEBOT_KURZ_SELECT)
+            .eq('kunde_id', kundeId)
+            .order('created_at', { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] }),
+    auftragId
+      ? supabase.from('auftraege').select(AUFTRAG_KURZ_SELECT).eq('id', auftragId).maybeSingle()
+      : leadId
+        ? supabase
+            .from('auftraege')
+            .select(AUFTRAG_KURZ_SELECT)
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : angebotId
+          ? supabase
+              .from('auftraege')
+              .select(AUFTRAG_KURZ_SELECT)
+              .eq('angebot_id', angebotId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+  ])
+
   let kunde: ProjektKontext['kunde'] = null
-  if (kundeId) {
-    const { data: kRow } = await supabase
-      .from('kunden')
-      .select('id, name, vorname, nachname, typ')
-      .eq('id', kundeId)
-      .maybeSingle()
-    if (kRow) {
-      kunde = { id: kRow.id as string, name: kundeDisplayName(kRow as Parameters<typeof kundeDisplayName>[0]) }
+  if (kundeRes.data) {
+    const kRow = kundeRes.data
+    kunde = {
+      id: kRow.id as string,
+      name: kundeDisplayName(kRow as Parameters<typeof kundeDisplayName>[0]),
     }
   }
 
   let lead: ProjektKontext['lead'] = null
-  if (leadId) {
-    const { data: lRow } = await supabase
-      .from('leads')
-      .select('id, status, situation, bereiche, org_freigabe_status, created_at')
-      .eq('id', leadId)
-      .maybeSingle()
-    if (lRow) {
-      lead = {
-        id: lRow.id as string,
-        label: leadLabel(lRow as { situation?: string | null; bereiche?: string[] | null; id: string }),
-        status: String(lRow.status ?? ''),
-        org_freigabe_status: (lRow.org_freigabe_status as string | null) ?? null,
-        created_at: (lRow.created_at as string | null) ?? null,
-      }
+  if (leadRes.data) {
+    const lRow = leadRes.data
+    lead = {
+      id: lRow.id as string,
+      label: leadLabel(lRow as { situation?: string | null; bereiche?: string[] | null; id: string }),
+      status: String(lRow.status ?? ''),
+      org_freigabe_status: (lRow.org_freigabe_status as string | null) ?? null,
+      created_at: (lRow.created_at as string | null) ?? null,
     }
   }
 
-  let angebote: ProjektAngebotKurz[] = []
-  if (leadId) {
-    const { data: angRows } = await supabase
-      .from('angebote')
-      .select(
-        'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max'
-      )
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-    angebote = (angRows ?? []) as ProjektAngebotKurz[]
-  } else if (kundeId) {
-    const { data: angRows } = await supabase
-      .from('angebote')
-      .select(
-        'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max'
-      )
-      .eq('kunde_id', kundeId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-    angebote = (angRows ?? []) as ProjektAngebotKurz[]
-  }
+  const angebote = (angeboteRes.data ?? []) as ProjektAngebotKurz[]
 
   let auftrag: ProjektKontext['auftrag'] = null
-  if (auftragId) {
-    const { data: aRow } = await supabase
-      .from('auftraege')
-      .select('id, titel, status, created_at')
-      .eq('id', auftragId)
-      .maybeSingle()
-    if (aRow) {
-      auftrag = {
-        id: aRow.id as string,
-        titel: (aRow.titel as string | null) ?? null,
-        status: String(aRow.status ?? ''),
-        created_at: (aRow.created_at as string | null) ?? null,
-      }
-    }
-  } else if (leadId) {
-    const { data: aRow } = await supabase
-      .from('auftraege')
-      .select('id, titel, status, created_at')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (aRow) {
-      auftragId = aRow.id as string
-      auftrag = {
-        id: aRow.id as string,
-        titel: (aRow.titel as string | null) ?? null,
-        status: String(aRow.status ?? ''),
-        created_at: (aRow.created_at as string | null) ?? null,
-      }
-    }
-  } else if (angebotId) {
-    const { data: aRow } = await supabase
-      .from('auftraege')
-      .select('id, titel, status, created_at')
-      .eq('angebot_id', angebotId)
-      .maybeSingle()
-    if (aRow) {
-      auftragId = aRow.id as string
-      auftrag = {
-        id: aRow.id as string,
-        titel: (aRow.titel as string | null) ?? null,
-        status: String(aRow.status ?? ''),
-        created_at: (aRow.created_at as string | null) ?? null,
-      }
+  if (auftragRes.data) {
+    const aRow = auftragRes.data
+    auftragId = aRow.id as string
+    auftrag = {
+      id: aRow.id as string,
+      titel: (aRow.titel as string | null) ?? null,
+      status: String(aRow.status ?? ''),
+      created_at: (aRow.created_at as string | null) ?? null,
     }
   }
 
+  // ── Phase 3: Rechnungen (braucht ggf. aufgelöste auftragId) ──
   let rechnungen: ProjektRechnungKurz[] = []
   if (auftragId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select(
-        'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
-      )
+      .select(RECHNUNG_KURZ_SELECT)
       .eq('auftrag_id', auftragId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   } else if (angebotId) {
     const { data: recRows } = await supabase
       .from('rechnungen')
-      .select(
-        'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
-      )
+      .select(RECHNUNG_KURZ_SELECT)
       .eq('angebot_id', angebotId)
       .order('rechnungsdatum', { ascending: false })
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]

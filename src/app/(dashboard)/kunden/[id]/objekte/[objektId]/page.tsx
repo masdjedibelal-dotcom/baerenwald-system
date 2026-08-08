@@ -24,7 +24,7 @@ export default async function ObjektAktePage({
   const [kunde, akte, vorgaenge] = await Promise.all([
     loadKundeDetail(kundeId),
     loadObjektAkteDetail(kundeId, objektId),
-    loadVorgaengeListe(),
+    loadVorgaengeListe({ kundeId }),
   ])
 
   if (!kunde || !akte) notFound()

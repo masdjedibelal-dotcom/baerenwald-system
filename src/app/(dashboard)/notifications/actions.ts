@@ -196,45 +196,156 @@ async function currentUserId(): Promise<string | null> {
   return user?.id ?? null
 }
 
-async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
+/**
+ * Aggregiert Updates aus ~11 Quellen (letzte 7 Tage).
+ * Quellen parallel laden — früher sequentiell → Glocke wirkte „ewig“ auf „Lädt…“.
+ */
+async function collectCrmNotificationItems(opts?: {
+  /** Kundenname in Subzeile (nur Liste; Badge braucht das nicht). */
+  enrichKunden?: boolean
+}): Promise<CrmNotificationItem[]> {
+  const enrichKunden = opts?.enrichKunden !== false
   const supabase = createClient()
   const since = sinceIso()
   const items: CrmNotificationItem[] = []
 
-  // ── Neue Anfrage ─────────────────────────────────────────────
-  const { data: leads, error: leadErr } = await supabase
-    .from('leads')
-    .select('id, kontakt_name, situation, plz, created_at')
-    .is('geloescht_am', null)
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(40)
+  const hwSelect = `id, status, antwort_at, hw_eingereicht_at, angebot_id,
+       handwerker:handwerker_id(name),
+       gewerke:gewerk_id(name),
+       angebote:angebot_id(id, lead_id, angebotsnr)`
 
-  if (leadErr && /geloescht_am/i.test(leadErr.message)) {
+  type HwZuweisungRow = {
+    id: string
+    status?: string | null
+    antwort_at?: string | null
+    hw_eingereicht_at?: string | null
+    angebot_id?: string | null
+    handwerker?: { name?: string | null } | { name?: string | null }[] | null
+    gewerke?: { name?: string | null } | { name?: string | null }[] | null
+    angebote?:
+      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
+      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
+      | null
+  }
+
+  const [
+    leadsRes,
+    peRes,
+    hwAntwortRes,
+    hwEinreichungRes,
+    posHwRes,
+    pvRes,
+    abnahmeTlRes,
+    freigabeRes,
+    auftraegeRes,
+    posMelRes,
+    waRes,
+  ] = await Promise.all([
+    supabase
+      .from('leads')
+      .select('id, kontakt_name, situation, plz, created_at')
+      .is('geloescht_am', null)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('position_eintraege')
+      .select(
+        'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
+      )
+      .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('angebot_handwerker')
+      .select(hwSelect)
+      .gte('antwort_at', since)
+      .order('antwort_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('angebot_handwerker')
+      .select(hwSelect)
+      .gte('hw_eingereicht_at', since)
+      .order('hw_eingereicht_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftrag_positionen')
+      .select(
+        'id, auftrag_id, leistung_name, handwerker_status, handwerker_angefragt_at, handwerker:handwerker_id(name)'
+      )
+      .in('handwerker_status', ['akzeptiert', 'abgelehnt', 'angenommen'])
+      .gte('handwerker_angefragt_at', since)
+      .order('handwerker_angefragt_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftrag_handwerker')
+      .select(
+        'id, auftrag_id, projektvertrag_bestaetigt_am, handwerker:handwerker_id(name), gewerke:gewerk_id(name)'
+      )
+      .gte('projektvertrag_bestaetigt_am', since)
+      .order('projektvertrag_bestaetigt_am', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftrag_timeline')
+      .select('id, auftrag_id, titel, beschreibung, created_at')
+      .ilike('titel', '%Abnahmeprotokoll bestätigt%')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftrag_abnahmeprotokolle')
+      .select(
+        'id, auftrag_id, updated_at, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel)'
+      )
+      .eq('freigabe_status', 'zur_freigabe')
+      .eq('ebene', 'handwerker')
+      .gte('updated_at', since)
+      .order('updated_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftraege')
+      .select('id, titel, status, updated_at, abnahme_datum, kunden:kunde_id(name)')
+      .eq('status', 'abgeschlossen')
+      .gte('updated_at', since)
+      .order('updated_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('partner_positions_anfragen')
+      .select(
+        'id, auftrag_id, titel, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel, projekt_name)'
+      )
+      .eq('status', 'offen')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('auftrag_positionen')
+      .select('id, auftrag_id, leistung_name, created_at, handwerker:handwerker_id(name)')
+      .eq('anerkennung_status', 'in_pruefung')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+  ])
+
+  // ── Neue Anfrage ─────────────────────────────────────────────
+  let leadRows = leadsRes.data ?? []
+  if (leadsRes.error && /geloescht_am/i.test(leadsRes.error.message)) {
     const retry = await supabase
       .from('leads')
       .select('id, kontakt_name, situation, plz, created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(40)
-    for (const row of retry.data ?? []) pushLead(items, row)
-  } else if (!leadErr) {
-    for (const row of leads ?? []) pushLead(items, row)
+    leadRows = retry.data ?? []
+  } else if (leadsRes.error) {
+    leadRows = []
   }
+  for (const row of leadRows) pushLead(items, row)
 
   // ── Bautagebuch (Partner-App) ────────────────────────────────
-  const { data: eintraege, error: peErr } = await supabase
-    .from('position_eintraege')
-    .select(
-      'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
-    )
-    .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(40)
-
-  if (!peErr) {
-    for (const row of eintraege ?? []) {
+  if (!peRes.error) {
+    for (const row of peRes.data ?? []) {
       const pos = one(
         row.auftrag_positionen as
           | {
@@ -271,40 +382,11 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Angebot: Handwerker Zusage / Ablehnung / Einreichung ─────
-  const hwSelect = `id, status, antwort_at, hw_eingereicht_at, angebot_id,
-       handwerker:handwerker_id(name),
-       gewerke:gewerk_id(name),
-       angebote:angebot_id(id, lead_id, angebotsnr)`
-  const [hwAntwortRes, hwEinreichungRes] = await Promise.all([
-    supabase
-      .from('angebot_handwerker')
-      .select(hwSelect)
-      .gte('antwort_at', since)
-      .order('antwort_at', { ascending: false })
-      .limit(40),
-    supabase
-      .from('angebot_handwerker')
-      .select(hwSelect)
-      .gte('hw_eingereicht_at', since)
-      .order('hw_eingereicht_at', { ascending: false })
-      .limit(40),
-  ])
-
-  type HwZuweisungRow = {
-    id: string
-    status?: string | null
-    antwort_at?: string | null
-    hw_eingereicht_at?: string | null
-    angebot_id?: string | null
-    handwerker?: { name?: string | null } | { name?: string | null }[] | null
-    gewerke?: { name?: string | null } | { name?: string | null }[] | null
-    angebote?:
-      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
-      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
-      | null
-  }
   const hwById = new Map<string, HwZuweisungRow>()
-  for (const row of [...(hwAntwortRes.data ?? []), ...(hwEinreichungRes.data ?? [])] as HwZuweisungRow[]) {
+  for (const row of [
+    ...(hwAntwortRes.data ?? []),
+    ...(hwEinreichungRes.data ?? []),
+  ] as HwZuweisungRow[]) {
     hwById.set(String(row.id), row)
   }
   const hwZuweisungen = Array.from(hwById.values())
@@ -397,19 +479,8 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Auftrag: Partner nimmt Leistung an / lehnt ab ────────────
-  // Zeitstempel: handwerker_angefragt_at (Portal-Antwort setzt Status, kein updated_at)
-  const { data: posHw, error: posErr } = await supabase
-    .from('auftrag_positionen')
-    .select(
-      'id, auftrag_id, leistung_name, handwerker_status, handwerker_angefragt_at, handwerker:handwerker_id(name)'
-    )
-    .in('handwerker_status', ['akzeptiert', 'abgelehnt', 'angenommen'])
-    .gte('handwerker_angefragt_at', since)
-    .order('handwerker_angefragt_at', { ascending: false })
-    .limit(40)
-
-  if (!posErr) {
-    for (const row of posHw ?? []) {
+  if (!posHwRes.error) {
+    for (const row of posHwRes.data ?? []) {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const st = normalizeHwZuweisungStatus(row.handwerker_status as string)
@@ -418,8 +489,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
       const hwName = hw?.name?.trim() || 'Handwerker'
       const leistung = (row.leistung_name as string)?.trim()
-      const at =
-        (row.handwerker_angefragt_at as string | null)?.trim() || since
+      const at = (row.handwerker_angefragt_at as string | null)?.trim() || since
       items.push({
         sourceKey: `${typ}:${row.id}`,
         typ,
@@ -436,16 +506,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Projektvertrag im Portal bestätigt ───────────────────────
-  const { data: pvRows } = await supabase
-    .from('auftrag_handwerker')
-    .select(
-      'id, auftrag_id, projektvertrag_bestaetigt_am, handwerker:handwerker_id(name), gewerke:gewerk_id(name)'
-    )
-    .gte('projektvertrag_bestaetigt_am', since)
-    .order('projektvertrag_bestaetigt_am', { ascending: false })
-    .limit(40)
-
-  for (const row of pvRows ?? []) {
+  for (const row of pvRes.data ?? []) {
     const auftragId = (row.auftrag_id as string | null)?.trim()
     const at = (row.projektvertrag_bestaetigt_am as string | null)?.trim()
     if (!auftragId || !at) continue
@@ -465,15 +526,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Abnahmeprotokoll im Portal bestätigt ─────────────────────
-  const { data: abnahmeTl } = await supabase
-    .from('auftrag_timeline')
-    .select('id, auftrag_id, titel, beschreibung, created_at')
-    .ilike('titel', '%Abnahmeprotokoll bestätigt%')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(40)
-
-  for (const row of abnahmeTl ?? []) {
+  for (const row of abnahmeTlRes.data ?? []) {
     const auftragId = (row.auftrag_id as string | null)?.trim()
     if (!auftragId) continue
     items.push({
@@ -488,18 +541,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Teilabnahme zur Freigabe (pro HW-Protokoll) ───────────────
-  const { data: freigabeRows } = await supabase
-    .from('auftrag_abnahmeprotokolle')
-    .select(
-      'id, auftrag_id, updated_at, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel)'
-    )
-    .eq('freigabe_status', 'zur_freigabe')
-    .eq('ebene', 'handwerker')
-    .gte('updated_at', since)
-    .order('updated_at', { ascending: false })
-    .limit(40)
-
-  for (const row of freigabeRows ?? []) {
+  for (const row of freigabeRes.data ?? []) {
     const auftragId = (row.auftrag_id as string | null)?.trim()
     if (!auftragId) continue
     const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
@@ -518,15 +560,7 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Auftrag abgeschlossen ────────────────────────────────────
-  const { data: auftraege } = await supabase
-    .from('auftraege')
-    .select('id, titel, status, updated_at, abnahme_datum, kunden:kunde_id(name)')
-    .eq('status', 'abgeschlossen')
-    .gte('updated_at', since)
-    .order('updated_at', { ascending: false })
-    .limit(40)
-
-  for (const row of auftraege ?? []) {
+  for (const row of auftraegeRes.data ?? []) {
     const kunde = one(row.kunden as { name?: string | null } | { name?: string | null }[] | null)
     const titel = (row.titel as string)?.trim()
     const kundeName = kunde?.name?.trim()
@@ -542,18 +576,8 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Partner: Nachtrag / neue Position gemeldet ───────────────
-  const { data: posMeldungen, error: posMelErr } = await supabase
-    .from('partner_positions_anfragen')
-    .select(
-      'id, auftrag_id, titel, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel, projekt_name)'
-    )
-    .eq('status', 'offen')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(40)
-
-  if (!posMelErr) {
-    for (const row of posMeldungen ?? []) {
+  if (!posMelRes.error) {
+    for (const row of posMelRes.data ?? []) {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
@@ -579,18 +603,8 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   // ── Partner: Weitere Arbeit (Regie) in Prüfung ───────────────
-  const { data: weitereArbeit, error: waErr } = await supabase
-    .from('auftrag_positionen')
-    .select(
-      'id, auftrag_id, leistung_name, created_at, handwerker:handwerker_id(name)'
-    )
-    .eq('anerkennung_status', 'in_pruefung')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(40)
-
-  if (!waErr) {
-    for (const row of weitereArbeit ?? []) {
+  if (!waRes.error) {
+    for (const row of waRes.data ?? []) {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
@@ -609,7 +623,9 @@ async function collectCrmNotificationItems(): Promise<CrmNotificationItem[]> {
   }
 
   items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  await applyUpdateZeilenAnzeige(supabase, items)
+  if (enrichKunden) {
+    await applyUpdateZeilenAnzeige(supabase, items)
+  }
   return items
 }
 
@@ -841,7 +857,8 @@ export async function getCrmNotificationUnreadCount(): Promise<number> {
   const userId = await currentUserId()
   if (!userId) return 0
 
-  const items = await collectCrmNotificationItems()
+  // Badge: ohne Kunden-Enrichment (spart 4 Extra-Queries)
+  const items = await collectCrmNotificationItems({ enrichKunden: false })
   if (!items.length) return 0
 
   const supabase = createClient()

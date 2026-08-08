@@ -324,21 +324,23 @@ export function HandwerkerListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Gewerke">
-          {gewerkChipOptions.map((o) => (
-            <MockChip
-              key={o.value}
-              active={gewerkChip === o.value}
-              count={o.count}
-              onClick={() => setGewerkChip(o.value)}
-            >
-              {o.label}
-            </MockChip>
-          ))}
-        </div>
-        <ListbarActionsMenu
+        <div className="listbar-main">
+          <div className="listbar-chips" role="group" aria-label="Gewerke">
+            {gewerkChipOptions.map((o) => (
+              <MockChip
+                key={o.value}
+                active={gewerkChip === o.value}
+                count={o.count}
+                onClick={() => setGewerkChip(o.value)}
+              >
+                {o.label}
+              </MockChip>
+            ))}
+          </div>
+          <ListbarActionsMenu
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
+          directOpen={() => setFilterOpen(true)}
           items={[
             {
               icon: 'filter',
@@ -409,6 +411,7 @@ export function HandwerkerListeClient({
             </>
           }
         />
+        </div>
       </div>
 
       {isMobile ? (

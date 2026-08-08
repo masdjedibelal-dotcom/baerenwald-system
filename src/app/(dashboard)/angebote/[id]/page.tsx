@@ -3,7 +3,6 @@ import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotDetailPageClient } from '@/components/angebote/AngebotDetailPageClient'
 import { loadWizardContext } from '@/lib/wizard-context'
-import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import type { AngebotDetail, Handwerker, LeadDetail, LeadTimelineRow } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { loadKiVisualisierungenForAngebot } from '@/lib/visualize/queries'
@@ -43,22 +42,17 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     positionen: normalizeAngebotPositionen((data as { positionen: unknown }).positionen),
   }
 
-  const { data: auftrag } = await supabase
-    .from('auftraege')
-    .select('id')
-    .eq('angebot_id', params.id)
-    .maybeSingle()
+  const [{ data: auftrag }, tlByAngebotRes] = await Promise.all([
+    supabase.from('auftraege').select('id').eq('angebot_id', params.id).maybeSingle(),
+    supabase
+      .from('lead_timeline')
+      .select('*')
+      .eq('angebot_id', params.id)
+      .order('created_at', { ascending: true }),
+  ])
 
-  let timeline: LeadTimelineRow[] = []
-  const { data: tlByAngebot } = await supabase
-    .from('lead_timeline')
-    .select('*')
-    .eq('angebot_id', params.id)
-    .order('created_at', { ascending: true })
-
-  if (tlByAngebot?.length) {
-    timeline = tlByAngebot as LeadTimelineRow[]
-  } else if (detail.lead_id) {
+  let timeline: LeadTimelineRow[] = (tlByAngebotRes.data ?? []) as LeadTimelineRow[]
+  if (!timeline.length && detail.lead_id) {
     const { data: tlByLead } = await supabase
       .from('lead_timeline')
       .select('*')
@@ -67,10 +61,22 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     timeline = (tlByLead ?? []) as LeadTimelineRow[]
   }
 
+  const auftragId = (auftrag as { id: string } | null)?.id ?? null
+
   const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext, { data: hwRows }] =
     await Promise.all([
       loadWizardContext(supabase),
-      detail.lead_id ? loadAnfrageDetail(supabase, detail.lead_id) : Promise.resolve(null),
+      // Schlankes Lead statt Full-Anfrage-Detail (Angebot hat schon Lead-Embed)
+      detail.lead_id
+        ? supabase
+            .from('leads')
+            .select(
+              'id, status, kanal, anlass, situation, bereiche, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, auftraggeber_kunde_id, org_freigabe_status, kundentyp, created_at, plz, notizen, budget_ca, preis_min, preis_max, kunde_id'
+            )
+            .eq('id', detail.lead_id)
+            .maybeSingle()
+            .then((r) => (r.data as LeadDetail | null) ?? null)
+        : Promise.resolve(null),
       loadKiVisualisierungenForAngebot(params.id),
       loadProjektKontext(supabase, {
         activeKind: 'angebot',
@@ -78,16 +84,20 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
         angebotId: params.id,
         leadId: detail.lead_id,
         kundeId: detail.kunde_id,
-        auftragId: (auftrag as { id: string } | null)?.id ?? null,
+        auftragId,
       }),
-      supabase.from('handwerker').select('*').eq('aktiv', true).order('name'),
+      supabase
+        .from('handwerker')
+        .select('id, name, email, telefon, gewerke, firma, aktiv')
+        .eq('aktiv', true)
+        .order('name'),
     ])
 
   return (
     <AngebotDetailPageClient
       detail={detail}
       timeline={timeline}
-      auftragId={(auftrag as { id: string } | null)?.id ?? null}
+      auftragId={auftragId}
       gewerke={gewerke}
       wizardPreislisten={wizardPreislisten}
       wizardFirm={firm}

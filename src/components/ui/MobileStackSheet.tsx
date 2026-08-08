@@ -35,14 +35,8 @@ export function MobileStackSheet({
         else onClose()
       }
     }
-    if (open) {
-      document.addEventListener('keydown', handler)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
-    }
+    if (open) document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [open, onClose, onBack, canGoBack])
 
   if (!open) return null

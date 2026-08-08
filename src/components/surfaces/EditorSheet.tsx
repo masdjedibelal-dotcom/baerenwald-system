@@ -215,27 +215,14 @@ export function EditorSheet({
     updateEditorSheetHistoryPop(sheetId, handleHistoryPop)
   }, [open, sheetId, handleHistoryPop, manageHistory])
 
-  /* Body scroll lock + focus trap (pausiert, wenn KI-Assistent über dem Sheet liegt).
+  /* Focus trap (Scroll-Lock über useOverlayChromeLock / body-scroll-lock).
+   * Pausiert, wenn KI-Assistent über dem Sheet liegt.
    * requestClose per Ref — sonst Re-Init bei Parent-Rerender → Fokus klauen → Tastatur zu. */
   useEffect(() => {
-    if (!open || !mounted) return
-    if (pauseFocusTrap) {
-      const prev = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = prev
-      }
-    }
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    if (!open || !mounted || pauseFocusTrap) return
     const el = rootRef.current
-    const release = el
-      ? trapFocus(el, () => requestCloseRef.current())
-      : undefined
-    return () => {
-      document.body.style.overflow = prev
-      release?.()
-    }
+    if (!el) return
+    return trapFocus(el, () => requestCloseRef.current())
   }, [open, mounted, pauseFocusTrap])
 
   /* S7: iOS-Tastatur — Overlay bleibt Vollfläche (sonst Lücke → Seite darunter sichtbar).

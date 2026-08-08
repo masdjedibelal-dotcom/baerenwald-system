@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -13,6 +13,7 @@ import {
   type GewerkUmsatzZeile,
   type RankingZeile,
   type UmsatzMonat,
+  umsatzMonatGesamt,
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
@@ -31,39 +32,32 @@ export type DashboardKpi = {
   href: string
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
-  return (name.slice(0, 2) || '?').toUpperCase()
-}
+const UMSATZ_BAR = {
+  aktiv: '#94A3B8',
+  erledigt: '#2E7D52',
+  rechnungen: '#3B82F6',
+} as const
 
-function UmsatzLineChart({ months }: { months: UmsatzMonat[] }) {
+function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const safeMonths = Array.isArray(months) ? months : []
-  const offenVals = safeMonths.map((m) => Number(m?.offen) || 0)
-  const doneVals = safeMonths.map((m) => Number(m?.abgeschlossen) || 0)
-  const max = Math.max(1, ...offenVals, ...doneVals)
-  const total = offenVals.reduce((s, n) => s + n, 0) + doneVals.reduce((s, n) => s + n, 0)
+  const totals = safeMonths.map((m) => umsatzMonatGesamt(m))
+  const max = Math.max(1, ...totals)
+  const total = totals.reduce((s, n) => s + n, 0)
 
   const W = 360
-  const H = 148
-  const padL = 6
-  const padR = 6
-  const padT = 10
-  const padB = 26
+  const H = 168
+  const padL = 8
+  const padR = 8
+  const padT = 12
+  const padB = 28
   const innerW = W - padL - padR
   const innerH = H - padT - padB
-  const n = safeMonths.length
+  const n = Math.max(1, safeMonths.length)
+  const slot = innerW / n
+  const barW = Math.min(28, Math.max(12, slot * 0.55))
 
-  function xAt(i: number) {
-    if (n <= 1) return padL + innerW / 2
-    return padL + (i / (n - 1)) * innerW
-  }
   function yAt(v: number) {
     return padT + innerH - (v / max) * innerH
-  }
-  function linePath(vals: number[]) {
-    if (!vals.length) return ''
-    return vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(' ')
   }
 
   return (
@@ -79,18 +73,14 @@ function UmsatzLineChart({ months }: { months: UmsatzMonat[] }) {
           <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
             {formatEurBetrag(total)}
           </div>
-          <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Netto · Auftragssummen · letzte 6 Monate
-          </div>
         </div>
         <div className="w-full">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            className="h-40 w-full"
+            className="h-44 w-full"
             role="img"
-            aria-label="Umsatzverlauf Liniendiagramm"
+            aria-label="Umsatzverlauf Balkendiagramm"
           >
-            {/* Hilfslinien */}
             {[0.25, 0.5, 0.75, 1].map((t) => (
               <line
                 key={t}
@@ -103,69 +93,122 @@ function UmsatzLineChart({ months }: { months: UmsatzMonat[] }) {
                 strokeDasharray="3 3"
               />
             ))}
-            <path
-              d={linePath(offenVals)}
-              fill="none"
-              stroke="var(--border-2, #c5c9ce)"
-              strokeWidth={2.25}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d={linePath(doneVals)}
-              fill="none"
-              stroke="var(--green)"
-              strokeWidth={2.25}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {safeMonths.map((m, i) => (
-              <g key={m.key}>
-                <circle
-                  cx={xAt(i)}
-                  cy={yAt(offenVals[i]!)}
-                  r={3}
-                  fill="var(--card, #fff)"
-                  stroke="var(--border-2, #c5c9ce)"
-                  strokeWidth={1.5}
-                >
-                  <title>{`${m.label} Offen: ${formatEurBetrag(offenVals[i]!)}`}</title>
-                </circle>
-                <circle
-                  cx={xAt(i)}
-                  cy={yAt(doneVals[i]!)}
-                  r={3}
-                  fill="var(--card, #fff)"
-                  stroke="var(--green)"
-                  strokeWidth={1.5}
-                >
-                  <title>{`${m.label} Abgeschlossen: ${formatEurBetrag(doneVals[i]!)}`}</title>
-                </circle>
-                <text
-                  x={xAt(i)}
-                  y={H - 6}
-                  textAnchor="middle"
-                  className="fill-[var(--text-3)]"
-                  style={{ fontSize: 11 }}
-                >
-                  {m.label}
-                </text>
-              </g>
-            ))}
+            {safeMonths.map((m, i) => {
+              const aktiv = Number(m.offen) || 0
+              const erledigt = Number(m.abgeschlossen) || 0
+              const rechnungen = Number(m.rechnungen) || 0
+              const cx = padL + slot * i + slot / 2
+              const x = cx - barW / 2
+              let yCursor = padT + innerH
+              const segments = [
+                { v: aktiv, fill: UMSATZ_BAR.aktiv, label: 'Aktiv' },
+                { v: erledigt, fill: UMSATZ_BAR.erledigt, label: 'Erledigt' },
+                { v: rechnungen, fill: UMSATZ_BAR.rechnungen, label: 'Rechnungen' },
+              ]
+              return (
+                <g key={m.key}>
+                  {segments.map((seg) => {
+                    if (seg.v <= 0) return null
+                    const h = (seg.v / max) * innerH
+                    yCursor -= h
+                    return (
+                      <rect
+                        key={seg.label}
+                        x={x}
+                        y={yCursor}
+                        width={barW}
+                        height={Math.max(h, 0.5)}
+                        rx={2}
+                        fill={seg.fill}
+                      >
+                        <title>{`${m.label} ${seg.label}: ${formatEurBetrag(seg.v)}`}</title>
+                      </rect>
+                    )
+                  })}
+                  <text
+                    x={cx}
+                    y={H - 8}
+                    textAnchor="middle"
+                    className="fill-[var(--text-3)]"
+                    style={{ fontSize: 11 }}
+                  >
+                    {m.label}
+                  </text>
+                </g>
+              )
+            })}
           </svg>
         </div>
-        <div className="mt-1 flex items-center gap-4 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--fs-meta)] text-[var(--text-3)]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: 'var(--green)' }} />
-            Abgeschlossen
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: UMSATZ_BAR.aktiv }} />
+            Aktiv
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: UMSATZ_BAR.erledigt }} />
+            Erledigt
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="inline-block h-0.5 w-3 rounded-full"
-              style={{ background: 'var(--border-2, #c5c9ce)' }}
+              className="inline-block h-2 w-2 rounded-sm"
+              style={{ background: UMSATZ_BAR.rechnungen }}
             />
-            Offen
+            Rechnungen
           </span>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[320px] border-collapse text-[length:var(--fs-meta)]">
+            <thead>
+              <tr className="border-b border-[var(--border)]">
+                <th className="px-1.5 py-1.5 text-left font-medium text-[var(--text-3)]"> </th>
+                {safeMonths.map((m) => (
+                  <th
+                    key={m.key}
+                    className="px-1.5 py-1.5 text-right font-medium tabular-nums text-[var(--text-3)]"
+                  >
+                    {m.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  { key: 'offen', label: 'Aktiv', get: (m: UmsatzMonat) => Number(m.offen) || 0 },
+                  {
+                    key: 'abgeschlossen',
+                    label: 'Erledigt',
+                    get: (m: UmsatzMonat) => Number(m.abgeschlossen) || 0,
+                  },
+                  {
+                    key: 'rechnungen',
+                    label: 'Rechnungen',
+                    get: (m: UmsatzMonat) => Number(m.rechnungen) || 0,
+                  },
+                  { key: 'gesamt', label: 'Gesamt', get: umsatzMonatGesamt },
+                ] as const
+              ).map((row) => (
+                <tr
+                  key={row.key}
+                  className={cn(
+                    'border-b border-[var(--border)] last:border-0',
+                    row.key === 'gesamt' && 'font-semibold'
+                  )}
+                >
+                  <td className="whitespace-nowrap px-1.5 py-1.5 text-[var(--text-2)]">{row.label}</td>
+                  {safeMonths.map((m) => (
+                    <td
+                      key={m.key}
+                      className="px-1.5 py-1.5 text-right tabular-nums text-[var(--text)]"
+                    >
+                      {formatEurBetrag(row.get(m))}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -279,17 +322,11 @@ function GewerkUmsatzCard({
           <MockIcon ctx="emphasis" n="clock" size={16} />
           Umsatz nach Gewerk
         </div>
-        <div className="text-right text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          Auftragsvolumen gesamt
-          <div className="text-[length:var(--fs-title)] font-semibold tabular-nums text-[var(--text)]">
-            {formatEurBetrag(gesamt)}
-          </div>
+        <div className="text-[length:var(--fs-title)] font-semibold tabular-nums text-[var(--text)]">
+          {formatEurBetrag(gesamt)}
         </div>
       </div>
       <div className="card-b">
-        <p className="mb-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          Nur abgeschlossene Vorgänge · Netto aus Angebotspositionen
-        </p>
         {(zeilen ?? []).length === 0 ? (
           <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
             Noch keine abgeschlossenen Vorgänge mit Gewerken.
@@ -332,6 +369,7 @@ function TopRankingCard({
   handwerker: RankingZeile[]
   kunden: RankingZeile[]
 }) {
+  const isMobile = useIsMobile()
   const [mode, setMode] = useState<'handwerker' | 'kunden'>('handwerker')
   const rows = (mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])).slice(
     0,
@@ -363,24 +401,38 @@ function TopRankingCard({
           </button>
         </div>
       </div>
-      <div className="card-b" style={{ paddingTop: 0 }}>
-        {mode === 'handwerker' ? (
-          <p className="mb-2 pt-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Sortiert nach Einkaufspreis (Zuweisung) · Umsatz = Auftragssumme Netto
-          </p>
-        ) : (
-          <p className="mb-2 pt-3 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Sortiert nach Auftragssumme Netto · Vorgänge einzeln (Anfrage / Angebot / Auftrag)
-          </p>
-        )}
+      <div className="card-b">
         {rows.length === 0 ? (
-          <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">Keine Daten im Zeitraum.</p>
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
+            Keine Daten im Zeitraum.
+          </p>
+        ) : isMobile ? (
+          <ul className="space-y-3">
+            {rows.map((r, i) => (
+              <li key={r.id} className="flex gap-3">
+                <span className="w-5 shrink-0 pt-0.5 text-[length:var(--fs-meta)] tabular-nums text-[var(--text-3)]">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[length:var(--fs-text)] font-medium">{r.name}</div>
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[length:var(--fs-meta)] text-[var(--text-2)]">
+                    <span className="font-medium tabular-nums text-[var(--text)]">
+                      {formatEurBetrag(r.umsatz)}
+                    </span>
+                    <span className="tabular-nums text-[var(--text-3)]">
+                      {r.vorgaenge} {r.vorgaenge === 1 ? 'Vorgang' : 'Vorgänge'}
+                    </span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
           <div className="overflow-x-auto">
             <div
               className="list-row head"
               style={{
-                gridTemplateColumns: '32px minmax(140px, 1.4fr) 72px minmax(100px, 1fr)',
+                gridTemplateColumns: '32px minmax(160px, 1.6fr) 88px minmax(110px, 1fr)',
                 gap: 8,
               }}
             >
@@ -394,23 +446,16 @@ function TopRankingCard({
                 key={r.id}
                 className="list-row"
                 style={{
-                  gridTemplateColumns: '32px minmax(140px, 1.4fr) 72px minmax(100px, 1fr)',
+                  gridTemplateColumns: '32px minmax(160px, 1.6fr) 88px minmax(110px, 1fr)',
                   gap: 8,
                   alignItems: 'center',
                 }}
               >
-                <div className="text-[length:var(--fs-meta)] tabular-nums text-[var(--text-3)]">{i + 1}</div>
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--fs-meta)] font-semibold text-white"
-                    style={{ background: gewerkColor(i) }}
-                  >
-                    {initials(r.name)}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="truncate text-[length:var(--fs-text)] font-medium">{r.name}</div>
-                    <div className="truncate text-[length:var(--fs-meta)] text-[var(--text-3)]">{r.sub}</div>
-                  </div>
+                <div className="text-[length:var(--fs-meta)] tabular-nums text-[var(--text-3)]">
+                  {i + 1}
+                </div>
+                <div className="min-w-0 truncate text-[length:var(--fs-text)] font-medium">
+                  {r.name}
                 </div>
                 <div className="text-[length:var(--fs-text)] tabular-nums">{r.vorgaenge}</div>
                 <div>
@@ -479,6 +524,14 @@ export function DashboardClient({
       }),
     []
   )
+
+  /* Mobil: Dokument-Scroll — nach Navigation von langen Listen (z. B. Vorgänge) zurücksetzen */
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    document.querySelector<HTMLElement>('main.page')?.scrollTo(0, 0)
+  }, [])
 
   function openKpiAnalyse() {
     const snapshot = buildDashboardKpiSnapshot({
@@ -551,15 +604,10 @@ export function DashboardClient({
       <section className="dash-sec dash-sec--zahlen" aria-label="Auswertung">
         <div className="dash-sec__title-row">
           <h2 className="dash-sec__title">Auswertung</h2>
-          {isMobile ? (
-            <span className="dash-sec__scroll-hint" aria-hidden>
-              <MockIcon ctx="empty" n="arrows-exchange" size={14} />
-            </span>
-          ) : null}
         </div>
         <div className="dash-zahlen">
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
-            <UmsatzLineChart months={umsatzMonate} />
+            <UmsatzBarChart months={umsatzMonate} />
           </DashboardLazyMount>
           <DashboardLazyMount minHeight={isMobile ? 200 : 260}>
             <VertriebsFunnel

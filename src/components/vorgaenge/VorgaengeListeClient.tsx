@@ -321,9 +321,18 @@ export function VorgaengeListeClient({
       setFilter(phase)
       setStatusFilter([])
       if (phase !== 'rechnung') setRechnungRichtung('ausgehend')
-      if (!embedded) syncPhaseToUrl(phase, undefined, phase === 'rechnung' ? rechnungRichtung : 'ausgehend')
+      // Erledigt nur unter „Alle“ — Phasen immer Offen
+      const nextLc = phase === 'alle' ? lifecycle : 'offen'
+      if (phase !== 'alle') setLifecycle('offen')
+      if (!embedded) {
+        syncPhaseToUrl(
+          phase,
+          nextLc,
+          phase === 'rechnung' ? rechnungRichtung : 'ausgehend'
+        )
+      }
     },
-    [embedded, syncPhaseToUrl, rechnungRichtung]
+    [embedded, syncPhaseToUrl, rechnungRichtung, lifecycle]
   )
 
   const setLifecycleFilter = useCallback(
@@ -338,26 +347,28 @@ export function VorgaengeListeClient({
     (next: 'ausgehend' | 'eingehend') => {
       setRechnungRichtung(next)
       setStatusFilter([])
-      if (!embedded) syncPhaseToUrl('rechnung', lifecycle, next)
+      setLifecycle('offen')
+      if (!embedded) syncPhaseToUrl('rechnung', 'offen', next)
     },
-    [embedded, syncPhaseToUrl, lifecycle]
+    [embedded, syncPhaseToUrl]
   )
 
   useEffect(() => {
     if (embedded) return
     const tab = searchParams.get('tab') ?? searchParams.get('phase')
-    if (isVorgangFilter(tab)) {
-      setFilter(tab)
-    } else if (!tab) {
-      setFilter('alle')
-    }
-    const lc = searchParams.get('lifecycle')
-    if (lc === 'erledigt' || lc === 'offen') {
-      setLifecycle(lc)
-    }
+    const phase: (typeof VORGANG_FILTERS)[number] = isVorgangFilter(tab) ? tab : 'alle'
+    setFilter(phase)
     const r = searchParams.get('richtung')
-    if (r === 'eingehend') setRechnungRichtung('eingehend')
-    else if (tab === 'rechnung') setRechnungRichtung('ausgehend')
+    if (phase === 'rechnung' && r === 'eingehend') setRechnungRichtung('eingehend')
+    else setRechnungRichtung('ausgehend')
+    const lc = searchParams.get('lifecycle')
+    // Erledigt-Toggle nur unter „Alle“
+    if (phase === 'alle') {
+      if (lc === 'erledigt' || lc === 'offen') setLifecycle(lc)
+      else setLifecycle('offen')
+    } else {
+      setLifecycle('offen')
+    }
   }, [embedded, searchParams])
 
   const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
@@ -426,18 +437,28 @@ export function VorgaengeListeClient({
   }, [hwEingangsrechnungen])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
-  /** Offen/Erledigt nur bei „Alle“ (und HW-Eingang) — in Phasen-Chips kaum sinnvoll. */
-  const showLifecycleToggle = filter === 'alle' || showHwEingang
-  const effectiveLifecycleCounts = showHwEingang ? hwLifecycleCounts : lifecycleCounts
+  /** Offen/Erledigt-Toggle nur bei „Alle“. */
+  const showLifecycleToggle = filter === 'alle'
+  const effectiveLifecycleCounts = lifecycleCounts
 
+  /** Erledigt nur unter „Alle“ — Phasen-Listen immer ohne erledigte Vorgänge. */
   const lifecycleRows = useMemo(() => {
-    if (!showLifecycleToggle) return baseRows
-    return baseRows.filter((v) =>
-      lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
-    )
-  }, [baseRows, lifecycle, showLifecycleToggle])
+    if (filter === 'alle') {
+      return baseRows.filter((v) =>
+        lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+      )
+    }
+    return baseRows.filter((v) => !isVorgangErledigt(v))
+  }, [baseRows, lifecycle, filter])
 
   const statusOptions = useMemo(() => {
+    if (showHwEingang) {
+      return [
+        { value: 'eingereicht', label: 'Offen' },
+        { value: 'bezahlt', label: 'Bezahlt' },
+        { value: 'abgelehnt', label: 'Abgelehnt' },
+      ]
+    }
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
     const phaseRows =
       filter === 'alle' || filter === 'bestand'
@@ -468,7 +489,64 @@ export function VorgaengeListeClient({
     return Array.from(byKey.entries())
       .sort((a, b) => a[1].localeCompare(b[1], 'de'))
       .map(([value, label]) => ({ value, label }))
-  }, [lifecycleRows, filter])
+  }, [lifecycleRows, filter, showHwEingang])
+
+  /** HW-Eingang: Filter über globales Sheet; ohne Statuswahl nur Offen. */
+  const hwFilteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const statuses = statusFilter.length > 0 ? statusFilter : ['eingereicht']
+    return hwEingangsrechnungen.filter((r) => {
+      if (!statuses.includes(r.status)) return false
+      if (fKunde) {
+        const needle = fKunde.toLowerCase()
+        const inKunde = (r.kundeName ?? '').toLowerCase().includes(needle)
+        const inPartner = r.handwerkerName.toLowerCase().includes(needle)
+        if (!inKunde && !inPartner) return false
+      }
+      if (fTitel) {
+        const needle = fTitel.toLowerCase()
+        const hay = `${r.auftragTitel ?? ''} ${r.angebotsnr ?? ''}`.toLowerCase()
+        if (!hay.includes(needle)) return false
+      }
+      if (q) {
+        const hay = [
+          r.handwerkerName,
+          r.kundeName,
+          r.auftragTitel,
+          r.gewerkName,
+          r.angebotsnr,
+          r.iban,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      const euro = r.betragBrutto
+      if (fWertVon) {
+        const min = Number(fWertVon)
+        if (Number.isFinite(min) && (euro == null || euro < min)) return false
+      }
+      if (fWertBis) {
+        const max = Number(fWertBis)
+        if (Number.isFinite(max) && (euro == null || euro > max)) return false
+      }
+      const dk = (r.eingereichtAt ?? '').replace(/\D/g, '').slice(0, 8)
+      if (fDatumVon && dk && dk < fDatumVon.replace(/-/g, '')) return false
+      if (fDatumBis && dk && dk > fDatumBis.replace(/-/g, '')) return false
+      return true
+    })
+  }, [
+    hwEingangsrechnungen,
+    statusFilter,
+    query,
+    fKunde,
+    fTitel,
+    fWertVon,
+    fWertBis,
+    fDatumVon,
+    fDatumBis,
+  ])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -739,13 +817,15 @@ export function VorgaengeListeClient({
     setSelected(n)
   }
 
+  const filterResultCount = showHwEingang ? hwFilteredRows.length : filtered.length
+
   const filterFooter = (
     <div className="sheet-footer-actions">
       <MockBtn kind="secondary" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
-        Anwenden ({filtered.length})
+        Anwenden ({filterResultCount})
       </MockBtn>
     </div>
   )
@@ -759,13 +839,17 @@ export function VorgaengeListeClient({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Kunde, Vorgang, Ort, Nummer…"
+          placeholder={
+            showHwEingang
+              ? 'Partner, Auftrag, IBAN …'
+              : 'Kunde, Vorgang, Ort, Nummer…'
+          }
           autoFocus={!isMobile}
         />
       </div>
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <label className="field">
-          <span className="field-lbl">Kunde</span>
+          <span className="field-lbl">{showHwEingang ? 'Partner / Kunde' : 'Kunde'}</span>
           <input
             className="txt"
             value={fKunde}
@@ -774,7 +858,7 @@ export function VorgaengeListeClient({
           />
         </label>
         <label className="field">
-          <span className="field-lbl">Vorgang</span>
+          <span className="field-lbl">{showHwEingang ? 'Auftrag' : 'Vorgang'}</span>
           <input
             className="txt"
             value={fTitel}
@@ -897,11 +981,7 @@ export function VorgaengeListeClient({
                 </MockChip>
                 <MockChip
                   active={rechnungRichtung === 'eingehend'}
-                  count={
-                    lifecycle === 'offen'
-                      ? hwLifecycleCounts.offen
-                      : hwLifecycleCounts.erledigt
-                  }
+                  count={hwLifecycleCounts.offen}
                   onClick={() => setRechnungRichtungFilter('eingehend')}
                 >
                   Eingehend
@@ -1041,39 +1121,7 @@ export function VorgaengeListeClient({
           open={filterOpen}
           onClose={() => setFilterOpen(false)}
           title="Filter & Suchen"
-          headerEnd={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="mobile-filter-sheet__reset"
-                onClick={() =>
-                  runMockListExport(
-                    exportToCSV,
-                    (filtered.length ? filtered : baseRows).map(toExportRow),
-                    EXPORT_FIELDS,
-                    'vorgaenge'
-                  )
-                }
-                title="CSV exportieren"
-                aria-label="CSV exportieren"
-              >
-                CSV
-              </button>
-              <button
-                type="button"
-                className="mobile-filter-sheet__reset"
-                onClick={resetFilters}
-                disabled={!activeFilterCount}
-              >
-                Zurücksetzen
-              </button>
-            </div>
-          }
-          footer={
-            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
-              Anwenden ({filtered.length})
-            </button>
-          }
+          footer={filterFooter}
         >
           {filterFields}
         </MobileListFilterSheet>
@@ -1176,7 +1224,10 @@ export function VorgaengeListeClient({
 
       <PullToRefresh onRefresh={() => router.refresh()}>
       {showHwEingang ? (
-        <HwEingangsrechnungenListe rows={hwEingangsrechnungen} lifecycle={lifecycle} />
+        <HwEingangsrechnungenListe
+          rows={hwFilteredRows}
+          filterKey={`${statusFilter.join(',')}|${query}|${fKunde}|${fTitel}|${fWertVon}|${fWertBis}|${fDatumVon}|${fDatumBis}`}
+        />
       ) : (
       <div
         className="listcard listcard--cols vg-selectmode"

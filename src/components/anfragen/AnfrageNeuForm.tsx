@@ -191,6 +191,7 @@ export function AnfrageNeuForm({
   const [budgetMax, setBudgetMax] = useState('')
   const [istBauprojekt, setIstBauprojekt] = useState(false)
   const [bauprojektManuell, setBauprojektManuell] = useState(false)
+  const [alsAkut, setAlsAkut] = useState(false)
   const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
     wiederkehrFromLead(bearbeitenLead)
   )
@@ -381,6 +382,10 @@ export function AnfrageNeuForm({
     } else setBudgetMax('')
     setIstBauprojekt(L.ist_bauprojekt === true)
     setBauprojektManuell(L.ist_bauprojekt === true)
+    setAlsAkut(
+      (L.freigabe_bypass_grund ?? '').trim() === 'akut' ||
+        (L.situation ?? '').trim() === 'notfall'
+    )
     setWiederkehr(wiederkehrFromLead(L))
     // Absichtlich nicht `bearbeitenLead` gesamt: vermeidet Zurücksetzen bei jedem Parent-Render bei offenem Sheet.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Nur bei anderer Lead-Revision neu aufbauen
@@ -414,6 +419,7 @@ export function AnfrageNeuForm({
     setZugaenglichkeit('')
     setBadAusstattung('')
     if (val === 'gewerbe') setKundentyp('gewerbe')
+    if (val === 'notfall') setAlsAkut(true)
   }
 
   function clearFachdetailsForBereich(bereich: string) {
@@ -535,6 +541,8 @@ export function AnfrageNeuForm({
       funnel_daten,
       notizen: interneNotiz.trim(),
       ist_bauprojekt: istBauprojekt,
+      als_akut: !isBearbeiten && alsAkut,
+      bestaetigungsmail_senden: !isBearbeiten && bestaetigungsmailSenden,
       ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
       wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     }
@@ -806,6 +814,22 @@ export function AnfrageNeuForm({
               </span>
             </span>
           </label>
+
+          {!isBearbeiten ? (
+            <label className="checkbox-row mt-4 rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
+              <input
+                type="checkbox"
+                checked={alsAkut}
+                onChange={(e) => setAlsAkut(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium text-bw-text">Akut / Notfall</span>
+                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                  Direkt beauftragen ohne Angebot — wie eingehende Akut-Meldungen.
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           <VorgangArtWiederkehrField
             value={wiederkehr}

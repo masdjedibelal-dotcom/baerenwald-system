@@ -158,6 +158,7 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     funnel_daten,
     notizen: state.interneNotiz.trim(),
     ist_bauprojekt: state.istBauprojekt,
+    als_akut: state.alsAkut,
     anlass: isHv ? 'meldung' : undefined,
     auftraggeber_kunde_id:
       isHv && state.kundeId && kundentyp === 'verwaltung' ? state.kundeId : undefined,
