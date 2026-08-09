@@ -20,7 +20,7 @@ import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { listSortDirNum } from '@/lib/list-mock-sort'
-import type { EntityMenuItem } from '@/lib/entity-menu'
+import { buildEntityMenu, type EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 
 export type PartnerKategorie = {

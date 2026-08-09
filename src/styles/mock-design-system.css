@@ -10460,6 +10460,13 @@ textarea.input:focus {
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green-50, rgba(46, 125, 82, 0.18));
 }
+.crm-login__input:disabled,
+.crm-login__input[readonly] {
+  background: var(--bg-soft, #f4f6f4);
+  color: var(--text-2);
+  opacity: 1;
+  -webkit-opacity: 1;
+}
 .crm-login__input::placeholder {
   color: var(--text-4);
 }
@@ -10476,9 +10483,13 @@ textarea.input:focus {
   place-items: center;
   cursor: pointer;
 }
-.crm-login__eye:hover {
+.crm-login__eye:hover:not(:disabled) {
   background: var(--bg-soft);
   color: var(--text);
+}
+.crm-login__eye:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .crm-login__row {
   display: flex;
@@ -10512,8 +10523,12 @@ textarea.input:focus {
   color: var(--green);
   cursor: pointer;
 }
-.crm-login__link:hover {
+.crm-login__link:hover:not(:disabled) {
   text-decoration: underline;
+}
+.crm-login__link:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .crm-login__submit {
   width: 100%;
@@ -10566,8 +10581,12 @@ textarea.input:focus {
   cursor: pointer;
   text-align: center;
 }
-.crm-login__back:hover {
+.crm-login__back:hover:not(:disabled) {
   color: var(--green);
+}
+.crm-login__back:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* Legacy login-screen (falls noch Referenzen) */

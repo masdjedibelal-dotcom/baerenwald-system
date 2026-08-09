@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
@@ -30,11 +30,27 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [mode, setMode] = useState<'login' | 'forgot'>('login')
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
+  const forgotEmailRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
   const devError = searchParams.get('dev_error')
   const urlError = searchParams.get('error')
+
+  function dismissKeyboard() {
+    emailRef.current?.blur()
+    passwordRef.current?.blur()
+    forgotEmailRef.current?.blur()
+    const active = document.activeElement
+    if (active instanceof HTMLElement) active.blur()
+  }
+
+  useEffect(() => {
+    if (!loading) return
+    dismissKeyboard()
+  }, [loading])
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +81,7 @@ function LoginPageContent() {
   }, [router, supabase, urlError])
 
   async function handleLogin() {
+    dismissKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -95,6 +112,7 @@ function LoginPageContent() {
   }
 
   async function handleForgot() {
+    dismissKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -177,12 +195,15 @@ function LoginPageContent() {
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
                     <input
                       id="crm-login-email"
+                      ref={emailRef}
                       className="crm-login__input"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="b.baerenwald@crm.de"
                       autoComplete="email"
+                      disabled={loading}
+                      readOnly={loading}
                       onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
                     />
                   </div>
@@ -195,18 +216,22 @@ function LoginPageContent() {
                   <div className="crm-login__input-wrap">
                     <input
                       id="crm-login-password"
+                      ref={passwordRef}
                       className="crm-login__input crm-login__input--plain"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       autoComplete="current-password"
+                      disabled={loading}
+                      readOnly={loading}
                       onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
                     />
                     <button
                       type="button"
                       className="crm-login__eye"
                       aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      disabled={loading}
                       onClick={() => setShowPassword((v) => !v)}
                     >
                       <MockIcon ctx="btn" n="eye" size={16} />
@@ -219,11 +244,12 @@ function LoginPageContent() {
                     <input
                       type="checkbox"
                       checked={remember}
+                      disabled={loading}
                       onChange={(e) => setRemember(e.target.checked)}
                     />
                     <span>Angemeldet bleiben</span>
                   </label>
-                  <button type="button" className="crm-login__link" onClick={openForgot}>
+                  <button type="button" className="crm-login__link" disabled={loading} onClick={openForgot}>
                     Passwort vergessen?
                   </button>
                 </div>
@@ -254,7 +280,7 @@ function LoginPageContent() {
 
               <p className="crm-login__foot">
                 Probleme bei der Anmeldung?{' '}
-                <button type="button" className="crm-login__link" onClick={openForgot}>
+                <button type="button" className="crm-login__link" disabled={loading} onClick={openForgot}>
                   Passwort zurücksetzen
                 </button>
               </p>
@@ -275,12 +301,15 @@ function LoginPageContent() {
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
                     <input
                       id="crm-forgot-email"
+                      ref={forgotEmailRef}
                       className="crm-login__input"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="b.baerenwald@crm.de"
                       autoComplete="email"
+                      disabled={loading}
+                      readOnly={loading}
                     />
                   </div>
                 </div>
@@ -304,6 +333,7 @@ function LoginPageContent() {
                 <button
                   type="button"
                   className="crm-login__back"
+                  disabled={loading}
                   onClick={() => {
                     setMode('login')
                     setError(null)
