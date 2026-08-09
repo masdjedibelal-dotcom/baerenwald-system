@@ -18448,6 +18448,8 @@ body.has-blocking-overlay .app {
   @apply items-end justify-stretch p-0;
   /* Kein Overlay-Padding bei Tastatur — sonst graue Lücke. Inset am Sheet selbst (Card-Farbe). */
   padding-bottom: 0;
+  /* Sheet immer am sichtbaren Overlay-Boden (iOS visualViewport), nie unter den Fold */
+  overflow: hidden;
 }
 .editor-sheet-overlay--slide {
   /* Immer rechts — nie links (Mock Split-over). Nur @apply: Raw-CSS nach @apply fällt im Build oft weg. */
@@ -18471,8 +18473,11 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet--bottom {
   @apply w-full rounded-t-2xl;
+  /* 100% = Overlay-Höhe (visualViewport auf iOS) — dvh allein kann größer als sichtbar sein */
   height: min(92dvh, 100%);
   max-height: min(92dvh, 100%);
+  margin-top: auto;
+  align-self: stretch;
   overflow: hidden;
   /* Card-Farbe bis zur Tastatur — kein graues Overlay-Loch */
   padding-bottom: var(--keyboard-inset, 0px);

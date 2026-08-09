@@ -225,29 +225,31 @@ export function EditorSheet({
     return trapFocus(el, () => requestCloseRef.current())
   }, [open, mounted, pauseFocusTrap])
 
-  /* S7: iOS-Tastatur — Overlay bleibt Vollfläche (sonst Lücke → Seite darunter sichtbar).
-   * URL-Bar-Schwankungen ≠ Keyboard (Threshold); sonst peekt Nav/CTA unten durch. */
+  /* S7: Overlay = visualViewport (nicht Layout-Viewport).
+   * Sonst ist coverH auf iOS oft höher als der sichtbare Bereich → Sheet hängt
+   * unter dem Fold (Overlay da, Panel unsichtbar). Tastatur schrumpft vv.height. */
   useEffect(() => {
     if (!open || !isMobile) return
     const overlay = overlayRef.current
     const vv = window.visualViewport
     if (!overlay || !vv) return
     const sync = () => {
+      const offsetTop = Math.round(vv.offsetTop)
+      const vvH = Math.max(1, Math.round(vv.height))
       const byInner = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
       const clientH = document.documentElement.clientHeight || window.innerHeight
       const byClient = Math.max(0, clientH - vv.height)
-      // Konservativ: kleinere Schätzung — Übermaß = sichtbare Lücke über der Tastatur
       const rawKb = Math.min(byInner, byClient)
       const kb = rawKb > 100 ? Math.min(Math.round(rawKb), Math.round(window.innerHeight * 0.55)) : 0
-      const coverH = Math.max(window.innerHeight, clientH, vv.height + vv.offsetTop)
-      overlay.style.top = '0'
+      overlay.style.top = `${offsetTop}px`
       overlay.style.left = '0'
       overlay.style.right = '0'
-      overlay.style.bottom = '0'
+      overlay.style.bottom = 'auto'
       overlay.style.width = '100%'
-      overlay.style.height = `${coverH}px`
-      overlay.style.minHeight = `${coverH}px`
-      overlay.style.setProperty('--keyboard-inset', `${kb}px`)
+      overlay.style.height = `${vvH}px`
+      overlay.style.minHeight = `${vvH}px`
+      /* Viewport liegt bereits über der Tastatur — kein Extra-Padding am Sheet */
+      overlay.style.setProperty('--keyboard-inset', '0px')
       document.body.classList.toggle('kb-open', kb > 40)
     }
     const onFocusIn = (e: FocusEvent) => {
