@@ -272,6 +272,13 @@ export type GewerkUmsatzZeile = {
   anteil: number
 }
 
+/** Katalog-Gewerk (wie Angebot/Rechnung-Select) — für Dashboard-Aggregation. */
+export type DashboardGewerkKatalog = {
+  id: string
+  name: string
+  slug: string
+}
+
 const GEWERK_COLORS = [
   '#2E7D52',
   '#3B82F6',
@@ -287,10 +294,82 @@ export function gewerkColor(index: number): string {
   return GEWERK_COLORS[index % GEWERK_COLORS.length]!
 }
 
-function addGewerkPositionen(map: Map<string, number>, positionen: unknown) {
+/** Interne Positions-Slugs — kein Katalog-Gewerk (Anfahrt, Nachlass, Freitext-Marker). */
+const DASHBOARD_GEWERK_SKIP_SLUGS = new Set([
+  '__anfahrt__',
+  '__gesamtrabatt__',
+  '__freitext__',
+  'abschlag_abzug',
+])
+
+type GewerkLookup = {
+  byId: Map<string, string>
+  bySlug: Map<string, string>
+  byName: Map<string, string>
+}
+
+function buildGewerkLookup(katalog: DashboardGewerkKatalog[]): GewerkLookup {
+  const byId = new Map<string, string>()
+  const bySlug = new Map<string, string>()
+  const byName = new Map<string, string>()
+  for (const g of katalog) {
+    const name = g.name.trim()
+    if (!name) continue
+    const id = g.id.trim()
+    if (id) byId.set(id, name)
+    const slug = g.slug.trim().toLowerCase()
+    if (slug) bySlug.set(slug, name)
+    byName.set(name.toLowerCase(), name)
+  }
+  return { byId, bySlug, byName }
+}
+
+/**
+ * Kanonisches Gewerk-Label wie im Angebot/Rechnung-Select.
+ * Nicht: Block-Titel / Freitext-Überschrift in `gewerk_name` (z. B. „Bad + WC“, „b4“).
+ */
+function resolveDashboardGewerkLabel(
+  p: AngebotPosition,
+  lookup: GewerkLookup
+): string | null {
+  const leistung = (p.leistung ?? '').trim().toLowerCase()
+  if (leistung === '__gewerk_beschreibung__') return null
+
+  const slug = (p.gewerk_slug ?? '').trim().toLowerCase()
+  if (slug && DASHBOARD_GEWERK_SKIP_SLUGS.has(slug)) return null
+
+  const id = (p.gewerk_id ?? '').trim()
+  if (id) {
+    const fromId = lookup.byId.get(id)
+    if (fromId) return fromId
+  }
+
+  if (slug) {
+    const fromSlug = lookup.bySlug.get(slug)
+    if (fromSlug) return fromSlug
+  }
+
+  const rawName = (p.gewerk_name ?? '').trim()
+  if (rawName) {
+    const fromName = lookup.byName.get(rawName.toLowerCase())
+    if (fromName) return fromName
+    const fromNameAsSlug = lookup.bySlug.get(rawName.toLowerCase())
+    if (fromNameAsSlug) return fromNameAsSlug
+  }
+
+  // Kein Katalog-Treffer — nicht den Block-Titel als Gewerk ausgeben
+  return 'Sonstiges'
+}
+
+function addGewerkPositionen(
+  map: Map<string, number>,
+  positionen: unknown,
+  lookup: GewerkLookup
+) {
   const pos = normalizeAngebotPositionen(positionen)
   for (const p of pos) {
-    const name = (p.gewerk_name || p.gewerk_slug || 'Sonstiges').trim() || 'Sonstiges'
+    const name = resolveDashboardGewerkLabel(p, lookup)
+    if (!name) continue
     const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
     if (line <= 0) continue
     map.set(name, (map.get(name) ?? 0) + line)
@@ -298,9 +377,10 @@ function addGewerkPositionen(map: Map<string, number>, positionen: unknown) {
 }
 
 /**
- * Umsatz nach Gewerk:
+ * Umsatz nach Gewerk (Katalog aus Angebot/Rechnung-Select):
  * - abgeschlossene Aufträge/Leads über Angebotspositionen
  * - plus Rechnungspositionen (nicht storniert)
+ * Aggregiert nach gewerk_id/slug → `gewerke.name`, nicht nach Block-Titel.
  */
 export function buildGewerkUmsatz(
   angebote: Array<{
@@ -311,8 +391,10 @@ export function buildGewerkUmsatz(
   rechnungen: Array<{
     positionen?: unknown
     status?: string | null
-  }> = []
+  }> = [],
+  gewerkeKatalog: DashboardGewerkKatalog[] = []
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
+  const lookup = buildGewerkLookup(gewerkeKatalog)
   const map = new Map<string, number>()
 
   for (const ang of angebote) {
@@ -321,12 +403,12 @@ export function buildGewerkUmsatz(
     const leadDone = String(lead?.status ?? '').toLowerCase() === 'abgeschlossen'
     const auftragDone = String(auftrag?.status ?? '').toLowerCase() === 'abgeschlossen'
     if (!leadDone && !auftragDone) continue
-    addGewerkPositionen(map, ang.positionen)
+    addGewerkPositionen(map, ang.positionen, lookup)
   }
 
   for (const r of rechnungen) {
     if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    addGewerkPositionen(map, r.positionen)
+    addGewerkPositionen(map, r.positionen, lookup)
   }
 
   const gesamt = Array.from(map.values()).reduce((a, b) => a + b, 0)

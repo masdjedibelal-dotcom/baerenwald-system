@@ -88,6 +88,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     rechnungenGewerkRaw,
     zuweisungenRaw,
     marketing,
+    gewerkeKatalogRaw,
   ] = await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
@@ -172,6 +173,11 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       )
     ),
     loadDashboardMarketing(zeitraumFilter),
+    safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db.from('gewerke').select('id, name, slug').order('name')
+      )
+    ),
   ])
 
   const leads = filterOutLegacyDemoLeads(
@@ -294,6 +300,13 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const rechnungenGewerkZ = rechnungenGewerk.filter((r) =>
     inZeitraum(r.created_at, zeitraumRange)
   )
+  const gewerkeKatalog = (gewerkeKatalogRaw as Array<{ id?: string; name?: string; slug?: string }>).map(
+    (g) => ({
+      id: String(g.id ?? ''),
+      name: String(g.name ?? ''),
+      slug: String(g.slug ?? ''),
+    })
+  )
   const gewerk = buildGewerkUmsatz(
     angeboteZ.map((a) => ({
       positionen: a.positionen,
@@ -303,7 +316,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
-    }))
+    })),
+    gewerkeKatalog
   )
 
   // Handwerker-Ranking aus Zuweisungen (Zeitraum über Auftrag.created_at)
