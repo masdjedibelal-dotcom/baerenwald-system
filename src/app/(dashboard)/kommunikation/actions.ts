@@ -17,6 +17,7 @@ import {
 } from '@/lib/kommunikation/email-log-list-filter'
 import { sendMail } from '@/lib/mail-service'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
+import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type { MailAnrede } from '@/lib/mail/anrede'
 import {
   freitextMailTyp,
@@ -417,21 +418,43 @@ export async function mailComposeContextFromLead(
 ): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
   const { data, error } = await supabaseAdmin
     .from('leads')
-    .select('id, kontakt_email, kontakt_name, kunde_id, kundentyp, kunden!kunde_id(id, name, email, typ)')
+    .select(
+      'id, kontakt_email, kontakt_name, kunde_id, auftraggeber_kunde_id, kundentyp, kunden!kunde_id(id, name, email, typ), auftraggeber:kunden!auftraggeber_kunde_id(id, name, email, typ, org_anzeigename)'
+    )
     .eq('id', leadId)
     .maybeSingle()
   if (error || !data) return { ok: false, message: 'Anfrage nicht gefunden' }
 
-  const kundenRaw = data.kunden as
-    | { id: string; name: string; email: string | null; typ: string | null }
-    | { id: string; name: string; email: string | null; typ: string | null }[]
-    | null
-  const kunden = Array.isArray(kundenRaw) ? kundenRaw[0] : kundenRaw
-  const kundeId = kunden?.id ?? data.kunde_id
+  type KundeEmbed = {
+    id: string
+    name: string
+    email: string | null
+    typ: string | null
+    org_anzeigename?: string | null
+  }
+  const melderRaw = data.kunden as KundeEmbed | KundeEmbed[] | null
+  const melder = Array.isArray(melderRaw) ? melderRaw[0] : melderRaw
+  const agRaw = data.auftraggeber as KundeEmbed | KundeEmbed[] | null
+  const ag = Array.isArray(agRaw) ? agRaw[0] : agRaw
+
+  const kundeId = leadVertragsKundeId({
+    kunde_id: data.kunde_id,
+    auftraggeber_kunde_id: data.auftraggeber_kunde_id,
+    kunden: melder,
+    auftraggeber: ag,
+  })
   if (!kundeId) return { ok: false, message: 'Kein Kunde verknüpft' }
 
-  const email = (kunden?.email ?? data.kontakt_email ?? '').trim()
-  const name = (kunden?.name ?? data.kontakt_name ?? 'Kundin/Kunde').trim()
+  const email = (ag?.email ?? melder?.email ?? data.kontakt_email ?? '').trim()
+  const name = leadKontaktAnzeigeName(
+    {
+      kontakt_name: data.kontakt_name,
+      kunden: melder,
+      auftraggeber: ag,
+      auftraggeber_kunde_id: data.auftraggeber_kunde_id,
+    },
+    'Kundin/Kunde'
+  )
 
   return {
     ok: true,
@@ -439,7 +462,7 @@ export async function mailComposeContextFromLead(
       kontextTyp: 'anfrage',
       kundeId,
       kundeName: name,
-      kundeTyp: kunden?.typ ?? data.kundentyp,
+      kundeTyp: ag?.typ ?? melder?.typ ?? data.kundentyp,
       leadId,
       defaultTo: email,
       defaultCc: [],

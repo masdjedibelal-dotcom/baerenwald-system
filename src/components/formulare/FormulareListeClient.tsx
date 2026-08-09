@@ -1,23 +1,15 @@
 'use client'
 
-import Link from 'next/link'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import { DokumentPdfVorlagenSection } from '@/components/formulare/DokumentPdfVorlagenSection'
-import { toast } from '@/components/ui/app-toast'
-import {
-  deleteFormularTemplate,
-  duplicateFormularTemplate,
-  type FormularListeZeile,
-} from '@/app/(dashboard)/formulare/actions'
+import { FormularCreateSheet } from '@/components/formulare/FormularCreateSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import type { FormularListeZeile } from '@/app/(dashboard)/formulare/actions'
 import type { DokumentPdfMusterEintrag } from '@/lib/templates/dokument-pdf-muster'
-import type { FormularFeld } from '@/lib/types'
 
-const COLS = '28px 1.6fr 1fr 100px 90px'
+const COLS = 'minmax(0, 1.6fr) 120px 90px 28px'
 
 function Sec({
   title,
@@ -31,28 +23,18 @@ function Sec({
   children: ReactNode
 }) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
+    <section className="formulare-sec">
+      <div className="formulare-sec__head">
         {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <span className="formulare-sec__title">{title}</span>
         <div style={{ flex: 1 }} />
         {actions}
       </div>
       <div>{children}</div>
-    </div>
+    </section>
   )
 }
 
-/** Mock-Typ: Abnahme · Update · Vorab · Service */
 function typLabel(f: FormularListeZeile): string {
   const phase = (f.phase ?? '').toLowerCase()
   const sub = (f.subtyp ?? '').toLowerCase()
@@ -63,11 +45,7 @@ function typLabel(f: FormularListeZeile): string {
   return 'Service'
 }
 
-function hatVorschau(felder: FormularFeld[] | null | undefined): boolean {
-  return (felder?.length ?? 0) > 0
-}
-
-/** Mock-Parität: Formulare-Liste unter Einstellungen. */
+/** Mock-Parität: Formulare-Liste + Anlegen-Drawer. */
 export function FormulareListeClient({
   templates,
   dokumentVorlagen = [],
@@ -76,38 +54,11 @@ export function FormulareListeClient({
   dokumentVorlagen?: DokumentPdfMusterEintrag[]
 }) {
   const router = useRouter()
-  const [rows, setRows] = useState(templates)
-  const [pending, startTransition] = useTransition()
-  const [preview, setPreview] = useState<FormularListeZeile | null>(null)
+  const isMobile = useIsMobile()
+  const [rows] = useState(templates)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const aktiv = useMemo(() => rows.filter((r) => r.aktiv !== false), [rows])
-
-  function onDuplizieren(f: FormularListeZeile) {
-    startTransition(async () => {
-      const r = await duplicateFormularTemplate(f.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Formular dupliziert')
-      router.push(`/formulare/${r.id}/bearbeiten`)
-      router.refresh()
-    })
-  }
-
-  function onLoeschen(f: FormularListeZeile) {
-    if (!confirm(`„${f.name}“ löschen?`)) return
-    startTransition(async () => {
-      const r = await deleteFormularTemplate(f.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setRows((prev) => prev.filter((x) => x.id !== f.id))
-      toast.success('Formular gelöscht')
-      router.refresh()
-    })
-  }
 
   return (
     <>
@@ -115,131 +66,104 @@ export function FormulareListeClient({
         <DokumentPdfVorlagenSection vorlagen={dokumentVorlagen} />
       ) : null}
       <Sec
-        title={`Baustellen-Formulare · ${aktiv.length}`}
+        title="Formulare"
         icon="forms"
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={() => router.push('/formulare/neu')}>
-            Formular
-          </MockBtn>
+          <button type="button" className="btn ghost sm" onClick={() => setCreateOpen(true)}>
+            + Formular
+          </button>
         }
       >
-        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 12px', lineHeight: 1.45 }}>
-          Interaktive Vorlagen für Handwerker (Bautagebuch, Regie, Prüfung, Abnahme-Checkliste).
-          Augen-Icon = Vorschau der Felder.
-        </p>
         {aktiv.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>
+          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
             Noch keine Formular-Vorlagen.{' '}
-            <Link href="/formulare/neu" style={{ color: 'var(--green)' }}>
-              Erstes Formular anlegen
-            </Link>
+            <button type="button" className="btn ghost sm" onClick={() => setCreateOpen(true)}>
+              Formular anlegen
+            </button>
           </p>
         ) : (
-          <div style={{ margin: 0 }}>
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
-              <div />
-              <div>Name</div>
-              <div>Typ</div>
-              <div>Genutzt</div>
-              <div />
-            </div>
-            {aktiv.map((f) => {
-              const fields = f.felder?.length ?? 0
-              const canPreview = hatVorschau(f.felder)
-              return (
-                <div
-                  key={f.id}
-                  className="list-row"
-                  style={{
-                    gridTemplateColumns: COLS,
-                    cursor: 'default',
-                    alignItems: 'center',
-                  }}
-                >
-                  <MockIcon ctx="row" n="file-text" size={18} style={{ color: 'var(--text-3)' }} />
+          <>
+            <div
+              className="listcard listcard--cols"
+              style={{ ['--list-cols' as string]: COLS }}
+            >
+              <div className="list-row head" aria-hidden>
+                <div>Name</div>
+                <div>Typ</div>
+                <div>Genutzt</div>
+                <div />
+              </div>
+              {aktiv.map((f) => {
+                const fields = f.felder?.length ?? 0
+                const typ = typLabel(f)
+                const open = () => router.push(`/formulare/${f.id}/bearbeiten`)
+                return (
                   <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      minWidth: 0,
+                    key={f.id}
+                    role="button"
+                    tabIndex={0}
+                    className="list-row"
+                    style={{ cursor: 'pointer', alignItems: 'center' }}
+                    onClick={open}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        open()
+                      }
                     }}
                   >
-                    {f.name}
-                    <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>
-                      {' '}
-                      · {fields} Feld{fields === 1 ? '' : 'er'}
-                    </span>
+                    {isMobile ? (
+                      <>
+                        <div className="lc-title">{f.name}</div>
+                        <div className="lc-pills">
+                          <span className="pill-tag">{typ}</span>
+                        </div>
+                        <div className="lc-sub">
+                          {fields} Feld{fields === 1 ? '' : 'er'} · {f.genutzt}× genutzt
+                        </div>
+                        <div className="row-actions" style={{ color: 'var(--text-4)' }}>
+                          <MockIcon ctx="default" n="chevron-right" size={16} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 'var(--fs-text)',
+                              fontWeight: 600,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {f.name}
+                          </div>
+                          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
+                            {fields} Feld{fields === 1 ? '' : 'er'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>{typ}</div>
+                        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)' }}>
+                          {f.genutzt}×
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
+                          <MockIcon ctx="default" n="chevron-right" size={16} />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{typLabel(f)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                    {f.genutzt}× genutzt
-                  </div>
-                  <div style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}>
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="eye"
-                      title={canPreview ? 'Vorschau' : 'Keine Vorschau (keine Felder)'}
-                      disabled={!canPreview || pending}
-                      onClick={() => canPreview && setPreview(f)}
-                    />
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="pencil"
-                      title="Editor"
-                      disabled={pending}
-                      onClick={() => router.push(`/formulare/${f.id}/bearbeiten`)}
-                    />
-                    <MockEntityRowMenu
-                      items={[
-                        ...(canPreview
-                          ? [
-                              {
-                                icon: 'eye',
-                                label: 'Vorschau',
-                                onClick: () => setPreview(f),
-                              } as const,
-                            ]
-                          : []),
-                        {
-                          icon: 'pencil',
-                          label: 'Bearbeiten',
-                          onClick: () => router.push(`/formulare/${f.id}/bearbeiten`),
-                        },
-                        {
-                          icon: 'copy',
-                          label: 'Duplizieren',
-                          onClick: () => onDuplizieren(f),
-                        },
-                        'sep',
-                        {
-                          icon: 'trash',
-                          label: 'Löschen',
-                          danger: true,
-                          onClick: () => onLoeschen(f),
-                        },
-                      ]}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+            <p className="formulare-sec__count">
+              {aktiv.length} Formular{aktiv.length === 1 ? '' : 'e'}
+            </p>
+          </>
         )}
       </Sec>
 
-      {preview ? (
-        <FormularVorschauModal
-          open
-          onClose={() => setPreview(null)}
-          name={preview.name}
-          felder={preview.felder ?? []}
-        />
-      ) : null}
+      <FormularCreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   )
 }

@@ -14,7 +14,7 @@ export function LogoutButton({ className }: { className?: string }) {
     if (!window.confirm('Wirklich abmelden?')) return
     setLoading(true)
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: "local" })
     router.replace('/login')
     router.refresh()
     setLoading(false)

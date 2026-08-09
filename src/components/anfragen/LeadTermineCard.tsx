@@ -1,7 +1,8 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   Calendar,
   Camera,
@@ -124,7 +125,7 @@ function TerminNotizFormModal({
   onReload: () => void
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [existingUrls, setExistingUrls] = useState<string[]>([])
@@ -326,7 +327,7 @@ function TerminNotizFormModal({
             Aufnehmen
           </button>
         </div>
-        <p className="mt-2 text-xs text-bw-text-muted">
+        <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
           Bis zu {TERMIN_NOTIZ_MAX_FOTOS} Fotos · {fotoCount}/{TERMIN_NOTIZ_MAX_FOTOS}
         </p>
         <TerminNotizFotoVorschau items={vorschauItems} onRemove={removeFoto} />
@@ -355,7 +356,7 @@ function TerminNotizZeile({
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   async function loeschen() {
     if (!window.confirm('Notiz löschen?')) return
@@ -408,7 +409,7 @@ function TerminNotizZeile({
       {open ? (
         <div className="lead-notiz-row__body">
           {(notiz.inhalt ?? '').trim() ? (
-            <RichTextContent html={notiz.inhalt ?? ''} className="text-sm text-bw-text-mid" />
+            <RichTextContent html={notiz.inhalt ?? ''} className="text-[length:var(--fs-text)] text-bw-text-mid" />
           ) : null}
           {fotos.length ? (
             <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -461,12 +462,12 @@ function TerminNotizenBlock({
   return (
     <div className="lead-termin-notizen border-t border-bw-border pt-3">
       <div className="lead-termin-notizen__head">
-        <p className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">
+        <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-text-muted">
           Notizen zum Termin
         </p>
         <button
           type="button"
-          className="btn ghost sm inline-flex items-center gap-1"
+          className="btn primary sm inline-flex items-center gap-1"
           onClick={() => setAddOpen(true)}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -475,7 +476,7 @@ function TerminNotizenBlock({
       </div>
 
       {notizen.length === 0 ? (
-        <p className="mt-2 text-sm text-bw-text-muted">Noch keine Notizen zu diesem Termin.</p>
+        <p className="mt-2 text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Notizen zu diesem Termin.</p>
       ) : (
         <ul className="lead-notiz-list mt-2">
           {notizen.map((n) => (
@@ -545,7 +546,7 @@ function LeadTerminZeile({
       </div>
       {open ? (
         <div className="lead-termin-row__body">
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-[length:var(--fs-text)]">
             <dl className="lead-termin-facts grid gap-2">
               <div className="lead-termin-facts__row">
                 <dt className="lead-termin-facts__label">Wer</dt>
@@ -638,8 +639,8 @@ export function LeadTermineCard({
     sorted.length === 0 ? (
       <div className="px-4 py-6 text-center">
         <Calendar className="mx-auto h-8 w-8 text-bw-text-muted" aria-hidden />
-        <p className="mt-2 text-sm font-medium text-bw-text">Noch kein Termin</p>
-        <p className="mt-1 text-xs text-bw-text-muted">
+        <p className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-text">Noch kein Termin</p>
+        <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
           Termin über <strong>Aktionen → Termin vereinbart</strong> anlegen — Kalender-Eintrag und
           Bestätigungs-Mail laufen automatisch mit.
         </p>

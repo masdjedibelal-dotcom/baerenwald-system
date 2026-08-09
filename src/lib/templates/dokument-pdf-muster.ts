@@ -2,20 +2,29 @@
  * Musterdaten (Max Mustermann) für PDF-Dokumentvorlagen in Einstellungen · Formulare.
  */
 
-import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { defaultFirmenEinstellungen, firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { buildAbnahmeProtokollHtml } from '@/lib/templates/abnahme-protokoll-template'
+import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import { buildAbschlussdokumentationHtml } from '@/lib/templates/abschlussdokumentation-template'
 import {
   buildAngebotHtml,
   type AngebotHtmlInput,
   type AngebotTemplatePosition,
 } from '@/lib/templates/angebot-template'
+import { buildAushangHtml } from '@/lib/templates/aushang-template'
+import { buildBerichtDatenquelle } from '@/lib/auftraege/bericht-datenquelle'
+import { buildRegieberichtLebenszyklusHtml } from '@/lib/templates/regiebericht-lebenszyklus-template'
+import { buildBautagebuchLebenszyklusHtml } from '@/lib/templates/bautagebuch-lebenszyklus-template'
 
 export type DokumentPdfMusterId =
   | 'angebot'
   | 'rechnung'
+  | 'rechnung_13b'
   | 'abnahme'
   | 'abschlussdokumentation'
+  | 'aushang'
+  | 'regiebericht'
+  | 'bautagebuch'
 
 export type DokumentPdfMusterEintrag = {
   id: DokumentPdfMusterId
@@ -28,7 +37,7 @@ export type DokumentPdfMusterEintrag = {
 }
 
 function firmAdresse(f: FirmenEinstellungen): string {
-  return `${f.strasse?.trim() || 'Bärenwaldstraße 20'}, ${f.plz?.trim() || '81737'} ${f.ort?.trim() || 'München'}`
+  return firmZeileAdresse(f) || 'Bärenwaldstraße 20, 81737 München'
 }
 
 function firmKontakt(f: FirmenEinstellungen): string {
@@ -226,6 +235,18 @@ function musterAbnahmeHtml(firm: FirmenEinstellungen): string {
       },
     ],
     notizen: 'Abnahme unter Vorbehalt der genannten Nacharbeit.',
+    meta: emptyAbnahmeProtokollMeta({
+      uebergabe_uhrzeit: '11:00',
+      uebergabe_ort: '80331 München',
+      vertreter_an: 'Max Mustermann (Bärenwald)',
+      ansprechpartner_kunde: 'Max Mustermann',
+      anwesend_uebergabe: 'Erika Mustermann',
+      projektbezeichnung: 'Malerarbeiten Wohnräume',
+      projektadresse: 'Musterstraße 12, 80331 München',
+      leistungsumfang_kurz: 'Streichen der Wohnräume inkl. Decken.',
+      abnahme_ergebnis: 'mit_vorbehalt',
+      hinweis_sonstiges: 'Nacharbeit Decke Wohnzimmer bis 19.07.2026.',
+    }),
   })
 }
 
@@ -286,6 +307,7 @@ function musterAbschlussHtml(firm: FirmenEinstellungen): string {
     fotoUrls: [],
     mitBautagebuch: true,
     mitFotos: false,
+    mitPreisen: false,
   })
 }
 
@@ -293,6 +315,88 @@ function musterAbschlussHtml(firm: FirmenEinstellungen): string {
 export function buildDokumentPdfMusterListe(
   firm: FirmenEinstellungen = defaultFirmenEinstellungen()
 ): DokumentPdfMusterEintrag[] {
+  const rechnung13bInput = musterAngebotInput(firm, 'rechnung')
+  rechnung13bInput.kunde_typ = 'hausverwaltung'
+  rechnung13bInput.rechtshinweise = {
+    hinweis_35a: false,
+    hinweis_19: false,
+    hinweis_13b: true,
+  }
+  rechnung13bInput.summen = {
+    ...rechnung13bInput.summen,
+    mwst_prozent: 0,
+    mwst_betrag: 0,
+    brutto: rechnung13bInput.summen.netto,
+  }
+
+  const berichtMuster = buildBerichtDatenquelle({
+    auftragId: 'au-muster-001',
+    projektTitel: 'Malerarbeiten Wohnräume',
+    projektAdresse: 'Musterstraße 12, 80331 München',
+    auftraggeberName: 'Max Mustermann',
+    positionen: [
+      {
+        id: 'pos-1',
+        leistung_name: 'Wände streichen',
+        gewerk_name: 'Malerarbeiten',
+        typ: 'regie',
+        verguetung: 'aufwand',
+        stundensatz: 69,
+        geschaetzt_std: 4,
+        handwerker_name: 'Hans Handwerk',
+      },
+      {
+        id: 'pos-2',
+        leistung_name: 'Decken streichen',
+        gewerk_name: 'Malerarbeiten',
+        typ: 'lv',
+        verguetung: 'festpreis',
+      },
+    ],
+    material: [
+      {
+        position_id: 'pos-1',
+        bezeichnung: 'Dispersionsfarbe weiß',
+        menge: 2,
+        einzelpreis: 28.5,
+        gesamt: 57,
+      },
+    ],
+    schichten: [
+      {
+        auftrag_id: 'au-muster-001',
+        tag: '2026-07-08',
+        spanne_von: '2026-07-08T08:00:00',
+        spanne_bis: '2026-07-08T12:05:00',
+        foto_count: 2,
+      },
+    ],
+    eintraege: [
+      {
+        id: 'e1',
+        position_id: 'pos-1',
+        typ: 'fortschritt',
+        beschreibung: 'Erster Anstrich Wohnzimmer und Flur',
+        zeit_minuten: 125,
+        erfasst_von: 'crm_intern',
+        ereignis_zeit: '2026-07-08T10:00:00',
+        created_at: '2026-07-08T10:00:00',
+        eintrag_fotos: [],
+      },
+      {
+        id: 'e2',
+        position_id: 'pos-2',
+        typ: 'fortschritt',
+        beschreibung: 'Decken vorbereitet und gestrichen',
+        zeit_minuten: 60,
+        erfasst_von: 'partner_app',
+        ereignis_zeit: '2026-07-08T11:30:00',
+        created_at: '2026-07-08T11:30:00',
+        eintrag_fotos: [],
+      },
+    ],
+  })
+
   return [
     {
       id: 'angebot',
@@ -306,9 +410,72 @@ export function buildDokumentPdfMusterListe(
       id: 'rechnung',
       title: 'Rechnung',
       art: 'Kunde · PDF',
-      description: 'Rechnung im gleichen Layout wie das Angebot',
+      description: 'Rechnung mit §35a-Hinweis (Privat, Lohn ausgewiesen)',
       icon: 'receipt',
       html: buildAngebotHtml(musterAngebotInput(firm, 'rechnung'), { includeBodyFooter: true }),
+    },
+    {
+      id: 'rechnung_13b',
+      title: 'Rechnung §13b',
+      art: 'Kunde · PDF',
+      description: 'Rechnung mit Reverse-Charge-Hinweis (§13b), wenn gesetzt',
+      icon: 'receipt',
+      html: buildAngebotHtml(rechnung13bInput, { includeBodyFooter: true }),
+    },
+    {
+      id: 'aushang',
+      title: 'Aushang Schadenmeldung',
+      art: 'HV · PDF',
+      description: 'Einseitiger Mieter-Aushang mit QR und HV-Branding',
+      icon: 'qrcode',
+      html: buildAushangHtml({
+        orgName: 'Verwaltung Mustermann',
+        orgSub: 'Verwaltung',
+        primaryColor: '#22508C',
+        objektTitel: 'WEG Musterstraße 12',
+        objektAdresse: 'Musterstraße 12 · 80331 München',
+        meldeUrl: 'https://baerenwaldmuenchen.de/melden/musterverwaltung/musterstrasse-12',
+        qrDataUrl: null,
+        hvTelefon: '089 123456',
+        hvEmail: 'hv@example.de',
+      }),
+    },
+    {
+      id: 'regiebericht',
+      title: 'Regiebericht',
+      art: 'Auftrag · PDF',
+      description: 'Zeiterfassung · Tätigkeiten · Material · Soll/Ist · §35a',
+      icon: 'clock',
+      html: buildRegieberichtLebenszyklusHtml({
+        ...baseFirmFields(firm),
+        firmenname: firm.firmenname?.trim() || 'Bärenwald München',
+        firmen_adresse: firmAdresse(firm),
+        firmen_kontakt: firmKontakt(firm),
+        data: berichtMuster,
+        stundensatz: 69,
+        lohnNetto: 143.75,
+        materialNetto: 57,
+        mwst: 38.14,
+        brutto: 238.89,
+        handwerkerName: 'Hans Handwerk',
+        gewerkName: 'Malerarbeiten',
+        sollIst: 'geschätzt 4:00 / erfasst 2:05',
+        hinweis35a: true,
+      }),
+    },
+    {
+      id: 'bautagebuch',
+      title: 'Bautagebuch',
+      art: 'Auftrag · PDF',
+      description: 'Zweistufig Tag → Position aus gemeinsamer Quelle',
+      icon: 'book',
+      html: buildBautagebuchLebenszyklusHtml({
+        ...baseFirmFields(firm),
+        firmenname: firm.firmenname?.trim() || 'Bärenwald München',
+        firmen_adresse: firmAdresse(firm),
+        firmen_kontakt: firmKontakt(firm),
+        data: berichtMuster,
+      }),
     },
     {
       id: 'abnahme',

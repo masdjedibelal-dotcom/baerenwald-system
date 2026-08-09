@@ -1,4 +1,5 @@
 import type { MailBranding } from '@/lib/mail-branding'
+import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -30,6 +31,12 @@ export type RechnungMailInput = {
   projektTitel?: string | null
   mailEinleitung?: string | null
   mailBetreff?: string | null
+  /** Reverse Charge (§13b) — Betrag netto, kein „inkl. MwSt.“ */
+  reverseCharge?: boolean
+  /** Storno-Gutschrift + neue RE in einer Mail */
+  mitStornoAnhang?: boolean
+  /** Abschlussbericht als zusätzlicher PDF-Anhang */
+  mitAbschlussberichtAnhang?: boolean
 }
 
 export function rechnungMailBetreff(
@@ -37,9 +44,41 @@ export function rechnungMailBetreff(
   rechnungsnummer: string,
   firmenname: string
 ): string {
+  const nr = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
   return anrede === 'du'
-    ? `Deine Rechnung ${rechnungsnummer} · ${firmenname}`
-    : `Ihre Rechnung ${rechnungsnummer} · ${firmenname}`
+    ? `Deine Rechnung ${nr} · ${firmenname}`
+    : `Ihre Rechnung ${nr} · ${firmenname}`
+}
+
+/** Kein „Entwurf“ im Kunden-Betreff (auch bei Platzhalter ohne echte Nummer). */
+export function sanitizeRechnungNrFuerBetreff(raw: string): string {
+  const s = raw.trim()
+  if (!s) return 'Rechnung'
+  const cleaned = s
+    .replace(/\bRE-Entwurf\b/gi, 'Rechnung')
+    .replace(/\bEntwurf\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*·\s*·/g, ' · ')
+    .replace(/^\s*·\s*|\s*·\s*$/g, '')
+    .trim()
+  return cleaned || 'Rechnung'
+}
+
+export function sanitizeRechnungMailBetreff(betreff: string): string {
+  return betreff
+    .replace(/\bRE-Entwurf\b/gi, 'Rechnung')
+    .replace(/\bEntwurf\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*·\s*·/g, ' · ')
+    .replace(/^\s*·\s*|\s*·\s*$/g, '')
+    .trim()
+}
+
+/** Standard-Einleitungstext in der Kunden-Mail (nicht PDF). */
+export function defaultRechnungMailEinleitung(anrede: AngebotMailAnrede = 'sie'): string {
+  return anrede === 'du'
+    ? 'anbei findest du deine Rechnung als PDF — kurz zur Übersicht:'
+    : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:'
 }
 
 export function buildRechnungMail(
@@ -54,20 +93,31 @@ export function buildRechnungMail(
 
   const introRaw =
     data.mailEinleitung?.trim() ||
-    (anrede === 'du'
-      ? 'anbei findest du deine Rechnung als PDF — kurz zur Übersicht:'
-      : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:')
+    defaultRechnungMailEinleitung(anrede)
   const intro = esc(introRaw)
 
-  const pdfHinweis =
-    anrede === 'du'
-      ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
-      : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
+  const pdfHinweis = data.mitAbschlussberichtAnhang
+    ? anrede === 'du'
+      ? 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
+      : 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
+    : data.mitStornoAnhang
+      ? anrede === 'du'
+        ? 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
+        : 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
+      : anrede === 'du'
+        ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
+        : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
 
   const summaryHtml = mailSummaryBlock({
-    label: anrede === 'du' ? `DEINE RECHNUNG · ${nr}` : `IHRE RECHNUNG · ${nr}`,
+    label: data.mitStornoAnhang
+      ? anrede === 'du'
+        ? `STORNO + RECHNUNG · ${nr}`
+        : `STORNO + RECHNUNG · ${nr}`
+      : anrede === 'du'
+        ? `DEINE RECHNUNG · ${nr}`
+        : `IHRE RECHNUNG · ${nr}`,
     title: titel,
-    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(data.brutto)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
+    priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
@@ -94,9 +144,10 @@ export function buildRechnungMail(
     mailKundenStandardOptions(anrede)
   )
 
-  const betreff =
+  const betreff = sanitizeRechnungMailBetreff(
     data.mailBetreff?.trim() ||
-    rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+      rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+  )
 
   return { betreff, html }
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 /** Client: Admin-Flag für Menü-Sichtbarkeit (Server prüft trotzdem). */
 export function useIsCrmAdmin(): boolean {
   const [isAdmin, setIsAdmin] = useState(false)
-  useEffect(() => {
+
+  const load = useCallback(() => {
     let cancelled = false
     fetch('/api/crm/me')
       .then((r) => r.json())
@@ -19,5 +20,18 @@ export function useIsCrmAdmin(): boolean {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const cancel = load()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      cancel()
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [load])
+
   return isAdmin
 }

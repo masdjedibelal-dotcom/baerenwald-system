@@ -1,6 +1,6 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useTransition } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import { updateAuftragBetreuer } from '@/app/(dashboard)/auftraege/actions'

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { Textarea } from '@/components/ui/Textarea'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { previewBesichtigungTerminMail } from '@/app/actions/mails'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import { TERMIN_MAIL_AUTO_MARKER } from '@/lib/mail/termin-mail-editor'
@@ -139,13 +140,13 @@ export function TerminBestaetigungMailEditor({
 
   if (!kontaktEmail.trim()) {
     return (
-      <p className="text-xs text-bw-text-muted">Keine E-Mail beim Kontakt — Bestätigung nur im Kalender.</p>
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Keine E-Mail beim Kontakt — Bestätigung nur im Kalender.</p>
     )
   }
 
   if (!datum.trim() || !uhrzeitVon.trim()) {
     return (
-      <p className="text-xs text-bw-text-muted">Datum und Uhrzeit eintragen, um die Mail-Vorschau zu laden.</p>
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Datum und Uhrzeit eintragen, um die Mail-Vorschau zu laden.</p>
     )
   }
 
@@ -153,22 +154,29 @@ export function TerminBestaetigungMailEditor({
 
   return (
     <div className="space-y-3 rounded-lg border border-bw-border bg-bw-bg p-3">
-      <p className="text-xs text-bw-text-muted">
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Terminbestätigung an den Kunden. Betreff, Empfänger und Text vor dem Versand prüfen.
       </p>
       {!hatMitarbeiter ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[length:var(--fs-meta)] text-amber-950">
           Noch kein Vor-Ort-Mitarbeiter gewählt — die Vorschau zeigt Termin ohne Kollegen-Block. Zum
           Speichern und Versand ist die Auswahl oben Pflicht.
         </p>
       ) : null}
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
-      <Input
+      {error ? <p className="text-[length:var(--fs-meta)] text-red-600">{error}</p> : null}
+      <KiAssistFieldLabel
         label="Betreff"
         value={draft.betreff}
-        onChange={(e) => onChange({ ...draft, betreff: e.target.value })}
-        placeholder={loading ? 'Wird geladen…' : undefined}
-      />
+        onApply={(text) => onChange({ ...draft, betreff: text })}
+        extraHint={`Terminbestätigung an ${kontaktName || 'Kunde'}.`}
+        multiline={false}
+      >
+        <Input
+          value={draft.betreff}
+          onChange={(e) => onChange({ ...draft, betreff: e.target.value })}
+          placeholder={loading ? 'Wird geladen…' : undefined}
+        />
+      </KiAssistFieldLabel>
       <EmailPillsField
         label="An"
         required
@@ -183,15 +191,21 @@ export function TerminBestaetigungMailEditor({
         placeholder="weitere@beispiel.de"
         hint="Optional."
       />
-      <Textarea
+      <KiAssistFieldLabel
         label="Nachricht"
-        rows={8}
         value={draft.bodyText}
-        onChange={(e) => onChange({ ...draft, bodyText: e.target.value })}
-        disabled={loading && !draft.bodyText}
-        placeholder={loading ? 'Text wird geladen…' : undefined}
-      />
-      <p className="text-xs text-bw-text-muted">
+        onApply={(text) => onChange({ ...draft, bodyText: text })}
+        extraHint={`Terminbestätigung Mailtext. Marker „${TERMIN_MAIL_AUTO_MARKER}“ belassen.`}
+      >
+        <Textarea
+          rows={8}
+          value={draft.bodyText}
+          onChange={(e) => onChange({ ...draft, bodyText: e.target.value })}
+          disabled={loading && !draft.bodyText}
+          placeholder={loading ? 'Text wird geladen…' : undefined}
+        />
+      </KiAssistFieldLabel>
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Die Zeile „{TERMIN_MAIL_AUTO_MARKER}“ nicht löschen — danach kommen Datum, Ort und der
         restliche Inhalt automatisch in der Vorschau.
       </p>
@@ -200,7 +214,7 @@ export function TerminBestaetigungMailEditor({
         loadingMessage="Vorschau lädt…"
       />
       {loading && draft.html ? (
-        <p className="text-xs text-bw-text-muted">Vorschau wird aktualisiert…</p>
+        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Vorschau wird aktualisiert…</p>
       ) : null}
     </div>
   )

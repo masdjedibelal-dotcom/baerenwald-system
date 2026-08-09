@@ -1,6 +1,7 @@
 "use client";
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from 'react';
 import { useRouter } from "next/navigation";
 import { addLeadNotizRow, deleteLeadNotizRow } from "@/app/(dashboard)/anfragen/actions";
 import { leadNotizFotoUrls } from "@/lib/anfragen/lead-notiz-fotos";
@@ -12,6 +13,7 @@ import { MockCard } from "@/components/mock-ui/MockCard";
 import { MockNotizComposer } from "@/components/mock-ui/MockDetailCards";
 import { MockBtn } from "@/components/mock-ui/MockPrimitives";
 import { MockModal } from "@/components/mock-ui/MockModal";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 function leadNotizErstellerLabel(n: LeadNotizRow): string {
   const name = n.user_profiles?.name?.trim();
@@ -38,6 +40,7 @@ export function AnfrageNotizenTab({
   const router = useRouter();
   const [val, setVal] = useState("");
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   const [pending, startTransition] = useTransition();
 
   const allgemeineNotizen = useMemo(
@@ -85,8 +88,10 @@ export function AnfrageNotizenTab({
           }}
         >
           {allgemeineNotizen.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: "var(--text-4)", padding: "4px 0" }}>
-              Noch keine Notizen — schreibe die erste unten.
+            <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-4)", padding: "4px 0" }}>
+              {isMobile
+                ? "Noch keine Notizen. Über „Notiz“ oben hinzufügen."
+                : "Noch keine Notizen — schreibe die erste unten."}
             </div>
           ) : (
             allgemeineNotizen.map((n) => {
@@ -95,21 +100,27 @@ export function AnfrageNotizenTab({
               const autor = leadNotizErstellerLabel(n);
               const time = formatTimelineStamp(n.created_at);
               return (
-                <div key={n.id} className="note" style={{ position: "relative", paddingRight: 36 }}>
+                <div
+                  key={n.id}
+                  className="note"
+                  style={{ position: "relative", paddingRight: isMobile ? 0 : 36 }}
+                >
                   <div className="meta">
                     {autor}
                     {time ? ` · ${time}` : ""}
                   </div>
-                  <div style={{ position: "absolute", top: 4, right: 4 }}>
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="trash"
-                      title="Löschen"
-                      disabled={pending}
-                      onClick={() => loeschen(n.id)}
-                    />
-                  </div>
+                  {!isMobile ? (
+                    <div style={{ position: "absolute", top: 4, right: 4 }}>
+                      <MockBtn
+                        sm
+                        kind="ghost"
+                        icon="trash"
+                        title="Löschen"
+                        disabled={pending}
+                        onClick={() => loeschen(n.id)}
+                      />
+                    </div>
+                  ) : null}
                   {text ? (
                     <div style={{ whiteSpace: "pre-wrap" }}>{text}</div>
                   ) : null}
@@ -153,7 +164,7 @@ export function AnfrageNotizenTab({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="link"
-                      style={{ display: "inline-block", marginTop: 6, fontSize: 12 }}
+                      style={{ display: "inline-block", marginTop: 6, fontSize: 'var(--fs-meta)' }}
                     >
                       Anhang öffnen
                     </a>
@@ -164,13 +175,15 @@ export function AnfrageNotizenTab({
           )}
         </div>
 
-        <MockNotizComposer
-          value={val}
-          onChange={setVal}
-          onSubmit={speichern}
-          disabled={pending}
-          placeholder="Notiz schreiben…  (Enter senden · Shift+Enter neue Zeile)"
-        />
+        {!isMobile ? (
+          <MockNotizComposer
+            value={val}
+            onChange={setVal}
+            onSubmit={speichern}
+            disabled={pending}
+            placeholder="Notiz schreiben"
+          />
+        ) : null}
       </MockCard>
 
       <MockModal

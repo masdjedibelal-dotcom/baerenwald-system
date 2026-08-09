@@ -59,10 +59,10 @@ export interface SendMailOptions {
   html: string
   /** Optional: Resend „from“ (Domain muss bei Resend verifiziert sein). */
   from?: string
-  pdfBuffer?: Buffer
+  pdfBuffer?: Buffer | Uint8Array
   pdfName?: string
   /** Weitere PDF-Anhänge vor dem Haupt-PDF (Reihenfolge bleibt erhalten). */
-  extraPdfAttachments?: { filename: string; content: Buffer }[]
+  extraPdfAttachments?: { filename: string; content: Buffer | Uint8Array }[]
   kundeId?: string | null
   leadId?: string | null
   angebotId?: string | null
@@ -107,30 +107,43 @@ const getAuthUserIdCached = cache(async (): Promise<string | null> => {
   }
 })
 
+function toBase64AttachmentContent(content: Buffer | Uint8Array | string): string {
+  if (typeof content === 'string') return content
+  return Buffer.from(content).toString('base64')
+}
+
 function mergeAttachments(
-  pdf?: { filename: string; content: Buffer },
+  pdf?: { filename: string; content: Buffer | Uint8Array },
   inlineLogos?: MailInlineLogoAttachment[],
-  extraPdfs?: { filename: string; content: Buffer }[]
+  extraPdfs?: { filename: string; content: Buffer | Uint8Array }[]
 ) {
   const list: Array<{
     filename: string
-    content: Buffer
+    content: string
     contentId?: string
     contentType?: string
   }> = []
   for (const logo of inlineLogos ?? []) {
     list.push({
       filename: logo.filename,
-      content: logo.content,
+      content: toBase64AttachmentContent(logo.content),
       contentId: logo.contentId,
       contentType: logo.contentType,
     })
   }
   for (const extra of extraPdfs ?? []) {
-    list.push({ filename: extra.filename, content: extra.content })
+    list.push({
+      filename: extra.filename,
+      content: toBase64AttachmentContent(extra.content),
+      contentType: 'application/pdf',
+    })
   }
   if (pdf) {
-    list.push({ filename: pdf.filename, content: pdf.content })
+    list.push({
+      filename: pdf.filename,
+      content: toBase64AttachmentContent(pdf.content),
+      contentType: 'application/pdf',
+    })
   }
   return list.length ? list : undefined
 }
@@ -141,6 +154,13 @@ export async function sendMail(
   const html = opts.html
   const inlineLogos =
     mailLogoInlineEnabled() ? inlineLogoAttachmentsForHtml(html) : []
+
+  if (opts.pdfBuffer && opts.pdfBuffer.byteLength === 0) {
+    const msg = 'PDF-Anhang ist leer — Versand abgebrochen'
+    await logMailError(opts, msg)
+    return { success: false, error: msg }
+  }
+
   const attachments = mergeAttachments(
     opts.pdfBuffer
       ? { filename: opts.pdfName ?? 'dokument.pdf', content: opts.pdfBuffer }
@@ -198,7 +218,12 @@ export async function sendMail(
       rechnung_id: opts.rechnungId ?? null,
       gesendet_von: gesendetVon,
       resend_id: resendId,
-      anhang_dateiname: attachments?.[0]?.filename ?? null,
+      anhang_dateiname:
+        opts.pdfName ??
+        opts.extraPdfAttachments?.[0]?.filename ??
+        attachments?.find((a) => a.contentType === 'application/pdf')?.filename ??
+        attachments?.[0]?.filename ??
+        null,
       kontext_typ: opts.kontextTyp ?? null,
       richtung: opts.richtung ?? 'gesendet',
       cc_email: ccJoined,

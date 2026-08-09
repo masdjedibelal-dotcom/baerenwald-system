@@ -1,13 +1,16 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
-import { Card } from '@/components/ui/Card'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { toast } from '@/components/ui/app-toast'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
-import { EinstellungenMeta } from '@/components/einstellungen/EinstellungenUi'
+import {
+  EinstellungenMeta,
+  EinstellungenSectionHeading,
+} from '@/components/einstellungen/EinstellungenUi'
 import type { MeinProfilDaten } from '@/app/(dashboard)/einstellungen/profil/actions'
 import { saveMeinProfil } from '@/app/(dashboard)/einstellungen/profil/actions'
 import { useRouter } from 'next/navigation'
@@ -16,7 +19,7 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
   const router = useRouter()
   const [name, setName] = useState(initial.name)
   const [telefon, setTelefon] = useState(initial.telefon)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   function save() {
     startTransition(async () => {
@@ -31,8 +34,9 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <Card title="Mein Profil">
+    <div className="mx-auto max-w-2xl space-y-8">
+      <section>
+        <EinstellungenSectionHeading className="mb-3">Mein Profil</EinstellungenSectionHeading>
         <div className="mb-4 flex items-center gap-3">
           <BrandAvatar size={48} />
           <div>
@@ -55,7 +59,6 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
             value={telefon}
             onChange={(e) => setTelefon(e.target.value)}
             placeholder="+49 …"
-            hint="Wird Kunden im Portal und in Termin-Mails angezeigt."
           />
         </div>
         <div className="mt-6 flex justify-end">
@@ -63,14 +66,15 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
             Speichern
           </Button>
         </div>
-      </Card>
+      </section>
 
-      <Card title="Rolle">
+      <section>
+        <EinstellungenSectionHeading className="mb-2">Rolle</EinstellungenSectionHeading>
         <p className="text-[13.5px] font-medium capitalize text-bw-text">{initial.rolle}</p>
         <EinstellungenMeta className="mt-1">
           Rollen ändern nur Admins unter Tab „Team“.
         </EinstellungenMeta>
-      </Card>
+      </section>
     </div>
   )
 }

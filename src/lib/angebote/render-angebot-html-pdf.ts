@@ -246,6 +246,11 @@ const PDF_BOTTOM_MARGIN_MM = 12
 export type RenderHtmlToPdfOptions = {
   /** Puppeteer footerTemplate (z. B. Angebots-PDF) */
   footerTemplate?: string
+  /** Ohne Header/Footer (z. B. einseitiger Aushang) */
+  displayHeaderFooter?: boolean
+  /** CSS @page-Größe bevorzugen */
+  preferCSSPageSize?: boolean
+  margin?: { top?: string; right?: string; bottom?: string; left?: string }
 }
 
 function findPdfWorkerScript(): string | null {
@@ -386,23 +391,31 @@ async function launchLocalBrowser(
 }
 
 function pdfMarginBottomMm(pdfOptions?: RenderHtmlToPdfOptions): number {
+  if (pdfOptions?.displayHeaderFooter === false) return 0
+  if (pdfOptions?.margin?.bottom != null) {
+    const n = Number.parseFloat(String(pdfOptions.margin.bottom))
+    if (Number.isFinite(n)) return n
+  }
   return pdfOptions?.footerTemplate ? ANGEBOT_PDF_BOTTOM_MARGIN_MM : PDF_BOTTOM_MARGIN_MM
 }
 
 function puppeteerPdfOptions(pdfOptions?: RenderHtmlToPdfOptions) {
   const footer = pdfOptions?.footerTemplate?.trim()
-  const useFooter = Boolean(footer)
+  const useFooter =
+    pdfOptions?.displayHeaderFooter === false ? false : Boolean(footer)
+  const margin = pdfOptions?.margin
   return {
     format: 'A4' as const,
     printBackground: true,
+    preferCSSPageSize: Boolean(pdfOptions?.preferCSSPageSize),
     displayHeaderFooter: useFooter,
     headerTemplate: '<div></div>',
-    footerTemplate: useFooter ? footer! : '<div></div>',
+    footerTemplate: useFooter && footer ? footer : '<div></div>',
     margin: {
-      top: '12mm',
-      right: '12mm',
-      bottom: `${pdfMarginBottomMm(pdfOptions)}mm`,
-      left: '12mm',
+      top: margin?.top ?? '12mm',
+      right: margin?.right ?? '12mm',
+      bottom: margin?.bottom ?? `${pdfMarginBottomMm(pdfOptions)}mm`,
+      left: margin?.left ?? '12mm',
     },
     timeout: 90_000,
   }

@@ -6,6 +6,7 @@ import {
   type AngebotVariantenPersistJson,
 } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
   normalizeAngebotPositionen,
   summenAusPositionen,
@@ -16,6 +17,8 @@ import {
   firmenSteuerFooterZeilen,
   parseRechtshinweiseFromWizardMeta,
 } from '@/lib/angebote/angebot-rechtshinweise'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { buildAngebotHtml, type AngebotHtmlInput, type AngebotTemplatePosition } from '@/lib/templates/angebot-template'
 import {
   angebotPdfBegruessung,
@@ -71,14 +74,22 @@ function firmenFusszeilen(firm: FirmenEinstellungen): {
   }
 }
 
-function firmZeileAdresse(f: FirmenEinstellungen): string {
-  const parts = [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')]
-  return parts.filter(Boolean).join('\n')
-}
-
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   const t = [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean)
   return t.join(' · ')
+}
+
+/** Angebotsdatum im PDF: nach Versand/Korrektur das aktuelle Änderungsdatum. */
+function angebotPdfDatumDe(detail: {
+  created_at: string
+  updated_at?: string | null
+  gesendet_kunde_at?: string | null
+}): string {
+  if (detail.gesendet_kunde_at) {
+    const src = detail.updated_at?.trim() || new Date().toISOString()
+    return new Date(src).toLocaleDateString('de-DE')
+  }
+  return new Date(detail.created_at).toLocaleDateString('de-DE')
 }
 
 function resolveLeistungsumfang(detail: AngebotDetail): string {
@@ -135,7 +146,7 @@ export function buildAngebotHtmlInputAusDetail(
       firmen_impressum: fuss.impressum,
       angebotsnr: detail.angebotsnr?.trim() || `AG${detail.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
       kundennr: '—',
-      datum: new Date(detail.created_at).toLocaleDateString('de-DE'),
+      datum: angebotPdfDatumDe(detail),
       gueltig_bis: parseGueltigDe(detail, firm),
       kunde_name: '',
       kunde_adresse: '',
@@ -151,7 +162,13 @@ export function buildAngebotHtmlInputAusDetail(
   }
 
   const pos = normalizeAngebotPositionen(detail.positionen)
-  const summen = summenAusPositionen(pos, 19)
+  const wm = wizardMetaAusNotizen(detail.notizen)
+  const rechtshinweise = parseRechtshinweiseFromWizardMeta(wm, kunde.typ, firm)
+  const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
+  const firmMwst = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ)
+  const mwstSatz =
+    rechtshinweise.hinweis_13b || kleinunternehmer ? 0 : firmMwst
+  const summen = summenAusPositionen(pos, mwstSatz)
 
   const istProjekt = detail.dokument_typ === 'projekt'
   const varianten = parseVariantenPersist(detail.varianten)
@@ -193,13 +210,13 @@ export function buildAngebotHtmlInputAusDetail(
 
   let variant_block: AngebotHtmlInput['variant_block'] = null
   if (hatZweiVarianten) {
-    const summenB = summenAusPositionen(posB, 19)
+    const summenB = summenAusPositionen(posB, mwstSatz)
     variant_block = {
       titel: varianten!.b.name?.trim() || 'Variante B',
       positionen: posBTemplate,
       summen: {
         netto: Math.round(summenB.nettoMin * 100) / 100,
-        mwst_prozent: 19,
+        mwst_prozent: mwstSatz,
         mwst_betrag: Math.round(summenB.mwstBetragMin * 100) / 100,
         brutto: Math.round(summenB.bruttoMin * 100) / 100,
       },
@@ -213,9 +230,6 @@ export function buildAngebotHtmlInputAusDetail(
     : detail.hinweise?.trim() || null
 
   const fuss = firmenFusszeilen(firm)
-  const wm = wizardMetaAusNotizen(detail.notizen)
-  const rechtshinweise = parseRechtshinweiseFromWizardMeta(wm, kunde.typ, firm)
-  const mwstSatz = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || 19)
   const projekt_bloecke = istProjekt
     ? buildProjektPdfBloecke(pos, varianten, gewerke, mwstSatz)
     : null
@@ -236,7 +250,7 @@ export function buildAngebotHtmlInputAusDetail(
     firmen_impressum: fuss.impressum,
     angebotsnr: detail.angebotsnr?.trim() || `AG${detail.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
     kundennr: kunde.id ? formatKundennr(kunde.id) : '—',
-    datum: new Date(detail.created_at).toLocaleDateString('de-DE'),
+    datum: angebotPdfDatumDe(detail),
     gueltig_bis: parseGueltigDe(detail, firm),
     kunde_name: empfaenger.name,
     kunde_adresse: empfaenger.adresse,
@@ -258,6 +272,13 @@ export function buildAngebotHtmlInputAusDetail(
       mwst_prozent: mwstSatz,
       mwst_betrag: Math.round(mwst * 100) / 100,
       brutto: Math.round(brutto * 100) / 100,
+      ...(summen.nachlassNetto > 0
+        ? {
+            nachlass_netto: Math.round(summen.nachlassNetto * 100) / 100,
+            nachlass_label: summen.nachlassLabel,
+            netto_vor_nachlass: Math.round(summen.nettoVorNachlass * 100) / 100,
+          }
+        : {}),
     },
     kostenaufstellung: summenKostenaufstellungAusPositionen(pos),
     rechtshinweise,

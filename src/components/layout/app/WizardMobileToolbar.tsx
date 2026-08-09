@@ -9,16 +9,18 @@ type WizardMobileToolbarProps = {
   totalSteps: number
   currentStep: number
   stepLabel?: string
-  actions: ReactNode
+  actions?: ReactNode
+  saveHint?: string | null
 }
 
-/** Eine kompakte Header-Zeile auf Mobile: Schließen · Schritte · Aktionen */
+/** Eine kompakte Header-Zeile auf Mobile: Schließen · Schritte · optionale Sekundäraktionen */
 export function WizardMobileToolbar({
   onClose,
   totalSteps,
   currentStep,
   stepLabel,
   actions,
+  saveHint,
 }: WizardMobileToolbarProps) {
   return (
     <div className="wizard-mobile-toolbar md:hidden">
@@ -33,8 +35,9 @@ export function WizardMobileToolbar({
       <div className="wizard-mobile-toolbar__center min-w-0">
         <AppFlowStepDots total={totalSteps} current={currentStep} compact />
         {stepLabel ? <span className="sr-only">{stepLabel}</span> : null}
+        {saveHint ? <span className="wizard-mobile-toolbar__hint">{saveHint}</span> : null}
       </div>
-      <div className="wizard-mobile-toolbar__actions">{actions}</div>
+      {actions ? <div className="wizard-mobile-toolbar__actions">{actions}</div> : null}
     </div>
   )
 }

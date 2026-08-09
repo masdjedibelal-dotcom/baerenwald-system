@@ -70,7 +70,7 @@ export function LeadFunnelProjektAnzeige({
   } catch (e) {
     console.error('[LeadFunnelProjektAnzeige]', e)
     return (
-      <p className="text-[13px] text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         Projektdaten konnten nicht geladen werden.
       </p>
     )

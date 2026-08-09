@@ -19,6 +19,13 @@ async function assertAuftrag(auftragId: string) {
   return { ok: true as const, supabase }
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(v: string | null | undefined): boolean {
+  return Boolean(v && UUID_RE.test(v))
+}
+
 function slugFromGewerk(name: string): string {
   return (
     name
@@ -38,12 +45,13 @@ function lineToRow(
   const unit = Math.round((Number(line.preis) || 0) * 100) / 100
   const lineTotal = Math.round(unit * menge * 100) / 100
   const gewerk = line.gewerk?.trim() || POS_BOARD_DEFAULT_GEWERK
+  const isRegie = Boolean(line.regieSchein)
   return {
     auftrag_id: auftragId,
     leistung_name: line.name?.trim() || 'Position',
     beschreibung: line.beschreibung?.trim() || null,
     menge,
-    einheit: line.einheit?.trim() || 'Stück',
+    einheit: line.einheit?.trim() || (isRegie ? 'h' : 'Stück'),
     gewerk_name: gewerk,
     gewerk_slug: base?.gewerk_slug?.trim() || slugFromGewerk(gewerk),
     gewerk_block_key: base?.gewerk_block_key ?? null,
@@ -57,6 +65,10 @@ function lineToRow(
     preis_partner: base?.preis_partner ?? null,
     notizen_intern: base?.notizen_intern ?? null,
     absprachen: base?.absprachen ?? null,
+    typ: isRegie ? 'regie' : base?.typ ?? 'lv',
+    verguetung: isRegie ? 'aufwand' : 'festpreis',
+    geschaetzt_std: isRegie ? menge : null,
+    stundensatz: isRegie ? unit : null,
   }
 }
 
@@ -83,7 +95,8 @@ export async function replaceAuftragPositionenFromPosBoard(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const base = baseById.get(line.id) ?? null
+    // PosBoard-Client-IDs (`p-…`) sind keine UUIDs — nur echte DB-IDs updaten
+    const base = isUuid(line.id) ? baseById.get(line.id) ?? null : null
     const row = lineToRow(line, auftragId, i, base)
 
     if (base) {
@@ -94,10 +107,8 @@ export async function replaceAuftragPositionenFromPosBoard(
         .eq('auftrag_id', auftragId)
       if (error) return { ok: false, message: error.message }
     } else {
-      const { error } = await supabase.from('auftrag_positionen').insert({
-        id: line.id,
-        ...row,
-      })
+      // id weglassen → Postgres generiert UUID (Client-IDs wie `p-…` sind ungültig)
+      const { error } = await supabase.from('auftrag_positionen').insert(row)
       if (error) return { ok: false, message: error.message }
     }
   }

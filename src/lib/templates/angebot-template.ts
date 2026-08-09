@@ -54,6 +54,11 @@ export type AngebotTemplateSummen = {
   mwst_prozent: number
   mwst_betrag: number
   brutto: number
+  /** Nachlass-Abzug (positiv = wird von der Zwischensumme abgezogen) */
+  nachlass_netto?: number
+  nachlass_label?: string
+  /** Netto vor Nachlass (für Anzeige) */
+  netto_vor_nachlass?: number
 }
 
 /** Steuerliche Aufschlüsselung unter der Positionstabelle */
@@ -66,6 +71,10 @@ export type AngebotPdfRechtshinweise = {
   hinweis_35a: boolean
   hinweis_19: boolean
   hinweis_13b: boolean
+  /** §35a-Betrag im Hinweistext (auch ohne Kostenaufstellungs-Block) */
+  lohn_netto_35a?: number
+  /** Explizites Material, das vom Lohnanteil abgezogen wurde */
+  material_netto_35a?: number
 }
 
 export type AngebotHtmlInput = {
@@ -142,6 +151,19 @@ export type AngebotHtmlInput = {
   /** Rechnung: voll | abschlag | schluss — steuert PDF-Überschrift */
   rechnung_typ?: 'voll' | 'abschlag' | 'schluss' | null
   rechnung_abschlag_index?: number | null
+  /**
+   * Schlussrechnung (v. a. Privatkunde): klarer Summenblock
+   * Netto → MwSt → Brutto → bereits gezahlt → Restsumme
+   */
+  schluss_abrechnung?: {
+    netto: number
+    mwst_prozent: number
+    mwst_betrag: number
+    brutto: number
+    bereits_gezahlt: Array<{ label: string; brutto: number }>
+    bereits_gezahlt_brutto: number
+    rest_brutto: number
+  } | null
 }
 
 function esc(s: string): string {
@@ -345,12 +367,24 @@ function rechtshinweisePlain(
 ): string {
   if (!rh) return ''
   const parts: string[] = []
-  const lohn = ka?.lohn_netto ?? 0
+  const lohn =
+    rh.lohn_netto_35a != null && rh.lohn_netto_35a > 0
+      ? rh.lohn_netto_35a
+      : ka?.lohn_netto ?? 0
+  const material =
+    rh.material_netto_35a != null && rh.material_netto_35a > 0
+      ? rh.material_netto_35a
+      : 0
   const pStyle = `margin:0 0 8px;font-size:8pt;color:${TEXT_PRIMARY};line-height:1.55;text-align:left;font-weight:400;`
-  if (rh.hinweis_35a && lohn > 0) {
+  if (rh.hinweis_35a) {
+    const betrag = lohn > 0 ? ` in Höhe von ${euro(lohn)}` : ''
+    const materialHinweis =
+      material > 0
+        ? ` (Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${euro(material)}; inkl. Anfahrt und Maschinenkosten, soweit enthalten)`
+        : ` (inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten)`
     parts.push(
       `<p style="${pStyle}">
-        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${euro(lohn)} kann bei der Einkommensteuer geltend gemacht werden.
+        Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil${betrag}${materialHinweis} kann bei der Einkommensteuer geltend gemacht werden.
       </p>`
     )
   }
@@ -374,12 +408,54 @@ function rechtshinweisePlain(
 function summenBlockHtml(
   s: AngebotTemplateSummen,
   ka?: AngebotKostenaufstellung | null,
-  rh?: AngebotPdfRechtshinweise | null
+  rh?: AngebotPdfRechtshinweise | null,
+  schluss?: AngebotHtmlInput['schluss_abrechnung']
 ): string {
   const recht = rechtshinweisePlain(rh, ka)
+
+  if (schluss && schluss.brutto > 0) {
+    const bereitsZeilen = schluss.bereits_gezahlt
+      .map(
+        (z) =>
+          `<tr><td style="padding:3px 4px;">Bereits gezahlt · ${esc(z.label)}</td><td style="padding:3px 4px;text-align:right;">−${euro(z.brutto)}</td></tr>`
+      )
+      .join('')
+    const summenSpalte = `<div style="width:300px;flex-shrink:0;">
+    <table style="width:100%;font-size:10pt;font-weight:400;">
+      <tr><td style="padding:3px 4px;">Gesamtbetrag (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.netto)}</td></tr>
+      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(schluss.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.mwst_betrag)}</td></tr>
+      <tr><td style="padding:3px 4px;font-weight:600;">Gesamtbetrag (brutto)</td><td style="padding:3px 4px;text-align:right;font-weight:600;">${euro(schluss.brutto)}</td></tr>
+      ${bereitsZeilen}
+    </table>
+    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid #111;">
+      <tr><td style="padding:8px 4px 4px;">Restsumme</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${euro(schluss.rest_brutto)}</td></tr>
+    </table>
+  </div>`
+    if (!recht) {
+      return `<div style="margin-top:14px;display:flex;justify-content:flex-end;">${summenSpalte}</div>`
+    }
+    return `<div style="margin-top:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
+    <div style="flex:1;min-width:0;padding-top:2px;">${recht}</div>
+    ${summenSpalte}
+  </div>`
+  }
+
+  const nachlass = s.nachlass_netto != null && s.nachlass_netto > 0 ? s.nachlass_netto : 0
+  const vorNachlass =
+    s.netto_vor_nachlass != null && s.netto_vor_nachlass > 0 ? s.netto_vor_nachlass : null
+  const nachlassLabel = (s.nachlass_label || 'Nachlass').trim() || 'Nachlass'
+  const nachlassZeilen =
+    nachlass > 0
+      ? `${
+          vorNachlass != null
+            ? `<tr><td style="padding:3px 4px;">Summe Positionen (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(vorNachlass)}</td></tr>`
+            : ''
+        }<tr><td style="padding:3px 4px;">${esc(nachlassLabel)}</td><td style="padding:3px 4px;text-align:right;">−${euro(nachlass)}</td></tr>`
+      : ''
   const summenSpalte = `<div style="width:300px;flex-shrink:0;">
     ${kostenaufstellungPlain(ka, true)}
     <table style="width:100%;font-size:10pt;font-weight:400;">
+      ${nachlassZeilen}
       <tr><td style="padding:3px 4px;">Zwischensumme (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(s.netto)}</td></tr>
       <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(s.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${euro(s.mwst_betrag)}</td></tr>
     </table>
@@ -676,9 +752,19 @@ function summenBlockKompaktHtml(s: AngebotTemplateSummen, gruen = false): string
   const bg = gruen ? PROJEKT_TINT : 'transparent'
   const border = gruen ? `1px solid ${PROJEKT_ACCENT}` : 'none'
   const pad = gruen ? '12px 14px' : '0'
+  const nachlass = s.nachlass_netto != null && s.nachlass_netto > 0 ? s.nachlass_netto : 0
+  const nachlassRows =
+    nachlass > 0
+      ? `${
+          s.netto_vor_nachlass != null
+            ? `<tr><td style="padding:3px 6px;">Summe Positionen</td><td style="padding:3px 6px;text-align:right;">${euro(s.netto_vor_nachlass)}</td></tr>`
+            : ''
+        }<tr><td style="padding:3px 6px;">${esc((s.nachlass_label || 'Nachlass').trim() || 'Nachlass')}</td><td style="padding:3px 6px;text-align:right;">−${euro(nachlass)}</td></tr>`
+      : ''
   return `<div style="margin-top:12px;display:flex;flex-direction:column;align-items:flex-end;">
     <div style="width:300px;background:${bg};border:${border};border-radius:4px;padding:${pad};">
       <table style="width:100%;font-size:10pt;color:${accent};font-weight:400;">
+        ${nachlassRows}
         <tr><td style="padding:3px 6px;">Gesamtsumme netto</td><td style="padding:3px 6px;text-align:right;font-weight:600;">${euro(s.netto)}</td></tr>
         <tr><td style="padding:3px 6px;">zzgl. ${esc(String(s.mwst_prozent))} % MwSt.</td><td style="padding:3px 6px;text-align:right;">${euro(s.mwst_betrag)}</td></tr>
         <tr style="border-top:1px solid ${accent};"><td style="padding:8px 6px 4px;font-weight:700;">Gesamtsumme brutto</td><td style="padding:8px 6px 4px;text-align:right;font-weight:700;">${euro(s.brutto)}</td></tr>
@@ -941,17 +1027,24 @@ function buildAngebotProjektHtml(
     .map((b) => projektBlockHtml(b, bloecke.length, mapPositions, props.projekt_hat_varianten))
     .join('')
 
-  const gesamtNetto = bloecke.reduce((s, b) => s + b.summen.netto, 0)
-  const gesamtMwst = bloecke.reduce((s, b) => s + b.summen.mwst_betrag, 0)
-  const gesamtBrutto = bloecke.reduce((s, b) => s + b.summen.brutto, 0)
+  const bloeckeNetto = bloecke.reduce((s, b) => s + b.summen.netto, 0)
   const mehrereGewerke = bloecke.length > 1
-
-  const gesamtSummenWerte = {
-    netto: Math.round(gesamtNetto * 100) / 100,
+  // Dokumentsummen inkl. Nachlass (nicht nur Summe der Gewerk-Blöcke)
+  const gesamtSummenWerte: AngebotTemplateSummen = {
+    netto: props.summen.netto,
     mwst_prozent: props.summen.mwst_prozent,
-    mwst_betrag: Math.round(gesamtMwst * 100) / 100,
-    brutto: Math.round(gesamtBrutto * 100) / 100,
+    mwst_betrag: props.summen.mwst_betrag,
+    brutto: props.summen.brutto,
+    ...(props.summen.nachlass_netto != null && props.summen.nachlass_netto > 0
+      ? {
+          nachlass_netto: props.summen.nachlass_netto,
+          nachlass_label: props.summen.nachlass_label,
+          netto_vor_nachlass:
+            props.summen.netto_vor_nachlass ?? Math.round(bloeckeNetto * 100) / 100,
+        }
+      : {}),
   }
+  const gesamtBrutto = gesamtSummenWerte.brutto
 
   const gesamtKompaktInner = summenBlockKompaktHtml(gesamtSummenWerte, true).replace(
     'margin-top:12px;display:flex;flex-direction:column;align-items:flex-end;',
@@ -1105,7 +1198,7 @@ export function buildAngebotHtml(
   ${erstePosUeberschrift}
   ${posTables}
   ${fotosBlock}
-  ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise)}
+  ${summenBlockHtml(props.summen, props.kostenaufstellung, props.rechtshinweise, props.schluss_abrechnung)}
   ${variantBlock}
   <div style="margin-top:18px;font-size:10pt;color:${TEXT_PRIMARY};line-height:1.55;">${plainTextToPdfHtml(props.zahlungsbedingungen)}</div>
   ${istRechnung ? bankBlock : ''}

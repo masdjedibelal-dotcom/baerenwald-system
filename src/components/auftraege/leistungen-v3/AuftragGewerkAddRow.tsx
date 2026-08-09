@@ -28,7 +28,7 @@ export function AuftragGewerkAddRow({
 
   if (!gewerke.length) {
     return (
-      <p className="text-sm text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         Keine Gewerke in den Stammdaten hinterlegt.
       </p>
     )

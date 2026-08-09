@@ -13,10 +13,13 @@ async function resolveKundeTarget(kundeId: string): Promise<
 > {
   const { data, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, email, name, portal_modus, auth_user_id')
+    .select('id, email, name, portal_modus, auth_user_id, ist_spam')
     .eq('id', kundeId)
     .maybeSingle()
   if (error || !data) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden.' }
+  if ((data as { ist_spam?: boolean | null }).ist_spam) {
+    return { ok: false, message: 'Kunde ist als Spam markiert — Portal-Zugang gesperrt.' }
+  }
   const email = (data.email as string | null)?.trim()
   if (!email) return { ok: false, message: 'Kunde hat keine E-Mail.' }
   if (!(data.auth_user_id as string | null)?.trim()) {
@@ -43,10 +46,13 @@ async function resolveHandwerkerTarget(handwerkerId: string): Promise<
 > {
   const { data, error } = await supabaseAdmin
     .from('handwerker')
-    .select('id, email, name, firma, auth_user_id')
+    .select('id, email, name, firma, auth_user_id, ist_portal_gesperrt')
     .eq('id', handwerkerId)
     .maybeSingle()
   if (error || !data) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden.' }
+  if ((data as { ist_portal_gesperrt?: boolean | null }).ist_portal_gesperrt) {
+    return { ok: false, message: 'Partner ist vom Portal ausgeschlossen — Zugang gesperrt.' }
+  }
   const email = (data.email as string | null)?.trim()
   if (!email) return { ok: false, message: 'Handwerker hat keine E-Mail.' }
   if (!(data.auth_user_id as string | null)?.trim()) {

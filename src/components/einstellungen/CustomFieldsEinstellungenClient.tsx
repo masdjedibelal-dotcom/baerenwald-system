@@ -1,6 +1,7 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -101,7 +102,7 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
   const [feldTyp, setFeldTyp] = useState('text')
   const [optionenText, setOptionenText] = useState('')
   const [pflicht, setPflicht] = useState(false)
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 

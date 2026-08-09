@@ -1,13 +1,16 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
+import { Toggle } from '@/components/ui/Toggle'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
-import { richTextToPlain } from '@/lib/rich-text'
+import { richTextToEditablePlain } from '@/lib/rich-text'
+import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 
 const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
   { value: 'allgemein', label: 'Allgemein' },
@@ -65,43 +68,22 @@ export function PositionModal({
       ? p.name || 'Freitext'
       : kind === 'nachlass'
         ? p.name || 'Nachlass'
-        : p.name || 'Neue Position'
-  const sub =
-    kind === 'freitext'
-      ? 'Hinweis ohne Preis'
-      : kind === 'nachlass'
-        ? 'Rabatt auf Gesamtsumme'
-        : 'Position bearbeiten'
+        : p.name || 'Position'
 
   return (
-    <MockModal
-      open
-      onClose={onClose}
-      icon={kind === 'nachlass' ? 'percent' : kind === 'freitext' ? 'align-left' : 'list-numbers'}
-      title={title}
-      sub={sub}
-      footer={
-        <>
-          {onRemove ? (
-            <MockBtn
-              sm
-              kind="danger"
-              icon="trash"
-              onClick={() => {
-                onRemove()
-                onClose()
-              }}
-            >
-              Entfernen
-            </MockBtn>
-          ) : null}
-          <div style={{ flex: 1 }} />
-          <MockBtn sm kind="primary" icon="check" onClick={onClose}>
-            Fertig
-          </MockBtn>
-        </>
-      }
-    >
+    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose}>
+      {onRemove ? (
+        <button
+          type="button"
+          className="mb-3 text-[length:var(--fs-text)] font-medium text-status-cancel-text"
+          onClick={() => {
+            onRemove()
+            onClose()
+          }}
+        >
+          Entfernen
+        </button>
+      ) : null}
       {kind === 'freitext' ? (
         <div className="form-grid">
           <Field label="Überschrift" full>
@@ -113,15 +95,15 @@ export function PositionModal({
               autoFocus={!p.name}
             />
           </Field>
-          <Field label="Text" full hint="Erscheint ohne Preis auf dem Dokument">
-            <textarea
-              className="ta"
-              value={richTextToPlain(p.beschreibung)}
-              onChange={(e) => onChange({ beschreibung: e.target.value })}
-              rows={3}
-              placeholder="z. B. Hinweis zu Ablauf oder Garantie"
-            />
-          </Field>
+          <SheetEditableField
+            label="Text"
+            value={richTextToEditablePlain(p.beschreibung)}
+            onSave={(beschreibung) => onChange({ beschreibung })}
+            multiline
+            rows={3}
+            placeholder="z. B. Hinweis zu Ablauf oder Garantie"
+            sheetContext="detail"
+          />
         </div>
       ) : kind === 'nachlass' ? (
         <div className="form-grid">
@@ -153,13 +135,11 @@ export function PositionModal({
           <Field label={(p.nachlassModus ?? 'prozent') === 'prozent' ? 'Prozent' : 'Betrag netto'}>
             <div className="txt-prefix">
               <span className="prefix">{(p.nachlassModus ?? 'prozent') === 'prozent' ? '%' : '€'}</span>
-              <input
+              <ClearableNumberInput
                 className="txt"
-                type="number"
-                step={(p.nachlassModus ?? 'prozent') === 'prozent' ? '0.5' : '0.01'}
                 min={0}
                 value={p.preis}
-                onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
+                onValueChange={(preis) => onChange({ preis })}
               />
             </div>
           </Field>
@@ -190,20 +170,16 @@ export function PositionModal({
               autoFocus={!p.name}
             />
           </Field>
-          <Field label="Beschreibung" full hint="Erscheint beim Kunden">
-            <textarea
-              className="ta"
-              value={richTextToPlain(p.beschreibung)}
-              onChange={(e) => onChange({ beschreibung: e.target.value })}
-              rows={2}
-              placeholder="Details zur Leistung…"
-            />
-          </Field>
-          <Field
-            label="Kostenart"
-            full
-            hint="Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung"
-          >
+          <SheetEditableField
+            label="Beschreibung"
+            value={richTextToEditablePlain(p.beschreibung)}
+            onSave={(beschreibung) => onChange({ beschreibung })}
+            multiline
+            rows={3}
+            placeholder="Details zur Leistung…"
+            sheetContext="detail"
+          />
+          <Field label="Kostenart" full>
             <div className="seg" role="group" aria-label="Kostenart">
               {KOSTENART_OPTIONS.map((opt) => {
                 const active = (p.kostenverteilung ?? 'allgemein') === opt.value
@@ -220,18 +196,31 @@ export function PositionModal({
               })}
             </div>
           </Field>
-          <Field label="Menge">
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input
-                className="txt"
-                type="number"
-                step="0.5"
-                value={p.menge}
-                onChange={(e) =>
+          <Field label="Vergütung" full>
+            <Toggle
+              checked={Boolean(p.regieSchein)}
+              label={REGIE_BADGE_LABEL}
+              onChange={(on) => {
+                if (on) {
+                  const einheit =
+                    p.einheit === 'h' || p.einheit === 'Std.' ? p.einheit : 'h'
                   onChange({
-                    menge: e.target.value === '' ? 0 : Number(e.target.value),
+                    regieSchein: true,
+                    einheit,
+                    notizExtern: p.notizExtern?.trim() || 'nach Aufwand',
                   })
+                } else {
+                  onChange({ regieSchein: false })
                 }
+              }}
+            />
+          </Field>
+          <Field label={p.regieSchein ? 'Geschätzte Stunden' : 'Menge'}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <ClearableNumberInput
+                className="txt"
+                value={p.menge}
+                onValueChange={(menge) => onChange({ menge })}
                 style={{ flex: 1 }}
               />
               <select
@@ -239,6 +228,7 @@ export function PositionModal({
                 value={p.einheit}
                 onChange={(e) => onChange({ einheit: e.target.value })}
                 style={{ width: 100 }}
+                disabled={Boolean(p.regieSchein)}
               >
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
@@ -248,39 +238,44 @@ export function PositionModal({
               </select>
             </div>
           </Field>
-          <Field label="Einzelpreis (netto)">
-            <div className="txt-prefix">
-              <span className="prefix">€</span>
-              <input
-                className="txt"
-                type="number"
-                value={p.preis}
-                onChange={(e) => onChange({ preis: Number(e.target.value) || 0 })}
-              />
+          <div className="field pos-add-preis-ust">
+            <div className="pos-add-preis-ust__labels">
+              <div className="field-label">
+                {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
+              </div>
+              {showUst !== false ? <div className="field-label">USt.</div> : null}
             </div>
-          </Field>
-          {showUst !== false ? (
-            <Field label="USt.">
-              <select
-                className="sel"
-                value={String(p.ust != null ? p.ust : 19)}
-                onChange={(e) => onChange({ ust: Number(e.target.value) })}
-              >
-                <option value="19">19%</option>
-                <option value="7">7%</option>
-                <option value="0">0%</option>
-              </select>
-            </Field>
-          ) : (
-            <div />
-          )}
+            <div className="pos-add-preis-ust__row">
+              <div className="txt-prefix pos-add-preis-ust__preis">
+                <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
+                <ClearableNumberInput
+                  className="txt"
+                  value={p.preis}
+                  onValueChange={(preis) => onChange({ preis })}
+                  min={0}
+                />
+              </div>
+              {showUst !== false ? (
+                <select
+                  className="sel pos-add-preis-ust__ust"
+                  value={String(p.ust != null ? p.ust : 19)}
+                  onChange={(e) => onChange({ ust: Number(e.target.value) })}
+                  aria-label="USt."
+                >
+                  <option value="19">19%</option>
+                  <option value="7">7%</option>
+                  <option value="0">0%</option>
+                </select>
+              ) : null}
+            </div>
+          </div>
           <Field label="Zeilensumme">
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>
+            <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
               {formatEurBetrag(line)}
             </div>
           </Field>
         </div>
       )}
-    </MockModal>
+    </EditorSheet>
   )
 }

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import {
   Calendar,
   CircleX,
-  HelpCircle,
   Info,
   PhoneOff,
   Save,
@@ -17,16 +16,15 @@ import {
   loadCrmTeamFuerTermin,
   saveLeadAlsVerloren,
   saveLeadNichtErreichbar,
-  saveLeadRueckfrage,
   saveLeadTerminVereinbart,
+  undoLeadTerminVereinbart,
 } from '@/app/(dashboard)/anfragen/actions'
 import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
 import {
   TerminBestaetigungMailEditor,
   type TerminMailDraft,
 } from '@/components/anfragen/TerminBestaetigungMailEditor'
-import { FormSheet } from '@/components/ui/FormSheet'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail } from '@/lib/types'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -34,16 +32,10 @@ import { anfrageAdresseAusPayload, formatAnfrageAdresseZeile } from '@/lib/anfra
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
 
-export type StatusModalKind = 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren'
+export type StatusModalKind = 'termin' | 'nicht_erreichbar' | 'verloren'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function plusDaysISO(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 const META: Record<
@@ -51,11 +43,10 @@ const META: Record<
   { title: string; icon: LucideIcon; saveLabel: string; danger?: boolean }
 > = {
   termin: { title: 'Termin vereinbart', icon: Calendar, saveLabel: 'Termin speichern' },
-  rueckfrage: { title: 'Warte auf Antwort', icon: HelpCircle, saveLabel: 'Speichern' },
   nicht_erreichbar: {
     title: 'Nicht erreichbar',
     icon: PhoneOff,
-    saveLabel: 'Wiedervorlage anlegen',
+    saveLabel: 'Versuch speichern',
   },
   verloren: {
     title: 'Verloren',
@@ -71,16 +62,18 @@ export function StatusModal({
   open,
   onClose,
   onSaved,
+  onSuggestVerloren,
 }: {
   kind: StatusModalKind | null
   lead: LeadDetail
   open: boolean
   onClose: () => void
   onSaved?: () => void
+  /** Nach 3× Nicht erreichbar: Verloren-Sheet öffnen */
+  onSuggestVerloren?: () => void
 }) {
   const [datum, setDatum] = useState(todayISO())
   const [uhrzeit, setUhrzeit] = useState('10:00')
-  const [wiedervorlage, setWiedervorlage] = useState(plusDaysISO(3))
   const [notiz, setNotiz] = useState('')
   const [grund, setGrund] = useState('zu_teuer')
   const [mitarbeiterId, setMitarbeiterId] = useState('')
@@ -89,7 +82,6 @@ export function StatusModal({
   const [mailToggle, setMailToggle] = useState(true)
   const [mailDraft, setMailDraft] = useState<TerminMailDraft | null>(null)
   const [saving, setSaving] = useState(false)
-  const isMobile = useIsMobile()
 
   const kontaktName = leadKontaktAnzeigeName(lead, 'Kundin/Kunde')
   const kontaktEmail = lead.kontakt_email?.trim() || ''
@@ -119,7 +111,6 @@ export function StatusModal({
     if (!open || !kind) return
     setDatum(todayISO())
     setUhrzeit('10:00')
-    setWiedervorlage(plusDaysISO(3))
     setNotiz('')
     setGrund('zu_teuer')
     setMitarbeiterId('')
@@ -149,12 +140,13 @@ export function StatusModal({
   if (!open || !kind) return null
 
   const meta = META[kind]
-  const Icon = meta.icon
 
   async function handleSave() {
     if (!kind) return
     setSaving(true)
-    let res: { ok: true } | { ok: false; message: string }
+    let res:
+      | { ok: true; versuche?: number; vorschlagVerloren?: boolean }
+      | { ok: false; message: string }
 
     if (kind === 'termin') {
       if (!datum.trim()) {
@@ -193,23 +185,11 @@ export function StatusModal({
         mailHtml: mailDraft?.html,
         mailBodyText: mailDraft?.bodyText,
       })
-    } else if (kind === 'rueckfrage') {
-      if (!notiz.trim()) {
-        setSaving(false)
-        toast.error('Bitte einen kurzen Text eintragen.')
-        return
-      }
-      res = await saveLeadRueckfrage({ leadId: lead.id, notiz: notiz.trim() })
     } else if (kind === 'nicht_erreichbar') {
-      if (!wiedervorlage.trim()) {
-        setSaving(false)
-        toast.error('Bitte Wiedervorlage-Datum wählen.')
-        return
-      }
       res = await saveLeadNichtErreichbar({
         leadId: lead.id,
         kontaktName,
-        wiedervorlage,
+        notiz: notiz.trim() || null,
       })
     } else {
       res = await saveLeadAlsVerloren({
@@ -224,15 +204,39 @@ export function StatusModal({
       toast.error(res.message)
       return
     }
-    toast.success(
-      kind === 'termin' && mailToggle && mailDraft?.to.length
-        ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
-        : kind === 'verloren'
-          ? 'Anfrage als verloren markiert.'
-          : kind === 'nicht_erreichbar'
-            ? 'Wiedervorlage angelegt.'
-            : 'Gespeichert'
-    )
+
+    if (kind === 'termin') {
+      toast.success(
+        mailToggle && mailDraft?.to.length
+          ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
+          : 'Termin vereinbart',
+        {
+          action: {
+            label: 'Rückgängig',
+            onClick: () => {
+              void undoLeadTerminVereinbart(lead.id).then((r) => {
+                if (!r.ok) toast.error(r.message)
+                else {
+                  toast.success('Termin rückgängig')
+                  onSaved?.()
+                }
+              })
+            },
+          },
+        }
+      )
+    } else if (kind === 'nicht_erreichbar') {
+      const versuche = res.versuche ?? 1
+      const vorschlag = Boolean(res.vorschlagVerloren)
+      toast.success(`Nicht erreichbar · Versuch ${versuche}`)
+      onClose()
+      onSaved?.()
+      if (vorschlag) onSuggestVerloren?.()
+      return
+    } else {
+      toast.success('Anfrage als verloren markiert.')
+    }
+
     onClose()
     onSaved?.()
   }
@@ -270,7 +274,7 @@ export function StatusModal({
                 required
               />
               {terminAdresse ? (
-                <p className="md:col-span-2 text-xs text-bw-text-muted">
+                <p className="md:col-span-2 text-[length:var(--fs-meta)] text-bw-text-muted">
                   Ort: <strong className="text-bw-text">{terminAdresse}</strong>
                 </p>
               ) : null}
@@ -282,11 +286,10 @@ export function StatusModal({
                   placeholder="Vor-Ort begehen, Maße aufnehmen, Wünsche notieren…"
                   rows={3}
                 />
-                <p className="form-field-hint mt-1">Wird im Kalender und in der Timeline gespeichert.</p>
               </div>
               <div className="md:col-span-2 space-y-3">
                 {kontaktEmail ? (
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
                     <input
                       type="checkbox"
                       checked={mailToggle}
@@ -295,7 +298,7 @@ export function StatusModal({
                     Bestätigungs-Mail an Kunden ({kontaktEmail})
                   </label>
                 ) : (
-                  <p className="text-xs text-bw-text-muted">
+                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                     Keine E-Mail beim Lead — Bestätigung nur im Kalender.
                   </p>
                 )}
@@ -322,50 +325,20 @@ export function StatusModal({
             </div>
           ) : null}
 
-          {kind === 'rueckfrage' ? (
+          {kind === 'nicht_erreichbar' ? (
             <div className="space-y-3">
               <Textarea
-                label="Worum wartest du auf eine Antwort? *"
+                label="Notiz (optional)"
                 value={notiz}
                 onChange={(e) => setNotiz(e.target.value)}
-                placeholder="Z. B. noch offene Infos vom Kunden, Rückruf angekündigt, Angebot abwarten…"
-                rows={4}
+                placeholder="Mailbox voll, keine Antwort, …"
+                rows={3}
               />
               <div className="status-hint status-hint-neutral">
                 <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                 <span>
-                  {lead.status === 'neu' ? (
-                    <>
-                      Status wird auf <strong>„Kontaktiert“</strong> gesetzt. Der Eintrag erscheint in der
-                      Timeline.
-                    </>
-                  ) : (
-                    <>
-                      Status bleibt <strong>„Kontaktiert“</strong>, der Eintrag erscheint in der Timeline.
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
-          ) : null}
-
-          {kind === 'nicht_erreichbar' ? (
-            <div className="space-y-3">
-              <label>
-                <span className="input-label">Wiedervorlage am *</span>
-                <input
-                  type="date"
-                  className="input"
-                  value={wiedervorlage}
-                  min={todayISO()}
-                  onChange={(e) => setWiedervorlage(e.target.value)}
-                  required
-                />
-              </label>
-              <div className="status-hint status-hint-neutral">
-                <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
-                <span>
-                  Erinnerung in der Timeline · Status: <strong>„Kontaktiert“</strong>
+                  Status bleibt unverändert. Der Versuch landet in der Timeline. Ab dem dritten
+                  Versuch schlägt das System „Als verloren markieren“ vor.
                 </span>
               </div>
             </div>
@@ -403,15 +376,13 @@ export function StatusModal({
   )
 
   const formFooter = (
-    <div className="flex w-full items-center gap-2">
-      <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+    <div className="sheet-footer-actions">
+      <Button type="button" variant="secondary" onClick={onClose}>
         Abbrechen
       </Button>
-      <div className="flex-1" />
       <Button
         type="button"
         variant={meta.danger ? 'danger' : 'primary'}
-        size="sm"
         loading={saving}
         className="inline-flex gap-1.5"
         onClick={() => void handleSave()}
@@ -422,45 +393,17 @@ export function StatusModal({
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <FormSheet open={open} onClose={onClose} breadcrumb="Anfragen" title={meta.title} footer={formFooter} width="lg">
-        <p className="mb-4 text-sm text-bw-text-muted">{sub}</p>
-        {formBody}
-      </FormSheet>
-    )
-  }
-
   return (
-    <div
-      className="modal-overlay-center"
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title={meta.title}
+      context="detail"
+      size="lg"
+      footer={formFooter}
     >
-      <div
-        className={kind === 'termin' ? 'modal-compact modal-compact-wide' : 'modal-compact'}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="status-modal-title"
-      >
-        <header className="modal-compact-h">
-          <div className={meta.danger ? 'modal-compact-icon modal-compact-icon-danger' : 'modal-compact-icon'}>
-            <Icon className="h-[18px] w-[18px]" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h2 id="status-modal-title" className="modal-compact-title">
-              {meta.title}
-            </h2>
-            <p className="modal-compact-sub">{sub}</p>
-          </div>
-        </header>
-
-        {formBody}
-
-        <footer className="modal-compact-f">{formFooter}</footer>
-      </div>
-    </div>
+      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">{sub}</p>
+      {formBody}
+    </EditorSheet>
   )
 }

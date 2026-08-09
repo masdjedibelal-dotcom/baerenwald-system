@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
@@ -113,7 +114,7 @@ export function RechnungAuswahlPanel({
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
     const items: ActionsMenuItem[] = [
       {
-        label: 'Ansehen',
+        label: 'Öffnen',
         icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => {
           onClose?.()
@@ -193,19 +194,19 @@ export function RechnungAuswahlPanel({
     <div className="space-y-4">
       {variant === 'page' ? (
         <div>
-          <p className="text-xs text-bw-text-muted">Auftrag</p>
-          <h1 className="text-lg font-semibold text-bw-text">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Auftrag</p>
+          <h1 className="text-[length:var(--fs-head)] font-semibold text-bw-text">
             Rechnungen{auftragsReferenz ? ` · ${auftragsReferenz}` : ''}
           </h1>
         </div>
       ) : null}
 
-      <p className="text-sm text-bw-text-muted">
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         Bestehende Rechnungen auswählen und bearbeiten — oder unten eine neue anlegen.
       </p>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-sm text-bw-text-muted">
+        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
           Noch keine Rechnungen zu diesem Auftrag.
         </p>
       ) : variant === 'page' ? (
@@ -294,18 +295,18 @@ export function RechnungAuswahlPanel({
                           <span className="block h-1.5 w-1.5 rounded-full bg-white" />
                         ) : null}
                       </span>
-                      <span className="text-[13px] font-medium text-bw-text">{titel}</span>
-                      <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-medium text-bw-text-muted">
+                      <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{titel}</span>
+                      <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
                         {label}
                       </span>
                     </div>
-                    <p className="mt-0.5 pl-6 text-[13px] text-bw-text-muted">
+                    <p className="mt-0.5 pl-6 text-[length:var(--fs-text)] text-bw-text-muted">
                       {r.rechnungsnummer?.trim() ? `${r.rechnungsnummer} · ` : ''}
                       {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
                       {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
                     </p>
                   </button>
-                  <span className="text-[13px] font-medium tabular-nums text-bw-text">
+                  <span className="text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
                     {formatEurBetrag(r.brutto ?? 0)}
                   </span>
                   <div className="flex shrink-0 items-center">

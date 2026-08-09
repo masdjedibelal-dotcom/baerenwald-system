@@ -1,6 +1,7 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -166,7 +167,7 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   const [rows, setRows] = useState(initial)
   const [neuOpen, setNeuOpen] = useState(false)
   const [neuName, setNeuName] = useState('')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   async function onDragEnd(e: DragEndEvent) {
@@ -281,11 +282,11 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
       {neuOpen ? (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-bw-border bg-bw-card p-3">
           <Input label="Neues Gewerk" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
-          <Button type="button" variant="primary" loading={pending} onClick={() => saveNeu()}>
-            Speichern
-          </Button>
           <Button type="button" variant="ghost" onClick={() => setNeuOpen(false)}>
             Abbrechen
+          </Button>
+          <Button type="button" variant="primary" loading={pending} onClick={() => saveNeu()}>
+            Speichern
           </Button>
         </div>
       ) : (

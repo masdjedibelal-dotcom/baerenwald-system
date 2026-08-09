@@ -1,5 +1,6 @@
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
+import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { Angebot, AngebotHandwerkerRow, AuftragDetail } from '@/lib/types'
 import {
@@ -8,23 +9,93 @@ import {
 } from '@/lib/partner/partner-hw-dokument-typen'
 import { normalizeUrlList } from '@/lib/utils'
 
+/** Versendet / bezahlt / storniert-mit-Versand — Entwürfe bleiben draußen. */
+export function rechnungIstAlsAkteUnterlage(r: {
+  status?: string | null
+  gesendet_at?: string | null
+}): boolean {
+  const st = (r.status ?? '').toLowerCase()
+  if (st === 'entwurf') return false
+  if (st === 'gesendet' || st === 'bezahlt' || st === 'versendet') return true
+  return Boolean(r.gesendet_at)
+}
+
 function dokumentDatumMs(datum: string | null | undefined): number {
   if (!datum?.trim()) return 0
   const ms = new Date(datum).getTime()
   return Number.isNaN(ms) ? 0 : ms
 }
 
+export type AuftragDokumentQuelle =
+  | 'timeline'
+  | 'rechnung'
+  | 'protokoll'
+  | 'angebot'
+  | 'vertrag'
+  | 'handwerker'
+
+export type AuftragDokumentZeile = {
+  id: string
+  name: string
+  beschreibung: string
+  datum: string
+  fuerKunde: boolean
+  href: string
+  quelle: AuftragDokumentQuelle
+  timelineId?: string
+  /** Storage-Pfad im Bucket handwerker-uploads — wird serverseitig signiert. */
+  storagePath?: string
+}
+
+export type DokumentSortKey = 'datum' | 'name' | 'typ'
+
+export function dokumentTypLabel(quelle: AuftragDokumentQuelle): string {
+  switch (quelle) {
+    case 'angebot':
+      return 'Angebot'
+    case 'rechnung':
+      return 'Rechnung'
+    case 'vertrag':
+      return 'Vertrag'
+    case 'handwerker':
+      return 'Partner'
+    case 'protokoll':
+      return 'Protokoll'
+    case 'timeline':
+      return 'Upload'
+    default:
+      return 'Dokument'
+  }
+}
+
 /** Neueste zuerst; ohne Datum unten; bei Gleichstand alphabetisch (wie Kunden-/Partnerportal). */
 export function sortDokumentZeilenNachDatum<T extends { datum: string; name: string }>(
   rows: T[]
 ): T[] {
+  return sortDokumentZeilen(rows, 'datum', 'desc')
+}
+
+export function sortDokumentZeilen<
+  T extends { datum: string; name: string; quelle?: AuftragDokumentQuelle },
+>(rows: T[], key: DokumentSortKey, dir: 'asc' | 'desc' = 'desc'): T[] {
+  const sign = dir === 'asc' ? 1 : -1
   return [...rows].sort((a, b) => {
+    if (key === 'name') {
+      const c = a.name.localeCompare(b.name, 'de', { sensitivity: 'base' })
+      return c * sign || dokumentDatumMs(b.datum) - dokumentDatumMs(a.datum)
+    }
+    if (key === 'typ') {
+      const la = dokumentTypLabel(a.quelle ?? 'timeline')
+      const lb = dokumentTypLabel(b.quelle ?? 'timeline')
+      const c = la.localeCompare(lb, 'de', { sensitivity: 'base' })
+      return c * sign || a.name.localeCompare(b.name, 'de')
+    }
     const ta = dokumentDatumMs(a.datum)
     const tb = dokumentDatumMs(b.datum)
     if (ta !== tb) {
       if (ta === 0) return 1
       if (tb === 0) return -1
-      return tb - ta
+      return (ta - tb) * sign
     }
     return a.name.localeCompare(b.name, 'de')
   })
@@ -41,19 +112,6 @@ export function isAngebotKundenportalSichtbar(
     st === 'angenommen' ||
     st === 'kunde_akzeptiert'
   )
-}
-
-export type AuftragDokumentZeile = {
-  id: string
-  name: string
-  beschreibung: string
-  datum: string
-  fuerKunde: boolean
-  href: string
-  quelle: 'timeline' | 'rechnung' | 'protokoll' | 'angebot' | 'vertrag' | 'handwerker'
-  timelineId?: string
-  /** Storage-Pfad im Bucket handwerker-uploads — wird serverseitig signiert. */
-  storagePath?: string
 }
 
 /** Einzelnes Angebot aus FK-Join (PostgREST liefert teils ein Objekt, teils Array). */
@@ -93,20 +151,22 @@ export function timelineDokumentZeilen(detail: AuftragDetail): AuftragDokumentZe
 }
 
 export function rechnungDokumentZeilen(rechnungen: RechnungAuswahlZeile[]): AuftragDokumentZeile[] {
-  return rechnungen
-    .filter((r) => (r.status ?? '').toLowerCase() === 'gesendet' && Boolean(r.pdf_url?.trim()))
-    .map((r) => ({
+  return rechnungen.filter(rechnungIstAlsAkteUnterlage).map((r) => {
+    const st = (r.status ?? '').toLowerCase()
+    const art =
+      (r.beleg_typ ?? '').toLowerCase() === 'gutschrift'
+        ? 'Gutschrift'
+        : rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
+    return {
       id: `rechnung-${r.id}`,
-      name: r.rechnungsnummer?.trim() || 'Rechnung',
-      beschreibung:
-        r.status === 'gesendet'
-          ? `Rechnung · ${r.status}`
-          : `Rechnung · ${r.status ?? 'Entwurf'}`,
-      datum: r.gesendet_at ?? r.rechnungsdatum ?? '',
-      fuerKunde: r.status === 'gesendet',
+      name: r.rechnungsnummer?.trim() || art,
+      beschreibung: `${art} · ${st || '—'}`,
+      datum: r.gesendet_at ?? r.rechnungsdatum ?? r.created_at ?? '',
+      fuerKunde: st === 'gesendet' || st === 'bezahlt' || st === 'versendet',
       href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
-      quelle: 'rechnung',
-    }))
+      quelle: 'rechnung' as const,
+    }
+  })
 }
 
 export function vertragDokumentZeilen(vertraege: HandwerkerVertragRow[]): AuftragDokumentZeile[] {

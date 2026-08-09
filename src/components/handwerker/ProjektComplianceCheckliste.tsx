@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
@@ -23,12 +24,11 @@ import { complianceAblaufHinweis, COMPLIANCE_EBENE_LABELS } from '@/lib/handwerk
 import {
   complianceDokumentStatus,
   dokumenteFuerProjekt,
-  dokumenteFuerTyp,
   dokumentFuerTyp,
   filterProjektComplianceTypen,
   gruppeComplianceTypen,
-  INDIVIDUELL_TYP_SLUG,
   individuellTyp,
+  istEigeneUnterlageTyp,
   isStandardScope,
   istPflichtTyp,
   projektChecklisteFortschritt,
@@ -44,12 +44,13 @@ function safeFileName(name: string): string {
 }
 
 function statusLabel(s: ComplianceDokumentStatus, docStatus?: string | null): string {
-  if (docStatus && !partnerDokumentIstFreigegeben(docStatus)) {
+  if (s === 'in_pruefung' || (docStatus && !partnerDokumentIstFreigegeben(docStatus) && s !== 'abgelehnt')) {
     return partnerDokumentStatusLabel(docStatus)
   }
   if (s === 'ok') return 'Vorhanden'
   if (s === 'warnung') return 'Läuft bald ab'
   if (s === 'abgelaufen') return 'Abgelaufen'
+  if (s === 'abgelehnt') return 'Abgelehnt'
   return 'Fehlt'
 }
 
@@ -61,7 +62,9 @@ function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
     <AlertCircle
       className={cn(
         'h-4 w-4 shrink-0',
-        status === 'warnung' ? 'text-amber-600' : 'text-status-cancel-text'
+        status === 'warnung' || status === 'in_pruefung'
+          ? 'text-amber-600'
+          : 'text-status-cancel-text'
       )}
       aria-hidden
     />
@@ -145,7 +148,14 @@ export function ProjektComplianceCheckliste({
   )
   const indTyp = useMemo(() => individuellTyp(complianceTypen), [complianceTypen])
   const individuelleDocs = useMemo(
-    () => dokumenteFuerTyp(projektDocs, INDIVIDUELL_TYP_SLUG, handwerkerId, auftragId),
+    () =>
+      projektDocs.filter(
+        (d) =>
+          istEigeneUnterlageTyp(d.typ) &&
+          d.handwerker_id === handwerkerId &&
+          d.auftrag_id === auftragId &&
+          d.datei_url?.trim()
+      ),
     [projektDocs, handwerkerId, auftragId]
   )
   const alleProjektTypen = useMemo(

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 /**
@@ -21,6 +22,7 @@ export function AppFlowScreen({
   className?: string
 }) {
   const [mounted, setMounted] = useState(false)
+  useOverlayChromeLock(mounted)
 
   useEffect(() => {
     setMounted(true)

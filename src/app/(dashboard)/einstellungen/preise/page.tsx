@@ -16,7 +16,7 @@ function normalizePreislistenRow(r: Record<string, unknown>): Preisliste {
   }
 }
 
-/** Einstellungen → Preislisten: Gewerk-Chips + PosTable (Mock). */
+/** Einstellungen → Preise: Preisliste (Gewerk-Chips + Leistungen). */
 export default async function EinstellungenPreisePage() {
   const supabase = createClient()
   const [{ data: rows, error }, { data: gewerke }] = await Promise.all([
@@ -28,6 +28,8 @@ export default async function EinstellungenPreisePage() {
     supabase.from('gewerke').select('id, name, slug, aktiv').order('name', { ascending: true }),
   ])
 
+  const gw = (gewerke ?? []) as Gewerk[]
+
   if (error) {
     return (
       <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
@@ -37,7 +39,6 @@ export default async function EinstellungenPreisePage() {
     )
   }
 
-  const gw = (gewerke ?? []) as Gewerk[]
   const normalized = (rows ?? []).map((r) => normalizePreislistenRow(r as Record<string, unknown>))
   const sorted = sortPreislistenRows(normalized)
 

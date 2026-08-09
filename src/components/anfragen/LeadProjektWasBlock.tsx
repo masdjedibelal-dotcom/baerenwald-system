@@ -1,15 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useState,
-  useTransition,
-  type ReactNode,
-} from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Textarea } from '@/components/ui/Textarea'
@@ -318,7 +310,6 @@ function ProjektLeistungAccordion({
               <>
                 <WizardField
                   label="Gewerk"
-                  hint="nur intern · erscheint nicht auf der Rechnung"
                 >
                   <select
                     className="input w-full"
@@ -378,7 +369,6 @@ function ProjektLeistungAccordion({
                 </WizardField>
                 <WizardField
                   label="Gewerk"
-                  hint="nur intern · erscheint nicht auf der Rechnung"
                 >
                   <select
                     className="input w-full"
@@ -410,11 +400,7 @@ function ProjektLeistungAccordion({
               </>
             )}
 
-            <WizardField
-              label="Beschreibung"
-              hint="Details für Kunden & spätere Rechnung"
-              full
-            >
+            <WizardField label="Beschreibung" full>
               <Textarea
                 rows={3}
                 disabled={pending}

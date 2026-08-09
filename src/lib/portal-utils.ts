@@ -130,6 +130,12 @@ export function buildPartnerLoginForAuftragUrl(auftragId: string): string {
   return buildPartnerAuftragPortalUrl(auftragId)
 }
 
+/** Deep-Link zur Anfrage im Partner-Portal (Tab „Vorgänge“). */
+export function buildPartnerAnfragePortalUrl(anfrageId: string): string {
+  const id = anfrageId.trim()
+  return `${publicWebsiteBaseUrl()}/partner?section=vorgaenge&id=${encodeURIComponent(id)}`
+}
+
 /** Angebote-Tab im Partner-Portal (Vertrag + Checkliste nach Übernahme). */
 export function buildPartnerAngebotPortalUrl(anfrageId: string): string {
   const id = anfrageId.trim()

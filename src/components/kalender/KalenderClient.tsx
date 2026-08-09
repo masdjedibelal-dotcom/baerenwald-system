@@ -1,59 +1,38 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
+import { deleteKalenderTermin } from '@/app/(dashboard)/kalender/actions'
+import { TodosPanel } from '@/components/todos/TodosPanel'
+import { kalenderTypLabel } from '@/lib/kalender-styles'
 import {
-  deleteKalenderTermin,
-  saveKalenderTermin,
-} from '@/app/(dashboard)/kalender/actions'
-import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
+  kalenderTerminEndeVergangen,
+} from '@/lib/kalender/termin-no-show-hint'
+import {
+  formatHm,
+  KalenderTerminEditorSheet,
+  katLabel,
+  typToKat,
+  type KalenderTerminEditorPrefill,
+} from '@/components/kalender/KalenderTerminEditorSheet'
 
 type UiView = 'tag' | 'woche' | 'monat'
-
-/** Mock-Farben: green / blue / yellow */
-type MockKat = 'green' | 'blue' | 'yellow'
+type UiMode = 'kalender' | 'todos'
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7) // 7–19
 const HOUR_PX = 52
 const DOW = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const
-
-const KAT_OPTIONS: { value: MockKat; label: string; typ: KalenderTermin['typ'] }[] = [
-  { value: 'green', label: 'Vor-Ort / Arbeit', typ: 'besichtigung' },
-  { value: 'blue', label: 'Kontakt / Kickoff', typ: 'sonstiges' },
-  { value: 'yellow', label: 'Abnahme', typ: 'abnahme' },
-]
-
-function typToKat(typ: KalenderTermin['typ']): MockKat {
-  if (typ === 'abnahme') return 'yellow'
-  if (typ === 'sonstiges' || typ === 'intern') return 'blue'
-  return 'green'
-}
-
-function katToTyp(kat: MockKat): KalenderTermin['typ'] {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.typ ?? 'besichtigung'
-}
-
-function katLabel(kat: MockKat): string {
-  return KAT_OPTIONS.find((k) => k.value === kat)?.label ?? 'Vor-Ort / Arbeit'
-}
 
 function ymd(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
-}
-
-function parseYmd(s: string): Date {
-  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
-  return new Date(y!, m! - 1, d!, 12, 0, 0)
 }
 
 function startOfWeek(d: Date): Date {
@@ -90,19 +69,6 @@ function timeToHours(t: string | null | undefined): number | null {
   return h! + (Number.isFinite(m) ? m! / 60 : 0)
 }
 
-function formatHm(t: string | null | undefined): string {
-  if (!t?.trim()) return ''
-  return t.trim().slice(0, 5)
-}
-
-function normalizeTimeInput(t: string): string | null {
-  const v = t.trim()
-  if (!v) return null
-  if (/^\d{2}:\d{2}$/.test(v)) return `${v}:00`
-  if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v
-  return v
-}
-
 function hourTop(v: number): number {
   return (v - HOURS[0]!) * HOUR_PX
 }
@@ -123,20 +89,13 @@ export function KalenderClient() {
   const [termine, setTermine] = useState<KalenderTermin[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [view, setView] = useState<UiView>('monat')
+  const [mode, setMode] = useState<UiMode>('kalender')
   const [cursor, setCursor] = useState(() => new Date())
-  const [pending, startTransition] = useTransition()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [editing, setEditing] = useState<KalenderTermin | null>(null)
-
-  const [fTitel, setFTitel] = useState('')
-  const [fKat, setFKat] = useState<MockKat>('green')
-  const [fDatum, setFDatum] = useState('')
-  const [fVon, setFVon] = useState('09:00')
-  const [fBis, setFBis] = useState('10:00')
-  const [fOrt, setFOrt] = useState('')
-  const [fDesc, setFDesc] = useState('')
+  const [editorPrefill, setEditorPrefill] = useState<KalenderTerminEditorPrefill | null>(null)
 
   const todayYmd = ymd(new Date())
 
@@ -184,39 +143,17 @@ export function KalenderClient() {
     return m
   }, [termine])
 
-  function openNeu(prefill?: { day?: Date; startHour?: number }) {
+  function openNeu(prefill?: KalenderTerminEditorPrefill) {
     setEditing(null)
+    setEditorPrefill(prefill ?? null)
     setDetailOpen(false)
-    const d = prefill?.day ?? cursor
-    setFTitel('')
-    setFKat('green')
-    setFDatum(ymd(d))
-    const sh = prefill?.startHour
-    if (sh != null) {
-      const von = `${String(Math.floor(sh)).padStart(2, '0')}:${sh % 1 ? '30' : '00'}`
-      const bisH = sh + 1
-      const bis = `${String(Math.floor(bisH)).padStart(2, '0')}:${bisH % 1 ? '30' : '00'}`
-      setFVon(von)
-      setFBis(bis)
-    } else {
-      setFVon('09:00')
-      setFBis('10:00')
-    }
-    setFOrt('')
-    setFDesc('')
     setModalOpen(true)
   }
 
   function openEdit(t: KalenderTermin) {
     setEditing(t)
+    setEditorPrefill(null)
     setDetailOpen(false)
-    setFTitel(t.titel)
-    setFKat(typToKat(t.typ))
-    setFDatum(t.datum.slice(0, 10))
-    setFVon(formatHm(t.uhrzeit_von) || '09:00')
-    setFBis(formatHm(t.uhrzeit_bis) || '10:00')
-    setFOrt(t.adresse ?? '')
-    setFDesc(t.beschreibung ?? '')
     setModalOpen(true)
   }
 
@@ -244,34 +181,6 @@ export function KalenderClient() {
 
   function goToday() {
     setCursor(new Date())
-  }
-
-  function submitForm(e: React.FormEvent) {
-    e.preventDefault()
-    startTransition(async () => {
-      const res = await saveKalenderTermin({
-        id: editing?.id,
-        titel: fTitel,
-        typ: katToTyp(fKat),
-        datum: fDatum,
-        uhrzeit_von: normalizeTimeInput(fVon),
-        uhrzeit_bis: normalizeTimeInput(fBis),
-        adresse: fOrt.trim() || null,
-        beschreibung: fDesc.trim() || null,
-        lead_id: editing?.lead_id ?? null,
-        auftrag_id: editing?.auftrag_id ?? null,
-        zugewiesen_an: editing?.zugewiesen_an ?? null,
-        erledigt: editing?.erledigt ?? false,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success(editing ? 'Termin gespeichert' : `Termin „${fTitel.trim() || 'Neuer Termin'}“ angelegt`)
-      setModalOpen(false)
-      setEditing(null)
-      await load()
-    })
   }
 
   async function onDelete() {
@@ -309,35 +218,67 @@ export function KalenderClient() {
   const monthCells = useMemo(() => buildMonthCells(cursor), [cursor])
 
   const nav = (
-    <div className="toolbar">
-      <MockBtn sm icon="chevron-left" onClick={navPrev} title="Zurück" />
-      <div style={{ fontSize: 16, fontWeight: 600, padding: '0 8px' }}>{titleText}</div>
-      <MockBtn sm icon="chevron-right" onClick={navNext} title="Weiter" />
-      <MockBtn sm onClick={goToday}>
-        Heute
-      </MockBtn>
-      <MockBtn sm kind="primary" icon="plus" onClick={() => openNeu()}>
-        Neuer Termin
-      </MockBtn>
-      <div style={{ flex: 1 }} />
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          padding: 2,
-          background: 'var(--card)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 6,
-        }}
-      >
-        <MockBtn sm kind={view === 'tag' ? 'primary' : 'ghost'} onClick={() => setView('tag')}>
-          Tag
+    <div className="cal-toolbar toolbar">
+      <div className="cal-toolbar__nav">
+        <MockBtn
+          sm
+          icon="chevron-left"
+          className="cal-toolbar__arrow"
+          onClick={navPrev}
+          title="Zurück"
+        />
+        <div className="cal-toolbar__title">{titleText}</div>
+        <MockBtn
+          sm
+          icon="chevron-right"
+          className="cal-toolbar__arrow"
+          onClick={navNext}
+          title="Weiter"
+        />
+      </div>
+      <div className="cal-toolbar__controls">
+        <div className="cal-toolbar__views" role="group" aria-label="Ansicht">
+          <button
+            type="button"
+            className={cn('cal-toolbar__view', view === 'tag' && 'is-active')}
+            onClick={() => setView('tag')}
+            aria-label="Tag"
+            aria-pressed={view === 'tag'}
+          >
+            Tag
+          </button>
+          <button
+            type="button"
+            className={cn('cal-toolbar__view', view === 'woche' && 'is-active')}
+            onClick={() => setView('woche')}
+            aria-label="Woche"
+            aria-pressed={view === 'woche'}
+          >
+            Woche
+          </button>
+          <button
+            type="button"
+            className={cn('cal-toolbar__view', view === 'monat' && 'is-active')}
+            onClick={() => setView('monat')}
+            aria-label="Monat"
+            aria-pressed={view === 'monat'}
+          >
+            Monat
+          </button>
+        </div>
+        <MockBtn sm className="cal-toolbar__heute" onClick={goToday}>
+          Heute
         </MockBtn>
-        <MockBtn sm kind={view === 'woche' ? 'primary' : 'ghost'} onClick={() => setView('woche')}>
-          Woche
-        </MockBtn>
-        <MockBtn sm kind={view === 'monat' ? 'primary' : 'ghost'} onClick={() => setView('monat')}>
-          Monat
+        <MockBtn
+          sm
+          kind="primary"
+          icon="plus"
+          className="cal-toolbar__add"
+          onClick={() => openNeu()}
+          title="Neuer Termin"
+          aria-label="Neuer Termin"
+        >
+          <span className="cal-toolbar__add-lbl">Neuer Termin</span>
         </MockBtn>
       </div>
     </div>
@@ -475,13 +416,46 @@ export function KalenderClient() {
     editing && (editing.uhrzeit_von || editing.uhrzeit_bis)
       ? `${formatHm(editing.uhrzeit_von)}${editing.uhrzeit_bis ? `–${formatHm(editing.uhrzeit_bis)}` : ''} Uhr`
       : ''
+  const detailNoShowHinweis =
+    editing &&
+    !editing.erledigt &&
+    kalenderTerminEndeVergangen(editing) &&
+    (editing.typ === 'besichtigung' ||
+      editing.typ === 'vor_ort' ||
+      editing.typ === 'aufmass' ||
+      editing.lead_id)
 
   return (
     <div>
+      <div className="kalender-mode-seg" role="tablist" aria-label="Kalender oder To-dos">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'kalender'}
+          className={cn('kalender-mode-seg__btn', mode === 'kalender' && 'on')}
+          onClick={() => setMode('kalender')}
+        >
+          Kalender
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'todos'}
+          className={cn('kalender-mode-seg__btn', mode === 'todos' && 'on')}
+          onClick={() => setMode('todos')}
+        >
+          To-dos
+        </button>
+      </div>
+
+      {mode === 'todos' ? (
+        <TodosPanel title="To-dos" />
+      ) : (
+        <>
       {nav}
 
       {loadErr ? (
-        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-sm text-status-cancel-text">
+        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-[length:var(--fs-text)] text-status-cancel-text">
           {loadErr}
         </p>
       ) : null}
@@ -541,11 +515,9 @@ export function KalenderClient() {
                   }}
                 />
                 {katLabel(detailKat)}
-                {editing.typ === 'beginn' || editing.typ === 'intern' ? (
-                  <span className="text-[12px] text-[var(--text-3)]">
-                    · {KALENDER_TYP_LABEL[editing.typ]}
-                  </span>
-                ) : null}
+                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                  · {kalenderTypLabel(editing.typ)}
+                </span>
               </div>
             </div>
             {detailZeit ? (
@@ -556,7 +528,7 @@ export function KalenderClient() {
             ) : null}
             {editing.adresse?.trim() ? (
               <div className="prop">
-                <div className="prop-l">Ort</div>
+                <div className="prop-l">Adresse</div>
                 <div className="prop-v">{editing.adresse}</div>
               </div>
             ) : null}
@@ -566,85 +538,28 @@ export function KalenderClient() {
                 <div className="prop-v">{editing.beschreibung}</div>
               </div>
             ) : null}
+            {detailNoShowHinweis ? (
+              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[length:var(--fs-text)] text-muted">
+                Kunde nicht erschienen? In der Anfrage{' '}
+                <strong className="font-medium text-ink">Aktionen → Nicht erreichbar</strong> setzen.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Modal>
 
-      <Modal
+      <KalenderTerminEditorSheet
         open={modalOpen}
+        termin={editing}
+        prefill={editorPrefill}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
-        size="md"
-        footer={
-          <div className="flex w-full items-center gap-2">
-            <MockBtn sm kind="ghost" onClick={() => setModalOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            {editing ? (
-              <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
-                Löschen
-              </MockBtn>
-            ) : null}
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              sm
-              kind="primary"
-              icon="check"
-              disabled={pending}
-              onClick={() => {
-                const form = document.getElementById('kalender-termin-form') as HTMLFormElement | null
-                form?.requestSubmit()
-              }}
-            >
-              {editing ? 'Speichern' : 'Termin anlegen'}
-            </MockBtn>
-          </div>
-        }
-      >
-        <form id="kalender-termin-form" onSubmit={submitForm} className="form-grid">
-          <div className="full">
-            <Input
-              label="Titel"
-              value={fTitel}
-              onChange={(e) => setFTitel(e.target.value)}
-              placeholder="z.B. Vor-Ort Termin Koch"
-              required
-            />
-          </div>
-          <div className="full">
-            <div className="mb-1 text-[12px] font-medium text-[var(--text-3)]">Kategorie</div>
-            <div className="seg">
-              {KAT_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  className={cn(fKat === o.value && 'on')}
-                  onClick={() => setFKat(o.value)}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Input type="date" label="Datum" value={fDatum} onChange={(e) => setFDatum(e.target.value)} required />
-          <div />
-          <Input type="time" label="Von" value={fVon} onChange={(e) => setFVon(e.target.value)} />
-          <Input type="time" label="Bis" value={fBis} onChange={(e) => setFBis(e.target.value)} />
-          <div className="full">
-            <Input
-              label="Ort"
-              value={fOrt}
-              onChange={(e) => setFOrt(e.target.value)}
-              placeholder="Stadtteil / Adresse"
-            />
-          </div>
-          {editing ? (
-            <div className="full">
-              <Textarea label="Beschreibung" value={fDesc} onChange={(e) => setFDesc(e.target.value)} rows={2} />
-            </div>
-          ) : null}
-        </form>
-      </Modal>
+        onSaved={() => {
+          setEditing(null)
+          void load()
+        }}
+      />
+        </>
+      )}
     </div>
   )
 }

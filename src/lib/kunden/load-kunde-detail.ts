@@ -128,6 +128,14 @@ const KUNDE_DETAIL_SELECT_BASE = `
 const KUNDE_ORG_FIELDS = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
       freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
+      kleinreparaturen_ohne_angebot,
+      ist_spam, spam_markiert_am,
+    `
+
+const KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN = `
+      portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
+      ist_spam, spam_markiert_am,
     `
 
 const KUNDE_DETAIL_SELECT = `
@@ -135,6 +143,14 @@ const KUNDE_DETAIL_SELECT = `
       notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
       gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
       ${KUNDE_ORG_FIELDS}
+      ${KUNDE_DETAIL_RELATIONS}
+    `
+
+const KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN = `
+      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
+      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
+      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
+      ${KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN}
       ${KUNDE_DETAIL_RELATIONS}
     `
 
@@ -161,6 +177,23 @@ async function fetchKundeDetailRow(
   }
 
   if (isMissingKundeColumnError(full.error)) {
+    const msg = (full.error.message ?? '').toLowerCase()
+    if (msg.includes('kleinreparaturen_ohne_angebot')) {
+      console.warn(
+        '[loadKundeDetail] Spalte kleinreparaturen_ohne_angebot fehlt — Fallback ohne Flag:',
+        full.error.message
+      )
+      const mid = await withCrmReadFallback(async (db) =>
+        db.from('kunden').select(KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN).eq('id', id).maybeSingle()
+      )
+      if (!mid.error) {
+        return { data: (mid.data as KundeDetailPayload | null) ?? null, error: null }
+      }
+      if (!isMissingKundeColumnError(mid.error)) {
+        return { data: null, error: { message: mid.error.message } }
+      }
+    }
+
     console.warn(
       '[loadKundeDetail] Optionale Spalten fehlen — Fallback ohne Org-Portal-Felder:',
       full.error.message

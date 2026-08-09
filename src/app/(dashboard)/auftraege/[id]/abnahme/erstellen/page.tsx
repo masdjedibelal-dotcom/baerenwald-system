@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
 
-/** Abnahmeprotokoll wird inline im Auftrag-Tab gepflegt — kein Wizard mehr. */
-export default function AuftragAbnahmeErstellenPage({
+/** Legacy: Abnahme läuft über „Auftrag abschließen“ im Auftrag-Detail. */
+export default function AuftragAbnahmeErstellenRedirect({
   params,
 }: {
   params: { id: string }
 }) {
-  redirect(`/auftraege/${params.id}?tab=abnahme`)
+  redirect(`/auftraege/${params.id}`)
 }

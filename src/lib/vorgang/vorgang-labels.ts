@@ -30,6 +30,7 @@ const AUFTRAG_UNTERSTATUS: Record<string, string> = {
 }
 
 const RECHNUNG_UNTERSTATUS: Record<string, string> = {
+  ausstehend: 'Offen',
   entwurf: 'Entwurf',
   gesendet: 'Gesendet',
   bezahlt: 'Bezahlt',
@@ -75,7 +76,7 @@ export function kanalMetaFromLead(kanal: string | null | undefined): string | nu
 }
 
 export const ACTOR_LABELS: Record<string, string> = {
-  freigabe: 'Wartet auf Freigabe (HV)',
+  freigabe: 'Warte auf Hausverwaltung',
   handwerker: 'Handwerker',
   kunde: 'Kunde',
   bw: 'Bärenwald',
@@ -104,5 +105,5 @@ export const PHASE_UNTERSTATUS_VALUES: Record<VorgangPhase, readonly string[]> =
     'storniert',
   ],
   auftrag: ['offen', 'in_arbeit', 'abnahme', 'abgeschlossen', 'storniert'],
-  rechnung: ['entwurf', 'gesendet', 'bezahlt', 'storniert'],
+  rechnung: ['ausstehend', 'entwurf', 'gesendet', 'bezahlt', 'storniert'],
 }

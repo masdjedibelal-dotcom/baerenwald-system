@@ -73,12 +73,17 @@ export function createAnthropicClient(apiKey: string): Anthropic {
   })
 }
 
-/** Nur für Fehlermeldungen — kein vollständiger Key. */
+/** Nur für Server-Logs / CRON-geschützte Health — kein Key-Material. */
 export function describeClaudeKeyForDebug(): string {
   const key = getClaudeApiKey()
   if (!key) return 'kein Key gesetzt'
   const gateway = isNetlifyAiGatewayBaseUrl()
     ? ', Netlify-Gateway-Env aktiv (wird im Code umgangen)'
     : ''
-  return `Quelle=${getClaudeApiKeySource()}, Länge=${key.length}, Anfang=${key.slice(0, 16)}…, Format=${claudeApiKeyLooksValid(key) ? 'ok' : 'ungültig'}${gateway}`
+  return `Quelle=${getClaudeApiKeySource()}, Länge=${key.length}, Format=${claudeApiKeyLooksValid(key) ? 'ok' : 'ungültig'}${gateway}`
+}
+
+/** Sichere Client-Fehlermeldung ohne Key-Details. */
+export function claudeAuthErrorForClient(): string {
+  return 'Claude API-Key abgelehnt (401). Bitte CLAUDE_API_KEY in der Server-Umgebung prüfen und neu deployen.'
 }

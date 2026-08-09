@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, ExternalLink, Mail, MessageCircle } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -17,6 +17,41 @@ import { formatDatum } from '@/lib/utils'
 
 export type HandwerkerKontaktModalMode = 'whatsapp' | 'email'
 
+function KontaktFooter({
+  mode,
+  onCopy,
+  onPrimary,
+}: {
+  mode: HandwerkerKontaktModalMode
+  onCopy: () => void
+  onPrimary: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="sheet-footer-actions ldr-cta">
+      <Button type="button" variant="secondary" onClick={() => requestClose?.()}>
+        Abbrechen
+      </Button>
+      <Button type="button" variant="secondary" onClick={onCopy}>
+        <Copy className="mr-1.5 h-4 w-4" aria-hidden />
+        Text kopieren
+      </Button>
+      {mode === 'whatsapp' ? (
+        <Button type="button" variant="primary" onClick={onPrimary}>
+          <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
+          In WhatsApp öffnen
+        </Button>
+      ) : (
+        <Button type="button" variant="primary" onClick={onPrimary}>
+          <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
+          In Mail-App öffnen
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** Handwerker WhatsApp/Mail — EditorSheet Split-over (Mock Surface B). */
 export function HandwerkerKontaktModal({
   open,
   onClose,
@@ -39,6 +74,7 @@ export function HandwerkerKontaktModal({
   const [mailTo, setMailTo] = useState<string[]>([])
   const [mailCc, setMailCc] = useState<string[]>([])
   const [telefonDraft, setTelefonDraft] = useState('')
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -47,6 +83,7 @@ export function HandwerkerKontaktModal({
     setMailTo(email?.trim() ? [email.trim()] : [])
     setMailCc([])
     setTelefonDraft(telefon?.trim() ?? '')
+    setDirty(false)
   }, [open, nachrichtInput, email, telefon])
 
   const projektKurz = useMemo(() => {
@@ -108,55 +145,43 @@ export function HandwerkerKontaktModal({
     window.location.href = `mailto:${to}?${params.toString()}`
   }
 
-  const title = mode === 'whatsapp' ? `WhatsApp — ${handwerkerName}` : `E-Mail — ${handwerkerName}`
-
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title={title}
+      title={mode === 'whatsapp' ? 'WhatsApp' : 'E-Mail'}
+      crumb={`${handwerkerName} >`}
+      context="detail"
+      dirty={dirty}
       size="lg"
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Abbrechen
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => void copyText(nachricht)}>
-            <Copy className="mr-1.5 h-4 w-4" aria-hidden />
-            Text kopieren
-          </Button>
-          {mode === 'whatsapp' ? (
-            <Button type="button" variant="primary" onClick={openWhatsapp}>
-              <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
-              In WhatsApp öffnen
-            </Button>
-          ) : (
-            <Button type="button" variant="primary" onClick={openMailApp}>
-              <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-              In Mail-App öffnen
-            </Button>
-          )}
-        </div>
+        <KontaktFooter
+          mode={mode}
+          onCopy={() => void copyText(nachricht)}
+          onPrimary={mode === 'whatsapp' ? openWhatsapp : openMailApp}
+        />
       }
     >
       <div className="space-y-4">
-        <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">Projektdaten</p>
+        <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-text)]">
+          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+            Projektdaten
+          </p>
           <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-bw-text-muted">Kunde</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Kunde</dt>
               <dd className="font-medium text-bw-text">{projektKurz.kunde}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Ort</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Ort</dt>
               <dd className="font-medium text-bw-text">{projektKurz.ort}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Gewerk</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Gewerk</dt>
               <dd className="font-medium text-bw-text">{projektKurz.gewerk}</dd>
             </div>
             <div>
-              <dt className="text-xs text-bw-text-muted">Zeitraum</dt>
+              <dt className="text-[length:var(--fs-meta)] text-bw-text-muted">Zeitraum</dt>
               <dd className="font-medium text-bw-text">{projektKurz.zeitraum}</dd>
             </div>
           </dl>
@@ -168,7 +193,10 @@ export function HandwerkerKontaktModal({
               label="Telefon / WhatsApp"
               type="tel"
               value={telefonDraft}
-              onChange={(e) => setTelefonDraft(e.target.value)}
+              onChange={(e) => {
+                setTelefonDraft(e.target.value)
+                setDirty(true)
+              }}
               placeholder="+49 …"
               hint={
                 telefon?.trim()
@@ -180,8 +208,11 @@ export function HandwerkerKontaktModal({
               label="Nachricht"
               rows={14}
               value={nachricht}
-              onChange={(e) => setNachricht(e.target.value)}
-              className="font-mono text-[13px]"
+              onChange={(e) => {
+                setNachricht(e.target.value)
+                setDirty(true)
+              }}
+              className="font-mono text-[length:var(--fs-text)]"
               hint="Enthält Kunde, Ort, Zeitraum, Gewerk und Leistungen — vor dem Senden anpassen."
             />
           </>
@@ -189,22 +220,37 @@ export function HandwerkerKontaktModal({
           <>
             <AngebotWizardVersandEmpfaengerCard
               mailTo={mailTo}
-              onMailToChange={setMailTo}
+              onMailToChange={(v) => {
+                setMailTo(v)
+                setDirty(true)
+              }}
               mailCc={mailCc}
-              onMailCcChange={setMailCc}
-              dokumentLabel="Handwerker-Anfrage"
+              onMailCcChange={(v) => {
+                setMailCc(v)
+                setDirty(true)
+              }}
             />
-            <Input label="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+            <Input
+              label="Betreff"
+              value={betreff}
+              onChange={(e) => {
+                setBetreff(e.target.value)
+                setDirty(true)
+              }}
+            />
             <Textarea
               label="Nachricht"
               rows={14}
               value={nachricht}
-              onChange={(e) => setNachricht(e.target.value)}
-              className="font-mono text-[13px]"
+              onChange={(e) => {
+                setNachricht(e.target.value)
+                setDirty(true)
+              }}
+              className="font-mono text-[length:var(--fs-text)]"
               hint="Enthält die wichtigsten Projektdaten — vor dem Öffnen der Mail-App anpassen."
             />
             {!email?.trim() ? (
-              <p className="flex items-start gap-2 text-sm text-amber-800">
+              <p className="flex items-start gap-2 text-[length:var(--fs-text)] text-amber-800">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 Keine E-Mail beim Handwerker hinterlegt — bitte unter An eine Adresse eintragen.
               </p>
@@ -212,6 +258,6 @@ export function HandwerkerKontaktModal({
           </>
         )}
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

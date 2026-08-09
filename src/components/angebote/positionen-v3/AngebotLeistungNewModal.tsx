@@ -1,8 +1,8 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, useTransition } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { useEffect, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { addAngebotPosition } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import type { AngebotGewerkBlock } from '@/components/angebote/positionen-v3/utils'
@@ -40,6 +40,7 @@ export function AngebotLeistungNewModal({
   const [menge, setMenge] = useState('1')
   const [einheit, setEinheit] = useState('Stk.')
   const [kostenverteilung, setKostenverteilung] = useState<KostenVerteilung>('allgemein')
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -51,7 +52,13 @@ export function AngebotLeistungNewModal({
     setEinheit('Stk.')
     setKostenverteilung('allgemein')
     setGewerkSlug(block?.gewerkSlug ?? gewerke[0]?.slug ?? '')
+    setDirty(false)
   }, [open, block, gewerke])
+
+  function mark<T>(setter: (v: T) => void, v: T) {
+    setter(v)
+    setDirty(true)
+  }
 
   const gewerk =
     gewerke.find((g) => g.slug === gewerkSlug) ??
@@ -96,42 +103,41 @@ export function AngebotLeistungNewModal({
         return
       }
       toast.success('Position hinzugefügt.')
+      setDirty(false)
       onSaved()
       onClose()
     })
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title="Position hinzufügen"
+      title="Position"
+      context="detail"
+      dirty={dirty}
       size="lg"
-      footer={
-        <>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </Button>
-          <Button type="button" variant="primary" onClick={save} disabled={pending}>
-            Speichern
-          </Button>
-        </>
-      }
+      confirmBusy={pending}
+      onConfirm={save}
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className="input-label">Bezeichnung *</label>
-          <input className="input w-full" value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            className="input w-full"
+            value={name}
+            onChange={(e) => mark(setName, e.target.value)}
+          />
         </div>
         <div className="sm:col-span-2">
           <label className="input-label">Gewerk *</label>
           {block ? (
-            <p className="text-sm font-medium text-bw-text">{block.gewerkName}</p>
+            <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{block.gewerkName}</p>
           ) : (
             <select
               className="input w-full"
               value={gewerkSlug}
-              onChange={(e) => setGewerkSlug(e.target.value)}
+              onChange={(e) => mark(setGewerkSlug, e.target.value)}
             >
               {gewerke.map((g) => (
                 <option key={g.id} value={g.slug}>
@@ -146,7 +152,7 @@ export function AngebotLeistungNewModal({
           <textarea
             className="input w-full min-h-[4rem]"
             value={beschreibung}
-            onChange={(e) => setBeschreibung(e.target.value)}
+            onChange={(e) => mark(setBeschreibung, e.target.value)}
           />
         </div>
         <div className="sm:col-span-2">
@@ -157,13 +163,13 @@ export function AngebotLeistungNewModal({
                 key={opt.value}
                 type="button"
                 className={kostenverteilung === opt.value ? 'on' : undefined}
-                onClick={() => setKostenverteilung(opt.value)}
+                onClick={() => mark(setKostenverteilung, opt.value)}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-bw-muted">
+          <p className="mt-1 text-[length:var(--fs-meta)] text-bw-muted">
             Allgemein = keine Aufteilung im PDF; Lohn bzw. Material = Ausweis in der Kostenaufstellung
           </p>
         </div>
@@ -177,7 +183,7 @@ export function AngebotLeistungNewModal({
               step="0.01"
               min="0"
               value={vk}
-              onChange={(e) => setVk(e.target.value)}
+              onChange={(e) => mark(setVk, e.target.value)}
             />
           </div>
         </div>
@@ -191,7 +197,7 @@ export function AngebotLeistungNewModal({
               step="0.01"
               min="0"
               value={ek}
-              onChange={(e) => setEk(e.target.value)}
+              onChange={(e) => mark(setEk, e.target.value)}
             />
           </div>
         </div>
@@ -203,14 +209,18 @@ export function AngebotLeistungNewModal({
             step="0.01"
             min="0.01"
             value={menge}
-            onChange={(e) => setMenge(e.target.value)}
+            onChange={(e) => mark(setMenge, e.target.value)}
           />
         </div>
         <div>
           <label className="input-label">Einheit</label>
-          <input className="input w-full" value={einheit} onChange={(e) => setEinheit(e.target.value)} />
+          <input
+            className="input w-full"
+            value={einheit}
+            onChange={(e) => mark(setEinheit, e.target.value)}
+          />
         </div>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

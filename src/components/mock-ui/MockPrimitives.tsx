@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
@@ -10,15 +10,23 @@ export function MockChip({
   onClick,
   children,
   icon,
+  title,
 }: {
   active?: boolean
   count?: number
   onClick?: () => void
   children: ReactNode
   icon?: string
+  /** Native Tooltip — z. B. Fachbegriff */
+  title?: string
 }) {
   return (
-    <button type="button" className={cn('chip', active && 'active')} onClick={onClick}>
+    <button
+      type="button"
+      className={cn('chip', active && 'active')}
+      onClick={onClick}
+      title={title}
+    >
       {icon ? <MockIcon ctx="btn" n={icon} size={14} /> : null}
       {children}
       {count != null ? <span className="chip-count">{count}</span> : null}
@@ -33,16 +41,18 @@ export function MockBtn({
   onClick,
   children,
   title,
+  'aria-label': ariaLabel,
   type = 'button',
   disabled,
   className,
 }: {
-  kind?: 'primary' | 'ghost' | 'danger' | ''
+  kind?: 'primary' | 'ghost' | 'secondary' | 'danger' | ''
   sm?: boolean
   icon?: string
   onClick?: () => void
   children?: ReactNode
   title?: string
+  'aria-label'?: string
   type?: 'button' | 'submit'
   disabled?: boolean
   className?: string
@@ -59,6 +69,7 @@ export function MockBtn({
       )}
       onClick={onClick}
       title={title}
+      aria-label={ariaLabel ?? (icon && !children ? title : undefined)}
       disabled={disabled}
     >
       {icon ? <MockIcon ctx="btn" n={icon} size={sm ? 14 : 15} /> : null}
@@ -151,6 +162,8 @@ export function MockSortHead({
   onSort,
   right,
   children,
+  resizable,
+  onResizePointerDown,
 }: {
   col: string
   sortCol: string | null
@@ -158,10 +171,14 @@ export function MockSortHead({
   onSort: (col: string) => void
   right?: boolean
   children: ReactNode
+  /** Desktop: Spaltenbreite per Ziehen anpassen */
+  resizable?: boolean
+  onResizePointerDown?: (e: PointerEvent) => void
 }) {
   return (
     <div
       role="columnheader"
+      className="col-head"
       onClick={() => onSort(col)}
       style={{
         cursor: 'pointer',
@@ -170,14 +187,32 @@ export function MockSortHead({
         gap: 4,
         justifyContent: right ? 'flex-end' : 'flex-start',
         userSelect: 'none',
+        position: 'relative',
+        minWidth: 0,
       }}
     >
-      {children}
+      <span className="col-head__label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {children}
+      </span>
       <MockIcon ctx="default"
         n={sortCol === col ? (sortDir === 1 ? 'arrow-up' : 'arrow-down') : 'arrows-exchange'}
         size={12}
-        style={{ opacity: sortCol === col ? 1 : 0.35 }}
+        style={{ opacity: sortCol === col ? 1 : 0.35, flexShrink: 0 }}
       />
+      {resizable ? (
+        <span
+          className="col-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Spaltenbreite anpassen"
+          title="Breite ziehen"
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            onResizePointerDown?.(e)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : null}
     </div>
   )
 }

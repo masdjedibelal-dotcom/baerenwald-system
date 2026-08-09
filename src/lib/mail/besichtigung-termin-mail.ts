@@ -12,6 +12,7 @@ import { getCrmTeamMitglied } from '@/lib/crm-team'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
   mergeTerminMailBodyText,
@@ -77,7 +78,7 @@ export async function buildBesichtigungTerminMail(
   const { data: lead, error } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kunde_id, plz, funnel_daten, kundentyp, kunden!kunde_id(adresse, strasse, hausnummer, plz, ort, typ)'
+      'id, kunde_id, auftraggeber_kunde_id, plz, funnel_daten, kundentyp, kunden!kunde_id(adresse, strasse, hausnummer, plz, ort, typ), auftraggeber:kunden!auftraggeber_kunde_id(adresse, strasse, hausnummer, plz, ort, typ)'
     )
     .eq('id', input.leadId)
     .maybeSingle()
@@ -95,7 +96,17 @@ export async function buildBesichtigungTerminMail(
   const row = lead as {
     plz?: string | null
     funnel_daten?: unknown
+    kunde_id?: string | null
+    auftraggeber_kunde_id?: string | null
     kunden?: {
+      adresse?: string | null
+      strasse?: string | null
+      hausnummer?: string | null
+      plz?: string | null
+      ort?: string | null
+      typ?: string | null
+    } | null
+    auftraggeber?: {
       adresse?: string | null
       strasse?: string | null
       hausnummer?: string | null
@@ -108,6 +119,7 @@ export async function buildBesichtigungTerminMail(
     row.funnel_daten && typeof row.funnel_daten === 'object' && !Array.isArray(row.funnel_daten)
       ? (row.funnel_daten as Record<string, unknown>)
       : null
+  // Adresse: Objekt/Melder-Kontext behalten (Vor-Ort); Kunde-ID = HV
   const kunde = row.kunden
   const addrFelder = anfrageAdresseAusPayload({
     plz: row.plz ?? undefined,
@@ -127,8 +139,8 @@ export async function buildBesichtigungTerminMail(
   })
 
   const kundeTyp = resolveAngebotKundeTyp(
-    (lead as { kunden?: { typ?: string | null } | null }).kunden?.typ,
-    (lead as { kundentyp?: string | null }).kundentyp
+    row.auftraggeber?.typ ?? row.kunden?.typ,
+    row.auftraggeber ? 'hausverwaltung' : (lead as { kundentyp?: string | null }).kundentyp
   )
   const anrede = resolveTerminMailAnrede(kundeTyp)
   const terminTitel = (input.terminTitel ?? VOR_ORT_TERMIN_TITEL).trim() || VOR_ORT_TERMIN_TITEL
@@ -167,6 +179,12 @@ export async function buildBesichtigungTerminMail(
     html: tpl.html,
     bodyText,
     defaultTo,
-    kundeId: (lead as { kunde_id?: string | null }).kunde_id ?? null,
+    kundeId:
+      leadVertragsKundeId({
+        kunde_id: row.kunde_id,
+        auftraggeber_kunde_id: row.auftraggeber_kunde_id,
+      }) ??
+      row.kunde_id ??
+      null,
   }
 }

@@ -11,6 +11,9 @@ export type KundenObjektInput = {
   melde_aktiv?: boolean
   einheiten_hinweis?: string | null
   notizen_intern?: string | null
+  /** Override Org; undefined = nicht ändern, null = Org erben */
+  freigabe_schwelle_eur?: number | null
+  notfall_direkt?: boolean | null
 }
 
 /** Nur Objekte des angegebenen Kunden (Client-State kann sonst Objekte anderer Kunden mischen). */

@@ -62,6 +62,8 @@ export type AbschlussdokuHtmlInput = {
   fotoUrls: Array<{ url: string; caption?: string | null }>
   mitBautagebuch: boolean
   mitFotos: boolean
+  /** Preise/Summen = Rechnungsoptik. Abschlussbericht: false (Dokumentation). */
+  mitPreisen: boolean
 }
 
 function esc(s: string): string {
@@ -131,7 +133,7 @@ function briefkopf(p: AbschlussdokuHtmlInput): string {
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:18px;">
     <div style="flex:1;min-width:0;">
       <div style="font-size:9pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Projektabschluss</div>
-      <h1 style="font-size:17pt;font-weight:700;margin:0;color:${ACCENT};line-height:1.25;">Abschlussdokumentation</h1>
+      <h1 style="font-size:17pt;font-weight:700;margin:0;color:${ACCENT};line-height:1.25;">Abschlussbericht</h1>
       <p style="margin:8px 0 0;font-size:11pt;color:${TEXT};line-height:1.45;font-weight:600;">${esc(p.dokumentTitel)}</p>
     </div>
     <div style="flex:0 0 auto;text-align:right;">
@@ -183,7 +185,7 @@ function summenBlockKompakt(s: AbschlussdokuSummen): string {
 function auftragDetailsKarte(p: AbschlussdokuHtmlInput): string {
   const zeilen: string[] = []
 
-  if (p.summen && p.summen.brutto > 0) {
+  if (p.mitPreisen && p.summen && p.summen.brutto > 0) {
     zeilen.push(
       `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid ${BORDER};">
         <div style="font-size:8.5pt;color:${MUTED};margin-bottom:2px;">Gesamtpreis (brutto)</div>
@@ -240,15 +242,15 @@ function einleitungHtml(p: AbschlussdokuHtmlInput): string {
   if (anrede === 'du') {
     return `<div style="margin:0 0 18px;font-size:10.5pt;line-height:1.65;color:${TEXT};">
     <p style="margin:0;">${begr}</p>
-    <p style="margin:12px 0 0;">hiermit erhältst du die <strong>Abschlussdokumentation</strong> zu deinem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
-    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss.</p>
+    <p style="margin:12px 0 0;">hiermit erhältst du den <strong>Abschlussbericht</strong> zu deinem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
+    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss. Die Abrechnung erfolgt gesondert über die Rechnung / Endabrechnung.</p>
   </div>`
   }
 
   return `<div style="margin:0 0 18px;font-size:10.5pt;line-height:1.65;color:${TEXT};">
     <p style="margin:0;">${begr}</p>
-    <p style="margin:12px 0 0;">hiermit erhalten Sie die <strong>Abschlussdokumentation</strong> zu Ihrem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
-    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss.</p>
+    <p style="margin:12px 0 0;">hiermit erhalten Sie den <strong>Abschlussbericht</strong> zu Ihrem Projekt <strong>${esc(p.dokumentTitel)}</strong>. Das Bauvorhaben wurde durch ${esc(team)} koordiniert und abgeschlossen.</p>
+    <p style="margin:12px 0 0;">Dieses Dokument fasst ${inhalte} zusammen und dient als Nachweis zum Projektabschluss. Die Abrechnung erfolgt gesondert über die Rechnung / Endabrechnung.</p>
   </div>`
 }
 
@@ -259,8 +261,10 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
 
   const fs = '8pt'
   const pad = '4px 5px'
+  const mitPreisen = p.mitPreisen
 
-  const head = `<thead>
+  const head = mitPreisen
+    ? `<thead>
     <tr style="background:#f3f4f6;font-size:${fs};color:${TEXT};font-weight:700;">
       <th style="padding:${pad};text-align:left;width:22px;border-bottom:1px solid #9CA3AF;">Pos.</th>
       <th style="padding:${pad};text-align:left;border-bottom:1px solid #9CA3AF;">Leistung</th>
@@ -268,6 +272,14 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
       <th style="padding:${pad};text-align:left;width:48px;border-bottom:1px solid #9CA3AF;">Einh.</th>
       <th style="padding:${pad};text-align:right;width:56px;border-bottom:1px solid #9CA3AF;">Einzel €</th>
       <th style="padding:${pad};text-align:right;width:60px;border-bottom:1px solid #9CA3AF;">Gesamt €</th>
+    </tr>
+  </thead>`
+    : `<thead>
+    <tr style="background:#f3f4f6;font-size:${fs};color:${TEXT};font-weight:700;">
+      <th style="padding:${pad};text-align:left;width:22px;border-bottom:1px solid #9CA3AF;">Pos.</th>
+      <th style="padding:${pad};text-align:left;border-bottom:1px solid #9CA3AF;">Leistung</th>
+      <th style="padding:${pad};text-align:right;width:40px;border-bottom:1px solid #9CA3AF;">Menge</th>
+      <th style="padding:${pad};text-align:left;width:48px;border-bottom:1px solid #9CA3AF;">Einh.</th>
     </tr>
   </thead>`
 
@@ -285,6 +297,18 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
       const menge = pos.menge ?? 1
       const gesamt = pos.preis_netto ?? 0
       const einzel = menge > 0 ? gesamt / menge : gesamt
+      if (!mitPreisen) {
+        return `<tr>
+        <td style="padding:${pad};border-bottom:1px solid ${BORDER};vertical-align:top;font-size:${fs};">${i + 1}</td>
+        <td style="padding:${pad};border-bottom:1px solid ${BORDER};vertical-align:top;font-size:${fs};">
+          ${gewerkZeile}
+          <div style="font-weight:600;">${esc(pos.leistung)}</div>
+          ${beschHtml}
+        </td>
+        <td style="padding:${pad};border-bottom:1px solid ${BORDER};text-align:right;vertical-align:top;font-size:${fs};">${esc(String(menge))}</td>
+        <td style="padding:${pad};border-bottom:1px solid ${BORDER};vertical-align:top;font-size:${fs};">${esc(pos.einheit ?? 'pauschal')}</td>
+      </tr>`
+      }
       return `<tr>
         <td style="padding:${pad};border-bottom:1px solid ${BORDER};vertical-align:top;font-size:${fs};">${i + 1}</td>
         <td style="padding:${pad};border-bottom:1px solid ${BORDER};vertical-align:top;font-size:${fs};">
@@ -300,7 +324,7 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
     })
     .join('')
 
-  const summenHtml = p.summen ? summenBlockKompakt(p.summen) : ''
+  const summenHtml = mitPreisen && p.summen ? summenBlockKompakt(p.summen) : ''
 
   return `<table style="width:100%;border-collapse:collapse;font-size:${fs};">${head}<tbody>${rows}</tbody></table>${summenHtml}`
 }
@@ -398,8 +422,8 @@ function abschlussHtml(p: AbschlussdokuHtmlInput): string {
   const anrede = p.mail_anrede ?? 'sie'
   const bestaetigung =
     anrede === 'du'
-      ? 'Mit dieser Abschlussdokumentation bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir dir jederzeit zur Verfügung.'
-      : 'Mit dieser Abschlussdokumentation bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir Ihnen jederzeit zur Verfügung.'
+      ? 'Mit diesem Abschlussbericht bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir dir jederzeit zur Verfügung.'
+      : 'Mit diesem Abschlussbericht bestätigen wir die ordnungsgemäße Durchführung und Abwicklung des genannten Auftrags. Für Rückfragen stehen wir Ihnen jederzeit zur Verfügung.'
   const gruss = anrede === 'du' ? 'Viele Grüße' : 'Mit freundlichen Grüßen'
   return `<div class="avoid-fuss-overlap" style="margin-top:24px;font-size:10.5pt;line-height:1.6;color:${TEXT};page-break-inside:avoid;">
     <p style="margin:0 0 12px;">${bestaetigung}</p>
@@ -492,5 +516,5 @@ export function buildAbschlussdokumentationHtml(p: AbschlussdokuHtmlInput): stri
 
   sections.push(abschlussHtml(p))
 
-  return pdfShell(sections.join('\n'), `Abschlussdokumentation — ${p.dokumentTitel}`)
+  return pdfShell(sections.join('\n'), `Abschlussbericht — ${p.dokumentTitel}`)
 }

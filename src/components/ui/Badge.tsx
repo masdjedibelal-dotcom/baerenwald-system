@@ -9,12 +9,13 @@ import {
   MessageCircle,
   Phone,
 } from 'lucide-react'
-import { LeadStatusMockBadge } from '@/components/mock-ui/LeadStatusMockBadge'
-import { cn, KANAL_LABELS, kanalLabel } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { cn, kanalLabel } from '@/lib/utils'
 import type { LeadKanal, LeadStatus } from '@/lib/types'
 
+/** Lead-Status über einheitliches StatusBadge (Phase 1 / Spec §11). */
 export function LeadStatusBadge({ status }: { status: LeadStatus | string }) {
-  return <LeadStatusMockBadge status={status} />
+  return <StatusBadge status={status} />
 }
 
 const kanalIcon: Record<LeadKanal, LucideIcon> = {

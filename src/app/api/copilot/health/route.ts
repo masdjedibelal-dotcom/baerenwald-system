@@ -35,8 +35,12 @@ export async function GET(req: NextRequest) {
       ANTHROPIC_API_KEY_set: !!normalizeClaudeApiKey(anthropicRaw),
       resolved_from: getClaudeApiKeySource(),
       resolved_key_length: resolved.length,
-      resolved_key_prefix: resolved ? `${resolved.slice(0, 12)}…` : null,
       resolved_key_format_ok: claudeApiKeyLooksValid(resolved),
+      TELEGRAM_WEBHOOK_SECRET_set: !!(
+        process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ||
+        process.env.COPILOT_WEBHOOK_SECRET?.trim() ||
+        process.env.CRON_SECRET?.trim()
+      ),
       ANTHROPIC_BASE_URL_netlify_gateway: isNetlifyAiGatewayBaseUrl(),
       anthropic_uses_direct_api: true,
       TELEGRAM_BOT_TOKEN_set: !!process.env.TELEGRAM_BOT_TOKEN?.trim(),

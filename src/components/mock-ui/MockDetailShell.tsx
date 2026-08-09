@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 
 export type MockDetailShellGroup = {
   id: string
@@ -11,6 +11,10 @@ export type MockDetailShellGroup = {
   render: () => ReactNode
 }
 
+/**
+ * Uncontrolled Convenience-API um die kanonische `DetailShell`.
+ * Neue Screens: bevorzugt `DetailShell` mit value/onChange.
+ */
 export function MockDetailShell({
   groups,
   defaultGroup,
@@ -23,39 +27,24 @@ export function MockDetailShell({
   onActiveGroupChange?: (id: string) => void
 }) {
   const [internalActive, setInternalActive] = useState(defaultGroup ?? groups[0]?.id ?? '')
-  const active = activeGroup ?? internalActive
-  const setActive = (id: string) => {
-    onActiveGroupChange?.(id)
-    if (activeGroup == null) setInternalActive(id)
-  }
+  const value = activeGroup ?? internalActive
+
+  const shellGroups: DetailShellGroup[] = groups.map((g) => ({
+    id: g.id,
+    label: g.label,
+    icon: g.icon,
+    count: g.count,
+    render: g.render,
+  }))
 
   return (
-    <div className="dshell">
-      <nav className="dshell-nav" aria-label="Detailbereiche">
-        {groups.map((gr) => (
-          <button
-            key={gr.id}
-            type="button"
-            className={`dshell-navitem${active === gr.id ? ' active' : ''}`}
-            onClick={() => setActive(gr.id)}
-          >
-            <MockIcon ctx="nav" n={gr.icon} size={16} />
-            <span>{gr.label}</span>
-            {gr.count != null ? <span className="dshell-count">{gr.count}</span> : null}
-          </button>
-        ))}
-      </nav>
-      <div className="dshell-body">
-        {groups.map((gr) => (
-          <div key={gr.id} className={`dshell-group${active === gr.id ? ' active' : ''}`}>
-            <div className="dshell-group-h">
-              <MockIcon ctx="nav" n={gr.icon} size={15} />
-              {gr.label}
-            </div>
-            <div className="dshell-cards">{gr.render()}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <DetailShell
+      groups={shellGroups}
+      value={value}
+      onChange={(id) => {
+        onActiveGroupChange?.(id)
+        if (activeGroup == null) setInternalActive(id)
+      }}
+    />
   )
 }

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { confirmDelete } from '@/components/ui/confirm-delete'
-import { toast } from '@/components/ui/app-toast'
 
 export type EntityMenuType =
   | 'anfrage'
@@ -21,28 +20,28 @@ export type EntityMenuItem =
       onClick: () => void
     }
 
-/**
- * Einheitliche ⋯-Menü-Reihenfolge (global → individuell → Kontakt → Gefahr):
- *
- * 1. Bearbeiten
- * 2. Kopieren
- * 3. Admin Login  (optional)
- * 4. …-Link versenden  (Portal, optional)
- * 5. Typ-Aktionen (Anfrage/Angebot/Auftrag/Rechnung)
- * 6. extra[]  (individuelle Aktionen der Seite)
- * 7. Anrufen
- * 8. Mail schreiben
- * 9. Löschen
- */
 export type EntityMenuHandlers = {
   onEdit?: () => void
   onCopy?: () => void
-  /** Impersonation / Admin-Portal öffnen */
+  /** Admin-Impersonation / Admin Login */
   onPortal?: () => void
-  /** Portal-Einladungs-/Login-Link per Mail */
+  /** Portal-Einladungsmail (Kunden-/Handwerker-/Partner-Link versenden) */
   onPortalLink?: () => void
-  onStatus?: (kind: 'termin' | 'rueckfrage' | 'nicht_erreichbar' | 'verloren') => void
+  onStatus?: (kind: 'termin' | 'nicht_erreichbar' | 'verloren') => void
+  /** Anfrage: Notfall melden → Auftrag mit Regie */
+  onNotfall?: () => void
   onAngebot?: () => void
+  /** Anfrage: Sheet mit allen Angeboten */
+  onAngeboteVerwalten?: () => void
+  /** Anfrage: Wiedervorlage setzen */
+  onWiedervorlage?: () => void
+  /** Anfrage: Duplikat zusammenführen */
+  onZusammenfuehren?: () => void
+  /** Kunde / Handwerker: Pipeline anlegen */
+  onCreateAnfrage?: () => void
+  onCreateAngebot?: () => void
+  onCreateAuftrag?: () => void
+  onCreateRechnung?: () => void
   onAccept?: () => void
   onPdf?: () => void
   onSend?: () => void
@@ -51,20 +50,20 @@ export type EntityMenuHandlers = {
   onInvoice?: () => void
   onEdit2?: () => void
   onMarkPaid?: () => void
-  onToAuftrag?: () => void
   onDelete?: () => void
   deleteLabel?: string
-  /** Menü-Text statt „Löschen“ (z. B. „Stornieren“) */
+  /** Menü-Text statt „Löschen“ (z. B. „Vorgang löschen“) */
   deleteMenuLabel?: string
   tel?: string | null
   mail?: string | null
+  /** Override statt tel:/mailto: (CRM-Compose etc.) */
   onCall?: () => void
   onMail?: () => void
-  /** Individuelle Aktionen — zwischen Typ-Aktionen und Kontakt */
   extra?: EntityMenuItem[]
 }
 
-type EntityLike = {
+/** Eine Quelle für alle ⋯-Menüs — 1:1 Mock entityMenu */
+export type EntityLike = {
   status?: string | null
   statusKey?: string | null
   name?: string | null
@@ -73,9 +72,16 @@ type EntityLike = {
   tel?: string | null
   mail?: string | null
   customer?: { tel?: string; mail?: string; name?: string } | null
+  /** Anfrage: Angebote vorhanden */
+  hasAngebote?: boolean
+  /** Anfrage: mind. ein angenommenes Angebot → kein „Verloren“ */
+  hasAngenommenesAngebot?: boolean
+  /** Anfrage: Duplikat erkannt (Band ggf. dismissed) → Menüeintrag */
+  showZusammenfuehren?: boolean
 }
 
-function portalLinkLabel(type: EntityMenuType): string {
+/** Kanonische Portal-Link-Labels — überall gleich. */
+export function portalLinkMenuLabel(type: EntityMenuType): string {
   if (type === 'handwerker') return 'Handwerker-Link versenden'
   if (type === 'partner') return 'Partner-Link versenden'
   return 'Kundenportal-Link versenden'
@@ -93,7 +99,11 @@ function dedupeSeps(items: EntityMenuItem[]): EntityMenuItem[] {
   return out
 }
 
-/** Eine Quelle für alle CRM-⋯-Menüs — feste Labels & Reihenfolge */
+function anfrageStatusEarly(st: string | null): boolean {
+  return st === 'neu' || st === 'kontaktiert'
+}
+
+/** Eine Quelle für alle ⋯-Menüs — 1:1 Mock entityMenu */
 export function buildEntityMenu(
   type: EntityMenuType,
   entity: EntityLike,
@@ -105,130 +115,155 @@ export function buildEntityMenu(
   const mail = h.mail ?? e.mail ?? e.customer?.mail ?? null
   const A: EntityMenuItem[] = []
 
-  // —— 1–2 Global: Bearbeiten / Kopieren ——
-  if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
-  if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
+  const isVorgangPhase =
+    type === 'anfrage' || type === 'angebot' || type === 'auftrag' || type === 'rechnung'
 
-  // —— 3–4 Portal (unabhängig voneinander) ——
-  if (h.onPortal || h.onPortalLink) {
-    if (A.length) A.push('sep')
+  /** Anfrage: Status zuerst, dann Kontext, dann Bearbeiten/Kopieren/Admin, Löschen unten */
+  if (type === 'anfrage') {
+    if (h.onStatus && anfrageStatusEarly(st)) {
+      A.push({
+        icon: 'calendar-event',
+        label: 'Termin vereinbart',
+        onClick: () => h.onStatus!('termin'),
+      })
+      A.push({
+        icon: 'phone-off',
+        label: 'Nicht erreichbar',
+        onClick: () => h.onStatus!('nicht_erreichbar'),
+      })
+    }
+    if (h.onStatus && !e.hasAngenommenesAngebot && st !== 'abgebrochen') {
+      A.push({
+        icon: 'circle-x',
+        label: 'Als verloren markieren',
+        onClick: () => h.onStatus!('verloren'),
+      })
+    }
+
+    const kontextBefore = A.length
+    if (e.hasAngebote && h.onAngeboteVerwalten) {
+      A.push('sep')
+      A.push({
+        icon: 'file-invoice',
+        label: 'Angebote verwalten',
+        onClick: h.onAngeboteVerwalten,
+      })
+    }
+    if (h.onWiedervorlage) {
+      if (A.length === kontextBefore) A.push('sep')
+      A.push({ icon: 'clock', label: 'Wiedervorlage', onClick: h.onWiedervorlage })
+    }
+    if (e.showZusammenfuehren && h.onZusammenfuehren) {
+      if (A.length === kontextBefore) A.push('sep')
+      A.push({ icon: 'link', label: 'Zusammenführen', onClick: h.onZusammenfuehren })
+    }
+
+    A.push('sep')
+    if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
+    if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
     if (h.onPortal) {
       A.push({ icon: 'external-link', label: 'Admin Login', onClick: h.onPortal })
     }
+
+    const extraItems = (h.extra ?? []).filter((c) => {
+      if (c === 'sep') return true
+      const label = c.label.toLowerCase()
+      if (label.includes('notfall')) return false
+      if (label.includes('portal')) return false
+      if (label === 'anrufen' || label.includes('mail schreiben') || label === 'kontakt') return false
+      if (label.includes('rückfrage') || label.includes('rueckfrage')) return false
+      return true
+    })
+    const extraNormal: EntityMenuItem[] = []
+    const extraDanger: EntityMenuItem[] = []
+    for (const c of extraItems) {
+      if (c !== 'sep' && c.danger) extraDanger.push(c)
+      else extraNormal.push(c)
+    }
+    if (extraNormal.length) {
+      A.push('sep')
+      extraNormal.forEach((c) => A.push(c))
+    }
+    if (h.onDelete || extraDanger.length) {
+      A.push('sep')
+      extraDanger.forEach((c) => A.push(c))
+      if (h.onDelete) {
+        const label =
+          h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
+        A.push({
+          icon: 'trash',
+          label: h.deleteMenuLabel ?? 'Löschen',
+          danger: true,
+          onClick: () => confirmDelete(String(label), h.onDelete!),
+        })
+      }
+    }
+    return dedupeSeps(A)
+  }
+
+  if (h.onEdit) A.push({ icon: 'pencil', label: 'Bearbeiten', onClick: h.onEdit })
+  if (h.onCopy) A.push({ icon: 'copy', label: 'Kopieren', onClick: h.onCopy })
+
+  /**
+   * Phase 5c: Vorgang-⋯ nur Statuswechsel · Bearbeiten/Kopieren · Löschen.
+   * Kontakt / Portal / Notfall → Stammdaten bzw. QuickBar, nicht Menü.
+   * Ausnahme Anfrage: Admin Login (siehe Zweig oben).
+   */
+  if (!isVorgangPhase) {
+    if (h.onPortal) {
+      A.push({ icon: 'external-link', label: 'Als Kunde öffnen', onClick: h.onPortal })
+    }
     if (h.onPortalLink) {
-      const linkLabel = portalLinkLabel(type)
-      A.push({ icon: 'send', label: linkLabel, onClick: h.onPortalLink })
-    } else if (h.onPortal) {
-      // Admin Login ohne expliziten Link-Handler → Hinweis wie bisher
-      const linkLabel = portalLinkLabel(type)
+      const linkLabel = portalLinkMenuLabel(type)
       A.push({
         icon: 'send',
         label: linkLabel,
-        onClick: () => toast.error(`${linkLabel} ist hier nicht verfügbar`),
+        onClick: h.onPortalLink,
       })
     }
   }
 
-  // —— 5 Typ-spezifisch ——
-  if (type === 'anfrage' && h.onStatus) {
-    A.push('sep')
-    A.push({ icon: 'calendar-event', label: 'Termin vereinbart', onClick: () => h.onStatus!('termin') })
-    A.push({ icon: 'help', label: 'Rückfrage', onClick: () => h.onStatus!('rueckfrage') })
-    A.push({
-      icon: 'phone-off',
-      label: 'Nicht erreichbar',
-      onClick: () => h.onStatus!('nicht_erreichbar'),
-    })
-    A.push({
-      icon: 'circle-x',
-      label: 'Als verloren markieren',
-      onClick: () => h.onStatus!('verloren'),
-    })
-  }
-  if (type === 'anfrage' && h.onAngebot) {
-    A.push('sep')
-    A.push({ icon: 'file-invoice', label: 'Angebot erstellen', onClick: h.onAngebot })
-  }
-
-  if (type === 'angebot') {
-    const versendet =
-      st === 'gesendet_kunde' || st === 'gesendet' || st === 'abgelaufen'
-    const erledigt =
-      st === 'kunde_akzeptiert' || st === 'abgelehnt' || st === 'angenommen'
-    const jeVersendet = Boolean(st && st !== 'entwurf')
+  if (type === 'kunde' || type === 'handwerker') {
     const before = A.length
     A.push('sep')
-    if (h.onAccept && versendet) {
-      A.push({ icon: 'check', label: 'Angebot annehmen', onClick: h.onAccept })
+    if (h.onCreateAnfrage) {
+      A.push({ icon: 'inbox', label: 'Neue Anfrage', onClick: h.onCreateAnfrage })
     }
-    if (h.onPdf) {
-      A.push({ icon: 'download', label: 'PDF herunterladen', onClick: h.onPdf })
+    if (h.onCreateAngebot) {
+      A.push({ icon: 'file-invoice', label: 'Neues Angebot', onClick: h.onCreateAngebot })
     }
-    if (h.onSend && !erledigt) {
-      A.push({
-        icon: 'send',
-        label: jeVersendet ? 'Angebot nochmal versenden' : 'Angebot versenden',
-        onClick: h.onSend,
-      })
+    if (h.onCreateAuftrag) {
+      A.push({ icon: 'briefcase', label: 'Neuer Auftrag', onClick: h.onCreateAuftrag })
+    }
+    if (h.onCreateRechnung) {
+      A.push({ icon: 'receipt', label: 'Neue Rechnung', onClick: h.onCreateRechnung })
     }
     if (A.length === before + 1) A.pop()
   }
 
-  if (type === 'auftrag') {
-    const laufend = st === 'offen' || st === 'in_arbeit' || st === 'aktiv' || st === 'in_bearbeitung'
-    const abschluss = st === 'abnahme' || st === 'abgeschlossen' || st === 'fertig'
-    const before = A.length
+  const extraItems = (h.extra ?? []).filter((c) => {
+    if (c === 'sep') return true
+    if (!isVorgangPhase) return true
+    const label = c.label.toLowerCase()
+    if (label.includes('notfall')) return false
+    if (label.includes('portal')) return false
+    if (label === 'anrufen' || label.includes('mail schreiben') || label === 'kontakt') return false
+    return true
+  })
+  const extraNormal: EntityMenuItem[] = []
+  const extraDanger: EntityMenuItem[] = []
+  for (const c of extraItems) {
+    if (c !== 'sep' && c.danger) extraDanger.push(c)
+    else extraNormal.push(c)
+  }
+  if (extraNormal.length) {
     A.push('sep')
-    if (h.onEditAngebot && !abschluss) {
-      A.push({ icon: 'file-pencil', label: 'Angebot korrigieren', onClick: h.onEditAngebot })
-    }
-    if (h.onComplete && laufend) {
-      A.push({ icon: 'checks', label: 'Auftrag abschließen', onClick: h.onComplete })
-    }
-    if (h.onInvoice && (abschluss || laufend)) {
-      A.push({ icon: 'file-invoice', label: 'Rechnung erstellen', onClick: h.onInvoice })
-    }
-    if (A.length === before + 1) A.pop()
+    extraNormal.forEach((c) => A.push(c))
   }
 
-  if (type === 'rechnung') {
-    const offen = st === 'versendet' || st === 'ueberfaellig' || st === 'gesendet'
-    const jeVersendet = Boolean(st && st !== 'entwurf')
-    const erledigt = st === 'bezahlt' || st === 'storniert'
-    const before = A.length
-    A.push('sep')
-    if (h.onEdit2 && !erledigt) {
-      A.push({ icon: 'file-pencil', label: 'Rechnung korrigieren', onClick: h.onEdit2 })
-    }
-    if (h.onMarkPaid && offen) {
-      A.push({ icon: 'check', label: 'Als bezahlt markieren', onClick: h.onMarkPaid })
-    }
-    if (h.onPdf) {
-      A.push({ icon: 'download', label: 'PDF herunterladen', onClick: h.onPdf })
-    }
-    if (h.onSend && !erledigt) {
-      A.push({
-        icon: 'send',
-        label: jeVersendet ? 'Rechnung nochmal versenden' : 'Rechnung versenden',
-        onClick: h.onSend,
-      })
-    }
-    if (h.onToAuftrag) {
-      A.push({ icon: 'briefcase', label: 'Zum Auftrag', onClick: h.onToAuftrag })
-    }
-    if (A.length === before + 1) A.pop()
-  }
-
-  // —— 6 Individuell ——
-  const extras = h.extra ?? []
-  if (extras.length) {
-    A.push('sep')
-    extras.forEach((c) => A.push(c))
-  }
-
-  // —— 7–8 Kontakt ——
-  const showCall = Boolean(tel) || Boolean(h.onCall)
-  const showMail = Boolean(mail) || Boolean(h.onMail)
+  /** Anrufen/Mail nur Kunde/Handwerker — Vorgänge: QuickBar / Stammdaten. */
+  const showCall = !isVorgangPhase && (Boolean(tel) || Boolean(h.onCall))
+  const showMail = !isVorgangPhase && (Boolean(mail) || Boolean(h.onMail))
   if (showCall || showMail) A.push('sep')
   if (showCall) {
     A.push({
@@ -251,20 +286,44 @@ export function buildEntityMenu(
     })
   }
 
-  // —— 9 Löschen ——
-  if (h.onDelete) {
-    A.push('sep')
-    const label =
-      h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
-    A.push({
-      icon: 'trash',
-      label: h.deleteMenuLabel ?? 'Löschen',
-      danger: true,
-      onClick: () => confirmDelete(String(label), h.onDelete!),
-    })
+  if (h.onDelete || extraDanger.length) {
+    if (extraDanger.length) {
+      A.push('sep')
+      extraDanger.forEach((c) => A.push(c))
+    }
+    if (h.onDelete) {
+      if (!extraDanger.length) A.push('sep')
+      const label =
+        h.deleteLabel ?? e.name ?? e.titel ?? e.title ?? e.customer?.name ?? 'Eintrag'
+      A.push({
+        icon: 'trash',
+        label: h.deleteMenuLabel ?? 'Löschen',
+        danger: true,
+        onClick: () => confirmDelete(String(label), h.onDelete!),
+      })
+    }
   }
 
   return dedupeSeps(A)
+}
+
+/**
+ * Listen-Row-Menü (UX2-6): nur Öffnen / Kopieren / Löschen (+ PDF wenn gesetzt).
+ * Keine Status-/Pipeline-Aktionen — die gehören ins Detail.
+ */
+export function buildListRowMenu(
+  type: EntityMenuType,
+  entity: EntityLike,
+  h: Pick<EntityMenuHandlers, 'onEdit' | 'onCopy' | 'onPdf' | 'onDelete' | 'deleteLabel' | 'deleteMenuLabel'>
+): EntityMenuItem[] {
+  return buildEntityMenu(type, entity, {
+    onEdit: h.onEdit,
+    onCopy: h.onCopy,
+    onPdf: h.onPdf,
+    onDelete: h.onDelete,
+    deleteLabel: h.deleteLabel,
+    deleteMenuLabel: h.deleteMenuLabel,
+  })
 }
 
 /** entityMenu-Items → ActionsMenu-Items mit MockIcon */

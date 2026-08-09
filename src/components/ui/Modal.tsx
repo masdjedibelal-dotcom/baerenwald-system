@@ -1,9 +1,11 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { X } from 'lucide-react'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
+import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
 
 interface ModalProps {
@@ -12,13 +14,13 @@ interface ModalProps {
   title: ReactNode
   /** Optionaler Untertitel unter dem Titel (Mock-Header) */
   subtitle?: ReactNode
-  /** Optional links neben dem Titel (z. B. Icon-Kreis) */
+  /** Optional neben dem Titel (z. B. Icon) — nach dem Schließen-Button links */
   leading?: ReactNode
   children: ReactNode
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
-  /** Footer: Abbrechen links, Primäraktion rechts */
+  /** Footer: Secondary/Abbrechen links · Primary rechts (space-between) */
   footerSpread?: boolean
 }
 
@@ -29,7 +31,7 @@ const SIZE_WIDTH: Record<NonNullable<ModalProps['size']>, string> = {
   xl: 'min(96vw, 56rem)',
 }
 
-/** Zentriertes Mock-Modal (nie Sidepanel). Portal auf document.body. */
+/** Legacy-Name „Modal“ — Layout Spec §6: Desktop Slide-over, Mobil Bottom Sheet. Portal body. */
 export function Modal({
   open,
   onClose,
@@ -43,24 +45,23 @@ export function Modal({
   footerSpread = false,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false)
+  const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  useOverlayChromeLock(open && mounted)
+
   useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', handler)
-      document.body.style.overflow = prev
-    }
-  }, [open, onClose])
+    if (!open || !mounted) return
+    const dialog = dialogRef.current
+    if (!dialog) return
+    return trapFocus(dialog, () => onCloseRef.current())
+  }, [open, mounted])
 
   if (!open || !mounted) return null
 
@@ -73,18 +74,31 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
         className={cn('modal', className)}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         style={{ width: SIZE_WIDTH[size] }}
       >
         <div className="modal-h">
+          <button
+            type="button"
+            className="editor-sheet__icon-btn"
+            onClick={onClose}
+            title="Schließen"
+            aria-label="Schließen"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
           {leading ? <div className="icon">{leading}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="title">{title}</div>
+            <div id={titleId} className="title">
+              {title}
+            </div>
             {subtitle ? <div className="sub">{subtitle}</div> : null}
           </div>
-          <MockBtn icon="x" kind="ghost" sm onClick={onClose} title="Schließen" />
         </div>
         <div className="modal-b">{children}</div>
         {footer ? (

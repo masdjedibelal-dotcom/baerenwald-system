@@ -8,6 +8,7 @@ import {
   defaultRechnungEinleitung,
   defaultRechnungHinweise,
 } from '@/lib/rechnungen/rechnung-texte'
+import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 
 export type RechnungWizardZahlungsart = 'standard' | 'abschlaege'
@@ -79,10 +80,23 @@ export type RechnungWizardBootstrap = {
   zahlungsplanBearbeiten?: boolean
   gesamtNetto?: number
   rechnungenAbschlag?: RechnungAbschlagLink[]
+  /** Bestand: von Auftrag übernommen oder manuell */
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
+  /**
+   * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
+   * nur Mail → ohne Storno.
+   */
+  korrekturKontext?: {
+    originalStatus: string
+    originalNr: string
+    materialFingerprint: string
+  } | null
 }
 
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
-  return status === 'entwurf'
+  const s = (status ?? '').toLowerCase()
+  return s === 'entwurf' || s === 'gesendet' || s === 'bezahlt' || s === 'versendet'
 }
 
 function addDaysYmd(ymd: string, days: number): string {
@@ -111,6 +125,7 @@ export function defaultRechnungWizardMeta(
   const bis = opts?.leistungszeitraum_bis?.trim() || heute
   const anrede: AngebotMailAnrede = istPrivatKundeTyp(opts?.kundeTyp) ? 'du' : 'sie'
   const einleitung = defaultRechnungEinleitung(anrede)
+  const mailEinleitung = defaultRechnungMailEinleitung(anrede)
   const hinweise = defaultRechnungHinweise()
   const klein = opts?.firm ? parseKleinunternehmerSetting(opts.firm.kleinunternehmer) : false
   const hinweis_35a = kundeZeigt35a(opts?.kundeTyp) && !klein
@@ -118,7 +133,7 @@ export function defaultRechnungWizardMeta(
   return {
     einleitung,
     hinweise,
-    mail_einleitung: '',
+    mail_einleitung: mailEinleitung,
     mail_betreff: '',
     reverse_charge_13b: false,
     hinweis_35a,
@@ -144,6 +159,15 @@ export type RechnungAuswahlZeile = {
   rechnung_art?: string | null
   abschlag_index?: number | null
   zahlungsplan_abschlag_id?: string | null
+  beleg_typ?: string | null
+  bezug_rechnung_id?: string | null
+  created_at?: string | null
+  /** Mahnwesen / RateDrawer */
+  erinnerung_7_sent_at?: string | null
+  erinnerung_21_sent_at?: string | null
+  intern_warnung_30_at?: string | null
+  reklamation_am?: string | null
+  reklamation_grund?: string | null
 }
 
 export type AbschlagRechnungEntwurf = {

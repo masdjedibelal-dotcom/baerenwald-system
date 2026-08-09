@@ -1,21 +1,22 @@
 'use client'
 
-import { useMemo } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockProp } from '@/components/mock-ui/MockProp'
-import { PosBoard } from '@/components/posboard/PosBoard'
-import { angebotPositionenToPosBoardLines } from '@/lib/posboard/position-adapters'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import type { LeadDetail, Rechnung, RechnungBelegTyp } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 
 function artLabel(detail: Rechnung, belegTyp: RechnungBelegTyp): string {
   if (belegTyp === 'gutschrift') return RECHNUNG_BELEG_TYP_LABELS.gutschrift
+  const art = String(
+    (detail as { rechnung_art?: string | null }).rechnung_art ?? ''
+  ).toLowerCase()
+  if (art === 'schluss') return 'Schlussrechnung'
+  if (art === 'abschlag') return 'Abschlag'
   const titel = (detail.auftraege?.titel ?? detail.rechnungsnummer ?? '').toLowerCase()
   const nr = (detail.rechnungsnummer ?? '').toLowerCase()
-  const blob = `${titel} ${nr}`
+  const blob = `${titel} ${nr} ${art}`
   if (/schluss/.test(blob)) return 'Schlussrechnung'
   if (/abschlag|anzahlung|teilrechnung/.test(blob)) return 'Abschlag'
   return RECHNUNG_BELEG_TYP_LABELS.rechnung
@@ -46,7 +47,7 @@ function tageSeitFaelligkeit(faelligAm: string | null): number {
   return Math.floor((today.getTime() - due.getTime()) / 86400000)
 }
 
-/** Details: Rechnungsdaten · Zahlungsstatus · PosBoard Leistungen (ohne Projekt-Übersicht). */
+/** Details: Rechnungsdaten · Zahlungsstatus (Leistungen → shared LeistungenTab). */
 export function RechnungDetailsTab({
   detail,
   zahlungszielFallback = 14,
@@ -57,8 +58,6 @@ export function RechnungDetailsTab({
 }) {
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
-  const pos = normalizeAngebotPositionen(detail.positionen ?? [])
-  const lines = useMemo(() => angebotPositionenToPosBoardLines(pos), [pos])
 
   const tageUeber = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
   const ueberfaellig =
@@ -136,8 +135,49 @@ export function RechnungDetailsTab({
           <MockProp label="Status">{zahlungsText}</MockProp>
         </div>
       </MockCard>
-
-      <PosBoard title="Leistungen" positionen={lines} showUst />
     </>
   )
+}
+
+/** Mock Phasen-Sheet / Übersicht — flache Prop-Liste. */
+export function buildRechnungPhaseSheetProps(
+  detail: Rechnung,
+  opts?: { zahlungszielFallback?: number; statusLabel?: string }
+): { k: string; v: string }[] {
+  const belegTyp: RechnungBelegTyp =
+    detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
+  const zielTage = zahlungszielTage(
+    detail.rechnungsdatum || detail.created_at,
+    detail.faellig_am,
+    opts?.zahlungszielFallback ?? 14
+  )
+  const rows: { k: string; v: string }[] = [
+    { k: 'Nummer', v: detail.rechnungsnummer?.trim() || '—' },
+    { k: 'Art', v: artLabel(detail, belegTyp) },
+    {
+      k: 'Erstellt',
+      v: detail.rechnungsdatum
+        ? formatDatum(detail.rechnungsdatum)
+        : detail.created_at
+          ? formatDatum(detail.created_at.slice(0, 10))
+          : '—',
+    },
+  ]
+  if (belegTyp === 'rechnung') {
+    rows.push({ k: 'Zahlungsziel', v: `${zielTage} Tage` })
+    rows.push({
+      k: 'Fällig',
+      v: detail.faellig_am ? formatDatum(detail.faellig_am) : '—',
+    })
+  }
+  if (detail.bezahlt_at) {
+    rows.push({ k: 'Bezahlt am', v: formatDatum(detail.bezahlt_at.slice(0, 10)) })
+  }
+  rows.push({
+    k: 'Status',
+    v:
+      opts?.statusLabel?.trim() ||
+      (detail.status === 'bezahlt' ? 'Bezahlt' : String(detail.status)),
+  })
+  return rows
 }

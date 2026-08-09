@@ -19,10 +19,13 @@ export function EinstellungenMeta({ children, className }: { children: ReactNode
 
 /** Untertitel in Listenzeilen (Typ, Anzahl, …). */
 export function EinstellungenListMeta({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn('text-xs text-bw-text-muted', className)}>{children}</p>
+  return <p className={cn('einst-list-meta', className)}>{children}</p>
 }
 
-/** Innere Listen in Cards (wie Kommunikation-Vorlagen). */
+/**
+ * Innere Listen in Cards (Vorlagen, E-Mail, …).
+ * Desktop: kompakte Divider-Liste · Mobil: gestapelte Cards wie CRM-Listen.
+ */
 export function EinstellungenListBody({
   children,
   empty,
@@ -33,7 +36,7 @@ export function EinstellungenListBody({
   if (empty) {
     return <p className="text-sm text-bw-text-muted">{empty}</p>
   }
-  return <ul className="divide-y divide-bw-border">{children}</ul>
+  return <ul className="einst-list">{children}</ul>
 }
 
 export function EinstellungenListItem({
@@ -43,9 +46,5 @@ export function EinstellungenListItem({
   children: ReactNode
   className?: string
 }) {
-  return (
-    <li className={cn('flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0', className)}>
-      {children}
-    </li>
-  )
+  return <li className={cn('einst-list-item', className)}>{children}</li>
 }

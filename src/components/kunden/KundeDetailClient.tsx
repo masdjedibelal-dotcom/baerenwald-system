@@ -1,11 +1,12 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
-import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
@@ -18,29 +19,35 @@ import { TypBadge } from '@/components/kunden/TypBadge'
 import {
   initKundeStammEditFelder,
   istKundeFirmaPflichtTyp,
-  istKundeHausverwaltungTyp,
   istKundeGewerbeTyp,
+  istKundeHausverwaltungTyp,
   istKundeNurGewerbeTyp,
   kundeDisplayName,
 } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
+import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
+import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
-import type { KundenObjekt } from '@/lib/types'
-import {
-  kundeNeueAnfrageHref,
-  kundeNeuerAuftragHref,
-  kundeNeuesAngebotHref,
-} from '@/lib/kunden/kunde-pipeline-nav'
-import { DetailHead } from '@/components/layout/DetailHead'
+import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
+import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
+import type { Kunde, KundenObjekt } from '@/lib/types'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { createAngebotHref, createRechnungHref } from '@/lib/crm/create-entry'
+import { showRouteBusy } from '@/components/ui/action-busy'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
-import { saveKunde, saveKundeCustomFieldValue } from '@/app/actions/kunden'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { saveKunde, saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
 import {
@@ -55,8 +62,6 @@ import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempf
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -113,7 +118,7 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-type KundeDetailTab = 'uebersicht' | 'objekte' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
+type KundeDetailTab = 'uebersicht' | 'objekte' | 'organisation' | 'vorgaenge' | 'akte'
 
 export function KundeDetailClient({
   kunde: initialKunde,
@@ -133,7 +138,7 @@ export function KundeDetailClient({
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [editingKontakt, setEditingKontakt] = useState(false)
@@ -148,17 +153,20 @@ export function KundeDetailClient({
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
-  const [hasPortalAccount, setHasPortalAccount] = useState(false)
+
   const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
-  const isCrmAdmin = useIsCrmAdmin()
-  const [impersonating, setImpersonating] = useState(false)
+  const [spamPending, setSpamPending] = useState(false)
+  const [mergePickerOpen, setMergePickerOpen] = useState(false)
+  const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
+    null
+  )
+  const istSpam = Boolean(kunde.ist_spam)
 
   useEffect(() => {
     void (async () => {
       const hint = await getPortalLoginHint(initialKunde.id)
       if (hint.ok) {
         setPortalLink(hint.loginLink)
-        setHasPortalAccount(hint.hasAuthAccount)
       } else {
         setPortalLink(buildPortalLoginLink())
       }
@@ -169,6 +177,53 @@ export function KundeDetailClient({
     setKunde(initialKunde)
     setEditForm(buildEditFormFromKunde(initialKunde))
   }, [initialKunde])
+
+  function toggleSpam() {
+    const next = !istSpam
+    const label = next
+      ? 'Als Spam markieren? Der Kunde kann dann keine Anfragen mehr über den Rechner stellen und sich nicht mehr mit dieser E-Mail anmelden oder registrieren.'
+      : 'Spam-Markierung aufheben? Rechner und Portal-Zugang sind danach wieder möglich.'
+    if (!confirm(label)) return
+    setSpamPending(true)
+    void setKundeSpam(kunde.id, next).then((r) => {
+      setSpamPending(false)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setKunde((k) => ({
+        ...k,
+        ist_spam: next,
+        spam_markiert_am: next ? new Date().toISOString() : null,
+      }))
+      toast.success(next ? 'Als Spam markiert' : 'Spam-Markierung aufgehoben')
+      refresh()
+    })
+  }
+
+  function confirmMergeIntoCurrent(other: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>) {
+    if (other.id === kunde.id) {
+      toast.error('Derselbe Kunde kann nicht zusammengeführt werden.')
+      return
+    }
+    setMergeOther(other)
+    setMergePickerOpen(false)
+  }
+
+  function executeMerge() {
+    if (!mergeOther) return
+    startTransition(async () => {
+      const res = await mergeKunden(kunde.id, mergeOther.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success(res.message)
+      setMergeOther(null)
+      router.push(`/kunden/${kunde.id}`)
+      router.refresh()
+    })
+  }
 
   const rechnungen = useMemo(() => kunde.rechnungen ?? [], [kunde.rechnungen])
 
@@ -199,17 +254,36 @@ export function KundeDetailClient({
     return n
   }, [kunde, rechnungen])
 
-  const zeigtOrganisationTab =
-    istKundeGewerbeTyp(kunde.typ) || kunde.portal_modus === 'organisation'
+  const zeigtOrganisationTab = istKundeHausverwaltungTyp(kunde.typ)
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
-  const zeigtObjekteTab = istKundeHausverwaltungTyp(kunde.typ)
+  const zeigtObjekteTab = istKundeGewerbeTyp(kunde.typ)
+
+  const wirtschaftSnap = useMemo(() => buildKundeWirtschaft(kunde, 'all'), [kunde])
+
+  const letzterKontaktLabel = useMemo(() => {
+    const mails = kunde.email_logs ?? []
+    const latest = mails[0]?.created_at
+    if (!latest) return '—'
+    const d = new Date(latest)
+    if (Number.isNaN(d.getTime())) return '—'
+    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+    return `${days[d.getDay()]} · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+  }, [kunde.email_logs])
+
+  const kundeSeitLabel = useMemo(() => {
+    const raw = kunde.created_at
+    if (!raw) return null
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return null
+    return `Kunde seit ${d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}`
+  }, [kunde.created_at])
 
   function beginEditKontakt() {
     setEditErr(null)
     setEditForm(buildEditFormFromKunde(kunde))
-    setTab('stammdaten')
+    setTab('uebersicht')
     setEditingKontakt(true)
   }
 
@@ -380,15 +454,9 @@ export function KundeDetailClient({
       onSave={saveKundeStamm}
       saving={pending}
     >
-      {editingKontakt ? (
-        <p className="inline-edit-hint">
-          <MockIcon ctx="default" n="info-circle" size={14} />
-          Hervorgehobene Felder sind bearbeitbar.
-        </p>
-      ) : null}
-      {editErr ? <p className="mb-2 text-sm text-status-cancel-text">{editErr}</p> : null}
+      {editErr ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{editErr}</p> : null}
       {kundenStamm.fehlendeRechnungsfelder.length > 0 && !editingKontakt ? (
-        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
           Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
         </p>
       ) : null}
@@ -554,41 +622,94 @@ export function KundeDetailClient({
     </InlineEditSection>
   )
 
-  const fixedOverview = <KundeWirtschaftlicheUebersicht kunde={kunde} />
-
-  const tabStammdaten = (
-    <>
-      {kontaktCard}
+  const fixedOverview = (
+    <div className="space-y-4">
+      {editingKontakt ? (
+        kontaktCard
+      ) : (
+        <EntityKundenStammdatenCard
+          kundeId={kunde.id}
+          kundeTyp={kunde.typ}
+          hideKundeLink
+          initial={{
+            name: kundeDisplayName(kunde),
+            telefon: kunde.telefon ?? '',
+            email: kunde.email ?? '',
+            plz: kunde.plz ?? '',
+            ort: kunde.ort ?? '',
+            strasse:
+              [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
+              kunde.adresse ||
+              '',
+            vorname: kunde.vorname ?? '',
+            nachname: kunde.nachname ?? '',
+            ansprechpartner: kunde.ansprechpartner ?? '',
+            webseite: kunde.webseite ?? '',
+            quelleLabel: kunde.quelle
+              ? (QUELLE_LABELS[kunde.quelle] ?? kunde.quelle)
+              : '',
+          }}
+          onSaved={() => refresh()}
+          onEdit={beginEditKontakt}
+        />
+      )}
+      {kunde.org_kennung?.trim() ? (
+        <MeldeLinksCard
+          orgSlug={kunde.org_kennung.trim().toLowerCase()}
+          aushangPdfHref={`/api/kunden/${kunde.id}/aushang-pdf`}
+        />
+      ) : null}
+      {zeigtOrganisationTab ? (
+        <FreigabeSettingsCard
+          value={{
+            notfall_direkt: kunde.notfall_direkt ?? true,
+            freigabe_schwelle_eur:
+              kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
+          }}
+          onSave={async (next) =>
+            saveKundeFreigabeRegeln(kunde.id, {
+              notfall_direkt: Boolean(next.notfall_direkt),
+              freigabe_schwelle_eur: next.freigabe_schwelle_eur,
+              freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
+            })
+          }
+          onSaved={() => refresh()}
+        />
+      ) : null}
       {zusatzfelderCard}
-    </>
+      <KundeWirtschaftlicheUebersicht kunde={kunde} />
+    </div>
   )
 
   const tabObjekte = zeigtObjekteTab ? (
     <KundenObjekteCard
       kundeId={kunde.id}
       objekte={kundenObjekte}
-      orgKennung={kunde.org_kennung}
+      verwaltungName={kundeDisplayName(kunde)}
       onChanged={() => refresh()}
     />
   ) : null
 
-  const tabNotizen = (
-    <KundenNotizenTab
-      kundeId={kunde.id}
-      notizen={kunde.kunden_notizen ?? []}
-      legacyNotiz={kunde.notizen}
-      onReload={() => refresh()}
-    />
-  )
-
-  const tabDokumenteInhalt = (
-    <KundenDokumenteTab
-      kundeId={kunde.id}
-      dokumente={kunde.kunden_dokumente ?? []}
-      auftraege={kunde.auftraege ?? []}
-      leads={kunde.leads ?? []}
-      rechnungen={rechnungen}
-      onReload={() => refresh()}
+  const tabAkte = (
+    <VorgangAkteTab
+      dateien={
+        <KundenDokumenteTab
+          kundeId={kunde.id}
+          dokumente={kunde.kunden_dokumente ?? []}
+          auftraege={kunde.auftraege ?? []}
+          leads={kunde.leads ?? []}
+          rechnungen={rechnungen}
+          onReload={() => refresh()}
+        />
+      }
+      notizen={
+        <KundenNotizenTab
+          kundeId={kunde.id}
+          notizen={kunde.kunden_notizen ?? []}
+          legacyNotiz={kunde.notizen}
+          onReload={() => refresh()}
+        />
+      }
     />
   )
 
@@ -605,13 +726,7 @@ export function KundeDetailClient({
   }, [vorgaengeRows, kundeLeadIds, kunde.id])
 
   const tabVorgaenge = (
-    <Suspense
-      fallback={
-        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
-          Vorgänge werden geladen…
-        </p>
-      }
-    >
+    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
       <VorgaengeListeClient
         rows={vorgaengeRows}
         embedded
@@ -621,90 +736,9 @@ export function KundeDetailClient({
     </Suspense>
   )
 
-  const kundeMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: 'Bearbeiten',
-        icon: mockMenuIcon('pencil', 16),
-        onClick: beginEditKontakt,
-      },
-      {
-        label: 'Mail schreiben',
-        icon: mockMenuIcon('mail', 16),
-        onClick: () => mailCompose.openCompose(() => mailComposeContextFromKunde(kunde.id)),
-      },
-      {
-        label: 'Neue Anfrage',
-        icon: mockMenuIcon('inbox', 16),
-        onClick: () => router.push(kundeNeueAnfrageHref(kunde.id)),
-      },
-      {
-        label: 'Neues Angebot',
-        icon: mockMenuIcon('file-invoice', 16),
-        onClick: () => router.push(kundeNeuesAngebotHref(kunde)),
-      },
-      {
-        label: 'Neuer Auftrag',
-        icon: mockMenuIcon('briefcase', 16),
-        onClick: () => router.push(kundeNeuerAuftragHref(kunde)),
-      },
-      'sep',
-      {
-        label: 'MeinBärenwald-Einladung',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !kunde.email ? 'Keine E-Mail' : undefined,
-        onClick: () => void openPortalModal(),
-      },
-    ]
-    if (zeigtOrganisationTab) {
-      items.push({
-        label: 'Organisation',
-        icon: mockMenuIcon('building', 16),
-        onClick: () => setTab('stammdaten'),
-      })
-    }
-    if (isCrmAdmin) {
-      const label = kundeDisplayName(kunde) || kunde.name || 'Kunde'
-      items.push('sep', {
-        label: 'Admin Login',
-        icon: mockMenuIcon('external-link', 16),
-        hint: !hasPortalAccount
-          ? 'Kein Portal-Account'
-          : impersonating
-            ? 'Öffne…'
-            : `HV-Portal als ${label}`,
-        onClick: () => {
-          if (!hasPortalAccount || impersonating) return
-          setImpersonating(true)
-          void openPortalAsKunde(kunde.id).then((r) => {
-            setImpersonating(false)
-            if (!r.ok) {
-              toast.error(r.message)
-              return
-            }
-            window.open(r.url, '_blank', 'noopener,noreferrer')
-          })
-        },
-      })
-    }
-    return items
-  }, [kunde, router, isCrmAdmin, impersonating, hasPortalAccount, zeigtOrganisationTab, mailCompose])
-
   const tabOrganisation = zeigtOrganisationTab ? (
-    <KundenOrganisationTab
-      kunde={kunde}
-      hasPortalAccount={hasPortalAccount}
-      onInvitePortal={() => void openPortalModal()}
-      onSaved={() => refresh()}
-    />
+    <KundenOrganisationTab kunde={kunde} onSaved={() => refresh()} />
   ) : null
-
-  const stammdatenInhalt = (
-    <>
-      {tabStammdaten}
-      {zeigtOrganisationTab ? tabOrganisation : null}
-    </>
-  )
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -712,6 +746,13 @@ export function KundeDetailClient({
       label: 'Übersicht',
       icon: 'layout-dashboard',
       render: () => fixedOverview,
+    },
+    {
+      id: 'vorgaenge',
+      label: 'Vorgänge',
+      icon: 'folders',
+      count: kundeVorgaengeCount || undefined,
+      render: () => tabVorgaenge,
     },
     ...(zeigtObjekteTab
       ? [
@@ -725,86 +766,93 @@ export function KundeDetailClient({
         ]
       : []),
     {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
-      id: 'vorgaenge',
-      label: 'Vorgänge',
-      icon: 'folders',
-      count: kundeVorgaengeCount || undefined,
-      render: () => tabVorgaenge,
-    },
-    {
-      id: 'dokumente',
-      label: 'Dokumente',
-      icon: 'files',
-      count: dokumenteCount || undefined,
-      render: () => tabDokumenteInhalt,
-    },
-    {
-      id: 'notizen',
-      label: 'Notizen',
-      icon: 'messages',
+      id: 'akte',
+      label: 'Akte',
+      icon: 'file-text',
       count:
-        (kunde.kunden_notizen?.length ?? 0) || (kunde.notizen?.trim() ? 1 : 0) || undefined,
-      render: () => tabNotizen,
+        dokumenteCount ||
+        (kunde.kunden_notizen?.length ?? 0) ||
+        (kunde.notizen?.trim() ? 1 : 0) ||
+        undefined,
+      render: () => tabAkte,
     },
   ]
 
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kunde.telefon,
+    email: kunde.email,
+    notiz: { kind: 'kunde', kundeId: kunde.id },
+    dokument: { kind: 'kunde', kundeId: kunde.id },
+    onSaved: () => refresh(),
+  })
+
   return (
-    <div className="space-y-4 pb-6">
-      <MockDetailBackLink href="/kunden" label="Zurück zu Kunden" />
-      <DetailHead
-        title={kundeDisplayName(kunde)}
-        badges={
+    <EntityDetailLayout
+      crumbBackHref="/kunden"
+      crumbBackLabel="Zurück zur Liste"
+      quickBar={quickBar}
+      head={{
+        title: kundeDisplayName(kunde),
+        titleBadges: (
           <>
             <TypBadge typ={kunde.typ} />
-            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
-              <span className="inline-flex items-center gap-1">
-                <MockIcon
-                  ctx="default"
-                  n={hasPortalAccount ? 'plug' : 'circle-x'}
-                  size={10}
-                />
-                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
-              </span>
-            </MockBadge>
+            {istSpam ? (
+              <MockBadge kind="storniert">
+                <span className="inline-flex items-center gap-1">
+                  <MockIcon ctx="default" n="shield-x" size={10} />
+                  Spam
+                </span>
+              </MockBadge>
+            ) : null}
           </>
-        }
-        actions={
-          <ActionsMenu
-            trigger={
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
-                aria-label="Weitere Aktionen"
-              >
-                <MockIcon ctx="btn" n="dots" size={16} />
-                <span className="sr-only">Mehr</span>
-              </button>
-            }
-            items={kundeMenuItems}
+        ),
+        badges: kundeSeitLabel ? <span>{kundeSeitLabel}</span> : null,
+        actions: (
+          <DetailActionsBar
             sheetTitle="Kunde"
+            primary={{
+              label: 'Angebot erstellen',
+              icon: 'file-text',
+              onClick: () => {
+                showRouteBusy('Angebot wird geöffnet…')
+                router.push(createAngebotHref(kunde.id))
+              },
+            }}
+            secondary={{
+              label: 'Rechnung erstellen',
+              icon: 'receipt',
+              onClick: () => {
+                showRouteBusy('Rechnung wird geöffnet…')
+                router.push(createRechnungHref(kunde.id))
+              },
+            }}
+            menuItems={[]}
           />
-        }
-      />
-
-      <DetailShell
-        groups={detailShellGroups}
-        value={tab}
-        onChange={(id) => setTab(id as KundeDetailTab)}
-      />
+        ),
+      }}
+    >
+      {zeigtOrganisationTab && tab === 'organisation' ? (
+        <div className="space-y-3">
+          <button type="button" className="btn ghost sm" onClick={() => setTab('uebersicht')}>
+            ← Zurück zur Übersicht
+          </button>
+          {tabOrganisation}
+        </div>
+      ) : (
+        <DetailShell
+          groups={detailShellGroups}
+          value={tab}
+          onChange={(id) => setTab(id as KundeDetailTab)}
+        />
+      )}
 
       <Modal
         open={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
-        title="MeinBärenwald-Einladung senden"
+        title="Kundenportal-Link versenden"
         size="lg"
         footer={
-          <div className="flex w-full justify-end gap-2">
+          <div className="kunde-create-footer">
             <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
             </Button>
@@ -848,10 +896,25 @@ export function KundeDetailClient({
               { value: 'sie', label: 'Sie' },
             ]}
           />
-          <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
-          <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          <KiAssistFieldLabel
+            label="Betreff"
+            value={portalBetreff}
+            onApply={setPortalBetreff}
+            extraHint="Portal-Einladung Betreff an den Kunden."
+            multiline={false}
+          >
+            <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
+          </KiAssistFieldLabel>
+          <KiAssistFieldLabel
+            label="Text"
+            value={portalText}
+            onApply={setPortalText}
+            extraHint="Portal-Einladungstext an den Kunden."
+          >
+            <Textarea rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          </KiAssistFieldLabel>
           <div>
-            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Kundenportal Mail Vorschau"
               sandbox="allow-same-origin"
@@ -860,12 +923,12 @@ export function KundeDetailClient({
             />
           </div>
           <Input
-            label="MeinBärenwald Login"
+            label="Portal-Login"
             value={portalLink}
             readOnly
             className="bg-bw-bg-soft"
           />
-          <p className="text-xs text-bw-text-muted">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             Der Button in der Mail führt immer zu <strong>/portal/login</strong>. Mehrere Adressen in „An“/„CC“
             mit Semikolon trennen.
           </p>
@@ -873,6 +936,40 @@ export function KundeDetailClient({
       </Modal>
 
       {mailCompose.modal}
-    </div>
+
+      <KundePickerSheet
+        open={mergePickerOpen}
+        onClose={() => setMergePickerOpen(false)}
+        title="Kunde zum Zusammenführen"
+        onPick={(other) => confirmMergeIntoCurrent(other)}
+      />
+
+      <Modal
+        open={Boolean(mergeOther)}
+        onClose={() => setMergeOther(null)}
+        title="Kunden zusammenführen"
+        size="sm"
+        footer={
+          <div className="kunde-create-footer">
+            <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" loading={pending} onClick={() => executeMerge()}>
+              Zusammenführen
+            </Button>
+          </div>
+        }
+      >
+        {mergeOther ? (
+          <p className="text-[length:var(--fs-text)] text-bw-text">
+            Kunde <strong>{kundeDisplayName(mergeOther)}</strong> in{' '}
+            <strong>{kundeDisplayName(kunde)}</strong> überführen?{' '}
+            <strong>{kundeDisplayName(mergeOther)}</strong> wird entfernt.
+          </p>
+        ) : null}
+      </Modal>
+
+      {quickActionSheets}
+    </EntityDetailLayout>
   )
 }

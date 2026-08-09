@@ -1,6 +1,7 @@
 'use client'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -55,7 +56,7 @@ export function HandwerkerBewertungModal({
   ziele: HandwerkerBewertungZiel[]
   onSaved: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [loading, setLoading] = useState(false)
   const [formulare, setFormulare] = useState<Record<string, BewertungFormular>>({})
 
@@ -135,7 +136,7 @@ export function HandwerkerBewertungModal({
       size="lg"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-bw-text-muted">
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             {vollstaendigCount}/{ziele.length} Handwerker vollständig bewertet
           </p>
           <div className="flex flex-wrap gap-2">
@@ -156,15 +157,15 @@ export function HandwerkerBewertungModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-bw-text-muted">
-          Bewerten Sie jeden beteiligten Handwerker in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
-          werden am Handwerker-Profil gespeichert.
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+          Bewerte jeden beteiligten Handwerker in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
+          werden am Partner-Profil gespeichert.
         </p>
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-bw-text-muted">Bewertungen werden geladen…</p>
+          <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Bewertungen werden geladen…</p>
         ) : ziele.length === 0 ? (
-          <p className="py-8 text-center text-sm text-bw-text-muted">
+          <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
             Keine Handwerker an diesem Auftrag hinterlegt.
           </p>
         ) : (
@@ -180,20 +181,20 @@ export function HandwerkerBewertungModal({
                   <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-bw-text">{z.name}</p>
-                      <p className="text-sm text-bw-text-muted">
+                      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
                         {[z.firma, z.gewerkName].filter(Boolean).join(' · ') || 'Handwerker'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       {f.gespeichert ? (
-                        <span className="rounded-full bg-bw-green-bg px-2 py-0.5 text-xs font-medium text-bw-primary">
+                        <span className="rounded-full bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
                           Gespeichert
                         </span>
                       ) : null}
                       {avg > 0 ? (
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-900'
+                            'inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-semibold tabular-nums text-amber-900'
                           )}
                         >
                           <Star className="h-3 w-3 fill-current" aria-hidden />

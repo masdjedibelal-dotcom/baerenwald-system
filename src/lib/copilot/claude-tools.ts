@@ -8,6 +8,57 @@ const emptySchema = {
 
 export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   {
+    name: 'crm_hilfe',
+    description:
+      'Erklärt CRM-Funktionen wie im Dashboard (Kunden, Angebote, Rechnungen, Mahnung, Partner, …). Für „Wie funktioniert X?“ — nicht für Live-Daten (dafür search_crm). Ohne thema: Themenliste.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        thema: {
+          type: 'string',
+          description:
+            'z. B. angebote, rechnungen, mahnung, kunden, anfragen, auftraege, partner, kalender — oder freie Frage',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'crm_oeffnen',
+    description:
+      'Deep-Link ins CRM erzeugen (Anfrage, Angebots-Wizard inkl. Schritt/Positionen, Rechnung, Kunde, …). Sidepanel zeigt Button „Öffnen“. Bei manueller Nacharbeit (Positionen tippen) IMMER anbieten.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ziel: {
+          type: 'string',
+          description:
+            'anfrage | angebot_wizard | angebot_positionen | angebot | rechnung | rechnung_neu | auftrag | kunde | kunde_neu | partner_neu | kalender | vorgaenge | lead_auskunft',
+        },
+        id: { type: 'string', description: 'Entity-UUID wenn nötig' },
+        lead_id: { type: 'string' },
+        kunde_id: { type: 'string' },
+        tab: { type: 'string', description: 'z. B. details, stammdaten, fotos' },
+        wizard_step: {
+          type: 'number',
+          description: '1=Typ/Projekt, 2=Positionen, 3=Finalisieren, 4=Vorschau, 5=Versenden',
+        },
+        focus: {
+          type: 'string',
+          description: 'titel | beschreibung | positionen',
+        },
+      },
+      required: ['ziel'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'plane_arbeitstag',
+    description:
+      'Tagesplan aus Live-CRM: neue Anfragen, Termine, offene/überfällige Rechnungen, Angebote, Aufträge + Deep-Links.',
+    input_schema: emptySchema,
+  },
+  {
     name: 'get_neue_anfragen',
     description: 'Neue Anfragen aus dem CRM laden',
     input_schema: emptySchema,
@@ -32,7 +83,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'search_crm',
-    description: 'CRM durchsuchen (Name, E-Mail, Angebotsnr., etc.)',
+    description: 'CRM durchsuchen (Name, E-Mail, Angebotsnr., Auftragstitel, To-do, …)',
     input_schema: {
       type: 'object',
       properties: {
@@ -40,7 +91,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
         types: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Optional: lead, kunde, angebot, termin, rechnung',
+          description: 'Optional: lead, kunde, angebot, termin, rechnung, auftrag, todo',
         },
       },
       required: ['query'],
@@ -50,7 +101,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   {
     name: 'get_entity',
     description:
-      'Einzelnen Datensatz laden (lead, kunde, angebot, termin, rechnung). Bei Kunden: UUID, Kundennummer (KD-…) oder Name — kein erfundener Slug.',
+      'Einzelnen Datensatz laden (lead, kunde, angebot, termin, rechnung, auftrag, todo). Auftrag inkl. Positionen & HW-Zuweisungen. Bei Kunden: UUID, Kundennummer oder Name.',
     input_schema: {
       type: 'object',
       properties: {
@@ -61,6 +112,88 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['typ', 'id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'read_document',
+    description:
+      'Dokumentinhalt lesen: strukturierte Daten (Positionen/Texte) + optional PDF-Text. Typ: angebot | rechnung | vertrag | abnahme (abnahme-id = auftrag_id).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        typ: { type: 'string' },
+        id: { type: 'string' },
+        include_pdf_text: {
+          type: 'boolean',
+          description: 'default true — PDF-Text extrahieren wenn pdf_url vorhanden',
+        },
+      },
+      required: ['typ', 'id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_todos',
+    description:
+      'To-dos laden. nur_wichtige=true → Priorität hoch oder fällig ≤3 Tage / überfällig. Für „Was braucht Aufmerksamkeit?“',
+    input_schema: {
+      type: 'object',
+      properties: {
+        nur_wichtige: { type: 'boolean' },
+        erledigt: { type: 'boolean', description: 'default false; true = erledigt; weglassen = offen' },
+        kunde_id: { type: 'string' },
+        lead_id: { type: 'string' },
+        auftrag_id: { type: 'string' },
+        limit: { type: 'number' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'save_todo',
+    description: 'To-do anlegen oder aktualisieren',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'nur bei Update' },
+        titel: { type: 'string' },
+        beschreibung: { type: 'string' },
+        faellig_am: { type: 'string', description: 'yyyy-mm-dd' },
+        prioritaet: { type: 'string', description: 'niedrig | normal | hoch' },
+        kunde_id: { type: 'string' },
+        lead_id: { type: 'string' },
+        auftrag_id: { type: 'string' },
+        handwerker_id: { type: 'string' },
+        zugewiesen_an: { type: 'string' },
+      },
+      required: ['titel'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_todo_erledigt',
+    description: 'To-do als erledigt/offen markieren',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        erledigt: { type: 'boolean' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'vorschlage_handwerker_zuordnung',
+    description:
+      'Schlägt passende Handwerker je Gewerk für Angebot oder Auftrag vor (aus Positionen). Danach Zuordnung mit User bestätigen und crm_aktion assign_auftrag_handwerker_gewerk.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        angebot_id: { type: 'string' },
+        auftrag_id: { type: 'string' },
+      },
       additionalProperties: false,
     },
   },

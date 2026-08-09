@@ -1,6 +1,7 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Download, FileText, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -123,7 +124,7 @@ export function BaustelleWochenberichteCard({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-bw-border bg-bw-bg/40 p-3 space-y-3">
-        <p className="text-sm font-medium text-bw-text">Neuer Wochenbericht</p>
+        <p className="text-[length:var(--fs-text)] font-medium text-bw-text">Neuer Wochenbericht</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input
             label="Kalenderwoche"
@@ -165,10 +166,10 @@ export function BaustelleWochenberichteCard({
                 >
                   <FileText className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-bw-text">
+                    <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
                       Wochenbericht {wn} — KW {w.kalenderwoche}/{w.jahr}
                     </p>
-                    <p className="text-xs text-bw-text-muted">
+                    <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                       {formatDatum(w.von_datum)} – {formatDatum(w.bis_datum)}
                     </p>
                   </div>
@@ -266,7 +267,7 @@ export function BaustelleWochenberichteCard({
           })}
         </div>
       ) : (
-        <p className="text-sm text-bw-text-muted">Noch keine Wochenberichte.</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Wochenberichte.</p>
       )}
     </div>
   )

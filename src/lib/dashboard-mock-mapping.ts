@@ -121,3 +121,27 @@ export function isOffeneRechnungStatus(status: string | null | undefined): boole
   const s = String(status ?? '').toLowerCase()
   return s === 'gesendet'
 }
+
+/** Gesendet + Fälligkeit überschritten (My Work / KPI). */
+export function isUeberfaelligeRechnung(input: {
+  status: string | null | undefined
+  faellig_am?: string | null
+}): boolean {
+  const st = String(input.status ?? '').toLowerCase()
+  if (st !== 'gesendet') return false
+  const f = input.faellig_am?.slice(0, 10)
+  if (!f) return false
+  const heute = new Date().toISOString().slice(0, 10)
+  return f < heute
+}
+
+/** Angebot beim Kunden — keine Annahme/Ablehnung (W2-02). */
+export function isAngebotWartetAufKundeStatus(
+  status: string | null | undefined,
+  statusEinfach?: string | null
+): boolean {
+  const fine = String(status ?? '').toLowerCase()
+  if (fine === 'gesendet_kunde' || fine === 'gesendet') return true
+  const einfach = String(statusEinfach ?? '').toLowerCase()
+  return einfach === 'gesendet'
+}

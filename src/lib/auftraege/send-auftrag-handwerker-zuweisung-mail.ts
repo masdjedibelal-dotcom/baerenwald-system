@@ -38,6 +38,7 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
       betreff?: string
       defaultTo?: string[]
       defaultCc?: string[]
+      emailLogId?: string | null
     }
   | { ok: false; message: string; portalLink?: string }
 > {
@@ -161,5 +162,5 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
     return { ok: false, message: mailRes.error ?? 'E-Mail-Versand fehlgeschlagen', portalLink }
   }
 
-  return { ok: true, portalLink, gesendet: true }
+  return { ok: true, portalLink, gesendet: true, emailLogId: mailRes.emailLogId ?? null }
 }

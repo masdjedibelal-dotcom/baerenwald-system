@@ -1,16 +1,22 @@
 "use client";
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from 'react';
 import {
   deleteLeadDokument,
   insertLeadDokument,
 } from "@/app/(dashboard)/anfragen/dokumente-actions";
 import { toast } from "@/components/ui/app-toast";
+import {
+  rechnungIstAlsAkteUnterlage,
+} from "@/lib/auftraege/auftrag-dokumente-helpers";
+import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan";
 import type { LeadDokumentRow } from "@/lib/types";
 import { MockDokumenteCard } from "@/components/mock-ui/MockDetailCards";
 import { MockIcon } from "@/components/mock-ui/MockIcon";
 import { MockBtn } from "@/components/mock-ui/MockPrimitives";
-import { MockModal } from "@/components/mock-ui/MockModal";
+import { DokMobileCard } from "@/components/ui/DokMobileCard";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { cn } from "@/lib/utils";
 
 type AngebotKurz = {
@@ -20,29 +26,32 @@ type AngebotKurz = {
   pdf_url?: string | null;
 };
 
+type RechnungKurz = {
+  id: string;
+  created_at?: string | null;
+  rechnungsnummer?: string | null;
+  status?: string | null;
+  rechnungsdatum?: string | null;
+  gesendet_at?: string | null;
+  pdf_url?: string | null;
+  rechnung_art?: string | null;
+  abschlag_index?: number | null;
+  beleg_typ?: string | null;
+};
+
 type DocRow = {
   id: string;
   name: string;
   href: string;
   created_at: string;
   groesse_bytes: number | null;
-  quelle: "upload" | "angebot";
+  quelle: "upload" | "angebot" | "rechnung";
   dokumentId?: string;
   beschreibung: string;
   freigabe: boolean;
 };
 
-type ViewState = {
-  id: string;
-  name: string;
-  url: string;
-  isImage: boolean;
-  date: string;
-  size: string | null;
-  beschreibung: string;
-};
-
-const COLS = "28px 1.6fr 1fr 120px 110px 70px";
+const COLS = "minmax(0, 1fr) auto auto";
 
 function formatBytes(n: number | null | undefined): string | null {
   if (n == null || n <= 0) return null;
@@ -63,30 +72,37 @@ function formatDatum(iso: string): string {
   }
 }
 
-function isImageDoc(name: string, url: string): boolean {
-  return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(`${name} ${url}`);
+function openDokumentDatei(url: string) {
+  const href = url.trim();
+  if (!href) return;
+  window.open(href, "_blank", "noopener,noreferrer");
 }
 
 export function AnfrageDokumenteTab({
   leadId,
   dokumente,
   angebote,
+  rechnungen = [],
+  immerRechnungIds = [],
   onReload,
 }: {
-  leadId: string;
-  dokumente: LeadDokumentRow[];
-  angebote: AngebotKurz[];
-  onReload: () => void;
+  leadId: string
+  dokumente: LeadDokumentRow[]
+  angebote: AngebotKurz[]
+  rechnungen?: RechnungKurz[]
+  /** Auch Entwürfe / sonst ausgefilterte Rechnungen (z. B. aktuelle RE in der Akte). */
+  immerRechnungIds?: string[]
+  onReload: () => void
 }) {
   const [meta, setMeta] = useState<
     Record<string, { name?: string; beschreibung: string; freigabe: boolean; created_at?: string }>
   >({});
   const [editId, setEditId] = useState<string | null>(null);
-  const [view, setView] = useState<ViewState | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const docs = useMemo((): DocRow[] => {
     const rows: DocRow[] = dokumente.map((d) => {
@@ -122,10 +138,41 @@ export function AnfrageDokumenteTab({
       });
     }
 
+    for (const r of rechnungen) {
+      const force = immerRechnungIds.includes(r.id)
+      if (!force && !rechnungIstAlsAkteUnterlage(r)) continue
+      const id = `rechnung-${r.id}`
+      const m = meta[id]
+      const st = (r.status ?? "").toLowerCase()
+      const art =
+        (r.beleg_typ ?? "").toLowerCase() === "gutschrift"
+          ? "Gutschrift"
+          : rechnungDokumentBezeichnung(r.rechnung_art, r.abschlag_index)
+      const defaultName = r.rechnungsnummer?.trim() || art
+      const defaultBeschreibung = force && st === "entwurf"
+        ? "Rechnungs-PDF"
+        : `${art} · ${st || "—"}`
+      rows.push({
+        id,
+        name: m?.name?.trim() || defaultName,
+        href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
+        created_at:
+          m?.created_at ||
+          r.gesendet_at ||
+          r.rechnungsdatum ||
+          r.created_at ||
+          new Date().toISOString(),
+        groesse_bytes: null,
+        quelle: "rechnung",
+        beschreibung: m?.beschreibung?.trim() || defaultBeschreibung,
+        freigabe: m?.freigabe ?? (st === "gesendet" || st === "bezahlt" || st === "versendet"),
+      })
+    }
+
     return rows.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-  }, [dokumente, angebote, meta]);
+    )
+  }, [dokumente, angebote, rechnungen, immerRechnungIds, meta])
 
   const upd = (id: string, patch: Partial<{ name: string; beschreibung: string; freigabe: boolean; created_at: string }>) => {
     setMeta((prev) => {
@@ -186,189 +233,159 @@ export function AnfrageDokumenteTab({
       }
       toast.success("Dokument gelöscht");
       if (editId === row.id) setEditId(null);
-      if (view?.id === row.id) setView(null);
       onReload();
     });
   }
-
-  const openView = (d: DocRow) => {
-    setView({
-      id: d.id,
-      name: d.name,
-      url: d.href,
-      isImage: isImageDoc(d.name, d.href),
-      date: formatDatum(d.created_at),
-      size: formatBytes(d.groesse_bytes),
-      beschreibung: d.beschreibung,
-    });
-  };
 
   const busy = uploading || pending;
 
   return (
     <>
       <MockDokumenteCard count={docs.length}>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.files?.length) void uploadFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
+        {!isMobile ? (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                if (e.target.files?.length) void uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
 
-        <div
-          className={cn(
-            "dok-upload-zone",
-            dragOver && "dok-upload-zone-active",
-            busy && "pointer-events-none opacity-60",
-          )}
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              inputRef.current?.click();
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files);
-          }}
-        >
-          <MockIcon ctx="btn" n="cloud-upload" size={18} />
-          {uploading ? "Wird hochgeladen…" : "Dateien hier ablegen oder klicken"}
-        </div>
-
-        {docs.length === 0 ? null : (
-          <div className="dok-list">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Beschreibung</div>
-              <div>Datum</div>
-              <div>Freigabe</div>
-              <div />
+            <div
+              className={cn(
+                "dok-upload-zone",
+                dragOver && "dok-upload-zone-active",
+                busy && "pointer-events-none opacity-60",
+              )}
+              role="button"
+              tabIndex={0}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                if (e.dataTransfer.files?.length) void uploadFiles(e.dataTransfer.files);
+              }}
+            >
+              <MockIcon ctx="btn" n="cloud-upload" size={18} />
+              {uploading ? "Wird hochgeladen…" : "Dateien hier ablegen oder klicken"}
             </div>
+          </>
+        ) : null}
+
+        {docs.length === 0 ? (
+          <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
+            {isMobile
+              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
+              : 'Noch keine Dokumente.'}
+          </p>
+        ) : isMobile ? (
+          <div className="dok-cards">
+            {docs.map((d) => {
+              const sizeLabel = formatBytes(d.groesse_bytes);
+              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
+              return (
+                <DokMobileCard
+                  key={d.id}
+                  title={d.name}
+                  meta={meta}
+                  onClick={() => openDokumentDatei(d.href)}
+                  badge={
+                    <span className={cn("dok-card__tag", d.freigabe && "is-kunde")}>
+                      {d.freigabe ? "Kunde" : "intern"}
+                    </span>
+                  }
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="dok-list">
             {docs.map((d) => {
               const editing = editId === d.id;
               const sizeLabel = formatBytes(d.groesse_bytes);
-              const isFoto = isImageDoc(d.name, d.href);
+              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
               return (
                 <div
                   key={d.id}
-                  className="list-row"
+                  className={cn("list-row", !editing && "dok-list__row--openable")}
                   style={{
                     gridTemplateColumns: COLS,
-                    cursor: "default",
-                    alignItems: editing ? "start" : "center",
+                    cursor: editing ? "default" : "pointer",
+                    alignItems: "center",
+                  }}
+                  role={editing ? undefined : "button"}
+                  tabIndex={editing ? undefined : 0}
+                  onClick={() => {
+                    if (!editing) openDokumentDatei(d.href);
+                  }}
+                  onKeyDown={(e) => {
+                    if (editing) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openDokumentDatei(d.href);
+                    }
                   }}
                 >
-                  <MockIcon
-                    ctx="row"
-                    n={isFoto ? "photo" : "file-text"}
-                    size={18}
-                    style={{ color: "var(--text-3)" }}
-                  />
                   {editing ? (
-                    <input
-                      className="txt"
-                      value={d.name}
-                      onChange={(e) => upd(d.id, { name: e.target.value })}
-                      style={{ height: 30 }}
-                      autoFocus
-                    />
-                  ) : (
                     <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
+                      className="dok-list__main min-w-0"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
                     >
-                      {d.name}
-                      {sizeLabel ? (
-                        <span style={{ color: "var(--text-4)", fontWeight: 400 }}>
-                          {" "}
-                          · {sizeLabel}
-                        </span>
-                      ) : null}
+                      <input
+                        className="txt"
+                        value={d.name}
+                        onChange={(e) => upd(d.id, { name: e.target.value })}
+                        style={{ height: 30 }}
+                        autoFocus
+                      />
                     </div>
-                  )}
-                  {editing ? (
-                    <input
-                      className="txt"
-                      value={d.beschreibung}
-                      onChange={(e) => upd(d.id, { beschreibung: e.target.value })}
-                      placeholder="Beschreibung…"
-                      style={{ height: 30 }}
-                    />
                   ) : (
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        color: "var(--text-3)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {d.beschreibung || (
-                        <span style={{ color: "var(--text-4)" }}>—</span>
-                      )}
-                    </div>
-                  )}
-                  {editing ? (
-                    <input
-                      className="txt"
-                      type="date"
-                      defaultValue={d.created_at.slice(0, 10)}
-                      onChange={(e) => {
-                        if (!e.target.value) return;
-                        upd(d.id, {
-                          created_at: new Date(e.target.value).toISOString(),
-                        });
-                      }}
-                      style={{ height: 30, fontSize: 12 }}
-                    />
-                  ) : (
-                    <div style={{ fontSize: 12, color: "var(--text-3)" }}>
-                      {formatDatum(d.created_at)}
+                    <div className="dok-list__main min-w-0">
+                      <div className="dok-list__name">
+                        {d.name}
+                        {meta ? (
+                          <span className="dok-list__name-size"> · {meta}</span>
+                        ) : null}
+                      </div>
                     </div>
                   )}
                   <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      cursor: "pointer",
-                      fontSize: 11.5,
-                    }}
+                    className="dok-list__freigabe"
+                    style={{ cursor: "pointer" }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={d.freigabe}
                       onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
-                      style={{ accentColor: "var(--green)", margin: 0 }}
                     />
-                    <span style={{ color: d.freigabe ? "var(--green)" : "var(--text-3)" }}>
+                    <span className={d.freigabe ? "is-kunde" : undefined}>
                       {d.freigabe ? "Kunde" : "intern"}
                     </span>
                   </label>
-                  <div style={{ display: "flex", gap: 0, justifyContent: "flex-end" }}>
+                  <div
+                    className="dok-list__actions"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     {editing ? (
                       <MockBtn
                         sm
@@ -383,7 +400,7 @@ export function AnfrageDokumenteTab({
                         kind="ghost"
                         icon="eye"
                         title="Ansehen"
-                        onClick={() => openView(d)}
+                        onClick={() => openDokumentDatei(d.href)}
                       />
                     )}
                     {d.quelle === "upload" ? (
@@ -393,11 +410,10 @@ export function AnfrageDokumenteTab({
                         icon="trash"
                         title="Löschen"
                         disabled={busy}
+                        className="dok-list__action--extra"
                         onClick={() => removeDoc(d)}
                       />
-                    ) : (
-                      <span style={{ width: 28 }} />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );
@@ -405,81 +421,6 @@ export function AnfrageDokumenteTab({
           </div>
         )}
       </MockDokumenteCard>
-
-      <MockModal
-        open={!!view}
-        onClose={() => setView(null)}
-        icon={view?.isImage ? "photo" : "file-text"}
-        title={view?.name ?? "Dokument"}
-        sub={
-          view ? `${view.date}${view.size ? ` · ${view.size}` : ""}` : undefined
-        }
-        footer={
-          <>
-            <MockBtn
-              sm
-              kind="ghost"
-              icon="pencil"
-              onClick={() => {
-                if (!view) return;
-                setEditId(view.id);
-                setView(null);
-              }}
-            >
-              Bearbeiten
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn sm kind="primary" icon="x" onClick={() => setView(null)}>
-              Schließen
-            </MockBtn>
-          </>
-        }
-      >
-        {view ? (
-          view.isImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={view.url}
-              alt={view.name}
-              style={{ width: "100%", borderRadius: 8, display: "block" }}
-            />
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                background: "var(--bg-soft)",
-                borderRadius: 10,
-                border: "0.5px solid var(--border)",
-              }}
-            >
-              <MockIcon
-                ctx="empty"
-                n="file-text"
-                size={44}
-                style={{ color: "var(--text-4)" }}
-              />
-              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 10 }}>{view.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>
-                <a
-                  href={view.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn ghost sm"
-                  style={{ marginTop: 12, display: "inline-flex" }}
-                >
-                  Datei öffnen
-                </a>
-              </div>
-            </div>
-          )
-        ) : null}
-        {view?.beschreibung ? (
-          <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 12 }}>
-            {view.beschreibung}
-          </div>
-        ) : null}
-      </MockModal>
     </>
   );
 }

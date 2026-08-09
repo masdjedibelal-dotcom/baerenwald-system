@@ -626,11 +626,11 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               Gesetzliche Grundlage ist in der Datenbank hinterlegt und wird hier nicht geändert.
             </p>
             <div className="mt-4 flex gap-2">
-              <Button type="button" variant="primary" loading={busy === 'frist'} onClick={() => void saveFrist()}>
-                Speichern
-              </Button>
               <Button type="button" variant="secondary" onClick={() => setFristModal(null)}>
                 Abbrechen
+              </Button>
+              <Button type="button" variant="primary" loading={busy === 'frist'} onClick={() => void saveFrist()}>
+                Speichern
               </Button>
             </div>
           </>
@@ -670,11 +670,11 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               <Textarea value={aufschubText} onChange={(e) => setAufschubText(e.target.value)} rows={4} />
             </label>
             <div className="mt-3 flex gap-2">
-              <Button type="button" variant="primary" loading={busy === 'aufschub'} onClick={() => void runAufschub()}>
-                Speichern
-              </Button>
               <Button type="button" variant="secondary" onClick={() => setAufschubModal(null)}>
                 Abbrechen
+              </Button>
+              <Button type="button" variant="primary" loading={busy === 'aufschub'} onClick={() => void runAufschub()}>
+                Speichern
               </Button>
             </div>
           </>
@@ -722,11 +722,11 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
           </label>
         </div>
         <div className="mt-4 flex gap-2">
-          <Button type="button" variant="primary" loading={busy === 'anfrage'} onClick={() => void runCreateAnfrage()}>
-            Speichern
-          </Button>
           <Button type="button" variant="secondary" onClick={() => setAnfrageOpen(false)}>
             Abbrechen
+          </Button>
+          <Button type="button" variant="primary" loading={busy === 'anfrage'} onClick={() => void runCreateAnfrage()}>
+            Speichern
           </Button>
         </div>
       </Modal>
@@ -757,11 +757,11 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
               </label>
             </div>
             <div className="mt-4 flex gap-2">
-              <Button type="button" variant="primary" loading={busy === 'edit-anfrage'} onClick={() => void runSaveAnfrage()}>
-                Speichern
-              </Button>
               <Button type="button" variant="secondary" onClick={() => setEditAnfrage(null)}>
                 Abbrechen
+              </Button>
+              <Button type="button" variant="primary" loading={busy === 'edit-anfrage'} onClick={() => void runSaveAnfrage()}>
+                Speichern
               </Button>
             </div>
           </>

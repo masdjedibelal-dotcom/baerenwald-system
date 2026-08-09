@@ -4,10 +4,16 @@ import plugin from 'tailwindcss/plugin'
 
 /** CSS-Var-Farbe mit Tailwind-/Opacity-Support (`bg-bw-border/50`). */
 function withAlpha(cssVar: string) {
-  return ({ opacityValue }: { opacityValue?: string }) =>
-    opacityValue === undefined
-      ? `var(${cssVar})`
-      : `color-mix(in srgb, var(${cssVar}) ${Number(opacityValue) * 100}%, transparent)`
+  return ({ opacityValue }: { opacityValue?: string }) => {
+    if (opacityValue === undefined) return `var(${cssVar})`
+    // Tailwind übergibt oft `var(--tw-*-opacity)` — Number() → NaN → transparenter Hintergrund.
+    if (/var\s*\(/.test(opacityValue)) {
+      return `color-mix(in srgb, var(${cssVar}) calc(${opacityValue} * 100%), transparent)`
+    }
+    const n = Number(opacityValue)
+    if (Number.isNaN(n)) return `var(${cssVar})`
+    return `color-mix(in srgb, var(${cssVar}) ${n * 100}%, transparent)`
+  }
 }
 
 /**
@@ -36,6 +42,11 @@ const config: Config = {
         'bw-bg-soft': withAlpha('--bg-soft'),
         'bw-card': withAlpha('--card'),
         'bw-hover': withAlpha('--bg-soft'),
+        /** Surface-Stufen — Alias auf bestehende Tokens (kein zweites Farbsystem) */
+        'bw-surface': withAlpha('--card'),
+        'bw-surface-2': withAlpha('--bg-soft'),
+        'bw-surface-alt': withAlpha('--bg-soft'),
+        'bw-muted': withAlpha('--text-3'),
         'bw-border': withAlpha('--border'),
         'bw-border-strong': withAlpha('--border-strong'),
         'bw-text': withAlpha('--text'),
@@ -113,6 +124,14 @@ const config: Config = {
       },
       borderWidth: {
         hairline: '0.5px',
+      },
+      zIndex: {
+        header: '20',
+        sidepanel: '40',
+        'sidepanel-pop': '45',
+        modal: '500',
+        search: '100',
+        toast: '1100',
       },
       boxShadow: {
         sm: '0 1px 2px rgba(0,0,0,0.05)',

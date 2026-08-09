@@ -18,7 +18,11 @@ export function AppDetailScreen({
   return (
     <div className={cn('app-detail-screen space-y-3 pb-6', className)}>
       {header}
-      {tabs ? <div className="app-detail-tabs sticky top-0 z-[2] bg-bw-bg py-1">{tabs}</div> : null}
+      {tabs ? (
+        <div className="app-detail-tabs sticky top-0 z-[2] bg-[var(--bg)] py-1 max-[767px]:bg-[var(--bg-soft)]">
+          {tabs}
+        </div>
+      ) : null}
       <div className="app-detail-body min-w-0 space-y-3">{children}</div>
     </div>
   )

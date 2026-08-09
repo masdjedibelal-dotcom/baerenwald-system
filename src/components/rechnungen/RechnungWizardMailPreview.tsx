@@ -7,6 +7,7 @@ import { mailIframeSrcDoc } from '@/lib/mail/mail-iframe-srcdoc'
 /** Echte Kunden-Mail wie beim Versand (gleiche Vorlage wie sendRechnung). */
 export function RechnungWizardMailPreview({
   rechnungId,
+  kundeId,
   betreff,
   einleitung,
   brutto,
@@ -16,6 +17,8 @@ export function RechnungWizardMailPreview({
   empfaengerHint,
 }: {
   rechnungId: string | null
+  /** Für Draft-Vorschau ohne gespeicherte Rechnung (z. B. FAB-Direktrechnung). */
+  kundeId?: string | null
   betreff?: string
   einleitung?: string | null
   brutto?: number
@@ -30,20 +33,14 @@ export function RechnungWizardMailPreview({
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!rechnungId) {
-      setHtml('')
-      setResolvedBetreff('')
-      setError(null)
-      return
-    }
-
     let cancelled = false
     const timer = window.setTimeout(() => {
       setLoading(true)
       void previewRechnungKundeMail({
-        rechnungId,
+        rechnungId: rechnungId?.trim() || null,
+        kundeId: kundeId?.trim() || null,
         betreff: betreff?.trim() || undefined,
-        einleitung,
+        einleitung: einleitung?.trim() ? einleitung : null,
         brutto,
         faelligAm,
         projektTitel,
@@ -69,6 +66,7 @@ export function RechnungWizardMailPreview({
     }
   }, [
     rechnungId,
+    kundeId,
     betreff,
     einleitung,
     brutto,
@@ -81,7 +79,7 @@ export function RechnungWizardMailPreview({
     <div style={{ display: 'grid', gap: 8, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div
         style={{
-          fontSize: 12,
+          fontSize: 'var(--fs-meta)',
           color: 'var(--text-3)',
           display: 'flex',
           flexDirection: 'column',
@@ -105,7 +103,7 @@ export function RechnungWizardMailPreview({
             borderRadius: 8,
             border: '0.5px solid var(--border)',
             background: 'var(--bg-soft)',
-            fontSize: 13,
+            fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
           }}
         >
@@ -114,7 +112,7 @@ export function RechnungWizardMailPreview({
       ) : (
         <iframe
           title="E-Mail-Vorschau Rechnung"
-          sandbox=""
+          sandbox="allow-same-origin"
           style={{
             width: '100%',
             height: 'min(520px, 55vh)',
@@ -124,11 +122,7 @@ export function RechnungWizardMailPreview({
           }}
           srcDoc={mailIframeSrcDoc(
             html,
-            !rechnungId
-              ? 'Rechnung wird gespeichert…'
-              : loading
-                ? 'Echte E-Mail-Vorlage lädt…'
-                : 'Vorschau lädt…'
+            loading ? 'Echte E-Mail-Vorlage lädt…' : 'Vorschau lädt…'
           )}
         />
       )}

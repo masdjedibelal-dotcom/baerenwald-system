@@ -7,6 +7,7 @@ import { FilterChips } from '@/components/ui/FilterChips'
 import { ComplianceEinstellungenClient } from '@/components/einstellungen/ComplianceEinstellungenClient'
 import { CustomFieldsEinstellungenClient } from '@/components/einstellungen/CustomFieldsEinstellungenClient'
 import { DatenschutzPageClient } from '@/components/datenschutz/DatenschutzPageClient'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import type { ComplianceTypRow } from '@/app/(dashboard)/einstellungen/compliance/actions'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
 import type {
@@ -90,7 +91,7 @@ function IntegrationInner({ compliance, felder, datenschutz }: Props) {
 
 export function EinstellungenIntegrationClient(props: Props) {
   return (
-    <Suspense fallback={<p className="text-sm text-bw-text-muted">Laden …</p>}>
+    <Suspense fallback={<CrmInlineLoading label="Einstellungen werden geladen …" minHeight={120} />}>
       <IntegrationInner {...props} />
     </Suspense>
   )

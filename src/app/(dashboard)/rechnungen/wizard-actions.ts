@@ -4,12 +4,16 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
+  createGutschriftFromRechnung,
   createRechnungEntwurf,
   sendRechnung,
   updateRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
-import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import {
+  aggregateRegieBeschreibungFromEintraege,
+  auftragPositionenToAngebotPositionen,
+} from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -24,7 +28,13 @@ import {
   type AbschlagRechnungEntwurf,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
+import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
+import {
+  rechnungMaterialFingerprint,
+  rechnungBrauchtStornoBeiAenderung,
+  type RechnungMaterialSnapshot,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import {
   abschlagTextKontextFromWizard,
   defaultAbschlagMailBetreff,
@@ -37,26 +47,49 @@ import {
   auftragSummenAusPositionen,
   berechneBereitsGestellt,
   berechneZahlungsplan,
+  naechsteAbschlagZumVersenden,
   naechsteOffeneAbschlagZeile,
   parseZahlungsplan,
   abschlagZahlungstextFuerRechnung,
+  istAbschlagPauschalPosition,
+  berechneSchlussAbrechnung,
   positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
   rechnungPositionenMitAuftrag,
   resolveAnredeKey,
   standardRechnungZahlungstext,
+  validateGestellteRechnungenGegenVk,
+  zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
   type ZahlungsplanZeileBerechnet,
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import { maybeUpgradeLegacyRechnungsnummer } from '@/lib/rechnungen/next-rechnungsnummer'
+import {
+  maybeUpgradeLegacyRechnungsnummer,
+  nextRechnungsnummerAusDb,
+} from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
+
+/** Vorschau der nächsten fortlaufenden Nummer (für neuen Wizard ohne Entwurf). */
+export async function previewNaechsteRechnungsnummer(): Promise<
+  { ok: true; nummer: string } | { ok: false; message: string }
+> {
+  try {
+    const nummer = await nextRechnungsnummerAusDb(supabaseAdmin)
+    return { ok: true, nummer }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Nummer nicht ermittelbar',
+    }
+  }
+}
 
 export type SaveRechnungWizardDraftPayload = {
   rechnungId?: string | null
@@ -74,6 +107,58 @@ export type SaveRechnungWizardDraftPayload = {
   zahlungsplan?: Zahlungsplan | null
   zahlungsplanSpeichern?: boolean
   versandZeileId?: string | null
+  ist_wiederkehrend?: boolean
+  wiederkehr_turnus?: string | null
+  /** Manuell gesetzte Nummer (RE2026-… oder Suffix); fortlaufend ab dort. */
+  rechnungsnummer?: string | null
+}
+
+function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterialSnapshot {
+  return {
+    positionen: rec.positionen,
+    reverse_charge_13b: Boolean(rec.reverse_charge_13b),
+    hinweis_35a: Boolean(rec.hinweis_35a),
+    rechnungsdatum: String(rec.rechnungsdatum ?? ''),
+    leistungszeitraum_von: String(rec.leistungszeitraum_von ?? ''),
+    leistungszeitraum_bis: String(rec.leistungszeitraum_bis ?? ''),
+    faellig_am: String(rec.faellig_am ?? ''),
+    zahlungsbedingungen: String(rec.zahlungsbedingungen ?? ''),
+    einleitung: String(rec.einleitung ?? ''),
+    hinweise: String(rec.hinweise ?? ''),
+  }
+}
+
+function materialSnapshotFromWizardPayload(
+  positionen: AngebotPosition[],
+  meta: RechnungWizardMeta
+): RechnungMaterialSnapshot {
+  return {
+    positionen,
+    reverse_charge_13b: meta.reverse_charge_13b,
+    hinweis_35a: meta.hinweis_35a,
+    rechnungsdatum: meta.rechnungsdatum,
+    leistungszeitraum_von: meta.leistungszeitraum_von,
+    leistungszeitraum_bis: meta.leistungszeitraum_bis,
+    faellig_am: meta.faellig_am,
+    zahlungsbedingungen: meta.zahlungsbedingungen,
+    einleitung: meta.einleitung,
+    hinweise: meta.hinweise,
+  }
+}
+
+function korrekturKontextFromRec(
+  rec: Record<string, unknown>,
+  snapshot?: RechnungMaterialSnapshot
+): NonNullable<RechnungWizardBootstrap['korrekturKontext']> | null {
+  const status = String(rec.status ?? '').toLowerCase()
+  if (status !== 'gesendet' && status !== 'bezahlt' && status !== 'versendet') return null
+  return {
+    originalStatus: status,
+    originalNr: String(rec.rechnungsnummer ?? '').trim() || 'Rechnung',
+    materialFingerprint: rechnungMaterialFingerprint(
+      snapshot ?? materialSnapshotFromRec(rec)
+    ),
+  }
 }
 
 async function positionenAusAuftrag(
@@ -90,6 +175,8 @@ async function positionenAusAuftrag(
   zahlungsplan: Zahlungsplan | null
   gesamtNetto: number
   gesamtBrutto: number
+  ist_wiederkehrend: boolean
+  wiederkehr_turnus: string | null
 }> {
   const gewerke = await loadGewerkeAusfuehrung(supabase)
 
@@ -100,11 +187,14 @@ async function positionenAusAuftrag(
       id,
       created_at,
       kunde_id,
+      lead_id,
       angebot_id,
       titel,
       start_datum,
       end_datum,
       zahlungsplan,
+      ist_wiederkehrend,
+      wiederkehr_turnus,
       angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan),
       auftrag_positionen(*)
     `
@@ -116,15 +206,52 @@ async function positionenAusAuftrag(
     console.error('[positionenAusAuftrag]', auftragId, error.message)
     throw new Error(error.message || 'Auftrag konnte nicht geladen werden.')
   }
-  if (!auf?.kunde_id) {
+  if (!auf) {
+    throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
+  }
+  if (!auf.kunde_id && !(auf as { lead_id?: string | null }).lead_id) {
     throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
   }
 
   const auftragPos = (auf.auftrag_positionen ?? []) as AuftragPosition[]
   let positionen: AngebotPosition[] = []
   if (auftragPos.length > 0) {
+    const regieIds = auftragPos
+      .filter((p) => String(p.typ ?? '').toLowerCase() === 'regie' || p.verguetung === 'aufwand')
+      .map((p) => p.id)
+    const regieZeitMinutenByPositionId: Record<string, number> = {}
+    const regieBeschreibungByPositionId: Record<string, string> = {}
+    if (regieIds.length) {
+      const { data: eintraege } = await supabase
+        .from('position_eintraege')
+        .select('position_id, zeit_minuten, beschreibung, typ, created_at')
+        .in('position_id', regieIds)
+        .order('created_at', { ascending: true })
+      for (const e of eintraege ?? []) {
+        const pid = String((e as { position_id?: string }).position_id ?? '')
+        if (!pid) continue
+        regieZeitMinutenByPositionId[pid] =
+          (regieZeitMinutenByPositionId[pid] ?? 0) +
+          (Number((e as { zeit_minuten?: number | null }).zeit_minuten) || 0)
+      }
+      Object.assign(
+        regieBeschreibungByPositionId,
+        aggregateRegieBeschreibungFromEintraege(
+          (eintraege ?? []) as Array<{
+            position_id?: string | null
+            beschreibung?: string | null
+            zeit_minuten?: number | null
+            typ?: string | null
+            created_at?: string | null
+          }>
+        )
+      )
+    }
     positionen = sanitizeAngebotPositionenForExport(
-      auftragPositionenToAngebotPositionen(auftragPos),
+      auftragPositionenToAngebotPositionen(auftragPos, {
+        regieZeitMinutenByPositionId,
+        regieBeschreibungByPositionId,
+      }),
       gewerke
     )
   } else {
@@ -152,7 +279,8 @@ async function positionenAusAuftrag(
     }) || null
 
   const angZahlung = angJoin as { zahlungsbedingungen?: string | null; zahlungsplan?: unknown } | null
-  let zahlungsplan = parseZahlungsplan(auf.zahlungsplan) ?? parseZahlungsplan(angZahlung?.zahlungsplan)
+  // Spec Q2: Vorschlag nur vom Angebot; auftraege.zahlungsplan wird nicht gelesen
+  let zahlungsplan = parseZahlungsplan(angZahlung?.zahlungsplan)
   if (!zahlungsplan && angZahlung?.zahlungsbedingungen === 'anzahlung_50') {
     zahlungsplan = zahlungsplanVorlage50_50()
   }
@@ -160,10 +288,23 @@ async function positionenAusAuftrag(
   const summen = auftragSummenAusPositionen(positionen)
   const kontext = zahlungsplan ? berechneZahlungsplan(zahlungsplan, summen.netto) : null
 
+  const kundeId =
+    (await resolveVertragsKundeIdForLead(
+      supabase,
+      (auf as { lead_id?: string | null }).lead_id,
+      auf.kunde_id as string | null
+    )) ?? (auf.kunde_id as string)
+
+  if (!kundeId) {
+    throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
+  }
+
+  const aufW = auf as { ist_wiederkehrend?: boolean | null; wiederkehr_turnus?: string | null }
+
   return {
     positionen,
     angebot_id: (auf.angebot_id as string | null) ?? null,
-    kunde_id: auf.kunde_id as string,
+    kunde_id: kundeId,
     auftragsReferenz,
     projektTitel,
     leistungszeitraum_von: (auf.start_datum as string | null) ?? null,
@@ -171,6 +312,8 @@ async function positionenAusAuftrag(
     zahlungsplan,
     gesamtNetto: summen.netto,
     gesamtBrutto: kontext?.gesamtBrutto ?? summen.brutto,
+    ist_wiederkehrend: aufW.ist_wiederkehrend === true,
+    wiederkehr_turnus: aufW.wiederkehr_turnus ?? null,
   }
 }
 
@@ -180,9 +323,25 @@ async function rechnungenAbschlagLinks(
 ) {
   const { data } = await supabase
     .from('rechnungen')
-    .select('id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto')
+    .select(
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer'
+    )
     .eq('auftrag_id', auftragId)
   return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
+}
+
+function berechneZahlungsplanMitIst(
+  plan: Zahlungsplan,
+  gesamtNetto: number,
+  rechnungen: import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[],
+  mwstSatz = 19
+) {
+  return berechneZahlungsplan(
+    plan,
+    gesamtNetto,
+    mwstSatz,
+    zahlplanAbgerechnetAusLinks(rechnungen)
+  )
 }
 
 function abschlagMetaDefaults(
@@ -315,24 +474,36 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           message: 'Kein Abschlagsplan hinterlegt. Bitte zuerst einen Zahlplan anlegen.',
         }
       }
-      const kontext = berechneZahlungsplan(gespeicherterPlan, basis.gesamtNetto)
-      const zeile = opts?.abschlagZeileId?.trim()
-        ? kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
-        : naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
-      if (!zeile) {
+      const kontext = berechneZahlungsplanMitIst(
+        gespeicherterPlan,
+        basis.gesamtNetto,
+        rechnungen
+      )
+      const versand = opts?.abschlagZeileId?.trim()
+        ? (() => {
+            const zeile =
+              kontext.zeilen.find((z) => z.id === opts.abschlagZeileId!.trim()) ?? null
+            if (!zeile) return null
+            if (abschlagBereitsAbgerechnet(zeile.id, rechnungen)) return null
+            const draft = rechnungen.find(
+              (r) =>
+                r.zahlungsplan_abschlag_id === zeile.id &&
+                String(r.status ?? '') === 'entwurf'
+            )
+            return { zeile, rechnungId: draft?.id ?? null }
+          })()
+        : naechsteAbschlagZumVersenden(kontext, rechnungen)
+      if (!versand) {
         return {
           ok: false,
           message: opts?.abschlagZeileId?.trim()
-            ? 'Abschlag nicht gefunden.'
+            ? abschlagBereitsAbgerechnet(opts.abschlagZeileId.trim(), rechnungen)
+              ? 'Für diesen Abschlag existiert bereits eine Rechnung.'
+              : 'Abschlag nicht gefunden.'
             : 'Alle Abschläge sind bereits abgerechnet.',
         }
       }
-      if (abschlagBereitsAbgerechnet(zeile.id, rechnungen)) {
-        return {
-          ok: false,
-          message: 'Für diesen Abschlag existiert bereits eine Rechnung.',
-        }
-      }
+      const zeile = versand.zeile
       meta = {
         ...metaDefaults,
         zahlungsart: 'abschlaege',
@@ -347,7 +518,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       }
       modus = 'abschlag'
       zahlungsplan = gespeicherterPlan
-      zahlungsplanBearbeiten = false
+      // Explizite Zeile aus Zahlplan-Tab → Plan nicht erneut editieren; sonst auswählbar
+      zahlungsplanBearbeiten = !opts?.abschlagZeileId?.trim()
       abschlag = {
         zeileId: zeile.id,
         zeileIndex: zeile.index,
@@ -358,21 +530,155 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         gesamtBrutto: kontext.gesamtBrutto,
         bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
       }
+
+      let positionen = basis.positionen
+      const abschlagMeta = abschlag
+      if (abschlagMeta && zahlungsplan) {
+        const kontextPos = berechneZahlungsplanMitIst(
+          zahlungsplan,
+          basis.gesamtNetto,
+          rechnungen
+        )
+        const zeilePos = kontextPos.zeilen.find((z) => z.id === abschlagMeta.zeileId) ?? null
+        if (zeilePos) {
+          positionen = positionenFuerAbschlagRechnung({
+            zeile: zeilePos,
+            allePositionen: basis.positionen,
+            plan: zahlungsplan,
+            gesamtNetto: basis.gesamtNetto,
+            auftragsReferenz: basis.auftragsReferenz,
+            projektTitel: basis.projektTitel ?? '',
+            bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+            vorherigeAbschlaege: rechnungen,
+            ausserRechnungId: versand.rechnungId,
+          })
+        }
+      }
+
+      let rechnungId: string | null = versand.rechnungId
+      let rechnungsnummer: string | null = null
+      if (rechnungId) {
+        const { data: nrRow } = await supabase
+          .from('rechnungen')
+          .select('rechnungsnummer')
+          .eq('id', rechnungId)
+          .maybeSingle()
+        rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
+      }
+
+      return {
+        ok: true,
+        bootstrap: {
+          rechnungId,
+          rechnungsnummer,
+          auftragId,
+          angebotId: basis.angebot_id,
+          kundeId: basis.kunde_id,
+          kunde: kunde ?? null,
+          positionen,
+          meta,
+          auftragsReferenz: basis.auftragsReferenz,
+          projektTitel: basis.projektTitel,
+          modus,
+          abschlag,
+          zahlungsplan,
+          zahlungsplanBearbeiten,
+          gesamtNetto: basis.gesamtNetto,
+          rechnungenAbschlag: rechnungen,
+          ist_wiederkehrend: basis.ist_wiederkehrend,
+          wiederkehr_turnus: basis.wiederkehr_turnus,
+        },
+      }
     } else if (opts?.vollOhnePlan) {
       zahlungsplan = null
       modus = 'voll'
+    } else if (gespeicherterPlan) {
+      // Vorhandenen Abschlagsplan aus dem Auftrag immer übernehmen
+      const kontext = berechneZahlungsplanMitIst(
+        gespeicherterPlan,
+        basis.gesamtNetto,
+        rechnungen
+      )
+      const zeile = naechsteOffeneAbschlagZeile(gespeicherterPlan, kontext, rechnungen)
+      zahlungsplan = gespeicherterPlan
+      zahlungsplanBearbeiten = true
+      if (zeile && !abschlagBereitsAbgerechnet(zeile.id, rechnungen)) {
+        meta = {
+          ...metaDefaults,
+          zahlungsart: 'abschlaege',
+          abschlag_zeile_id: zeile.id,
+          zahlungsbedingungen: zahlungstextFuerAbschlagZeile(
+            gespeicherterPlan,
+            basis.gesamtNetto,
+            zt,
+            zeile
+          ),
+          faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am,
+        }
+        modus = 'abschlag'
+        abschlag = {
+          zeileId: zeile.id,
+          zeileIndex: zeile.index,
+          zeileTitel: zeile.titel,
+          rechnungArt: rechnungArtFuerZeile(zeile),
+          istSchluss: zeile.istSchluss,
+          gesamtNetto: kontext.gesamtNetto,
+          gesamtBrutto: kontext.gesamtBrutto,
+          bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+        }
+      }
+    }
+
+    let positionen = basis.positionen
+    let draftRechnungId: string | null = null
+    if (abschlag && zahlungsplan) {
+      const kontextPos = berechneZahlungsplanMitIst(
+        zahlungsplan,
+        basis.gesamtNetto,
+        rechnungen
+      )
+      const zeilePos = kontextPos.zeilen.find((z) => z.id === abschlag.zeileId) ?? null
+      if (zeilePos) {
+        const draft = rechnungen.find(
+          (r) =>
+            r.zahlungsplan_abschlag_id === zeilePos.id &&
+            String(r.status ?? '') === 'entwurf'
+        )
+        draftRechnungId = draft?.id ?? null
+        positionen = positionenFuerAbschlagRechnung({
+          zeile: zeilePos,
+          allePositionen: basis.positionen,
+          plan: zahlungsplan,
+          gesamtNetto: basis.gesamtNetto,
+          auftragsReferenz: basis.auftragsReferenz,
+          projektTitel: basis.projektTitel ?? '',
+          bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+          vorherigeAbschlaege: rechnungen,
+          ausserRechnungId: draftRechnungId,
+        })
+      }
+    }
+
+    let rechnungsnummer: string | null = null
+    if (draftRechnungId) {
+      const { data: nrRow } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', draftRechnungId)
+        .maybeSingle()
+      rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
     }
 
     return {
       ok: true,
       bootstrap: {
-        rechnungId: null,
-        rechnungsnummer: null,
+        rechnungId: draftRechnungId,
+        rechnungsnummer,
         auftragId,
         angebotId: basis.angebot_id,
         kundeId: basis.kunde_id,
         kunde: kunde ?? null,
-        positionen: basis.positionen,
+        positionen,
         meta,
         auftragsReferenz: basis.auftragsReferenz,
         projektTitel: basis.projektTitel,
@@ -382,6 +688,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         zahlungsplanBearbeiten,
         gesamtNetto: basis.gesamtNetto,
         rechnungenAbschlag: rechnungen,
+        ist_wiederkehrend: basis.ist_wiederkehrend,
+        wiederkehr_turnus: basis.wiederkehr_turnus,
       },
     }
   } catch (e) {
@@ -447,10 +755,17 @@ export async function loadRechnungWizardBootstrap(
   const kRaw = rec.kunden
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
 
+  const rechnungArt = String(rec.rechnung_art ?? 'voll')
+  const abschlagZeileIdEarly = String(rec.zahlungsplan_abschlag_id ?? '').trim() || null
+  const keepAbschlagPauschal =
+    rechnungArt === 'abschlag' ||
+    rechnungArt === 'schluss' ||
+    Boolean(abschlagZeileIdEarly)
   const positionen = repairAngebotPositionen(
     rechnungPositionenMitAuftrag(
       (rec.positionen as AngebotPosition[]) ?? [],
-      basis.positionen
+      basis.positionen,
+      { keepAbschlagPauschal }
     )
   )
 
@@ -468,9 +783,8 @@ export async function loadRechnungWizardBootstrap(
     firm,
   })
 
-  const rechnungArt = String(rec.rechnung_art ?? 'voll')
   const modus = rechnungArt === 'abschlag' || rechnungArt === 'schluss' ? 'abschlag' : 'voll'
-  const abschlagZeileId = String(rec.zahlungsplan_abschlag_id ?? '').trim() || null
+  const abschlagZeileId = abschlagZeileIdEarly
 
   const meta: RechnungWizardMeta = {
     einleitung: String(rec.einleitung ?? '').trim() || metaDefaults.einleitung,
@@ -522,6 +836,14 @@ export async function loadRechnungWizardBootstrap(
           : null,
       gesamtNetto: basis.gesamtNetto,
       rechnungenAbschlag: rechnungen,
+      ist_wiederkehrend:
+        rec.ist_wiederkehrend === true || basis.ist_wiederkehrend,
+      wiederkehr_turnus:
+        (rec.wiederkehr_turnus as string | null) ?? basis.wiederkehr_turnus,
+      korrekturKontext: korrekturKontextFromRec(
+        rec,
+        materialSnapshotFromWizardPayload(positionen, meta)
+      ),
     },
   }
 }
@@ -628,6 +950,10 @@ export async function loadRechnungWizardBootstrapStandalone(
       zahlungsplan: null,
       abschlag: null,
       gesamtNetto: berechnung.netto,
+      korrekturKontext: korrekturKontextFromRec(
+        rec,
+        materialSnapshotFromWizardPayload(positionen, meta)
+      ),
     },
   }
 }
@@ -653,10 +979,24 @@ export async function saveRechnungWizardDraft(
 
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(positionen))
 
-  const rechnungArt: 'voll' | 'abschlag' | 'schluss' =
-    abschlagAktiv || input.modus === 'abschlag'
-      ? (input.abschlag?.rechnungArt ?? 'abschlag')
-      : 'voll'
+  const rechnungArt: 'voll' | 'abschlag' | 'schluss' = (() => {
+    if (!abschlagAktiv && input.modus !== 'abschlag') return 'voll'
+    if (input.abschlag?.rechnungArt === 'schluss' || input.abschlag?.rechnungArt === 'abschlag') {
+      return input.abschlag.rechnungArt
+    }
+    const zeileId = input.meta.abschlag_zeile_id?.trim()
+    if (zeileId && input.zahlungsplan?.zeilen.length) {
+      const z = input.zahlungsplan.zeilen.find((x) => x.id === zeileId)
+      if (z) {
+        const restIdx = input.zahlungsplan.zeilen.findIndex((x) => x.typ === 'rest')
+        const idx = input.zahlungsplan.zeilen.findIndex((x) => x.id === zeileId)
+        const istSchluss =
+          z.typ === 'rest' || (restIdx === -1 && idx === input.zahlungsplan!.zeilen.length - 1)
+        return istSchluss ? 'schluss' : 'abschlag'
+      }
+    }
+    return 'abschlag'
+  })()
 
   const abschlagZeileId = input.meta.abschlag_zeile_id?.trim() || null
 
@@ -670,51 +1010,100 @@ export async function saveRechnungWizardDraft(
   )
 
   let liste_berechnung = berechnungVoll
-  if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId) {
-    const gesamtNetto = auftragSummenAusPositionen(positionen).netto
-    const kontext = berechneZahlungsplan(input.zahlungsplan, gesamtNetto)
+  let positionenFuerBeleg = positionen
+  if (abschlagAktiv && input.zahlungsplan?.zeilen.length && abschlagZeileId && input.auftrag_id?.trim()) {
+    const links = await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id)
+    let gesamtNetto = auftragSummenAusPositionen(positionen).netto
+    let auftragPositionen = positionen
+    try {
+      const basis = await positionenAusAuftrag(supabaseForBerechnung, input.auftrag_id)
+      gesamtNetto = basis.gesamtNetto
+      auftragPositionen = basis.positionen
+    } catch {
+      /* Wizard-Positionen / Summe behalten */
+    }
+    const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, links)
     const zeile = kontext.zeilen.find((z) => z.id === abschlagZeileId) ?? null
-    if (
-      zeile &&
-      input.auftrag_id?.trim() &&
-      abschlagBereitsAbgerechnet(
-        zeile.id,
-        await rechnungenAbschlagLinks(supabaseForBerechnung, input.auftrag_id),
-        input.rechnungId ?? null
-      )
-    ) {
+    if (zeile && abschlagBereitsAbgerechnet(zeile.id, links, input.rechnungId ?? null)) {
       return {
         ok: false,
         message: 'Für diesen Abschlag existiert bereits eine Rechnung. Bitte andere Rate wählen.',
       }
     }
-    const zeilenPos = zeile
-      ? positionenFuerAbschlagRechnung({
-          zeile,
-          allePositionen: positionen,
-          plan: input.zahlungsplan,
-          gesamtNetto,
-          auftragsReferenz: '',
-          projektTitel: '',
-          bereitsGestelltBrutto: berechneBereitsGestellt(
-            await rechnungenAbschlagLinks(
-              supabaseForBerechnung,
-              input.auftrag_id as string
-            )
-          ).brutto,
+    if (zeile) {
+      const wizardHatLeistungen =
+        positionen.length > 1 && !positionen.every((p) => istAbschlagPauschalPosition(p))
+      const leistungenQuelle = zeile.istSchluss
+        ? wizardHatLeistungen
+          ? positionen
+          : auftragPositionen
+        : wizardHatLeistungen
+          ? positionen
+          : auftragPositionen
+      positionenFuerBeleg = positionenFuerAbschlagRechnung({
+        zeile,
+        allePositionen: leistungenQuelle,
+        plan: input.zahlungsplan,
+        gesamtNetto,
+        auftragsReferenz: '',
+        projektTitel: '',
+        bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
+        vorherigeAbschlaege: links,
+        ausserRechnungId: input.rechnungId ?? null,
+      })
+      if (zeile.istSchluss || rechnungArt === 'schluss') {
+        const schluss = berechneSchlussAbrechnung(positionenFuerBeleg, links, {
+          reverseCharge13b: input.meta.reverse_charge_13b,
+          ausserRechnungId: input.rechnungId ?? null,
+          ausserZeileId: zeile.id,
         })
-      : positionen
-    liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
-      berechnungVoll,
-      zeile,
-      rechnungArt,
-      zeilenPos,
-      { reverseCharge13b: input.meta.reverse_charge_13b }
-    )
+        liste_berechnung = {
+          ...berechnungVoll,
+          netto: schluss.rest_netto,
+          mwst_betrag: schluss.rest_mwst,
+          brutto: schluss.rest_brutto,
+          mwst_satz: schluss.mwst_prozent,
+          lohn_netto: berechnungVoll.lohn_netto,
+          material_netto: berechnungVoll.material_netto,
+          mwst_aufschluesselung:
+            schluss.rest_mwst > 0
+              ? [{ satz: schluss.mwst_prozent, netto: schluss.rest_netto, mwst: schluss.rest_mwst }]
+              : [{ satz: 0, netto: schluss.rest_netto, mwst: 0 }],
+        }
+      } else {
+        liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
+          berechnungVoll,
+          zeile,
+          rechnungArt === 'voll' ? 'abschlag' : rechnungArt,
+          positionenFuerBeleg,
+          { reverseCharge13b: input.meta.reverse_charge_13b }
+        )
+      }
+    }
+  }
+
+  if (input.auftrag_id?.trim()) {
+    const auftragId = input.auftrag_id.trim()
+    const links = await rechnungenAbschlagLinks(supabaseForBerechnung, auftragId)
+    let vkNetto = auftragSummenAusPositionen(positionen).netto
+    try {
+      const basis = await positionenAusAuftrag(supabaseForBerechnung, auftragId)
+      vkNetto = basis.gesamtNetto
+    } catch {
+      /* Wizard-Summe */
+    }
+    const vkGate = validateGestellteRechnungenGegenVk({
+      bestehende: links,
+      gesamtNetto: vkNetto,
+      neueNetto: liste_berechnung.netto,
+      ausserRechnungId: input.rechnungId ?? null,
+      mwstSatz: Number(liste_berechnung.mwst_satz) || 19,
+    })
+    if (!vkGate.ok) return vkGate
   }
 
   const payload = {
-    positionen,
+    positionen: positionenFuerBeleg,
     leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
     leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
     faellig_am: input.meta.faellig_am || null,
@@ -737,9 +1126,89 @@ export async function saveRechnungWizardDraft(
         : null),
     zahlungsplan_abschlag_id: input.abschlag?.zeileId ?? abschlagZeileId,
     liste_berechnung,
+    rechnungsnummer: input.rechnungsnummer?.trim() || null,
   }
 
   if (input.rechnungId) {
+    const supabaseCheck = createClient()
+    const { data: existingRec } = await supabaseCheck
+      .from('rechnungen')
+      .select(
+        'id, status, rechnungsnummer, positionen, reverse_charge_13b, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis, faellig_am, zahlungsbedingungen, einleitung, hinweise, beleg_typ, angebot_id, auftrag_id'
+      )
+      .eq('id', input.rechnungId)
+      .maybeSingle()
+
+    const existingStatus = String(existingRec?.status ?? 'entwurf').toLowerCase()
+    const belegTyp = String(
+      (existingRec as { beleg_typ?: string } | null)?.beleg_typ ?? 'rechnung'
+    ).toLowerCase()
+
+    if (belegTyp === 'gutschrift' && existingStatus !== 'entwurf') {
+      return { ok: false, message: 'Versendete Gutschriften können nicht mehr bearbeitet werden.' }
+    }
+
+    if (
+      existingRec &&
+      (existingStatus === 'gesendet' ||
+        existingStatus === 'bezahlt' ||
+        existingStatus === 'versendet')
+    ) {
+      const vorher = materialSnapshotFromRec(existingRec as Record<string, unknown>)
+      const nachher = materialSnapshotFromWizardPayload(positionenFuerBeleg, input.meta)
+      const brauchtStorno = rechnungBrauchtStornoBeiAenderung(existingStatus, vorher, nachher)
+
+      if (!brauchtStorno) {
+        const { error: mailErr } = await supabaseCheck
+          .from('rechnungen')
+          .update({
+            mail_einleitung: input.meta.mail_einleitung?.trim() || null,
+            mail_betreff: input.meta.mail_betreff?.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', input.rechnungId)
+        if (mailErr) return { ok: false, message: mailErr.message }
+        revalidatePath('/rechnungen')
+        revalidatePath(`/rechnungen/${input.rechnungId}`)
+        revalidateAuftragPfad(input.auftrag_id)
+        return {
+          ok: true,
+          rechnungId: input.rechnungId,
+          rechnungsnummer: String(existingRec.rechnungsnummer ?? ''),
+        }
+      }
+
+      const gutschrift = await createGutschriftFromRechnung(input.rechnungId)
+      if (!gutschrift.ok) return gutschrift
+
+      const created = await createRechnungEntwurf({
+        angebot_id: input.angebot_id ?? (existingRec.angebot_id as string | null) ?? null,
+        auftrag_id: input.auftrag_id ?? (existingRec.auftrag_id as string | null) ?? null,
+        kunde_id: input.kunde_id,
+        ...payload,
+        ist_wiederkehrend: input.ist_wiederkehrend,
+        wiederkehr_turnus: input.wiederkehr_turnus,
+      })
+      if (!created.ok) return created
+
+      const { data: nr } = await supabaseCheck
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', created.id)
+        .maybeSingle()
+
+      revalidatePath('/rechnungen')
+      revalidatePath(`/rechnungen/${input.rechnungId}`)
+      revalidatePath(`/rechnungen/${gutschrift.id}`)
+      revalidatePath(`/rechnungen/${created.id}`)
+      revalidateAuftragPfad(input.auftrag_id)
+      return {
+        ok: true,
+        rechnungId: created.id,
+        rechnungsnummer: String(nr?.rechnungsnummer ?? ''),
+      }
+    }
+
     const upd = await updateRechnungEntwurf(input.rechnungId, {
       kunde_id: input.kunde_id,
       ...payload,
@@ -784,6 +1253,7 @@ export async function saveRechnungWizardDraft(
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${created.id}`)
+  revalidatePath('/vorgaenge')
   revalidateAuftragPfad(input.auftrag_id)
   return {
     ok: true,
@@ -817,6 +1287,8 @@ function entwurfPayloadAusWizardMeta(
     abschlag_index: zeile?.index ?? null,
     zahlungsplan_abschlag_id: zeileId,
     liste_berechnung,
+    ist_wiederkehrend: input.ist_wiederkehrend,
+    wiederkehr_turnus: input.wiederkehr_turnus,
   }
 }
 
@@ -847,8 +1319,8 @@ export async function createAllAbschlagRechnungenFromWizard(
   })
 
   const gesamtNetto = auftragSummenAusPositionen(allePositionen).netto
-  const kontext = berechneZahlungsplan(input.zahlungsplan, gesamtNetto)
   const bestehend = await rechnungenAbschlagLinks(supabase, input.auftrag_id)
+  const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, bestehend)
 
   const erstellt: AbschlagRechnungEntwurf[] = []
 
@@ -865,14 +1337,43 @@ export async function createAllAbschlagRechnungenFromWizard(
       auftragsReferenz: '',
       projektTitel: '',
       bereitsGestelltBrutto: bereits.brutto,
+      vorherigeAbschlaege: bestehend,
+      ausserRechnungId: bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)?.id ?? null,
     })
-    const liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
-      berechnungVoll,
-      zeile,
-      rechnungArt,
-      zeilenPos,
-      { reverseCharge13b: input.meta.reverse_charge_13b }
-    )
+    const liste_berechnung =
+      rechnungArt === 'schluss'
+        ? (() => {
+            const schluss = berechneSchlussAbrechnung(zeilenPos, bestehend, {
+              reverseCharge13b: input.meta.reverse_charge_13b,
+              ausserRechnungId:
+                bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)?.id ?? null,
+              ausserZeileId: zeile.id,
+            })
+            return {
+              ...berechnungVoll,
+              netto: schluss.rest_netto,
+              mwst_betrag: schluss.rest_mwst,
+              brutto: schluss.rest_brutto,
+              mwst_satz: schluss.mwst_prozent,
+              mwst_aufschluesselung:
+                schluss.rest_mwst > 0
+                  ? [
+                      {
+                        satz: schluss.mwst_prozent,
+                        netto: schluss.rest_netto,
+                        mwst: schluss.rest_mwst,
+                      },
+                    ]
+                  : [{ satz: 0, netto: schluss.rest_netto, mwst: 0 }],
+            }
+          })()
+        : rechnungBerechnungFuerAbschlagZeile(
+            berechnungVoll,
+            zeile,
+            rechnungArt,
+            zeilenPos,
+            { reverseCharge13b: input.meta.reverse_charge_13b }
+          )
 
     const existing = bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)
     if (existing && existing.status !== 'entwurf') {
@@ -949,12 +1450,17 @@ export async function createAllAbschlagRechnungenFromWizard(
 
   const versandZeileId = input.versandZeileId?.trim() || null
   const versand =
-    erstellt.find((r) => r.zeileId === versandZeileId && r.status === 'entwurf') ??
-    erstellt.find((r) => r.status === 'entwurf') ??
-    erstellt[0]
+    (versandZeileId
+      ? erstellt.find((r) => r.zeileId === versandZeileId && r.status === 'entwurf')
+      : undefined) ??
+    erstellt.find((r) => r.status === 'entwurf')
 
   if (!versand) {
-    return { ok: false, message: 'Keine Rechnung zum Versand verfügbar.' }
+    return {
+      ok: false,
+      message:
+        'Keine Entwurfs-Rechnung für die gewählte Rate. Bereits bezahlte/gestellte Rechnungen können hier nicht als Vorschau dienen — offene Rate prüfen.',
+    }
   }
 
   revalidatePath('/rechnungen')
@@ -996,18 +1502,22 @@ export async function sendRechnungWizard(input: {
   rechnungId: string
   mailTo: string[]
   mailCc?: string[]
+  mitAbschlussbericht?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await sendRechnung(input.rechnungId, {
     to: input.mailTo,
     cc: input.mailCc,
+    mitAbschlussbericht: input.mitAbschlussbericht,
   })
   if (!res.ok) return res
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${input.rechnungId}`)
+  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
-/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation). */
+/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation).
+ * Voll-/Schlussrechnung: Status „gesendet“ + Auftrag abgeschlossen. */
 export async function finalizeRechnungWizardWithoutMail(
   rechnungId: string
 ): Promise<{ ok: true; rechnungsnummer: string } | { ok: false; message: string }> {
@@ -1016,13 +1526,42 @@ export async function finalizeRechnungWizardWithoutMail(
 
   const { data: rec } = await supabaseAdmin
     .from('rechnungen')
-    .select('rechnungsnummer, auftrag_id')
+    .select('rechnungsnummer, auftrag_id, rechnung_art, beleg_typ, status')
     .eq('id', rechnungId)
     .maybeSingle()
+
+  const art = String(rec?.rechnung_art ?? 'voll').trim().toLowerCase()
+  const isEndabrechnung = art === 'voll' || art === 'schluss'
+  const st = String(rec?.status ?? '').trim().toLowerCase()
+
+  if (isEndabrechnung && st === 'entwurf') {
+    const now = new Date().toISOString()
+    await supabaseAdmin
+      .from('rechnungen')
+      .update({
+        status: 'gesendet',
+        gesendet_at: now,
+        updated_at: now,
+      })
+      .eq('id', rechnungId)
+  }
+
+  if (isEndabrechnung && rec?.auftrag_id) {
+    const { completeAuftragNachEndabrechnung } = await import(
+      '@/app/(dashboard)/auftraege/actions'
+    )
+    await completeAuftragNachEndabrechnung({
+      auftragId: rec.auftrag_id as string,
+      rechnungArt: art,
+      rechnungsnummer: String(rec.rechnungsnummer ?? ''),
+      belegTyp: rec.beleg_typ as string | null,
+    })
+  }
 
   if (rec?.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath('/vorgaenge')
 
   return {
     ok: true,
@@ -1049,6 +1588,7 @@ export async function deleteRechnungEntwurf(
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/rechnungen')
+  revalidatePath('/vorgaenge')
   if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id}`)
   return { ok: true }
 }

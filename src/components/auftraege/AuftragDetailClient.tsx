@@ -1,40 +1,45 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { ActionsMenu } from '@/components/ui/actions-menu'
-import { buildEntityMenu, entityMenuToActionItems, type EntityMenuItem } from '@/lib/entity-menu'
-import { runDuplicateAuftrag } from '@/lib/list-actions'
-import { AuftragDetailsTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
+import { AuftragAbschliessenSheet } from '@/components/auftraege/AuftragAbschliessenSheet'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
-import { AuftragZahlungsplanSection, type RechnungErstellenOpts } from '@/components/auftraege/AuftragZahlungsplanSection'
-import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromAuftrag } from '@/app/(dashboard)/kommunikation/actions'
-import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
+import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
+import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
+import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
+import {
+  gewichteterFortschrittProzent,
+  normalizeLeistungStatus,
+} from '@/lib/auftraege/auftrag-fortschritt-preis'
+import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
+import {
+  VorgangZahlungTab,
+  type RechnungErstellenOpts,
+} from '@/components/vorgang/VorgangZahlungTab'
+import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
-import { AbschlussdokumentationModal } from '@/components/auftraege/AbschlussdokumentationModal'
-import { AuftragAbschlussSection } from '@/components/auftraege/AuftragAbschlussSection'
-import { AuftragBautagebuchCard } from '@/components/auftraege/AuftragBautagebuchCard'
-import { AuftragBaustelleTab } from '@/components/auftraege/AuftragBaustelleTab'
+import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import { AuftragAbnahmeprotokollInline } from '@/components/auftraege/AuftragAbnahmeprotokollInline'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import { erzeugeVersicherungsaktePdf } from '@/lib/org/hv-auftrag-actions'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
-import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
+import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
   AngebotDetail,
@@ -47,9 +52,6 @@ import type {
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
-import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
-import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
@@ -60,7 +62,6 @@ import {
   type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
-  loadProjektVertragBootstrap,
   loadNachtragBootstrap,
   type ProjektVertragWizardBootstrap,
 } from '@/app/(dashboard)/vertraege/wizard-actions'
@@ -68,21 +69,41 @@ import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
-import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
+import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
+import {
+  auftragHatZahlungOffen,
+  auftragSummenAusPositionen,
+  berechneZahlungsplan,
+  hatAktivenAbschlagsplan,
+  naechsteAuftragRechnungAktion,
+  parseZahlungsplan,
+  zahlplanAbgerechnetAusLinks,
+} from '@/lib/rechnungen/zahlungsplan'
+import { sendRechnung, updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
-import { loadAngebotKorrekturWizardBootstrap } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+import {
+  loadAngebotKorrekturWizardBootstrap,
+  loadNachtragAngebotBootstrap,
+} from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
+  }
 )
 
 type GewerkOpt = { id: string; name: string; slug: string }
@@ -98,6 +119,7 @@ function AuftragNotizenPanel({
 }) {
   const [val, setVal] = useState(initial)
   const [pending, startTransition] = useTransition()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     setVal(initial)
@@ -114,6 +136,32 @@ function AuftragNotizenPanel({
       toast.success('Notizen gespeichert')
       onSaved()
     })
+  }
+
+  const text = initial.trim()
+
+  if (isMobile) {
+    return (
+      <div className="card">
+        <div className="card-h">
+          <div className="card-title title">
+            <MockIcon ctx="emphasis" n="messages" size={16} />
+            Notizen
+          </div>
+        </div>
+        <div className="card-b">
+          {text ? (
+            <p className="akte-notiz-readonly whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text">
+              {text}
+            </p>
+          ) : (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              Noch keine Notizen. Über „Notiz“ oben hinzufügen.
+            </p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -177,57 +225,147 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab =
-  | 'stammdaten'
-  | 'leistung'
-  | 'baustelle'
-  | 'abnahme'
-  | 'abschluss'
-  | 'aktivitaet'
-  | 'dokumente'
-  | 'finanzen'
-  | 'notizen'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
-  'stammdaten',
-  'leistung',
-  'baustelle',
-  'abnahme',
-  'abschluss',
+  'uebersicht',
+  'leistungen',
+  'zahlung',
+  'akte',
   'aktivitaet',
-  'dokumente',
-  'finanzen',
-  'notizen',
 ])
 
-/** Query-/Deep-Link-Aliase auf stabile interne IDs. */
-function resolveAuftragDetailTabFromQuery(raw: string | null): AuftragDetailTab | null {
-  const tab = (raw ?? '').trim().toLowerCase()
-  if (!tab) return null
-  if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') return 'stammdaten'
+const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
+
+/** Legacy Deep-Link-Alias (kein eigener Tab mehr) → Leistungen. */
+type VorOrtAbschnitt = 'bautagebuch' | 'abnahme' | 'abschluss'
+
+function vorOrtAbschnittFromQuery(raw: string | null): VorOrtAbschnitt | null {
+  const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
+  if (tab === 'bautagebuch' || tab === 'baustelle' || tab === 'vor-ort-bautagebuch') {
+    return 'bautagebuch'
+  }
   if (
+    tab === 'abnahme' ||
+    tab === 'abnahmeprotokoll' ||
+    tab === 'abnahmeprotokolle' ||
+    tab === 'auftrag-abnahmeprotokoll' ||
+    tab === 'vor-ort-abnahme'
+  ) {
+    return 'abnahme'
+  }
+  if (
+    tab === 'abschluss' ||
+    tab === 'abschlussdokumentation' ||
+    tab === 'abschlussdoku' ||
+    tab === 'abschlussbericht' ||
+    tab === 'dokumentation' ||
+    tab === 'vor-ort-abschluss' ||
+    tab === 'nachtrag' ||
+    tab === 'nachtraege'
+  ) {
+    return 'abschluss'
+  }
+  return null
+}
+
+type AuftragDetailTabDefaultContext = {
+  status: string
+  zahlungOffen?: boolean
+}
+
+function defaultAuftragDetailTabFromStatus(_ctx: AuftragDetailTabDefaultContext): AuftragDetailTab {
+  return AUFTRAG_DETAIL_DEFAULT_TAB
+}
+
+function resolveAuftragDetailTabFromQuery(
+  raw: string | null,
+  defaultWhenEmpty?: AuftragDetailTabDefaultContext
+): AuftragDetailTab | null {
+  const tab = (raw ?? '').trim().toLowerCase()
+  if (!tab) {
+    return defaultWhenEmpty ? defaultAuftragDetailTabFromStatus(defaultWhenEmpty) : null
+  }
+  if (
+    tab === 'zahlung' ||
+    tab === 'zahlplan' ||
+    tab === 'finanzen'
+  ) {
+    return 'zahlung'
+  }
+  if (
+    tab === 'akte' ||
+    tab === 'dokumente' ||
+    tab === 'notizen' ||
+    tab === 'compliance' ||
+    tab === 'compliance-checkliste' ||
+    tab === 'kommunikation'
+  ) {
+    return 'akte'
+  }
+  if (
+    tab === 'leistungen' ||
+    tab === 'leistung' ||
     tab === 'positionen' ||
-    tab === 'details' ||
+    tab === 'ausfuehrung' ||
+    tab === 'vor-ort' ||
+    vorOrtAbschnittFromQuery(tab)
+  ) {
+    return 'leistungen'
+  }
+  if (
+    tab === 'uebersicht' ||
+    tab === 'stammdaten' ||
+    tab === 'schritte' ||
+    tab === 'naechste-schritte' ||
+    tab === 'naechste_schritte' ||
+    tab === 'auftragdetails' ||
     tab === 'auftrag-details' ||
+    tab === 'auftragsdaten' ||
+    tab === 'projektdetails' ||
+    tab === 'projektinfos' ||
+    tab === 'details' ||
     tab === 'auftrag' ||
     tab === 'anfrage' ||
     tab === 'anfrage-details' ||
     tab === 'angebot' ||
-    tab === 'angebot-details'
+    tab === 'angebot-details' ||
+    tab === 'fotos' ||
+    tab === 'bilder' ||
+    tab === 'photos'
   ) {
-    return 'leistung'
+    return 'uebersicht'
   }
-  if (tab === 'zahlplan') return 'finanzen'
-  if (tab === 'bautagebuch') return 'baustelle'
-  if (tab === 'abnahmeprotokoll' || tab === 'abnahmeprotokolle') return 'abnahme'
-  if (tab === 'abschlussdokumentation' || tab === 'abschlussdoku' || tab === 'abschlussbericht') {
-    return 'abschluss'
+  if (
+    tab === 'verlauf' ||
+    tab === 'aktivitaet' ||
+    tab === 'historie' ||
+    tab === 'projekt-historie' ||
+    tab === 'phasen'
+  ) {
+    return 'aktivitaet'
   }
-  if (tab === 'verlauf') return 'aktivitaet'
-  if (tab === 'compliance' || tab === 'compliance-checkliste') return 'dokumente'
-  if (tab === 'kommunikation') return 'notizen'
+  if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'uebersicht'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
-  return null
+  return AUFTRAG_DETAIL_DEFAULT_TAB
+}
+
+function needsAkteAliasRedirect(rawTab: string | null): boolean {
+  const tab = (rawTab ?? '').trim().toLowerCase()
+  return (
+    tab === 'finanzen' ||
+    tab === 'zahlplan' ||
+    tab === 'dokumente' ||
+    tab === 'notizen' ||
+    tab === 'stammdaten' ||
+    tab === 'auftragdetails' ||
+    tab === 'leistung' ||
+    tab === 'fotos' ||
+    tab === 'historie' ||
+    tab === 'schritte' ||
+    tab === 'ausfuehrung' ||
+    tab === 'vor-ort'
+  )
 }
 
 export function AuftragDetailClient({
@@ -266,23 +404,30 @@ export function AuftragDetailClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { refresh, generation } = useCrmRefresh()
+  const { refresh } = useCrmRefresh()
   const isMobile = useIsMobile()
-  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
   const [detail, setDetail] = useState(initial)
-  const [, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition()
 
-  const [mainTab, setMainTab] = useState<AuftragDetailTab>('stammdaten')
+  const kundeTel =
+    detail.kunden?.telefon?.trim() || _leadDetail?.kontakt_telefon?.trim() || ''
+  const kundeEmail =
+    detail.kunden?.email?.trim() || _leadDetail?.kontakt_email?.trim() || ''
+  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
+    telefon: kundeTel,
+    email: kundeEmail,
+    notiz: {
+      kind: 'auftrag',
+      auftragId: detail.id,
+      initial: detail.notizen ?? '',
+    },
+    dokument: { kind: 'auftrag', auftragId: detail.id },
+    onSaved: () => refresh(),
+  })
 
-  useEffect(() => {
-    const tab = resolveAuftragDetailTabFromQuery(searchParams.get('tab'))
-    if (tab === 'notizen' && !initial.notizen?.trim()) {
-      setMainTab('stammdaten')
-      return
-    }
-    if (tab) setMainTab(tab)
-  }, [searchParams, initial.notizen])
-  const [abschlussModal, setAbschlussModal] = useState(false)
+  const [mainTab, setMainTab] = useState<AuftragDetailTab>(AUFTRAG_DETAIL_DEFAULT_TAB)
+  // vorOrtFocus entfernt — kein Tagebuch-/Vor-Ort-Segment mehr (Phase 6)
+
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
   const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
@@ -293,14 +438,13 @@ export function AuftragDetailClient({
     useState<ProjektVertragWizardBootstrap | null>(null)
   const [vertragWizardKey, setVertragWizardKey] = useState(0)
   const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
+  const [bewertungOpen, setBewertungOpen] = useState(false)
+  const [abschliessenOpen, setAbschliessenOpen] = useState(false)
   const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
   const [angebotKorrekturBootstrap, setAngebotKorrekturBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
-  const isCrmAdmin = useIsCrmAdmin()
-  const [impersonating, setImpersonating] = useState(false)
-  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   const openAngebotKorrektur = useCallback(() => {
     if (!detail.angebot_id) {
@@ -313,6 +457,24 @@ export function AuftragDetailClient({
     }
     startTransition(async () => {
       const res = await loadAngebotKorrekturWizardBootstrap(detail.id)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      setAngebotKorrekturBootstrap(res.bootstrap)
+      setAngebotKorrekturLead(res.lead)
+      setAngebotKorrekturKey((k) => k + 1)
+      setAngebotKorrekturOpen(true)
+    })
+  }, [detail.angebot_id, detail.id, detail.lead_id])
+
+  const openNachtragAngebot = useCallback(() => {
+    if (!detail.angebot_id || !detail.lead_id) {
+      toast.error('Nachtrag braucht verknüpftes Angebot und Anfrage.')
+      return
+    }
+    startTransition(async () => {
+      const res = await loadNachtragAngebotBootstrap(detail.id)
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -339,6 +501,11 @@ export function AuftragDetailClient({
     [firm?.zahlungsziel_tage, initial.kunden?.typ]
   )
 
+  const leistungenMwstSatz = useMemo(() => {
+    if (parseKleinunternehmerSetting(firm?.kleinunternehmer)) return 0
+    return Math.max(0, parseInt(firm?.mwst_satz ?? '', 10) || DEFAULT_MWST_SATZ)
+  }, [firm?.kleinunternehmer, firm?.mwst_satz])
+
   const openRechnungWizard = useCallback((bootstrap: RechnungWizardBootstrap) => {
     setRechnungWizardBootstrap(bootstrap)
     setRechnungWizardKey((k) => k + 1)
@@ -346,26 +513,14 @@ export function AuftragDetailClient({
   }, [])
 
   const openAuftragAbschliessen = useCallback(() => {
-    if (isMobile) router.push(`/auftraege/${detail.id}/abschluss`)
-    else setAbschlussModal(true)
-  }, [detail.id, isMobile, router])
+    setAbschliessenOpen(true)
+  }, [])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
     setVertragWizardKey((k) => k + 1)
     setVertragWizardOpen(true)
   }, [])
-
-  const openNachunternehmervertrag = useCallback(() => {
-    startTransition(async () => {
-      const res = await loadProjektVertragBootstrap(detail.id)
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      openVertragWizard(res.bootstrap)
-    })
-  }, [detail.id, openVertragWizard])
 
   const startNachtragWizard = useCallback(
     (parentVertragId: string) => {
@@ -418,6 +573,14 @@ export function AuftragDetailClient({
           vollOhnePlan: Boolean(opts?.voll),
         })
         if (!res.ok) {
+          // Kein offener Abschlag → normale Rechnung / Plan im Wizard
+          if (opts?.naechsterAbschlag) {
+            const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {})
+            if (fallback.ok) {
+              openRechnungWizard(fallback.bootstrap)
+              return
+            }
+          }
           toast.error(res.message)
           return
         }
@@ -441,10 +604,19 @@ export function AuftragDetailClient({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const hash = window.location.hash
-    if (hash === '#dokumentation') setMainTab('dokumente')
-    if (hash === '#compliance' || hash === '#compliance-checkliste') setMainTab('dokumente')
-    if (hash === '#auftrag-abnahmeprotokoll' || hash === '#abnahme') setMainTab('abnahme')
+    const hash = window.location.hash.replace(/^#/, '')
+    if (hash === 'dokumentation') {
+      setMainTab('leistungen')
+      return
+    }
+    if (hash === 'compliance' || hash === 'compliance-checkliste') {
+      setMainTab('akte')
+      return
+    }
+    const focus = vorOrtAbschnittFromQuery(hash)
+    if (focus) {
+      setMainTab('leistungen')
+    }
   }, [])
 
   useEffect(() => {
@@ -461,13 +633,11 @@ export function AuftragDetailClient({
   }, [])
 
   const kunde = detail.kunden
-  const name = kunde?.name ?? 'Auftrag'
-  const posCount = detail.auftrag_positionen?.length ?? 0
-  const kundeAdresse = useMemo(() => {
-    const str = [kunde?.strasse, kunde?.hausnummer].filter(Boolean).join(' ').trim()
-    const ort = [kunde?.plz, kunde?.ort].filter(Boolean).join(' ').trim()
-    return [str, ort].filter(Boolean).join(', ') || kunde?.adresse?.trim() || ''
-  }, [kunde])
+  const name =
+    (_leadDetail && leadKontaktAnzeigeName(_leadDetail, '')) ||
+    kunde?.name ||
+    'Auftrag'
+  const posCount = auftragPositionenFuerSumme(detail.auftrag_positionen).length
 
   const istBauprojekt = useMemo(
     () =>
@@ -490,155 +660,145 @@ export function AuftragDetailClient({
     bereiche: lead?.bereiche,
     fallback: detail.titel?.trim() || formatAuftragsNr(detail),
   })
-  const kundeTelefon = detail.kunden?.telefon?.trim() ?? ''
   const headMeta = useMemo(() => {
-    const name =
-      detail.kunden?.name?.trim() ||
-      [detail.kunden?.vorname, detail.kunden?.nachname].filter(Boolean).join(' ').trim() ||
-      null
-    return name
-  }, [detail.kunden])
+    const parts: string[] = []
+    if (projektName) parts.push(projektName)
+    if (detail.created_at) parts.push(`erstellt ${formatDatum(detail.created_at)}`)
+    return parts.filter(Boolean).join(' · ')
+  }, [projektName, detail.created_at])
 
-  const istAbgeschlossen = detail.status === 'abgeschlossen'
-  const istStorniert = detail.status === 'storniert'
+  const freigabeAusstehend = (_leadDetail?.org_freigabe_status ?? '').trim() === 'ausstehend'
 
-  /** Nur Aktionen, die nicht schon über Header-CTA oder Detail-Tabs erreichbar sind */
-  const aktionenMenuItems = useMemo(() => {
-    const extras: EntityMenuItem[] = [
-      ...(detail.angebot_id
-        ? ([
-            {
-              icon: 'file-pencil',
-              label: 'Angebot korrigieren',
-              onClick: openAngebotKorrektur,
-            },
-          ] as EntityMenuItem[])
-        : []),
-      ...(istBauprojekt
-        ? ([
-            {
-              icon: 'file-pencil',
-              label: 'Nachunternehmervertrag',
-              onClick: () => openNachunternehmervertrag(),
-            },
-            ...(hauptvertraegeFuerNachtrag.length
-              ? [
-                  {
-                    icon: 'file-pencil',
-                    label: 'Nachtrag erstellen',
-                    onClick: () => openNachtragErstellen(),
-                  },
-                ]
-              : []),
-          ] as EntityMenuItem[])
-        : []),
-      ...(String(detail.kostentraeger ?? '').trim() === 'versicherung'
-        ? ([
-            {
-              icon: 'shield-check',
-              label: 'Versicherungsakte erzeugen',
-              onClick: () => {
-                startTransition(async () => {
-                  const r = await erzeugeVersicherungsaktePdf(detail.id)
-                  if (!r.ok) toast.error(r.message)
-                  else {
-                    toast.success('Versicherungsakte erstellt')
-                    refresh()
-                  }
-                })
-              },
-            },
-          ] as EntityMenuItem[])
-        : []),
-    ]
+  const positionenAktiv = useMemo(
+    () => auftragPositionenFuerSumme(detail.auftrag_positionen),
+    [detail.auftrag_positionen]
+  )
+  const leistungenErledigt = useMemo(
+    () =>
+      positionenAktiv.filter((p) => normalizeLeistungStatus(p.leistung_status) === 'erledigt')
+        .length,
+    [positionenAktiv]
+  )
+  const fortschrittPct = useMemo(() => {
+    if (positionenAktiv.length) return gewichteterFortschrittProzent(positionenAktiv)
+    return auftragFortschritt(detail)
+  }, [positionenAktiv, detail])
 
-    return entityMenuToActionItems(
-      buildEntityMenu(
-        'auftrag',
-        {
-          name: projektName,
-          status: detail.status,
-          customer: {
-            name: detail.kunden?.name ?? undefined,
-            tel: kundeTelefon || undefined,
-            mail: detail.kunden?.email?.trim() || undefined,
-          },
-        },
-        {
-          onCopy: () => runDuplicateAuftrag(detail.id, router),
-          onPortal: () => {
-            if (!isCrmAdmin || !detail.kunde_id) {
-              toast.error('Admin Login nur für CRM-Admins mit Kundenkonto')
-              return
-            }
-            if (impersonating) return
-            setImpersonating(true)
-            void openPortalAsKunde(detail.kunde_id).then((r) => {
-              setImpersonating(false)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              window.open(r.url, '_blank', 'noopener,noreferrer')
-            })
-          },
-          onPortalLink: () => {
-            if (!detail.kunde_id) {
-              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
-              return
-            }
-            setPortalLinkModalOpen(true)
-          },
-          tel: kundeTelefon || null,
-          mail: detail.kunden?.email?.trim() || null,
-          onCall: kundeTelefon
-            ? () => {
-                window.location.href = `tel:${kundeTelefon.replace(/\s/g, '')}`
-              }
-            : undefined,
-          onMail: detail.kunden?.email?.trim()
-            ? () => mailCompose.openCompose(() => mailComposeContextFromAuftrag(detail.id))
-            : undefined,
-          onDelete: detail.lead_id
-            ? () => {
-                void deleteVorgang(detail.lead_id!).then((r) => {
-                  if (!r.ok) toast.error(r.message)
-                  else {
-                    toast.success('Vorgang gelöscht')
-                    router.push('/vorgaenge?tab=auftrag')
-                  }
-                })
-              }
-            : undefined,
-          deleteLabel: projektName,
-          extra: extras,
-        }
-      ),
-      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+  const auftragWertLabel = useMemo(() => {
+    const ap = auftragPositionenFuerSumme(detail.auftrag_positionen)
+    let netto = 0
+    if (ap.length) {
+      netto = auftragSummenAusPositionen(auftragPositionenToAngebotPositionen(ap)).netto
+    } else {
+      const ang0 = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+      const raw = (ang0 as { positionen?: unknown } | null)?.positionen
+      netto = auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
+    }
+    const brutto = netto > 0 ? netto * (1 + leistungenMwstSatz / 100) : 0
+    return formatEurKurz(brutto > 0 ? brutto : null)
+  }, [detail.auftrag_positionen, detail.angebote, leistungenMwstSatz])
+
+  const handwerkerKurz = useMemo(() => {
+    const list = handwerkerAusAuftrag(detail)
+    if (!list.length) return null
+    return list[0]?.firma?.trim() || list[0]?.name || null
+  }, [detail])
+
+  const auftragDatumRange = useMemo(() => {
+    const start = detail.start_datum ? formatDatum(detail.start_datum) : null
+    const end = detail.end_datum
+      ? formatDatum(detail.end_datum)
+      : detail.created_at
+        ? formatDatum(detail.created_at)
+        : null
+    if (start && detail.end_datum) return `${start}–${formatDatum(detail.end_datum)}`
+    if (start && end && start !== end) return `${start}–${end}`
+    if (start) return start
+    if (detail.created_at) return formatDatum(detail.created_at)
+    return null
+  }, [detail.start_datum, detail.end_datum, detail.created_at])
+
+  const phasenExtras = useMemo(() => {
+    const auftragKopfParts = [auftragDatumRange, handwerkerKurz].filter(Boolean)
+    const aktiveRe = (projektKontext?.rechnungen ?? []).filter(
+      (r) => String(r.status).toLowerCase() !== 'storniert'
     )
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    const plan = parseZahlungsplan(
+      (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+    )
+    const geplant = plan?.zeilen?.length ?? 0
+    const gestellt = aktiveRe.length
+    let rechnungKopf: string | undefined
+    if (gestellt > 0 && geplant > 0) rechnungKopf = `${gestellt} von ${geplant} gestellt`
+    else if (gestellt > 0) rechnungKopf = `${gestellt} gestellt`
+
+    const statusParts = Array.from(
+      new Set(
+        aktiveRe
+          .map((r) => {
+            const s = String(r.status).toLowerCase()
+            if (s === 'bezahlt') return 'Bezahlt'
+            if (s === 'gesendet' || s === 'versendet') return 'Versendet'
+            if (s === 'entwurf') return 'Entwurf'
+            if (s === 'ueberfaellig' || s === 'überfällig') return 'Überfällig'
+            return null
+          })
+          .filter(Boolean)
+      )
+    ) as string[]
+
+    const reBetrag = aktiveRe.reduce((s, r) => s + (r.brutto ?? 0), 0)
+
+    return {
+      auftrag: {
+        kopf: auftragKopfParts.length
+          ? auftragKopfParts.join(' · ')
+          : undefined,
+        sub:
+          positionenAktiv.length > 0
+            ? `${leistungenErledigt} von ${positionenAktiv.length} Leistungen erledigt`
+            : undefined,
+        betrag: auftragWertLabel !== '—' ? auftragWertLabel : null,
+        props: [
+          { k: 'Titel', v: detail.titel?.trim() || projektName || '—' },
+          {
+            k: 'Zeitraum',
+            v: auftragDatumRange || (detail.created_at ? formatDatum(detail.created_at) : '—'),
+          },
+          { k: 'Status', v: auftragStatus.label },
+          ...(handwerkerKurz ? [{ k: 'Handwerker', v: handwerkerKurz }] : []),
+          {
+            k: 'Leistungen',
+            v: positionenAktiv.length
+              ? `${leistungenErledigt} von ${positionenAktiv.length} erledigt`
+              : '—',
+          },
+          { k: 'Auftragswert', v: auftragWertLabel },
+        ],
+      },
+      rechnung: {
+        kopf: rechnungKopf,
+        sub: statusParts.length ? statusParts.join(' · ') : undefined,
+        betrag: gestellt > 0 ? formatEurKurz(reBetrag) : null,
+      },
+    }
   }, [
-    detail.angebot_id,
-    detail.id,
-    detail.kunde_id,
-    detail.kunden?.name,
-    detail.kunden?.email,
-    detail.status,
-    detail.kostentraeger,
-    detail.lead_id,
-    kundeTelefon,
-    mailCompose,
-    hauptvertraegeFuerNachtrag.length,
-    openAngebotKorrektur,
-    openNachtragErstellen,
-    openNachunternehmervertrag,
-    router,
-    refresh,
-    startTransition,
-    istBauprojekt,
-    isCrmAdmin,
-    impersonating,
+    auftragDatumRange,
+    handwerkerKurz,
+    projektKontext?.rechnungen,
+    detail.angebote,
+    detail.titel,
+    detail.created_at,
+    positionenAktiv.length,
+    leistungenErledigt,
+    auftragWertLabel,
+    auftragStatus.label,
     projektName,
   ])
+
+  const istStorniert = detail.status === 'storniert'
+
 
   const timelineCount = useMemo(() => {
     const lead = leadTimeline.length
@@ -652,83 +812,35 @@ export function AuftragDetailClient({
   )
 
   const stammdatenInhalt = (
-    <AuftragStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
-  )
-
-  const leistungInhalt = (
-    <AuftragDetailsTab
+    <AuftragStammdatenCard
       detail={detail}
-      lead={lead}
-      team={team}
-      gewerke={gewerke}
-      angebotDetail={angebotDetail}
-      editable={detail.status !== 'storniert'}
+      lead={_leadDetail ?? null}
       onSaved={() => refresh()}
     />
   )
 
-  const angPos = useMemo(() => {
-    const raw =
-      (Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote)?.positionen ??
-      angebotDetail?.positionen ??
-      null
-    return raw ? normalizeAngebotPositionen(raw) : null
-  }, [detail.angebote, angebotDetail?.positionen])
-
-  const abnahmeInhalt = (
-    <AuftragAbnahmeprotokollInline
-      auftragId={detail.id}
-      positionen={detail.auftrag_positionen ?? []}
-      angebotPositionen={angPos}
+  const leistungInhalt = (
+    <AuftragLeistungenTab
+      detail={detail}
+      lead={lead}
       gewerke={gewerke}
-      kundeName={name}
-      onChanged={() => refresh()}
+      angebotDetail={angebotDetail}
+      editable={detail.status !== 'storniert'}
+      mwstSatz={leistungenMwstSatz}
+      onSaved={() => refresh()}
+      onOpenDokument={openAngebotKorrektur}
+      vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
+      onVertragNachtragErstellen={openNachtragErstellen}
+      initialLeistungenView={
+        vorOrtAbschnittFromQuery(searchParams.get('tab')) === 'bautagebuch'
+          ? 'bautagebuch'
+          : 'leistungen'
+      }
     />
-  )
-
-  const abschlussInhalt = (
-    <AuftragAbschlussSection
-      auftragId={detail.id}
-      istAbgeschlossen={istAbgeschlossen}
-      abschlussUrl={detail.abschlussdokumentation_url}
-      abschlussGesendetAt={detail.abschlussdokumentation_gesendet_at}
-      onRefresh={() => refresh()}
-    />
-  )
-
-  const baustelleInhalt = (
-    <div className="space-y-4">
-      <AuftragBautagebuchCard
-        auftragId={detail.id}
-        eintraege={detail.auftrag_bautagebuch ?? []}
-        kundeName={name}
-        positionen={detail.auftrag_positionen ?? []}
-        gewerke={gewerke}
-        onChanged={() => refresh()}
-      />
-      {istBauprojekt ? (
-        <AuftragBaustelleTab
-          auftragId={detail.id}
-          team={
-            detail.auftrag_baustelle_team ?? {
-              bau_mannschaft: [],
-            }
-          }
-          bautagesberichte={detail.auftrag_bautagesberichte ?? []}
-          regiearbeiten={detail.auftrag_regiearbeiten ?? []}
-          wochenberichte={detail.auftrag_wochenberichte ?? []}
-          baustellenDokumente={detail.auftrag_baustellen_dokumente ?? []}
-          kundeName={name}
-          kundeAdresse={kundeAdresse}
-          handwerker={detail.auftrag_handwerker ?? []}
-          onChanged={() => refresh()}
-        />
-      ) : null}
-    </div>
   )
 
   const auftragNettoSumme = useMemo(() => {
-    const ap = detail.auftrag_positionen ?? []
+    const ap = auftragPositionenFuerSumme(detail.auftrag_positionen)
     if (ap.length) {
       // Auftrag: lohn_fix/material_fix/preis_fix sind Zeilensummen — erst in Stückpreise wandeln
       return auftragSummenAusPositionen(auftragPositionenToAngebotPositionen(ap)).netto
@@ -738,13 +850,153 @@ export function AuftragDetailClient({
     return auftragSummenAusPositionen(normalizeAngebotPositionen(raw)).netto
   }, [detail.auftrag_positionen, detail.angebote])
 
+  const zahlungOffen = useMemo(
+    () =>
+      auftragHatZahlungOffen({
+        auftragStatus: detail.status,
+        rechnungen: rechnungenListe.map((r) => ({
+          id: r.id,
+          brutto: r.brutto,
+          status: String(r.status),
+          zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
+          rechnung_art: r.rechnung_art ?? null,
+          faellig_am: r.faellig_am ?? null,
+        })),
+        gesamtNetto: auftragNettoSumme,
+      }),
+    [detail.status, rechnungenListe, auftragNettoSumme]
+  )
+
+  const zahlungsplanParsed = useMemo(() => {
+    const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+    return parseZahlungsplan(
+      (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+    )
+  }, [detail.angebote])
+
+  const rechnungLinks = useMemo(
+    () =>
+      rechnungenListe.map((r) => ({
+        id: r.id,
+        status: String(r.status),
+        zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
+        rechnung_art: r.rechnung_art ?? null,
+        brutto: r.brutto,
+        beleg_typ: r.beleg_typ ?? null,
+      })),
+    [rechnungenListe]
+  )
+
+  const hatAbschlagsplan = hatAktivenAbschlagsplan(zahlungsplanParsed)
+
+  const abrechnungKontext = useMemo(() => {
+    if (!hatAbschlagsplan || !zahlungsplanParsed) return null
+    return berechneZahlungsplan(
+      zahlungsplanParsed,
+      auftragNettoSumme,
+      19,
+      zahlplanAbgerechnetAusLinks(rechnungLinks)
+    )
+  }, [hatAbschlagsplan, zahlungsplanParsed, auftragNettoSumme, rechnungLinks])
+
+  /** Nächste RE-Aktion am Auftrag (Versenden → Bezahlt → Erstellen). */
+  const naechsteRechnungAktion = useMemo(() => {
+    if (detail.status !== 'abgeschlossen') return undefined
+    return naechsteAuftragRechnungAktion(abrechnungKontext, rechnungLinks, hatAbschlagsplan)
+  }, [detail.status, abrechnungKontext, rechnungLinks, hatAbschlagsplan])
+
+  const openRechnungBearbeiten = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const { loadRechnungWizardBootstrap } = await import(
+          '@/app/(dashboard)/rechnungen/wizard-actions'
+        )
+        const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        openRechnungWizard(res.bootstrap)
+      })
+    },
+    [detail.id, openRechnungWizard]
+  )
+
+  const versendeNaechsteRechnung = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const r = await sendRechnung(rechnungId)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success('Rechnung gesendet')
+        refresh()
+      })
+    },
+    [refresh]
+  )
+
+  const markiereNaechsteRechnungBezahlt = useCallback(
+    (rechnungId: string) => {
+      startTransition(async () => {
+        const r = await updateRechnungStatus(rechnungId, 'bezahlt', {
+          notifyKunde: Boolean(kundeEmail),
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(
+          r.zahlungsbestaetigungGesendet
+            ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
+            : 'Als bezahlt markiert'
+        )
+        refresh()
+      })
+    },
+    [kundeEmail, refresh]
+  )
+
+  useEffect(() => {
+    const rawTab = searchParams.get('tab')
+    const hasExplicitTab = rawTab !== null && rawTab.trim() !== ''
+    if (hasExplicitTab && needsAkteAliasRedirect(rawTab)) {
+      const resolved = resolveAuftragDetailTabFromQuery(rawTab) ?? 'uebersicht'
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', resolved)
+      q.delete('segment')
+      // replace: History nicht mit Alias-Hops füllen
+      router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+      return
+    }
+    const tab = resolveAuftragDetailTabFromQuery(
+      hasExplicitTab ? rawTab : null,
+      hasExplicitTab ? undefined : { status: detail.status, zahlungOffen: zahlungOffen }
+    )
+    if (tab) setMainTab(tab)
+    if (searchParams.has('segment')) {
+      const q = new URLSearchParams(searchParams.toString())
+      q.delete('segment')
+      router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+    }
+  }, [searchParams, detail.status, detail.id, zahlungOffen, router])
+
   const finanzenInhalt = (
-    <AuftragZahlungsplanSection
+    <VorgangZahlungTab
+      variant="auftrag"
       auftragId={detail.id}
-      zahlungsplanRaw={(detail as { zahlungsplan?: unknown }).zahlungsplan}
+      zahlungsplanRaw={
+        (() => {
+          const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
+          return (ang as { zahlungsplan?: unknown } | null | undefined)?.zahlungsplan
+        })()
+      }
       gesamtNetto={auftragNettoSumme}
       rechnungen={rechnungenListe}
       onCreateInvoice={openRechnungErstellen}
+      onOpenWizard={openRechnungWizard}
+      onEditInvoice={openRechnungBearbeiten}
       onRefresh={() => refresh()}
     />
   )
@@ -757,58 +1009,28 @@ export function AuftragDetailClient({
     />
   )
 
-  const detailShellGroups: DetailShellGroup[] = [
-    {
-      id: 'stammdaten',
-      label: 'Stammdaten',
-      icon: 'clipboard-list',
-      render: () => stammdatenInhalt,
-    },
-    {
-      id: 'leistung',
-      label: 'Leistungen',
-      icon: 'list-details',
-      count: posCount || undefined,
-      render: () => leistungInhalt,
-    },
-    {
-      id: 'finanzen',
-      label: 'Zahlung & Rechnung',
-      icon: 'calculator',
-      render: () => finanzenInhalt,
-    },
-    {
-      id: 'baustelle',
-      label: 'Bautagebuch',
-      icon: 'clipboard-list',
-      render: () => baustelleInhalt,
-    },
-    {
-      id: 'abnahme',
-      label: 'Abnahmeprotokoll',
-      icon: 'checklist',
-      render: () => abnahmeInhalt,
-    },
-    {
-      id: 'abschluss',
-      label: 'Abschlussbericht',
-      icon: 'file-text',
-      render: () => abschlussInhalt,
-    },
-    {
-      id: 'aktivitaet',
-      label: ACTIVITY_SECTIONS.verlauf,
-      icon: 'history',
-      count: timelineCount || undefined,
-      render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
-    },
-    {
-      id: 'dokumente',
-      label: ACTIVITY_SECTIONS.dokumente,
-      icon: 'files',
-      count: dokumenteCount || undefined,
-      render: () => (
-        <>
+  const uebersichtInhalt = (
+    <div className="space-y-6">
+      {stammdatenInhalt}
+      <VorgangPhasenVerlauf
+        kontext={projektKontext}
+        fromRef={{ kind: 'auftrag', id: detail.id }}
+        lead={_leadDetail}
+        extras={phasenExtras}
+        onSaved={() => refresh()}
+      />
+    </div>
+  )
+
+  /** Phase 6: nur LeistungenTab — kein Tagebuch-Segment / Vor-Ort-Umschalter */
+  const leistungenTabInhalt = <div className="space-y-6">{leistungInhalt}</div>
+
+  const zahlungTabInhalt = <div className="space-y-6">{finanzenInhalt}</div>
+
+  const akteInhalt = (
+    <VorgangAkteTab
+      dateien={
+        <div className="space-y-4">
           <AuftragDokumenteTab
             detail={detail}
             rechnungen={rechnungenListe}
@@ -824,14 +1046,46 @@ export function AuftragDetailClient({
               onChanged={() => refresh()}
             />
           ) : null}
-        </>
-      ),
+        </div>
+      }
+      notizen={notizenInhalt}
+    />
+  )
+
+  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte · Aktivität */
+  const detailShellGroups: DetailShellGroup[] = [
+    {
+      id: 'uebersicht',
+      label: entityDetailTabLabel('uebersicht'),
+      icon: 'clipboard-list',
+      render: () => uebersichtInhalt,
     },
     {
-      id: 'notizen',
-      label: ACTIVITY_SECTIONS.notizen,
-      icon: 'messages',
-      render: () => notizenInhalt,
+      id: 'leistungen',
+      label: entityDetailTabLabel('leistungen'),
+      icon: 'tool',
+      count: posCount || undefined,
+      render: () => leistungenTabInhalt,
+    },
+    {
+      id: 'zahlung',
+      label: entityDetailTabLabel('zahlung'),
+      icon: 'receipt',
+      render: () => zahlungTabInhalt,
+    },
+    {
+      id: 'akte',
+      label: entityDetailTabLabel('akte'),
+      icon: 'files',
+      count: dokumenteCount || undefined,
+      render: () => akteInhalt,
+    },
+    {
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
+      icon: 'history',
+      count: timelineCount || undefined,
+      render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
     },
   ]
 
@@ -839,47 +1093,108 @@ export function AuftragDetailClient({
     <EntityDetailLayout
       phase="auftrag"
       projektKontext={projektKontext}
-      crumbBackHref="/vorgaenge?tab=auftrag"
+      crumbBackHref="/vorgaenge?tab=auftrag&lifecycle=offen"
       crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbSectionLabel="Aufträge"
+      breadcrumbTitle={projektName}
       className="space-y-4 pb-0"
+      wiedervorlageDatum={detail.wiedervorlage_datum}
+      wiedervorlageNotiz={detail.wiedervorlage_notiz}
+      wiedervorlageEntity="auftrag"
+      wiedervorlageEntityId={detail.id}
+      onWiedervorlageSaved={() => refresh()}
+      banner={
+        <AuftragNotfallBanner
+          istNotfall={Boolean(detail.ist_notfall)}
+          verguetung={detail.notfall_verguetung}
+        />
+      }
+      quickBar={quickBar}
       head={{
-        title: projektName,
+        title: name,
+        titleBadges: freigabeAusstehend ? (
+          <StatusBadge status="termin" label="Wartet auf Freigabe" />
+        ) : null,
         badges: (
-          <MockBadge kind={variantToMockBadgeKind(auftragStatus.variant)}>{auftragStatus.label}</MockBadge>
+          <StatusBadge status={detail.status} label={auftragStatus.label} />
         ),
         meta: headMeta,
+        titleTrailing: (
+          <PortalLoginIconButton
+            kundeId={detail.kunde_id ?? detail.kunden?.id}
+            label="Kundenportal öffnen"
+          />
+        ),
         actions: (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {!istStorniert ? (
-              <button
-                type="button"
-                className="btn primary sm inline-flex shrink-0 gap-1.5"
-                onClick={() => openRechnungErstellen()}
-              >
-                <MockIcon ctx="btn" n="file-invoice" size={15} />
-                Rechnung erstellen
-              </button>
-            ) : null}
-            {!istAbgeschlossen && !istStorniert ? (
-              <button
-                type="button"
-                className="btn ghost sm inline-flex shrink-0 gap-1.5"
-                onClick={openAuftragAbschliessen}
-              >
-                <MockIcon ctx="btn" n="checks" size={15} />
-                Auftrag abschließen
-              </button>
-            ) : null}
-            <ActionsMenu
-              trigger={
-                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
-                  <MockIcon ctx="btn" n="dots" size={18} />
-                </button>
+          <DetailActionsBar
+            sheetTitle="Auftrag"
+            primary={(() => {
+              if (istStorniert) return null
+              const cta = primaryCta('auftrag', detail.status, {
+                abnahmeFaellig: detail.status === 'abnahme',
+                rechnungBezahlt:
+                  detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
+                naechsterAbschlagSenden: Boolean(
+                  hatAbschlagsplan && naechsteRechnungAktion?.art === 'erstellen'
+                ),
+                naechsteRechnungAktion:
+                  detail.status === 'abgeschlossen'
+                    ? naechsteRechnungAktion === null
+                      ? null
+                      : naechsteRechnungAktion?.art
+                    : undefined,
+              })
+              if (!cta) return null
+              const onClick = () => {
+                if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
+                  openAuftragAbschliessen()
+                  return
+                }
+                if (cta.id === 'rechnung_versenden') {
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    versendeNaechsteRechnung(naechsteRechnungAktion.rechnungId)
+                    return
+                  }
+                  openRechnungErstellen({ naechsterAbschlag: hatAbschlagsplan })
+                  return
+                }
+                if (cta.id === 'als_bezahlt') {
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    markiereNaechsteRechnungBezahlt(naechsteRechnungAktion.rechnungId)
+                  }
+                  return
+                }
+                if (cta.id === 'rechnung_erstellen') {
+                  if (naechsteRechnungAktion?.rechnungId) {
+                    openRechnungBearbeiten(naechsteRechnungAktion.rechnungId)
+                    return
+                  }
+                  openRechnungErstellen({ naechsterAbschlag: hatAbschlagsplan })
+                  return
+                }
+                if (cta.id === 'bewertung_einholen') {
+                  setBewertungOpen(true)
+                }
               }
-              items={aktionenMenuItems}
-              sheetTitle="Auftrag"
-            />
-          </div>
+              return {
+                label: cta.label,
+                icon: cta.icon,
+                onClick,
+                disabled: pending,
+              }
+            })()}
+            secondary={
+              !istStorniert && detail.angebot_id
+                ? {
+                    label: 'Auftrag bearbeiten',
+                    icon: 'pencil',
+                    onClick: openAngebotKorrektur,
+                    disabled: pending,
+                  }
+                : null
+            }
+            menuItems={[]}
+          />
         ),
       }}
     >
@@ -887,14 +1202,6 @@ export function AuftragDetailClient({
         groups={detailShellGroups}
         value={mainTab}
         onChange={(id) => setMainTab(id as AuftragDetailTab)}
-      />
-
-      <AbschlussdokumentationModal
-        open={abschlussModal}
-        onClose={() => setAbschlussModal(false)}
-        auftragId={detail.id}
-        kundeName={name}
-        onDone={() => refresh()}
       />
 
       <RechnungAuswahlModal
@@ -906,14 +1213,20 @@ export function AuftragDetailClient({
         onNeueRechnung={() => {
           setRechnungAuswahlOpen(false)
           startTransition(async () => {
+            // Vorhandenen Abschlagsplan übernehmen (nächste offene Rate), sonst Plan im Wizard
             const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {
-              vollOhnePlan: true,
+              naechsterAbschlag: true,
             })
-            if (!res.ok) {
+            if (res.ok) {
+              openRechnungWizard(res.bootstrap)
+              return
+            }
+            const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            if (!fallback.ok) {
               toast.error(res.message)
               return
             }
-            openRechnungWizard(res.bootstrap)
+            openRechnungWizard(fallback.bootstrap)
           })
         }}
         onWeiterbearbeiten={(bootstrap) => {
@@ -965,14 +1278,24 @@ export function AuftragDetailClient({
         onSelect={startNachtragWizard}
       />
 
-      {mailCompose.modal}
-
-      <KundenportalLinkVersendenModal
-        open={portalLinkModalOpen}
-        onClose={() => setPortalLinkModalOpen(false)}
-        kundeId={detail.kunde_id}
-        fallbackEmail={detail.kunden?.email}
+      <HandwerkerBewertungModal
+        open={bewertungOpen}
+        onClose={() => setBewertungOpen(false)}
+        auftragId={detail.id}
+        ziele={handwerkerAusAuftrag(detail)}
+        onSaved={() => refresh()}
       />
+
+      <AuftragAbschliessenSheet
+        open={abschliessenOpen}
+        onClose={() => setAbschliessenOpen(false)}
+        auftragId={detail.id}
+        positionen={detail.auftrag_positionen ?? []}
+        onDone={() => refresh()}
+        onNachRechnung={() => openRechnungErstellen({ naechsterAbschlag: true })}
+      />
+
+      {quickActionSheets}
 
       {angebotKorrekturOpen && angebotKorrekturLead && angebotKorrekturBootstrap ? (
         <AngebotWizard

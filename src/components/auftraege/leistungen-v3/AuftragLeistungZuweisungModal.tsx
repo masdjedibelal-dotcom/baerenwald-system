@@ -1,10 +1,9 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { useEffect, useMemo, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
-import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import {
   sendAuftragLeistungenAnHandwerkerV3,
@@ -15,6 +14,9 @@ import type { AuftragPosition } from '@/lib/types'
 import { richTextToPlain } from '@/lib/rich-text'
 import { BEREICH_LABELS, cn } from '@/lib/utils'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
+import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 
 function ymdToDisplay(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
@@ -38,7 +40,7 @@ function parseNum(raw: string): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : null
 }
 
-function gewerkeLabel(h: HandwerkerGewerkListeEintrag & { gewerke?: string[] | null }): string {
+function gewerkeLabel(h: HandwerkerGewerkListeEintrag): string {
   const raw = h.gewerke ?? []
   if (!raw.length) return ''
   return raw
@@ -69,14 +71,13 @@ export function AuftragLeistungZuweisungModal({
   onDone: () => void
 }) {
   const [pending, startTransition] = useTransition()
-  const [loading, setLoading] = useState(false)
-  const [empfohlen, setEmpfohlen] = useState<HandwerkerGewerkListeEintrag[]>([])
-  const [alle, setAlle] = useState<HandwerkerGewerkListeEintrag[]>([])
+  const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
+  const [selectedHwRows, setSelectedHwRows] = useState<HandwerkerGewerkListeEintrag[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
-  const [vk, setVk] = useState('')
   const [partnerNetto, setPartnerNetto] = useState('')
   const [zeitModus, setZeitModus] = useState<'zeitraum' | 'tag'>('zeitraum')
   const [von, setVon] = useState('')
@@ -93,65 +94,55 @@ export function AuftragLeistungZuweisungModal({
     : `${selectedPositions.length} Leistungen`
 
   useEffect(() => {
-    if (!open || !sample) return
-    let cancelled = false
-    setLoading(true)
-    void listHandwerkerAuswahlFuerGewerk({
-      gewerkId: null,
-      gewerkSlug: sample.gewerk_slug,
-    }).then((r) => {
-      if (cancelled) return
-      if (!r.ok) {
-        toast.error(r.message)
-        setLoading(false)
-        return
-      }
-      setEmpfohlen(r.empfohlen)
-      setAlle(r.alle)
-      setLoading(false)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [open, sample])
-
-  useEffect(() => {
     if (!open) {
       setSelectedHwIds(new Set())
+      setSelectedHwRows([])
+      setPickerOpen(false)
+      setDirty(false)
       return
     }
     if (!sample) return
     setTitel(sample.leistung_name?.trim() || '')
     setBeschreibung(richTextToPlain(sample.beschreibung ?? '') || '')
-    setVk(numInput(sample.preis_fix))
     setPartnerNetto(numInput(sample.preis_partner))
     const start = sample.start_datum?.slice(0, 10) || ''
     const end = sample.end_datum?.slice(0, 10) || ''
     setVon(start ? ymdToDisplay(start) : '')
     setBis(end ? ymdToDisplay(end) : '')
     setZeitModus(start && end && start === end ? 'tag' : 'zeitraum')
-    if (sample.handwerker_id) setSelectedHwIds(new Set([sample.handwerker_id]))
-    else setSelectedHwIds(new Set())
+    if (sample.handwerker_id) {
+      setSelectedHwIds(new Set([sample.handwerker_id]))
+      // Zeile wird beim Öffnen des Pickers / Übernehmen befüllt; Platzhalter bis dahin
+      setSelectedHwRows((prev) => {
+        const hit = prev.find((h) => h.id === sample.handwerker_id)
+        if (hit) return [hit]
+        return [
+          {
+            id: sample.handwerker_id!,
+            name: 'Zugewiesener Partner',
+            firma: null,
+            telefon: null,
+            letzter_einsatz: null,
+            verfuegbar: true,
+            gewerke: sample.gewerk_slug ? [sample.gewerk_slug] : null,
+          },
+        ]
+      })
+    } else {
+      setSelectedHwIds(new Set())
+      setSelectedHwRows([])
+    }
+    setDirty(false)
   }, [open, sample])
 
-  const merged = useMemo(() => {
-    const seen = new Set<string>()
-    const out: HandwerkerGewerkListeEintrag[] = []
-    for (const h of [...empfohlen, ...alle]) {
-      if (seen.has(h.id)) continue
-      seen.add(h.id)
-      out.push(h)
-    }
-    return out
-  }, [empfohlen, alle])
-
-  function toggleHw(id: string) {
+  function removeHw(id: string) {
+    setDirty(true)
     setSelectedHwIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      next.delete(id)
       return next
     })
+    setSelectedHwRows((prev) => prev.filter((h) => h.id !== id))
   }
 
   function confirm() {
@@ -161,8 +152,11 @@ export function AuftragLeistungZuweisungModal({
       return
     }
     const primaryHw = ids[0]
-    const vkNum = parseNum(vk)
     const ekNum = parseNum(partnerNetto)
+    if (ekNum == null || ekNum <= 0) {
+      toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+      return
+    }
     const vonYmd = von.trim() ? displayToYmd(von) : null
     const bisYmd =
       zeitModus === 'tag'
@@ -176,7 +170,6 @@ export function AuftragLeistungZuweisungModal({
         const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
           leistung_name: titel.trim() || sample.leistung_name,
           beschreibung: beschreibung.trim() || null,
-          preis_fix: vkNum,
           preis_partner: ekNum,
           start_datum: vonYmd,
           end_datum: bisYmd,
@@ -220,32 +213,34 @@ export function AuftragLeistungZuweisungModal({
     })
   }
 
+  const ekOk = (() => {
+    const n = parseNum(partnerNetto)
+    return n != null && n > 0
+  })()
+  const canSend = !pending && selectedHwIds.size > 0 && ekOk
+
+  const selectedDisplay = useMemo(() => {
+    return selectedHwRows.filter((h) => selectedHwIds.has(h.id))
+  }, [selectedHwRows, selectedHwIds])
+
   return (
-    <MockModal
-      open={open}
-      onClose={onClose}
-      className="hw-anfrage-modal"
-      icon="send"
-      title="Handwerker anfragen"
-      sub={subtitle}
-      footer={
-        <>
-          <button type="button" className="hw-anfrage-cancel" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </button>
-          <div style={{ flex: 1 }} />
-          <MockBtn
-            kind="primary"
-            icon="send"
-            disabled={pending || loading || selectedHwIds.size === 0}
-            onClick={confirm}
-          >
-            {pending ? 'Senden…' : 'Anfrage senden'}
-          </MockBtn>
-        </>
-      }
-    >
-      <div className="hw-anfrage-body">
+    <>
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title="Zuweisung"
+        context="detail"
+        dirty={dirty}
+        size="lg"
+        compose
+        composeLabel={pending ? 'Senden…' : 'Senden'}
+        confirmBusy={pending}
+        confirmDisabled={!canSend}
+        onConfirm={confirm}
+        className="hw-anfrage-modal"
+        bodyClassName="hw-anfrage-body"
+      >
+        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
         {isSingle ? (
           <>
             <label className="hw-anfrage-field">
@@ -253,58 +248,65 @@ export function AuftragLeistungZuweisungModal({
               <input
                 className="input"
                 value={titel}
-                onChange={(e) => setTitel(e.target.value)}
+                onChange={(e) => {
+                  setDirty(true)
+                  setTitel(e.target.value)
+                }}
                 disabled={pending}
               />
             </label>
+
+            <div className="hw-anfrage-field">
+              <KiAssistFieldLabel
+                label="Beschreibung"
+                value={beschreibung}
+                onApply={(text) => {
+                  setDirty(true)
+                  setBeschreibung(text)
+                }}
+                extraHint="Leistungsbeschreibung für die Handwerker-Anfrage (Partner-Portal / Mail)."
+                disabled={pending}
+              >
+                <textarea
+                  className="input ta"
+                  rows={5}
+                  value={beschreibung}
+                  onChange={(e) => {
+                    setDirty(true)
+                    setBeschreibung(e.target.value)
+                  }}
+                  disabled={pending}
+                />
+              </KiAssistFieldLabel>
+            </div>
 
             <label className="hw-anfrage-field">
-              <span className="hw-anfrage-label">Beschreibung</span>
-              <textarea
-                className="input ta"
-                rows={2}
-                value={beschreibung}
-                onChange={(e) => setBeschreibung(e.target.value)}
-                disabled={pending}
-              />
+              <span className="hw-anfrage-label">Partner-EK netto *</span>
+              <div className="txt-prefix">
+                <span className="prefix" aria-hidden>
+                  €
+                </span>
+                <input
+                  type="number"
+                  className="input"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={partnerNetto}
+                  onChange={(e) => {
+                    setDirty(true)
+                    setPartnerNetto(e.target.value)
+                  }}
+                  disabled={pending}
+                  aria-invalid={!ekOk && partnerNetto.trim() !== ''}
+                />
+              </div>
+              {!ekOk ? (
+                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                  Pflicht — größer als 0 €
+                </span>
+              ) : null}
             </label>
-
-            <div className="hw-anfrage-price-row">
-              <label className="hw-anfrage-field">
-                <span className="hw-anfrage-label">Verkaufspreis (netto)</span>
-                <div className="txt-prefix">
-                  <span className="prefix" aria-hidden>
-                    €
-                  </span>
-                  <input
-                    type="number"
-                    className="input"
-                    step="0.01"
-                    min="0"
-                    value={vk}
-                    onChange={(e) => setVk(e.target.value)}
-                    disabled={pending}
-                  />
-                </div>
-              </label>
-              <label className="hw-anfrage-field">
-                <span className="hw-anfrage-label">Partner Netto (Richtwert)</span>
-                <div className="txt-prefix">
-                  <span className="prefix" aria-hidden>
-                    €
-                  </span>
-                  <input
-                    type="number"
-                    className="input"
-                    step="0.01"
-                    min="0"
-                    value={partnerNetto}
-                    onChange={(e) => setPartnerNetto(e.target.value)}
-                    disabled={pending}
-                  />
-                </div>
-              </label>
-            </div>
 
             <div className="hw-anfrage-section">
               <div className="hw-anfrage-section-head">
@@ -314,7 +316,10 @@ export function AuftragLeistungZuweisungModal({
                 <button
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
-                  onClick={() => setZeitModus('zeitraum')}
+                  onClick={() => {
+                    setDirty(true)
+                    setZeitModus('zeitraum')
+                  }}
                   disabled={pending}
                 >
                   Zeitraum
@@ -323,6 +328,7 @@ export function AuftragLeistungZuweisungModal({
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
                   onClick={() => {
+                    setDirty(true)
                     setZeitModus('tag')
                     if (von) setBis(von)
                   }}
@@ -334,38 +340,84 @@ export function AuftragLeistungZuweisungModal({
               <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
                 <label className="hw-anfrage-field">
                   <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
-                  <input
-                    type="date"
-                    className="input"
-                    value={von.trim() ? displayToYmd(von) : ''}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setVon(v ? ymdToDisplay(v) : '')
-                      if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
-                    }}
-                    disabled={pending}
-                  />
+                  <div className="hw-anfrage-date-field">
+                    <input
+                      type="date"
+                      className="input"
+                      value={von.trim() ? displayToYmd(von) : ''}
+                      onChange={(e) => {
+                        setDirty(true)
+                        const v = e.target.value
+                        setVon(v ? ymdToDisplay(v) : '')
+                        if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
+                      }}
+                      disabled={pending}
+                    />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending}
+                      aria-label="Kalender öffnen"
+                      onClick={(e) => {
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                          input?.click()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
+                  </div>
                 </label>
                 {zeitModus === 'zeitraum' ? (
                   <label className="hw-anfrage-field">
                     <span className="hw-anfrage-label">Bis</span>
-                    <input
-                      type="date"
-                      className="input"
-                      value={bis.trim() ? displayToYmd(bis) : ''}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending}
-                    />
+                    <div className="hw-anfrage-date-field">
+                      <input
+                        type="date"
+                        className="input"
+                        value={bis.trim() ? displayToYmd(bis) : ''}
+                        onChange={(e) => {
+                          setDirty(true)
+                          const v = e.target.value
+                          setBis(v ? ymdToDisplay(v) : '')
+                        }}
+                        disabled={pending}
+                      />
+                      <button
+                        type="button"
+                        className="hw-anfrage-date-icon"
+                        tabIndex={-1}
+                        disabled={pending}
+                        aria-label="Kalender öffnen"
+                        onClick={(e) => {
+                          const input = (e.currentTarget.parentElement?.querySelector(
+                            'input[type="date"]'
+                          ) ?? null) as HTMLInputElement | null
+                          try {
+                            input?.showPicker?.()
+                          } catch {
+                            input?.focus()
+                            input?.click()
+                          }
+                        }}
+                      >
+                        <MockIcon ctx="btn" n="calendar" size={15} />
+                      </button>
+                    </div>
                   </label>
                 ) : null}
               </div>
             </div>
           </>
         ) : (
-          <p className="text-sm text-bw-text-muted">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             {selectedPositions.length} Leistungen — Partner Netto und Handwerker gelten für alle
             Ausgewählten.
           </p>
@@ -373,7 +425,7 @@ export function AuftragLeistungZuweisungModal({
 
         {!isSingle ? (
           <label className="hw-anfrage-field">
-            <span className="hw-anfrage-label">Partner Netto (Richtwert)</span>
+            <span className="hw-anfrage-label">Partner-EK netto *</span>
             <div className="txt-prefix">
               <span className="prefix" aria-hidden>
                 €
@@ -382,49 +434,40 @@ export function AuftragLeistungZuweisungModal({
                 type="number"
                 className="input"
                 step="0.01"
-                min="0"
+                min="0.01"
+                required
                 value={partnerNetto}
-                onChange={(e) => setPartnerNetto(e.target.value)}
+                onChange={(e) => {
+                  setDirty(true)
+                  setPartnerNetto(e.target.value)
+                }}
                 disabled={pending}
+                aria-invalid={!ekOk && partnerNetto.trim() !== ''}
               />
             </div>
+            {!ekOk ? (
+              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                Pflicht — größer als 0 €
+              </span>
+            ) : null}
           </label>
         ) : null}
 
         <div className="hw-anfrage-section">
           <div className="hw-anfrage-section-head">
             <span>Handwerker anfragen</span>
-            <span>{selectedHwIds.size} ausgewählt</span>
+            {selectedHwIds.size > 0 ? <span>{selectedHwIds.size} ausgewählt</span> : null}
           </div>
 
-          {loading ? (
-            <p className="text-sm text-bw-text-muted">Lade Handwerker…</p>
-          ) : merged.length === 0 ? (
-            <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
-          ) : (
+          {selectedDisplay.length > 0 ? (
             <ul className="hw-anfrage-list">
-              {merged.map((h) => {
-                const checked = selectedHwIds.has(h.id)
-                const label =
-                  gewerkeLabel(h as HandwerkerGewerkListeEintrag & { gewerke?: string[] | null }) ||
-                  sample?.gewerk_name ||
-                  '—'
-                const rating = h.bewertung ?? null
+              {selectedDisplay.map((h) => {
                 const displayName = h.firma?.trim() || h.name
+                const label = gewerkeLabel(h) || sample?.gewerk_name || '—'
+                const rating = h.bewertung ?? null
                 return (
                   <li key={h.id}>
-                    <button
-                      type="button"
-                      className={cn('hw-anfrage-row', checked && 'is-selected')}
-                      onClick={() => toggleHw(h.id)}
-                      disabled={pending}
-                    >
-                      <span
-                        className={cn('hw-anfrage-check', checked && 'is-checked')}
-                        aria-hidden
-                      >
-                        {checked ? '✓' : ''}
-                      </span>
+                    <div className="hw-anfrage-row is-selected">
                       <span className="hw-anfrage-avatar" aria-hidden>
                         {handwerkerInitialen(displayName)}
                       </span>
@@ -440,14 +483,50 @@ export function AuftragLeistungZuweisungModal({
                           ) : null}
                         </span>
                       </span>
-                    </button>
+                      <button
+                        type="button"
+                        className="hw-anfrage-remove"
+                        aria-label={`${displayName} entfernen`}
+                        disabled={pending}
+                        onClick={() => removeHw(h.id)}
+                      >
+                        <MockIcon ctx="btn" n="x" size={14} />
+                      </button>
+                    </div>
                   </li>
                 )
               })}
             </ul>
+          ) : (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Noch kein Handwerker gewählt.</p>
           )}
+
+          <button
+            type="button"
+            className="pos-add-btn w-full"
+            disabled={pending}
+            onClick={() => setPickerOpen(true)}
+          >
+            <span className="icon-wrap">
+              <MockIcon ctx="default" n="search" size={16} />
+            </span>
+            <span>Handwerker suchen</span>
+          </button>
         </div>
-      </div>
-    </MockModal>
+      </EditorSheet>
+
+      <HandwerkerSuchenSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        gewerke={gewerke}
+        preferredGewerkSlug={sample?.gewerk_slug ?? null}
+        selectedIds={selectedHwIds}
+        onConfirm={(ids, rows) => {
+          setDirty(true)
+          setSelectedHwIds(ids)
+          setSelectedHwRows(rows)
+        }}
+      />
+    </>
   )
 }
