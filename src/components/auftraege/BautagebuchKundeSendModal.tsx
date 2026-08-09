@@ -182,7 +182,6 @@ export function BautagebuchKundeSendModal({
             setDirty(true)
           }}
           disabled={pending}
-          dokumentLabel="Projekt-Update"
         />
 
         <div className="flex gap-4 border-b border-bw-border pb-4 text-[length:var(--fs-text)]">

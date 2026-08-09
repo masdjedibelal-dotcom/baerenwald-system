@@ -287,13 +287,31 @@ export function gewerkColor(index: number): string {
   return GEWERK_COLORS[index % GEWERK_COLORS.length]!
 }
 
-/** Umsatz nach Gewerk aus Angebotspositionen — nur abgeschlossene Vorgänge. */
+function addGewerkPositionen(map: Map<string, number>, positionen: unknown) {
+  const pos = normalizeAngebotPositionen(positionen)
+  for (const p of pos) {
+    const name = (p.gewerk_name || p.gewerk_slug || 'Sonstiges').trim() || 'Sonstiges'
+    const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
+    if (line <= 0) continue
+    map.set(name, (map.get(name) ?? 0) + line)
+  }
+}
+
+/**
+ * Umsatz nach Gewerk:
+ * - abgeschlossene Aufträge/Leads über Angebotspositionen
+ * - plus Rechnungspositionen (nicht storniert)
+ */
 export function buildGewerkUmsatz(
   angebote: Array<{
     positionen?: unknown
     leads?: { status?: string | null } | { status?: string | null }[] | null
     auftraege?: { status?: string | null } | { status?: string | null }[] | null
-  }>
+  }>,
+  rechnungen: Array<{
+    positionen?: unknown
+    status?: string | null
+  }> = []
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
   const map = new Map<string, number>()
 
@@ -303,14 +321,12 @@ export function buildGewerkUmsatz(
     const leadDone = String(lead?.status ?? '').toLowerCase() === 'abgeschlossen'
     const auftragDone = String(auftrag?.status ?? '').toLowerCase() === 'abgeschlossen'
     if (!leadDone && !auftragDone) continue
+    addGewerkPositionen(map, ang.positionen)
+  }
 
-    const pos = normalizeAngebotPositionen(ang.positionen)
-    for (const p of pos) {
-      const name = (p.gewerk_name || p.gewerk_slug || 'Sonstiges').trim() || 'Sonstiges'
-      const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
-      if (line <= 0) continue
-      map.set(name, (map.get(name) ?? 0) + line)
-    }
+  for (const r of rechnungen) {
+    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
+    addGewerkPositionen(map, r.positionen)
   }
 
   const gesamt = Array.from(map.values()).reduce((a, b) => a + b, 0)
@@ -388,8 +404,8 @@ export function buildHandwerkerRanking(
     .map(([id, a]) => ({
       id,
       name: a.name,
-      sub: Array.from(a.gewerke).slice(0, 2).join(' · ') || '—',
-      vorgaenge: a.leads.size + a.angebote.size + a.auftraege.size,
+      sub: '',
+      vorgaenge: a.auftraege.size,
       umsatz: a.umsatz,
       ek: a.ek,
     }))
@@ -397,21 +413,21 @@ export function buildHandwerkerRanking(
     .slice(0, 8)
 }
 
+/** Top-Kunden: nur Aufträge + Rechnungen (keine Anfragen/Angebote). */
 export function buildKundenRanking(
   rows: Array<{
     kunde_id: string
     kunde_name: string
-    lead_id: string | null
-    angebot_id: string | null
-    auftrag_id: string | null
-    auftrag_netto: number
+    auftrag_id?: string | null
+    auftrag_netto?: number
+    rechnung_id?: string | null
+    rechnung_netto?: number
   }>
 ): RankingZeile[] {
   type Acc = {
     name: string
-    leads: Set<string>
-    angebote: Set<string>
     auftraege: Set<string>
+    rechnungen: Set<string>
     umsatz: number
   }
   const map = new Map<string, Acc>()
@@ -421,20 +437,22 @@ export function buildKundenRanking(
     if (!acc) {
       acc = {
         name: r.kunde_name,
-        leads: new Set(),
-        angebote: new Set(),
         auftraege: new Set(),
+        rechnungen: new Set(),
         umsatz: 0,
       }
       map.set(r.kunde_id, acc)
     }
-    if (r.lead_id) acc.leads.add(r.lead_id)
-    if (r.angebot_id) acc.angebote.add(r.angebot_id)
-    if (r.auftrag_id) {
-      if (!acc.auftraege.has(r.auftrag_id)) {
-        acc.auftraege.add(r.auftrag_id)
-        acc.umsatz += r.auftrag_netto
-      }
+    if (r.kunde_name && r.kunde_name !== 'Kunde') acc.name = r.kunde_name
+    const auftragId = (r.auftrag_id ?? '').trim()
+    if (auftragId && !acc.auftraege.has(auftragId)) {
+      acc.auftraege.add(auftragId)
+      acc.umsatz += Number(r.auftrag_netto) || 0
+    }
+    const rechnungId = (r.rechnung_id ?? '').trim()
+    if (rechnungId && !acc.rechnungen.has(rechnungId)) {
+      acc.rechnungen.add(rechnungId)
+      acc.umsatz += Number(r.rechnung_netto) || 0
     }
   }
 
@@ -442,16 +460,11 @@ export function buildKundenRanking(
     .map(([id, a]) => ({
       id,
       name: a.name,
-      sub: [
-        a.leads.size ? `${a.leads.size} Anfragen` : null,
-        a.angebote.size ? `${a.angebote.size} Angebote` : null,
-        a.auftraege.size ? `${a.auftraege.size} Aufträge` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ') || '—',
-      vorgaenge: a.leads.size + a.angebote.size + a.auftraege.size,
+      sub: '',
+      vorgaenge: a.auftraege.size + a.rechnungen.size,
       umsatz: a.umsatz,
     }))
+    .filter((r) => r.vorgaenge > 0)
     .sort((a, b) => b.umsatz - a.umsatz || b.vorgaenge - a.vorgaenge)
     .slice(0, 8)
 }
@@ -466,50 +479,38 @@ export type FunnelStufe = {
 
 export function buildVertriebsFunnel(input: {
   anfragen: number
-  /** Angenommene Angebote (Lead-eindeutig empfohlen). */
+  /** Erstellte Angebote (Lead-eindeutig empfohlen). */
   angebote: number
-  /** Aktive oder abgeschlossene Aufträge (Lead-eindeutig empfohlen). */
+  /** Aufträge gesamt (aktiv + erledigt, Lead-eindeutig empfohlen). */
   auftraege: number
-}): { stufen: FunnelStufe[]; conversionGesamt: number; dropoffs: { after: string; lost: number; rate: number }[] } {
-  // Monoton halten: Folge-Stufen dürfen die vorherige nicht übersteigen (1:n-Schutz)
+}): { stufen: FunnelStufe[]; conversionGesamt: number } {
+  // Monoton: Anfragen ≥ Angebote ≥ Aufträge
   const a = Math.max(0, input.anfragen)
   const b = Math.min(Math.max(0, input.angebote), a)
   const c = Math.min(Math.max(0, input.auftraege), b)
+
+  const rateOf = (n: number) => (a > 0 ? Math.round((n / a) * 100) : 0)
 
   const stufen: FunnelStufe[] = [
     { key: 'anfrage', label: 'Anfragen', count: a, rate: 100, color: '#3B82F6' },
     {
       key: 'angebot',
-      label: 'Angebote angenommen',
+      label: 'Angebote erstellt',
       count: b,
-      rate: a > 0 ? Math.round((b / a) * 100) : 0,
+      rate: rateOf(b),
       color: '#F59E0B',
     },
     {
       key: 'auftrag',
-      label: 'Aufträge aktiv/fertig',
+      label: 'Aufträge',
       count: c,
-      rate: a > 0 ? Math.round((c / a) * 100) : 0,
+      rate: rateOf(c),
       color: '#2E7D52',
     },
   ]
 
-  const dropoffs: { after: string; lost: number; rate: number }[] = []
-  if (a > 0) {
-    const lost1 = Math.max(0, a - b)
-    dropoffs.push({ after: 'anfrage', lost: lost1, rate: Math.round((lost1 / a) * 100) })
-  }
-  if (b > 0) {
-    const lost2 = Math.max(0, b - c)
-    dropoffs.push({
-      after: 'angebot',
-      lost: lost2,
-      rate: Math.round((lost2 / b) * 100),
-    })
-  }
-
   const conversionGesamt = a > 0 ? Math.round((c / a) * 100) : 0
-  return { stufen, conversionGesamt, dropoffs }
+  return { stufen, conversionGesamt }
 }
 
 /** Zählt eindeutige Vorgänge (Lead-ID), Fallback ohne Lead = eigene ID. */

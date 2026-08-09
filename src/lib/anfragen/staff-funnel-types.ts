@@ -76,6 +76,8 @@ export type StaffFunnelState = {
   beratungText: string
   istBauprojekt: boolean
   freitext: string
+  /** Akut/Notfall: Direktbeauftragung ohne Angebot */
+  alsAkut: boolean
 }
 
 /**
@@ -306,6 +308,7 @@ export function createInitialStaffFunnelState(
     beratungText: '',
     istBauprojekt: false,
     freitext: '',
+    alsAkut: false,
     ...partial,
   }
 }
