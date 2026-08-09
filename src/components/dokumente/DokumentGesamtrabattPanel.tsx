@@ -2,7 +2,6 @@
 
 import { Percent, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import {
   formatEurBetrag,
   gesamtrabattBetrag,
@@ -91,11 +90,13 @@ export function DokumentGesamtrabattPanel({
           <label className="lex-form-field form-field w-[100px] shrink-0">
             <span className="form-field-label">Wert</span>
             <div className="relative">
-              <ClearableNumberInput
+              <input
+                type="number"
                 min={0}
-                className="input w-full pr-7"
-                value={rabatt.wert}
-                onValueChange={(wert) => patchRabatt({ wert })}
+                step="0.01"
+                className="input w-full pr-7 tabular-nums"
+                value={rabatt.wert || ''}
+                onChange={(e) => patchRabatt({ wert: Math.max(0, Number(e.target.value) || 0) })}
               />
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-bw-text-muted">
                 {rabatt.modus === 'prozent' ? '%' : '€'}
@@ -180,11 +181,13 @@ export function DokumentGesamtrabattPanel({
             <span className="input-label">{rabatt.modus === 'prozent' ? 'Prozent' : 'Betrag'}</span>
             <div className="txt-prefix">
               <span className="prefix">{rabatt.modus === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
+              <input
                 className="input"
+                type="number"
                 min={0}
-                value={rabatt.wert}
-                onValueChange={(wert) => patchRabatt({ wert })}
+                step={rabatt.modus === 'prozent' ? '0.5' : '0.01'}
+                value={rabatt.wert || ''}
+                onChange={(e) => patchRabatt({ wert: Math.max(0, Number(e.target.value) || 0) })}
               />
             </div>
           </label>

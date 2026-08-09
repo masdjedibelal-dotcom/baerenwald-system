@@ -1,10 +1,8 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { Textarea } from '@/components/ui/Textarea'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
   type BaustoppTyp,
   beendeBaustopp,
@@ -68,21 +66,15 @@ function seitText(iso: string | null) {
 export function AuftragNachtragBaustoppSection({
   detail,
   onChanged,
-  vertragNachtragVerfuegbar = false,
-  onVertragNachtragErstellen,
 }: {
   detail: AuftragDetail
   onChanged: () => void
-  /** Hauptvertrag vorhanden — Vertrags-Nachtrag-Wizard (gleiche Aktion wie früher im ⋯). */
-  vertragNachtragVerfuegbar?: boolean
-  onVertragNachtragErstellen?: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [nachtragOpen, setNachtragOpen] = useState(false)
   const [grund, setGrund] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [posText, setPosText] = useState('')
-
   const [posMin, setPosMin] = useState('')
   const [posMax, setPosMax] = useState('')
   const [hwBest, setHwBest] = useState(false)
@@ -147,7 +139,7 @@ export function AuftragNachtragBaustoppSection({
   return (
     <div className="space-y-6 border-b border-border pb-8">
       {hwWarn ? (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-[length:var(--fs-text)] text-amber-950">
+        <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-950">
           <p className="font-semibold">
             <IconText icon={AlertTriangle}>Kunden-Bestätigung liegt vor</IconText>
           </p>
@@ -157,7 +149,7 @@ export function AuftragNachtragBaustoppSection({
           {ersteHw?.handwerker?.telefon ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-[length:var(--fs-text)] font-medium text-white"
+                className="inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-sm font-medium text-white"
                 href={`https://wa.me/${ersteHw.handwerker.telefon.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -165,7 +157,7 @@ export function AuftragNachtragBaustoppSection({
                 Handwerker kontaktieren (WhatsApp)
               </a>
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
+                className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary"
                 href={`tel:${ersteHw.handwerker.telefon}`}
               >
                 Anrufen
@@ -175,23 +167,16 @@ export function AuftragNachtragBaustoppSection({
         </div>
       ) : null}
 
-      <section id="auftrag-nachtrag-section">
+      <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Nachträge</h2>
-          <div className="flex flex-wrap gap-2">
-            {vertragNachtragVerfuegbar && onVertragNachtragErstellen ? (
-              <Button type="button" variant="secondary" onClick={onVertragNachtragErstellen}>
-                Vertrags-Änderung
-              </Button>
-            ) : null}
-            <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
-              Änderung anlegen
-            </Button>
-          </div>
+          <h2 className="text-lg font-semibold text-ink">Nachträge</h2>
+          <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
+            Nachtrag anlegen
+          </Button>
         </div>
 
         {nachtraege.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-muted">Keine Nachträge.</p>
+          <p className="text-sm text-muted">Keine Nachträge.</p>
         ) : (
           <ul className="space-y-3">
             {nachtraege.map((n) => {
@@ -200,14 +185,14 @@ export function AuftragNachtragBaustoppSection({
               const summe = formatPreis(undefined, n.gesamt_min, n.gesamt_max)
 
               return (
-                <Card key={n.id} className="space-y-3 p-4 text-[length:var(--fs-text)]">
+                <Card key={n.id} className="space-y-3 p-4 text-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-ink">{n.grund}</p>
                       {n.beschreibung ? <p className="text-muted">{n.beschreibung}</p> : null}
-                      <p className="mt-1 text-[length:var(--fs-meta)] text-muted">Summe: {summe}</p>
+                      <p className="mt-1 text-xs text-muted">Summe: {summe}</p>
                     </div>
-                    <label className="flex items-center gap-2 text-[length:var(--fs-meta)]">
+                    <label className="flex items-center gap-2 text-xs">
                       <input
                         type="checkbox"
                         checked={Boolean(n.handwercher_bestaetigt)}
@@ -225,7 +210,7 @@ export function AuftragNachtragBaustoppSection({
                   </div>
 
                   {pos.length > 0 ? (
-                    <ul className="divide-y divide-border rounded border border-border text-[length:var(--fs-meta)]">
+                    <ul className="divide-y divide-border rounded border border-border text-xs">
                       {pos.map((p) => (
                         <li key={p.id} className="flex justify-between gap-2 px-2 py-1">
                           <span className="min-w-0 truncate">{p.beschreibung}</span>
@@ -239,14 +224,14 @@ export function AuftragNachtragBaustoppSection({
                   ) : null}
 
                   {n.status === 'abgelehnt' ? (
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[length:var(--fs-meta)] text-red-900">
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
                       <p className="font-medium">
                         <IconText icon={X}>Abgelehnt</IconText>
                       </p>
                       <p>{n.abgelehnt_grund ?? '—'}</p>
                     </div>
                   ) : n.status === 'akzeptiert' || n.kunde_bestaetigt_at ? (
-                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-meta)] text-emerald-950">
+                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
                       <p className="font-medium">
                         <IconText icon={Check}>Akzeptiert</IconText>
                       </p>
@@ -282,7 +267,7 @@ export function AuftragNachtragBaustoppSection({
                       ) : null}
                     </div>
                   ) : n.status === 'gesendet' ? (
-                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
                       <p className="font-medium">
                         <IconText icon={Send}>Gesendet</IconText>
                       </p>
@@ -312,7 +297,7 @@ export function AuftragNachtragBaustoppSection({
                               <IconText icon={Mail}>Per Mail senden</IconText>
                             </Button>
                             <a
-                              className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
+                              className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-sm font-medium text-primary"
                               href={`https://wa.me/?text=${encodeURIComponent(
                                 `Guten Tag, hier ist Ihr Link zur Bestätigung des Nachtrags (${summe}): ${link}`
                               )}`}
@@ -344,7 +329,7 @@ export function AuftragNachtragBaustoppSection({
                       ) : null}
                     </div>
                   ) : (
-                    <div className="rounded bg-canvas px-2 py-2 text-[length:var(--fs-meta)] text-muted">
+                    <div className="rounded bg-canvas px-2 py-2 text-xs text-muted">
                       <p className="font-medium text-ink">
                         <IconText icon={Clock}>Entwurf</IconText>
                       </p>
@@ -379,17 +364,17 @@ export function AuftragNachtragBaustoppSection({
       {detail.status === 'in_arbeit' ? (
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Baustopps</h2>
-            <Button type="button" variant="primary" onClick={() => setBaustoppOpen(true)}>
+            <h2 className="text-lg font-semibold text-ink">Baustopps</h2>
+            <Button type="button" variant="secondary" onClick={() => setBaustoppOpen(true)}>
               <IconText icon={CloudRain}>Baustopp melden</IconText>
             </Button>
           </div>
           {aktiv.length > 0 ? (
-            <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-[length:var(--fs-text)] text-orange-950">
+            <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-950">
               <p className="font-semibold">
                 <IconText icon={CloudRain}>Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</IconText>
               </p>
-              <p className="text-[length:var(--fs-meta)]">{aktiv[0]!.grund}</p>
+              <p className="text-xs">{aktiv[0]!.grund}</p>
               {aktiv.map((b) => (
                 <Button
                   key={b.id}
@@ -414,19 +399,10 @@ export function AuftragNachtragBaustoppSection({
             </div>
           ) : null}
           {baustopps.length === 0 ? (
-            <p className="text-[length:var(--fs-text)] text-muted">
-              Keine Baustopps erfasst.{' '}
-              <button
-                type="button"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-                onClick={() => setBaustoppOpen(true)}
-              >
-                Baustopp jetzt melden
-              </button>
-            </p>
+            <p className="text-sm text-muted">Keine Baustopps erfasst.</p>
           ) : (
             <>
-              <ul className="space-y-2 text-[length:var(--fs-text)]">
+              <ul className="space-y-2 text-sm">
                 {baustopps.map((b) => (
                   <li key={b.id} className="rounded border border-border p-2">
                     <p className="font-medium">
@@ -434,14 +410,14 @@ export function AuftragNachtragBaustoppSection({
                       {b.ende_datum ? ` – ${formatDatum(b.ende_datum)}` : ' (offen)'}
                     </p>
                     <p className="text-muted">{b.grund}</p>
-                    <p className="text-[length:var(--fs-meta)] text-muted">
+                    <p className="text-xs text-muted">
                       Verzögerung: {b.verzoegerung_tage ?? '—'} Tage
                       {b.neues_enddatum ? ` · neues Ende: ${formatDatum(b.neues_enddatum)}` : ''}
                     </p>
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[length:var(--fs-text)] font-medium text-ink">
+              <p className="mt-2 text-sm font-medium text-ink">
                 Bisher {summeVerzug} Tage Verzögerung durch Baustopps
               </p>
             </>
@@ -450,7 +426,7 @@ export function AuftragNachtragBaustoppSection({
       ) : null}
 
       <Modal open={nachtragOpen} onClose={() => setNachtragOpen(false)} title="Nachtrag erstellen" size="md">
-            <div className="space-y-3 text-[length:var(--fs-text)]">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 <span className="font-medium">Grund</span>
                 <input
@@ -459,30 +435,18 @@ export function AuftragNachtragBaustoppSection({
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 />
               </label>
-              <KiAssistFieldLabel
+              <Textarea
                 label="Beschreibung"
                 value={beschreibung}
-                onApply={setBeschreibung}
-                extraHint="Nachtrag-Beschreibung für den Kunden."
-              >
-                <Textarea
-                  value={beschreibung}
-                  onChange={(e) => setBeschreibung(e.target.value)}
-                  rows={3}
-                />
-              </KiAssistFieldLabel>
-              <KiAssistFieldLabel
+                onChange={(e) => setBeschreibung(e.target.value)}
+                rows={3}
+              />
+              <Textarea
                 label="Position (Beschreibung)"
                 value={posText}
-                onApply={setPosText}
-                extraHint="Leistungsbeschreibung der Nachtragsposition."
-              >
-                <Textarea
-                  value={posText}
-                  onChange={(e) => setPosText(e.target.value)}
-                  rows={2}
-                />
-              </KiAssistFieldLabel>
+                onChange={(e) => setPosText(e.target.value)}
+                rows={2}
+              />
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="font-medium">Preis min (€)</span>
@@ -505,7 +469,7 @@ export function AuftragNachtragBaustoppSection({
                   />
                 </label>
               </div>
-              <label className="flex items-start gap-2 text-[length:var(--fs-meta)]">
+              <label className="flex items-start gap-2 text-xs">
                 <input type="checkbox" checked={hwBest} onChange={(e) => setHwBest(e.target.checked)} />
                 <span>
                   Handwerker hat die Mehrkosten bestätigt?{' '}
@@ -559,7 +523,7 @@ export function AuftragNachtragBaustoppSection({
         title="Baustopp melden"
         size="md"
       >
-            <div className="space-y-3 text-[length:var(--fs-text)]">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 <span className="font-medium">Typ</span>
                 <select
@@ -599,10 +563,10 @@ export function AuftragNachtragBaustoppSection({
                   className="mt-1 w-full rounded-lg border border-border px-3 py-2"
                 />
               </label>
-              <p className="text-[length:var(--fs-meta)] text-muted">
+              <p className="text-xs text-muted">
                 Aktuelles Enddatum Auftrag: <strong>{detail.end_datum ? formatDatum(detail.end_datum) : '—'}</strong>
               </p>
-              <p className="text-[length:var(--fs-meta)] text-muted">
+              <p className="text-xs text-muted">
                 Neues Enddatum (Vorschau): <strong>{formatDatum(neuesEndPreview)}</strong>
               </p>
               <label className="flex items-center gap-2">

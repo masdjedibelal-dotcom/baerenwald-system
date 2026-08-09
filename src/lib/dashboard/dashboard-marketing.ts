@@ -1,8 +1,8 @@
 import 'server-only'
 
 import {
-  type DashboardZeitraumFilter,
-  getDashboardZeitraumRange,
+  type DashboardZeitraum,
+  zeitraumStartIso,
 } from '@/lib/dashboard/dashboard-analytics'
 import { fetchGscSummary } from '@/lib/ki-hub/sources/google'
 import {
@@ -11,6 +11,8 @@ import {
   type MarketingDateRange,
   type RechnerFunnelStep,
 } from '@/lib/ki-hub/sources/posthog'
+import { fetchResendSummary } from '@/lib/ki-hub/sources/resend'
+
 export type DashboardMarketingTopQuery = {
   query: string
   clicks: number
@@ -38,6 +40,9 @@ export type DashboardMarketingSnapshot = {
   gscOk: boolean
   gscError: string | null
   topQueries: DashboardMarketingTopQuery[]
+  deliveryRatePct: number | null
+  resendOk: boolean
+  resendError: string | null
   /** Rechner-Funnel (PostHog) */
   funnelOk: boolean
   funnelError: string | null
@@ -48,20 +53,18 @@ export type DashboardMarketingSnapshot = {
 
 /** Datumsspanne für Marketing-Quellen — entspricht dem Dashboard-Zeitfilter. */
 export function marketingDateRange(
-  filter: DashboardZeitraumFilter,
+  z: DashboardZeitraum,
   now = new Date()
 ): MarketingDateRange {
-  const range = getDashboardZeitraumRange(filter, now)
-  if (range) {
-    return {
-      from: range.from.toISOString().slice(0, 10),
-      to: range.to.toISOString().slice(0, 10),
-    }
+  const to = now.toISOString().slice(0, 10)
+  const startIso = zeitraumStartIso(z, now)
+  if (startIso) {
+    return { from: startIso.slice(0, 10), to }
   }
   // „Gesamt“: Search Console liefert max. ~16 Monate
   const d = new Date(now)
   d.setMonth(d.getMonth() - 16)
-  return { from: d.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+  return { from: d.toISOString().slice(0, 10), to }
 }
 
 /** Feste Meilensteine — Rohschritte werden per Label zugeordnet und zusammengefasst. */
@@ -146,11 +149,11 @@ function buildFunnelStages(
 
 /** Leichtes Laden der Marketing-Zahlen für das Haupt-Dashboard (ohne vollen KI-Hub-Payload). */
 export async function loadDashboardMarketing(
-  zeitraumFilter: DashboardZeitraumFilter = { preset: 'gesamt', von: '', bis: '' }
+  zeitraum: DashboardZeitraum = 'all'
 ): Promise<DashboardMarketingSnapshot> {
-  const range = marketingDateRange(zeitraumFilter)
+  const range = marketingDateRange(zeitraum)
 
-  const [posthog, funnel, google] = await Promise.all([
+  const [posthog, funnel, google, resend] = await Promise.all([
     fetchPostHogSummary(range).catch(() => ({
       status: 'unavailable' as const,
       error: 'PostHog nicht erreichbar',
@@ -164,6 +167,11 @@ export async function loadDashboardMarketing(
     fetchGscSummary(range).catch(() => ({
       status: 'unavailable' as const,
       error: 'Search Console nicht erreichbar',
+      data: undefined,
+    })),
+    fetchResendSummary().catch(() => ({
+      status: 'unavailable' as const,
+      error: 'Resend nicht erreichbar',
       data: undefined,
     })),
   ])
@@ -197,6 +205,10 @@ export async function loadDashboardMarketing(
         }))
       : []
 
+  const rateRaw = resend.data?.delivery_rate_pct
+  const deliveryRatePct =
+    typeof rateRaw === 'number' && Number.isFinite(rateRaw) ? rateRaw : null
+
   const rechnerStart =
     funnel.status === 'ok' && funnel.data ? funnel.data.start : null
   const rechnerLead =
@@ -215,6 +227,9 @@ export async function loadDashboardMarketing(
     gscOk: google.status === 'ok',
     gscError: google.status === 'ok' ? null : (google.error ?? 'Nicht verbunden'),
     topQueries,
+    deliveryRatePct,
+    resendOk: resend.status === 'ok',
+    resendError: resend.status === 'ok' ? null : (resend.error ?? 'Nicht verbunden'),
     funnelOk: funnel.status === 'ok',
     funnelError:
       funnel.status === 'ok'

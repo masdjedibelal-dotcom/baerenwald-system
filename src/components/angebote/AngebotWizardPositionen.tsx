@@ -13,7 +13,6 @@ import {
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { PosAddRow } from '@/components/posboard/PosAddRow'
 import { Button } from '@/components/ui/Button'
-import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
 import { Textarea } from '@/components/ui/Textarea'
@@ -95,7 +94,10 @@ function KostenverteilungField({
   onChange: (next: KostenVerteilung) => void
 }) {
   return (
-    <WizardField label="Kostenart">
+    <WizardField
+      label="Kostenart"
+      hint="Allgemein = keine Aufteilung im PDF; Arbeits- bzw. Materialkosten = 100 % in eine Kategorie (wird im PDF ausgewiesen)"
+    >
       <select
         className="input w-full"
         value={value}
@@ -150,13 +152,17 @@ function FachbetriebHinweisCheckbox({
             })
           }}
         />
-        <span className="min-w-0 text-[length:var(--fs-text)] leading-snug text-bw-text">
+        <span className="min-w-0 text-[13px] leading-snug text-bw-text">
           <span className="font-medium text-ink">
             Hinweis „Ausführung durch zugelassenen Fachbetrieb“ in Angebot und Rechnung anzeigen
           </span>
           {hinweisText ? (
-            <span className="mt-1 block text-[length:var(--fs-meta)] text-bw-text-muted">{hinweisText}</span>
-          ) : null}
+            <span className="mt-1 block text-xs text-bw-text-muted">{hinweisText}</span>
+          ) : (
+            <span className="mt-1 block text-xs text-bw-text-muted">
+              Zusätzlich der Standard-Hinweis unter der Leistung im PDF.
+            </span>
+          )}
         </span>
       </label>
     </div>
@@ -321,7 +327,7 @@ function PositionAccordionItem({
                 autoFocus={display === 'editor'}
               />
             </WizardField>
-            <WizardField label="Beschreibung" full>
+            <WizardField label="Beschreibung" full hint="Erscheint unter der Überschrift auf dem Angebot">
               <Textarea
                 rows={3}
                 value={z.text}
@@ -355,16 +361,18 @@ function PositionAccordionItem({
             <WizardField label={z.modus === 'prozent' ? 'Prozent' : 'Betrag netto'}>
               <div className="txt-prefix">
                 <span className="prefix">{z.modus === 'prozent' ? '%' : '€'}</span>
-                <ClearableNumberInput
+                <input
                   className="input"
+                  type="number"
+                  step={z.modus === 'prozent' ? '0.5' : '0.01'}
                   min={0}
                   value={z.wert}
-                  onValueChange={(wert) => onPatch({ wert })}
+                  onChange={(e) => onPatch({ wert: Number(e.target.value) || 0 })}
                 />
               </div>
             </WizardField>
             <WizardField label="Abzug (netto)">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums text-amber-800">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums text-amber-800">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -372,7 +380,7 @@ function PositionAccordionItem({
         ) : preislisteMode ? (
           <>
             {!lockGewerk ? (
-              <WizardField label="Gewerk">
+              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
                 <select
                   className="input w-full"
                   value={z.gewerk_id ?? ''}
@@ -399,7 +407,11 @@ function PositionAccordionItem({
                 </select>
               </WizardField>
             ) : null}
-            <WizardField label="Leistung aus Liste" required>
+            <WizardField
+              label="Leistung aus Liste"
+              required
+              hint="Name der Position im Angebot (PDF) — wird aus der Preisliste übernommen"
+            >
               <select
                 className="input w-full"
                 value={z.preisliste_id ?? ''}
@@ -416,7 +428,11 @@ function PositionAccordionItem({
                 ))}
               </select>
             </WizardField>
-            <WizardField label="Beschreibung (optional)" full>
+            <WizardField
+              label="Beschreibung (optional)"
+              full
+              hint="Zusätzlicher Text unter der Leistung im PDF — z. B. Material, Umfang, Hinweise"
+            >
               <Textarea
                 rows={3}
                 value={z.positionBeschreibung ?? ''}
@@ -434,12 +450,15 @@ function PositionAccordionItem({
             ) : null}
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
-                <ClearableNumberInput
+                <input
                   className="input min-w-0 flex-1"
+                  type="number"
+                  step="0.5"
                   min={0.01}
-                  blurEmptyValue={0.01}
                   value={z.menge}
-                  onValueChange={(menge) => onPatch({ menge })}
+                  onChange={(e) =>
+                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
+                  }
                 />
                 <select
                   className="input"
@@ -454,11 +473,18 @@ function PositionAccordionItem({
                 </select>
               </div>
             </WizardField>
-            <WizardField label="Einzelpreis netto">
+            <WizardField
+              label="Einzelpreis netto"
+              hint={
+                z.preisliste_id
+                  ? 'Abweichung von der Liste wird als eigene Leistung gespeichert'
+                  : undefined
+              }
+            >
               <EuroNettoInput value={z.vkNetto} onChange={patchVkNetto} />
             </WizardField>
             <WizardField label="Zeilensumme">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -475,7 +501,12 @@ function PositionAccordionItem({
           </>
         ) : (
           <>
-            <WizardField label="Leistung" required full>
+            <WizardField
+              label="Leistung"
+              required
+              full
+              hint="Positions-Überschrift im Angebot (PDF) — das sieht der Kunde fett über Menge und Preis"
+            >
               <input
                 className="input w-full"
                 value={z.bezeichnung}
@@ -485,7 +516,7 @@ function PositionAccordionItem({
               />
             </WizardField>
             {!lockGewerk ? (
-              <WizardField label="Gewerk">
+              <WizardField label="Gewerk" hint="nur intern · erscheint nicht auf der Rechnung">
                 <select
                   className="input w-full"
                   value={z.gewerk_id ?? ''}
@@ -524,7 +555,11 @@ function PositionAccordionItem({
                 onPatch={onPatch}
               />
             ) : null}
-            <WizardField label="Beschreibung (optional)" full>
+            <WizardField
+              label="Beschreibung (optional)"
+              full
+              hint="Zusätzlicher Text unter der Leistung im PDF — sichtbar für den Kunden und auf der Rechnung"
+            >
               <Textarea
                 rows={3}
                 value={z.positionBeschreibung ?? ''}
@@ -534,12 +569,15 @@ function PositionAccordionItem({
             </WizardField>
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
-                <ClearableNumberInput
+                <input
                   className="input min-w-0 flex-1"
+                  type="number"
+                  step="0.5"
                   min={0.01}
-                  blurEmptyValue={0.01}
                   value={z.menge}
-                  onValueChange={(menge) => onPatch({ menge })}
+                  onChange={(e) =>
+                    onPatch({ menge: Math.max(Number(e.target.value) || 0, 0.01) })
+                  }
                 />
                 <select
                   className="input"
@@ -581,7 +619,7 @@ function PositionAccordionItem({
               </select>
             </WizardField>
             <WizardField label="Zeilensumme">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[13px] font-semibold tabular-nums">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -870,7 +908,9 @@ export function AngebotWizardPositionen({
 
   const caption =
     untertitel ??
-    `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'}`
+    (isMobile
+      ? `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · tippen zum Bearbeiten`
+      : `${zeilen.length} Position${zeilen.length === 1 ? '' : 'en'} · klicke auf eine Zeile zum Bearbeiten`)
 
   const openIndex = openId ? listenZeilen.findIndex((z) => z.id === openId) : -1
   const openZeile = openIndex >= 0 ? listenZeilen[openIndex] : null
@@ -902,8 +942,8 @@ export function AngebotWizardPositionen({
         <div className={cn('flex flex-wrap items-start justify-between gap-4', !hideTitle && 'mb-3.5')}>
           {!hideTitle ? (
             <div>
-              <h2 className="text-[length:var(--fs-head)] font-semibold tracking-tight text-bw-text">{titel}</h2>
-              <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">{caption}</p>
+              <h2 className="text-lg font-semibold tracking-tight text-bw-text">{titel}</h2>
+              <p className="mt-0.5 text-[12.5px] text-bw-text-muted">{caption}</p>
             </div>
           ) : (
             <div />
@@ -948,7 +988,7 @@ export function AngebotWizardPositionen({
           <div className="pos-list-head" aria-hidden>
             <div className="pos-nr">Nr.</div>
             <div className="pos-title">
-              <span className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-text-muted">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-bw-text-muted">
                 Leistung · Beschreibung
               </span>
             </div>
@@ -961,6 +1001,7 @@ export function AngebotWizardPositionen({
         {listenZeilen.length === 0 ? (
           <div className="pos-empty">
             <p className="font-medium text-bw-text-mid">Noch keine Positionen</p>
+            <p className="mt-1 text-xs text-bw-text-muted">Wähle unten eine Hinzufüge-Option</p>
           </div>
         ) : (
           listenZeilen.map((z, i) => (
@@ -1038,7 +1079,7 @@ export function AngebotWizardPositionen({
         <PosAddRow
           onAdd={(kind) => {
             if (kind === 'position') {
-              addZeile(neueArtikelZeile({ bezeichnung: '', ...artikelPartial() }))
+              addZeile(neueArtikelZeile({ bezeichnung: 'Neue Position', ...artikelPartial() }))
               return
             }
             if (kind === 'preisliste') {

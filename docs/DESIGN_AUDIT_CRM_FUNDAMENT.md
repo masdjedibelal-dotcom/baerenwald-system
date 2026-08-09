@@ -1,12 +1,10 @@
 # Bärenwald CRM — Design-Audit & Fundament-Review
 
-**Stand:** Juli 2026 (Erweiterung: Vor-Ort / Abnahmeprotokoll-Wizard)  
+**Stand:** Juni 2026  
 **Zielgruppe:** Product Designer, UX, Design Lead  
 **Zweck:** Ein **einziger Einstiegspunkt**, um Flows, Prozesse, UI-Patterns, Ist-Zustand und Fundament-Lücken nachzuvollziehen — ohne den Code lesen zu müssen.
 
 **Kernbefund:** Das CRM ist funktional breit aufgestellt, aber **visuell und strukturell noch kein skalierbares Produkt**. Viele Bereiche wurden iterativ gebaut (Legacy + v2 + v3 parallel). Das Fundament (Status-Logik, Detail-Screen-Pattern, Design Tokens, Mobile/Desktop-IA) muss **vor** weiterem Feature-Ausbau vereinheitlicht werden.
-
-**Neu / kritisch (Juli 2026):** Der **Abnahmeprotokoll-Wizard** und der Tab **Vor Ort & Abschluss** sind fachlich gewachsen, UI/UX aber **nicht designiert** — parallele Surfaces, 7-Schritt-Formular-Wizard, Mock-UI neben Form-Inputs. Details: [§5.7](#57-abnahme--vor-ort--kritischer-neubau) · [§9.3](#93-vor-ort--abnahme--vertieft-juli-2026).
 
 **Soll-Zustand (UI/UX-Zielbild):** [DESIGN_KONZEPT_CRM_UI_UX.md](./DESIGN_KONZEPT_CRM_UI_UX.md) — vollständiges Konzept für intuitive Navigation, Screens, Status und Umsetzungswellen.
 
@@ -18,11 +16,11 @@
 2. [Executive Summary](#2-executive-summary)
 3. [Produktkontext & Rollen](#3-produktkontext--rollen)
 4. [Informationsarchitektur (Sitemap)](#4-informationsarchitektur-sitemap)
-5. [End-to-End-Flows](#5-end-to-end-flows) — inkl. [§5.7 Abnahme / Vor Ort](#57-abnahme--vor-ort--kritischer-neubau)
+5. [End-to-End-Flows](#5-end-to-end-flows)
 6. [Entitäten & Datenbeziehungen](#6-entitäten--datenbeziehungen)
 7. [Status-System — das größte UX-Problem](#7-status-system--das-größte-ux-problem)
 8. [Screen-Patterns (wie Screens aufgebaut sind)](#8-screen-patterns-wie-screens-aufgebaut-sind)
-9. [Modul-Audit (Modul für Modul)](#9-modul-audit-modul-für-modul) — inkl. [§9.3 Vor Ort / Abnahme](#93-vor-ort--abnahme--vertieft-juli-2026)
+9. [Modul-Audit (Modul für Modul)](#9-modul-audit-modul-für-modul)
 10. [Design System — Ist-Zustand](#10-design-system--ist-zustand)
 11. [Skalierbarkeit & Fundament-Schulden](#11-skalierbarkeit--fundament-schulden)
 12. [CRM ↔ Partner-Portal](#12-crm--partner-portal)
@@ -64,21 +62,14 @@ Ein **B2B-CRM für Bauprojekte / Handwerkskoordination**: Leads erfassen → Ang
 | Gleiche Aktion, unterschiedliche UI | 3 Generationen Positions-UI (Accordion → v2 Tabs → v3 Modals) |
 | Desktop ≠ Mobile | Eigene Tab-Sets, andere Default-Tabs, andere Labels |
 | Status unklar | 6+ parallele Status-Felder (Lead, Angebot, Auftrag, Leistung, Handwerker, Partner) |
-| Wizards vs. Pages | Angebot/Rechnung als Modal, Anfrage neu als Page, **Abnahme als Route** |
+| Wizards vs. Pages | Angebot/Rechnung als Modal, Anfrage neu als Page |
 | Versteckte Module | Formulare, Preislisten ohne Sidebar-Eintrag |
-| **Abnahme / Vor Ort** | 4+ parallele UIs für denselben Job (Wizard, Inline, FillFlow, Card, VorOrt-Stack) |
 
 ### Design-Diagnose in einem Satz
 
 > **Die Oberfläche spiegelt die Datenbank — nicht den Nutzer-Job.**
 
 Nutzer denken in **„Was ist der nächste Schritt?“**; das UI zeigt **Entitäten, Felder und parallele Status**.
-
-**Zusatzdiagnose Abnahme (Juli 2026):**
-
-> **Die Abnahme spiegelt das PDF-Formular — nicht den Vor-Ort-Job.**
-
-Sieben Wizard-Schritte (Übergabe → Personen → Bauvorhaben → Leistungen → Ergebnis → Fotos → PDF), dazu ein Tab „Vor Ort“, der Abnahme + Bautagebuch + Abschluss + Extras stapelt. Ergebnis: funktional möglich, **visuell und kognitiv grauenhaft**.
 
 ### Was „Fundament optimieren“ bedeutet (Design-Sicht)
 
@@ -186,9 +177,9 @@ flowchart LR
 | **3. Auftrag** | `/auftraege/[id]` | „Annehmen & Auftrag anlegen“ aus Angebot | Sync Positionen, ProjektKette |
 | **4. Handwerker** | Tab **Positionen** im Auftrag | Zuweisen → Senden | DB + Partner-Mail |
 | **5. Ausführung** | Positionen (Baufortschritt), Baustelle-Tab | Offen / In Arbeit / Erledigt | Fortschritt % auf Auftrag |
-| **6. Abnahme** | Tab Vor Ort + `/auftraege/[id]/abnahme/*` | Protokoll, Mängel, PDF | Punch List, Status abnahme |
+| **6. Abnahme** | `/auftraege/[id]/abnahme/*` | Protokoll, Mängel | Punch List |
 | **7. Rechnung** | `RechnungWizard` (Modal) | Leistungen wählen, Versand | Rechnungs-PDF |
-| **8. Abschluss** | Abschnitt im Vor-Ort-Tab + Route `/abschluss` | Dokumentation, Archiv | Auftrag abgeschlossen |
+| **8. Abschluss** | `/auftraege/[id]/abschluss` | Dokumentation, Archiv | Auftrag abgeschlossen |
 
 **Visuelle Kette im UI:** `ProjektKette` (Kunde → Anfrage → Angebot → Auftrag → Rechnung) auf Detail-Screens.
 
@@ -303,66 +294,6 @@ Analog Angebot: Leistungen → Details → Versand · Modal aus Auftrag oder `/r
 
 ---
 
-### 5.7 Abnahme / Vor Ort — kritischer Neubau
-
-**Job des Nutzers (PL / Innendienst vor Ort oder danach):**  
-„Übergabe dokumentieren → Checkliste abhaken → ggf. Mängel → PDF für Kunde → Auftrag weiter.“
-
-**Was gebaut wurde (Ist, Juli 2026):** mehrere konkurrierende Surfaces für denselben Job.
-
-| Surface | Route / Ort | Rolle | UI-Qualität |
-|---------|-------------|-------|-------------|
-| **AbnahmeprotokollCreateWizard** | `/auftraege/[id]/abnahme/erstellen` | 7-Schritt-Fullscreen (`AppFlowScreen`) | 🔴 Formular-Stack, Stepper überladen |
-| **AuftragVorOrtPanel** | Tab `Vor Ort & Abschluss` | Einstiegskacheln + Bautagebuch + Abschluss | 🔴 Kitchen-Sink, lange Scroll-Seite |
-| **AuftragAbnahmeprotokollInline** | teils unter Vor Ort / Legacy | Inline-Checkliste + FAB Edit | 🟠 Mock-UI, parallel zum Wizard |
-| **AbnahmeprotokollFillFlow** | `/auftraege/[id]/abnahme` | „Ausfüllen“-Flow | 🟠 Dritter Pfad |
-| **AuftragAbnahmeprotokollCard** | Auftrag-Detail Cards | Liste / PDF / Bearbeiten | 🟡 ok als Liste, Einstieg unklar |
-| **AbnahmeMaengelBearbeitenFlow** | `/abnahme/maengel` | Nacharbeit | 🟡 funktional, isoliert |
-| **AuftragLeistungVorOrtTabelle** | Vor Ort | Bautagebuch je Leistung | 🟠 dicht, vermischt mit Abnahme-CTAs |
-
-**Wizard-Schritte (Ist):**
-
-```
-1 Übergabe → 2 Personen → 3 Bauvorhaben → 4 Leistungen → 5 Ergebnis → 6 Fotos → 7 PDF
-```
-
-Vergleich Angebot (logische Phasen) vs. Abnahme (PDF-Felder als Steps): Abnahme zerlegt **Meta-Felder eines Dokuments** in Klicks — nicht den Arbeitsablauf.
-
-#### UX-Befunde (Abnahme-Wizard)
-
-| Problem | Detail |
-|---------|--------|
-| **Zu viele Steps** | 7 Screens für ein Protokoll; Desktop-Stepper zeigt Labels nur `lg+`, mobil nur „Schritt n“ |
-| **Formular-Ästhetik** | Standard-`Input`/`Textarea`/`Button`, Card-Borders, wenig Hierarchie — wirkt wie Admin-CRUD, nicht wie Vor-Ort-Tool |
-| **Leistungen-Step** | Checklist mit editierbaren Gewerk-/Titel-Feldern + Status — auf Mobile unhandlich; Default-Labels historisch „Sonstiges“ / „Zusätzlicher Punkt“ |
-| **Keine Live-Vorschau** | PDF erst am Ende; Nutzer sieht Layout-Fehler (Checks, Texte) erst nach Erzeugen |
-| **Bearbeiten nachträglich** | inzwischen möglich (Prefill + Update) — aber gleicher 7-Step-Zwang für eine Tippfehler-Korrektur |
-| **Shell-Inkonsistenz** | Angebot/RE = Modal-Feeling; Abnahme = eigene Route — anderer „Raum“ |
-
-#### UX-Befunde (Vor-Ort-Tab)
-
-| Problem | Detail |
-|---------|--------|
-| **Drei Jobs, eine Seite** | Abnahme-Einstieg + Bautagebuch + Abschlussbericht + „Extras“ in `<details>` |
-| **Copy** | Intro erklärt zwei Wege; Kacheln und Hint („Partner erfasst im Portal“) konkurrieren |
-| **Visuelle Sprache** | `vor-ort-flow` CSS + Mock-Buttons + Wizard-Link — drei Generationen auf einer Scrollfläche |
-| **Primary falsch** | Auftrag-Primary bleibt oft „Rechnung“, obwohl Status Abnahme verlangt |
-
-#### Design-Soll (kurz — Konzept erweitern)
-
-1. **Ein** Abnahme-Einstieg (Tab oder Primary „Abnahme starten“) — Inline/FillFlow/Card konsolidieren oder nur Liste behalten.  
-2. Wizard auf **max. 3 Schritte:** Checkliste & Ergebnis · Meta/Übergabe (kollabiert) · Prüfen & PDF.  
-3. Vor-Ort-Tab = **eine** Aufgabe pro View (Toggle: Abnahme | Tagebuch | Abschluss) — kein Endlos-Scroll.  
-4. Gleiche Wizard-Shell wie Angebot (`AppFlowScreen` + Stepper-Pattern, aber weniger Steps).  
-5. Mobile-first: große Tap-Targets für OK/Mangel, Gewerk-Rename nicht im kritischen Path.
-
-**Code:**  
-`AbnahmeprotokollCreateWizard.tsx` · `AuftragVorOrtPanel.tsx` · `AuftragAbnahmeprotokollInline.tsx` · `AbnahmeprotokollFillFlow.tsx` · `AbnahmeprotokollChecklist.tsx` · `abnahmeprotokoll-actions.ts` · Template `abnahme-protokoll-template.ts`
-
-**Alltag-Audit:** Situationen 18–19, 38–42 in [CRM-ALLTAG-AUDIT.md](./CRM-ALLTAG-AUDIT.md).
-
----
-
 ## 6. Entitäten & Datenbeziehungen
 
 ```mermaid
@@ -457,15 +388,14 @@ Modals / Wizards (overlay)
 
 ### 8.3 Wizards
 
-| Wizard | Container | Schritte | Urteil |
-|--------|-----------|----------|--------|
-| Angebot | Fullscreen-Modal | 3–5 | 🟡 länger, aber Phasen logisch |
-| Rechnung | Fullscreen-Modal | 3–4 | 🟠 Labels unklar |
-| **Abnahmeprotokoll** | **eigene Route** | **7** | 🔴 Formular-Steps, PDF-getrieben — siehe §5.7 |
-| Projektvertrag | Modal | variabel | 🟡 |
-| Anfrage neu | **eigene Page** | 1 Form | 🟡 |
+| Wizard | Container | Schritte |
+|--------|-----------|----------|
+| Angebot | Fullscreen-Modal | 3 |
+| Rechnung | Fullscreen-Modal | 3 |
+| Projektvertrag | Modal | variabel |
+| Anfrage neu | **eigene Page** | 1 Form |
 
-**UX-Problem:** Unterschiedliche „Raumgefühl“ — Designer sollten **eine Wizard-Shell** definieren (Modal vs. Route) **und** Step-Anzahl an Jobs koppeln (nicht an PDF-Felder).
+**UX-Problem:** Unterschiedliche „Raumgefühl“ — Designer sollten **eine Wizard-Shell** definieren (Modal vs. Route).
 
 ---
 
@@ -491,7 +421,7 @@ Legende: 🔴 kritisch · 🟠 hoch · 🟡 mittel · 🟢 ok
 | **Dashboard** | 🟡 | Viele Widgets, KPI ohne klare Priorität | Tages-Cockpit: „Was muss ich heute tun?“ |
 | **Anfragen** | 🟢 | Relativ konsistent, FAB auf Mobile | Lead-Status vereinfachen |
 | **Angebote** | 🟠 | Wizard gut, Detail überladen, Tab-Dopplung Desktop/Mobile | Angebot-Detail entflechten |
-| **Aufträge** | 🔴 | Meiste Tabs, HW-Komplexität, v1/v2/v3, **Vor-Ort/Abnahme-Chaos** | Positionen v3 polish + **Abnahme-UX Redesign** |
+| **Aufträge** | 🔴 | Meiste Tabs, HW-Komplexität, v1/v2/v3 | **Positionen v3 polish**, Tab-IA vereinheitlichen |
 | **Handwerker (Stamm)** | 🟡 | Kein Master-Detail wie andere | An Auftrag-Pattern angleichen |
 | **Kunden** | 🟢 | Standard-Pattern | — |
 | **Rechnungen** | 🟡 | Wizard ok, Finanzen doppelt geroutet | Ein Einstieg Finanzen |
@@ -515,7 +445,6 @@ Legende: 🔴 kritisch · 🟠 hoch · 🟡 mittel · 🟢 ok
 | Tab **Baustelle** | nur Bauprojekt | Conditional Tab ok — visuell kennzeichnen |
 | Tab **Compliance** | Checklisten | Mit Portal-Status verknüpfen |
 | Tab **Finanzen** | + Route `/finanzen` | **Ein** Einstieg |
-| Tab **Vor Ort & Abschluss** | Abnahme-Wizard + Tagebuch + Abschluss gestapelt | **Eine Aufgabe pro View**; Wizard ≤3 Steps |
 | Handwerker-Gegenvorschlag | Legacy-Komponenten deprecated | Neues Pattern oder Portal-only |
 
 ---
@@ -528,30 +457,6 @@ Legende: 🔴 kritisch · 🟠 hoch · 🟡 mittel · 🟢 ok
 | Status | DB-Status vs. `status_einfach` — zwei Wahrheiten |
 | HW im Wizard | Kein dedizierter Schritt, aber fachlich relevant |
 | Visualisierung | eigene Route `/visualisierung` — Flow-Anbindung unklar |
-
----
-
-### 9.3 Vor Ort / Abnahme — vertieft (Juli 2026)
-
-**Reife:** 🔴 kritisch (funktional ja, Produkt-UX nein)
-
-| Dimension | Ist | Soll |
-|-----------|-----|------|
-| **Einstieg** | Kachel „erstellen/bearbeiten“, Card, Inline, FillFlow, Deep-Link | Ein Primary „Abnahme“ + Liste der Protokolle |
-| **Wizard** | 7 Steps, Meta-first | 3 Steps: Checkliste → Angaben → PDF |
-| **Checkliste** | Cards, Inputs, Gewerk-Rename im Edit-Mode | Große Status-Toggles; Rename nur „Mehr“ |
-| **Vor-Ort-Tab** | Scroll-Stack | Segmented: Abnahme \| Tagebuch \| Abschluss |
-| **PDF** | Checks/Layout-Bugs historisch; Template vs. UI drift | Live-Preview oder PDF-getreue Preview-Step |
-| **Visuell** | Mock-UI + Tailwind-Forms gemischt | Eine Shell (wie Angebot-Wizard) |
-| **Mobile** | Stepper + viele Felder | Daumen-first Checkliste; Meta sekundär |
-
-**Priorisierte Redesign-Tickets (Design → Dev):**
-
-1. IA: Surfaces konsolidieren (welche 1–2 bleiben?)  
-2. Wireframes Abnahme-Wizard 3 Steps + Empty/Error  
-3. Visual polish: Typo, Spacing, Status-Controls, Foto-Grid  
-4. Vor-Ort Segmented Control  
-5. Abgleich PDF-Template ↔ Preview  
 
 ---
 
@@ -729,9 +634,8 @@ Handwerker-Flows sind **dual**:
 |------|-------|------------|
 | **P0** | Status-Matrix + Badge-Konsolidierung | Verwirrung überall |
 | **P0** | Auftrag Positionen v3 — Design abschließen | Größter operativer Screen |
-| **P0** | **Abnahme / Vor-Ort UX Redesign** | Neuer Flow, aktuell unbenutzbar-wirkend (§5.7 / §9.3) |
 | **P1** | Detail-Tabs Desktop = Mobile (Namen, Defaults) | Lernkurve halbieren |
-| **P1** | Wizard-Shell vereinheitlichen (inkl. Abnahme ≤3 Steps) | Orientierung |
+| **P1** | Wizard-Shell vereinheitlichen | Orientierung |
 | **P1** | Design Tokens / Figma Library | Skalierung |
 | **P2** | Finanzen-Einstieg bereinigen | Doppelroute |
 | **P2** | Einstellungen / Preis-IA | Admin-Verwirrung |
@@ -752,8 +656,6 @@ Handwerker-Flows sind **dual**:
 | HW-Angebot Einreichung | [HANDWERKER_ANGEBOT_EINREICHUNG.md](./HANDWERKER_ANGEBOT_EINREICHUNG.md) |
 | HW-Zuweisung & Bauprojekt (Handoff) | [CRM_HANDOFF_HW_BAUAUFTRAG.md](./CRM_HANDOFF_HW_BAUAUFTRAG.md) |
 | Positions v3 Code | `src/components/auftraege/leistungen-v3/` |
-| **Abnahme / Vor Ort** | `AbnahmeprotokollCreateWizard.tsx`, `AuftragVorOrtPanel.tsx`, `abnahme-protokoll-template.ts` |
-| **Alltag-Audit (Situationen)** | [CRM-ALLTAG-AUDIT.md](./CRM-ALLTAG-AUDIT.md) |
 | Navigation | `src/lib/nav-config.ts` |
 | UI-Roadmap (Code) | `src/lib/design-system/phases.ts` |
 

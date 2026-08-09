@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { RechnungNeuPageClient } from '@/components/rechnungen/RechnungNeuPageClient'
-import { RechnungNeuKundeGate } from '@/components/rechnungen/RechnungNeuKundeGate'
 import {
   loadRechnungWizardBootstrapFromAuftrag,
   loadRechnungWizardKunde,
@@ -13,16 +12,15 @@ import type { Gewerk, Preisliste } from '@/lib/types'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 
 /**
- * Neue Rechnung — DocumentCanvas-Wizard (Mock).
- * - ohne kunde/auftrag → Kundenwahl im Canvas
- * - auftrag_id + neu=1 → Rechnung zum Auftrag
- * - kunde_id → Direktrechnung
- * - auftrag_id ohne neu → Auswahl bestehender Entwürfe
+ * Neue Rechnung:
+ * - auftrag_id + neu=1 → immer neue Rechnung zum Auftrag (kein Auswahl-Modal)
+ * - kunde_id → Direktrechnung für diesen Kunden
+ * - auftrag_id ohne neu → Legacy-Auswahl
  */
 export default async function RechnungNeuPage({
   searchParams,
 }: {
-  searchParams: { auftrag_id?: string; kunde_id?: string; neu?: string; err?: string }
+  searchParams: { auftrag_id?: string; kunde_id?: string; neu?: string }
 }) {
   const auftragId = searchParams.auftrag_id?.trim()
   const kundeId = searchParams.kunde_id?.trim()
@@ -30,10 +28,6 @@ export default async function RechnungNeuPage({
 
   if (auftragId && !forceNeu) {
     redirect(`/auftraege/${auftragId}/rechnungen-auswahl`)
-  }
-
-  if (!auftragId && !kundeId) {
-    return <RechnungNeuKundeGate initialError={searchParams.err} />
   }
 
   const supabase = createClient()
@@ -53,17 +47,16 @@ export default async function RechnungNeuPage({
     bootstrap = loaded.bootstrap
   } else if (kundeId) {
     const k = await loadRechnungWizardKunde(kundeId)
-    if (!k.ok) {
-      return <RechnungNeuKundeGate initialError={k.message} />
-    }
-    bootstrap = {
-      ...buildStandaloneRechnungWizardBootstrap(firm),
-      kundeId: k.kunde.id,
-      kunde: k.kunde,
-      meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
-        kundeTyp: k.kunde.typ,
-        firm,
-      }),
+    if (k.ok) {
+      bootstrap = {
+        ...buildStandaloneRechnungWizardBootstrap(firm),
+        kundeId: k.kunde.id,
+        kunde: k.kunde,
+        meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
+          kundeTyp: k.kunde.typ,
+          firm,
+        }),
+      }
     }
   }
 

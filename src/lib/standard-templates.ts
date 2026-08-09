@@ -268,57 +268,33 @@ export async function deactivateObsoleteFormularTemplates(): Promise<number> {
   return data?.length ?? 0
 }
 
-/** Prozess-Cache: Layout ruft das oft auf — nicht bei jedem Request die DB peitschen. */
-const ENSURE_TTL_MS = 60 * 60 * 1000
-let ensureCache: { at: number; result: EnsureStandardTemplatesResult } | null = null
-let ensureInflight: Promise<EnsureStandardTemplatesResult> | null = null
-
-/** Cached Wrapper für Dashboard-Layout (Warm-Instance / Request-Burst). */
-export async function ensureStandardTemplatesCached(): Promise<EnsureStandardTemplatesResult> {
-  const now = Date.now()
-  if (ensureCache && now - ensureCache.at < ENSURE_TTL_MS && ensureCache.result.ok) {
-    return ensureCache.result
-  }
-  if (ensureInflight) return ensureInflight
-  ensureInflight = ensureStandardTemplates()
-    .then((result) => {
-      if (result.ok) ensureCache = { at: Date.now(), result }
-      return result
-    })
-    .finally(() => {
-      ensureInflight = null
-    })
-  return ensureInflight
-}
-
 /** Legt fehlende Standard-Templates an (idempotent nach `name`). */
 export async function ensureStandardTemplates(): Promise<EnsureStandardTemplatesResult> {
-  const names = STANDARD_TEMPLATES.map((t) => t.name)
-  const { data: existingRows, error: selErr } = await supabaseAdmin
-    .from('formular_templates')
-    .select('name')
-    .in('name', names)
-  if (selErr) return { ok: false, message: selErr.message }
-
-  const existing = new Set((existingRows ?? []).map((r) => String(r.name)))
-  const missing = STANDARD_TEMPLATES.filter((t) => !existing.has(t.name))
-  const skipped = STANDARD_TEMPLATES.length - missing.length
-
-  if (missing.length) {
-    const { error: insErr } = await supabaseAdmin.from('formular_templates').insert(
-      missing.map((tpl) => ({
-        name: tpl.name,
-        typ: tpl.typ,
-        subtyp: tpl.subtyp,
-        phase: tpl.phase,
-        gewerk_id: tpl.gewerk_id,
-        felder: tpl.felder,
-        aktiv: true,
-      }))
-    )
+  let inserted = 0
+  let skipped = 0
+  for (const tpl of STANDARD_TEMPLATES) {
+    const { data: existing, error: selErr } = await supabaseAdmin
+      .from('formular_templates')
+      .select('id')
+      .eq('name', tpl.name)
+      .maybeSingle()
+    if (selErr) return { ok: false, message: selErr.message }
+    if (existing) {
+      skipped += 1
+      continue
+    }
+    const { error: insErr } = await supabaseAdmin.from('formular_templates').insert({
+      name: tpl.name,
+      typ: tpl.typ,
+      subtyp: tpl.subtyp,
+      phase: tpl.phase,
+      gewerk_id: tpl.gewerk_id,
+      felder: tpl.felder,
+      aktiv: true,
+    })
     if (insErr) return { ok: false, message: insErr.message }
+    inserted += 1
   }
-
   const deactivated = await deactivateObsoleteFormularTemplates()
-  return { ok: true, inserted: missing.length, skipped, deactivated }
+  return { ok: true, inserted, skipped, deactivated }
 }

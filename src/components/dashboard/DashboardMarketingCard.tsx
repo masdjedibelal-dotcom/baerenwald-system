@@ -5,14 +5,13 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
-import { useIsMobile } from '@/hooks/useIsMobile'
 
 function formatNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return new Intl.NumberFormat('de-DE').format(Math.round(n))
 }
 
-/** Kompakte Mock-KPI-Kachel: Label oben, Wert (+ optional Detail rechts). */
+/** Kompakte Mock-KPI-Kachel: Label oben, Wert + Detail in einer Zeile. */
 function CompactKpi({
   label,
   value,
@@ -23,88 +22,47 @@ function CompactKpi({
 }: {
   label: string
   value: string
-  detail?: string | null
+  detail: string
   detailTone?: 'muted' | 'positive'
   muted?: boolean
   onErrorClick?: () => void
 }) {
-  const showDetail = Boolean(detail?.trim())
   return (
     <div className="mkt-kpi">
       <div className="mkt-kpi-label">{label}</div>
       <div className="mkt-kpi-row">
         <span className={`mkt-kpi-val${muted ? ' muted' : ''}`}>{value}</span>
-        {showDetail ? (
-          onErrorClick ? (
-            <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
-              {detail}
-            </button>
-          ) : (
-            <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
-              {detail}
-            </span>
-          )
-        ) : null}
+        {onErrorClick ? (
+          <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
+            {detail}
+          </button>
+        ) : (
+          <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
+            {detail}
+          </span>
+        )}
       </div>
     </div>
   )
 }
 
 export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnapshot }) {
-  const isMobile = useIsMobile()
   const [tab, setTab] = useState<'marketing' | 'sichtbarkeit'>('marketing')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
-  const [funnelOpen, setFunnelOpen] = useState(false)
 
   const maxFunnel = useMemo(() => {
     const counts = data.funnelStages.map((s) => s.count)
     return Math.max(1, ...counts, data.rechnerStart ?? 0)
   }, [data.funnelStages, data.rechnerStart])
 
-  const funnelBody =
-    data.funnelOk && data.funnelStages.length > 0 ? (
-      <div className="mkt-funnel-list">
-        {data.funnelStages.map((s) => (
-          <div key={s.key} className="mkt-funnel-row">
-            <div className="mkt-funnel-left">
-              <span className="mkt-funnel-title">{s.label}</span>
-            </div>
-            <div className="mkt-funnel-bar">
-              <div
-                className="mkt-funnel-bar-fill"
-                style={{
-                  width: `${Math.round((s.count / maxFunnel) * 100)}%`,
-                }}
-              />
-            </div>
-            <div className="mkt-funnel-nums">
-              <span className="mkt-funnel-count">{formatNum(s.count)}</span>
-              <span className="mkt-funnel-pct">
-                {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="mkt-funnel-empty">
-        {data.funnelOk
-          ? 'Noch keine Rechner-Events im Zeitraum.'
-          : 'Funnel nicht verfügbar.'}
-        {!data.funnelOk && data.funnelError ? (
-          <>
-            {' '}
-            <button
-              type="button"
-              className="underline decoration-dotted"
-              onClick={() => setErrorDetail(data.funnelError)}
-            >
-              Details
-            </button>
-          </>
-        ) : null}
-      </div>
-    )
+  const worstDropKey = useMemo(() => {
+    let best: (typeof data.funnelStages)[number] | null = null
+    for (const s of data.funnelStages) {
+      if (s.dropoffPct == null || s.dropoffLost == null || s.dropoffLost <= 0) continue
+      if (!best || s.dropoffPct > (best.dropoffPct ?? -1)) best = s
+    }
+    return best?.key ?? null
+  }, [data.funnelStages])
 
   return (
     <div className="card">
@@ -134,11 +92,11 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
       <div className="card-b" style={{ paddingTop: 4 }}>
         {tab === 'marketing' ? (
           <>
-            <div className="mkt-kpi-grid mkt-kpi-grid--3">
+            <div className="mkt-kpi-grid">
               <CompactKpi
                 label="Website-Besuche"
                 value={data.pageviewsOk ? formatNum(data.pageviews) : '—'}
-                detail={!data.pageviewsOk ? 'Fehler' : null}
+                detail={data.pageviewsOk ? 'Website' : 'Fehler'}
                 muted={!data.pageviewsOk || data.pageviews == null}
                 onErrorClick={
                   !data.pageviewsOk && data.pageviewsError
@@ -149,7 +107,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Rechner gestartet"
                 value={data.funnelOk ? formatNum(data.rechnerStart) : '—'}
-                detail={!data.funnelOk ? 'Fehler' : null}
+                detail={data.funnelOk ? 'PostHog' : 'Fehler'}
                 muted={!data.funnelOk || data.rechnerStart == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -160,7 +118,24 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Anfrage abgeschickt"
                 value={data.funnelOk ? formatNum(data.rechnerLead) : '—'}
-                detail={!data.funnelOk ? 'Fehler' : null}
+                detail={
+                  data.funnelOk &&
+                  data.rechnerStart &&
+                  data.rechnerStart > 0 &&
+                  data.rechnerLead != null
+                    ? `${Math.round((data.rechnerLead / data.rechnerStart) * 1000) / 10}% vom Start`
+                    : data.funnelOk
+                      ? 'PostHog'
+                      : 'Fehler'
+                }
+                detailTone={
+                  data.funnelOk &&
+                  data.rechnerStart &&
+                  data.rechnerStart > 0 &&
+                  data.rechnerLead != null
+                    ? 'positive'
+                    : 'muted'
+                }
                 muted={!data.funnelOk || data.rechnerLead == null}
                 onErrorClick={
                   !data.funnelOk && data.funnelError
@@ -168,34 +143,95 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     : undefined
                 }
               />
+              <CompactKpi
+                label="E-Mail-Zustellrate"
+                value={
+                  data.resendOk && data.deliveryRatePct != null
+                    ? `${formatNum(data.deliveryRatePct)}%`
+                    : '—'
+                }
+                detail={data.resendOk ? 'E-Mail' : 'Fehler'}
+                muted={!data.resendOk || data.deliveryRatePct == null}
+                onErrorClick={
+                  !data.resendOk && data.resendError
+                    ? () => setErrorDetail(data.resendError)
+                    : undefined
+                }
+              />
             </div>
 
-            <div className={`mkt-funnel-block${isMobile ? ' mkt-funnel-block--acc' : ''}`}>
-              {isMobile ? (
-                <button
-                  type="button"
-                  className="mkt-funnel-acc-trigger"
-                  aria-expanded={funnelOpen}
-                  onClick={() => setFunnelOpen((o) => !o)}
-                >
-                  <span className="mkt-funnel-h">Rechner-Funnel</span>
-                  <MockIcon
-                    ctx="empty"
-                    n="chevron-down"
-                    size={16}
-                    className={funnelOpen ? 'mkt-funnel-acc-ico open' : 'mkt-funnel-acc-ico'}
-                  />
-                </button>
+            <div className="mkt-funnel-block">
+              <p className="mkt-funnel-h">Rechner-Funnel</p>
+              {data.funnelOk && data.funnelStages.length > 0 ? (
+                <div className="mkt-funnel-list">
+                  {data.funnelStages.map((s) => {
+                    const hasDrop =
+                      s.dropoffPct != null && s.dropoffLost != null && s.dropoffLost > 0
+                    const isWorst = worstDropKey === s.key
+                    const detail = hasDrop
+                      ? `↓ −${s.dropoffPct}% · −${formatNum(s.dropoffLost)}${
+                          isWorst ? ' · größter Absprung' : ''
+                        }`
+                      : s.key === 'start'
+                        ? 'Start'
+                        : s.key === 'lead'
+                          ? 'Conversion'
+                          : null
+                    return (
+                      <div key={s.key} className="mkt-funnel-row">
+                        <div className="mkt-funnel-left">
+                          <span className="mkt-funnel-title">{s.label}</span>
+                          {detail ? (
+                            <span
+                              className={
+                                isWorst
+                                  ? 'mkt-funnel-detail worst'
+                                  : 'mkt-funnel-detail'
+                              }
+                            >
+                              {detail}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mkt-funnel-bar">
+                          <div
+                            className="mkt-funnel-bar-fill"
+                            style={{
+                              width: `${Math.round((s.count / maxFunnel) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="mkt-funnel-nums">
+                          <span className="mkt-funnel-count">{formatNum(s.count)}</span>
+                          <span className="mkt-funnel-pct">
+                            {s.pctOfStart != null ? `${s.pctOfStart}%` : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               ) : (
-                <p className="mkt-funnel-h">Rechner-Funnel</p>
-              )}
-              {(!isMobile || funnelOpen) ? (
-                <>
-                  {funnelBody}
-                  {data.funnelOk && data.funnelError ? (
-                    <p className="mkt-funnel-hint">Hinweis: {data.funnelError}</p>
+                <div className="mkt-funnel-empty">
+                  {data.funnelOk
+                    ? 'Noch keine Rechner-Events im Zeitraum.'
+                    : 'Funnel nicht verfügbar.'}
+                  {!data.funnelOk && data.funnelError ? (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="underline decoration-dotted"
+                        onClick={() => setErrorDetail(data.funnelError)}
+                      >
+                        Details
+                      </button>
+                    </>
                   ) : null}
-                </>
+                </div>
+              )}
+              {data.funnelOk && data.funnelError ? (
+                <p className="mkt-funnel-hint">Hinweis: {data.funnelError}</p>
               ) : null}
             </div>
           </>
@@ -205,24 +241,32 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               <CompactKpi
                 label="Google-Klicks"
                 value={data.gscOk ? formatNum(data.gscClicks) : '—'}
+                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscClicks == null}
+                onErrorClick={
+                  !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined
+                }
               />
               <CompactKpi
                 label="Impressionen"
                 value={data.gscOk ? formatNum(data.gscImpressions) : '—'}
+                detail={data.gscOk ? 'Search Console' : 'Fehler'}
                 muted={!data.gscOk || data.gscImpressions == null}
+                onErrorClick={
+                  !data.gscOk && data.gscError ? () => setErrorDetail(data.gscError) : undefined
+                }
               />
             </div>
 
             <div className="mt-4">
-              <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">
                 Meistgesucht (Google)
               </p>
               {data.topQueries.length > 0 ? (
                 <div className="overflow-x-auto rounded-[10px] border border-[var(--border)]">
-                  <table className="w-full text-left text-[length:var(--fs-meta)]">
+                  <table className="w-full text-left text-[12.5px]">
                     <thead>
-                      <tr className="border-b border-[var(--border)] text-[length:var(--fs-meta)] uppercase tracking-[0.03em] text-[var(--text-3)]">
+                      <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-[0.03em] text-[var(--text-3)]">
                         <th className="px-3 py-2 font-semibold">Suchbegriff</th>
                         <th className="px-3 py-2 text-right font-semibold">Klicks</th>
                         <th className="px-3 py-2 text-right font-semibold">Impr.</th>
@@ -242,7 +286,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                   </table>
                 </div>
               ) : (
-                <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[12.5px] text-[var(--text-3)]">
                   —
                 </div>
               )}
@@ -262,7 +306,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
           </MockBtn>
         }
       >
-        <p className="break-words text-[length:var(--fs-text)] text-[var(--text)]">{errorDetail}</p>
+        <p className="break-words text-[13px] text-[var(--text)]">{errorDetail}</p>
       </MockModal>
     </div>
   )

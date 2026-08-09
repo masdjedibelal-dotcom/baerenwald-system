@@ -12,7 +12,6 @@ Migrationen ausführen:
 Siehe `.env.copilot.example` — Werte in `.env.local` und **Netlify** setzen:
 
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- **`TELEGRAM_WEBHOOK_SECRET`** (Pflicht für `/api/telegram`) — zufälliger String, 1–256 Zeichen; wird als Telegram `secret_token` gesetzt. Fallback: `COPILOT_WEBHOOK_SECRET` oder `CRON_SECRET`
 - `OPENWEATHER_API_KEY` (Briefing)
 - `GOOGLE_MAPS_API_KEY` (optional, Abfahrtszeit)
 - `CLAUDE_API_KEY` (oder alternativ `ANTHROPIC_API_KEY` — gleicher Wert, offizieller SDK-Name)
@@ -56,20 +55,13 @@ curl -X POST https://<SITE>/api/copilot/notify-lead \
 
 ## 7. Webhook (nach Deploy, einmalig)
 
-`secret_token` muss mit `TELEGRAM_WEBHOOK_SECRET` (bzw. Fallback-Secret) übereinstimmen. Telegram sendet dann bei jedem Update den Header `X-Telegram-Bot-Api-Secret-Token`.
-
-```bash
-# SECRET = Wert aus TELEGRAM_WEBHOOK_SECRET (oder CRON_SECRET)
-curl -sS "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-  -d "url=https://<DEINE-NETLIFY-URL>/api/telegram" \
-  -d "secret_token=<SECRET>"
 ```
-
-Ohne gültigen Secret-Header antwortet `/api/telegram` mit **401**.
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DEINE-NETLIFY-URL>/api/telegram
+```
 
 ## 8. Test
 
-- Nachricht an den Bot senden (nur `TELEGRAM_CHAT_ID` wird akzeptiert; Webhook braucht gültigen `secret_token`)
+- Nachricht an den Bot senden (nur `TELEGRAM_CHAT_ID` wird akzeptiert)
 - Manuell Briefing: `GET /api/cron/copilot-briefing` mit Header `Authorization: Bearer <CRON_SECRET>`
 
 ### Chat zurücksetzen (wenn der Bot „hängt“)
@@ -107,11 +99,10 @@ Prüfen:
 
 ### Webhook 401 (Telegram `getWebhookInfo`, kein Bot-Text)
 
-Mögliche Ursachen:
+Wenn Telegram den Webhook selbst mit 401 meldet (nicht die Copilot-Fehlernachricht):
 
-1. **Secret fehlt/falsch:** `TELEGRAM_WEBHOOK_SECRET` (oder Fallback) muss mit `setWebhook` `secret_token` übereinstimmen. Ohne Header `X-Telegram-Bot-Api-Secret-Token` → App antwortet 401.
-2. Netlify **Password protection** / Visitor access deaktivieren (blockiert `POST` von Telegram).
-3. Prüfen: `curl -X POST https://<site>/api/telegram` (ohne Secret → 401; mit Header → weiter).
+- Netlify **Password protection** / Visitor access deaktivieren (blockiert `POST` von Telegram ohne Body).
+- Prüfen: `curl -X POST https://<site>/.netlify/functions/...` bzw. `https://<site>/api/telegram` mit leerem/minimalem JSON.
 
 ### Bot antwortet gar nicht (kein 401)
 

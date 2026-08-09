@@ -31,13 +31,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const kindClass =
     variant === 'primary'
       ? 'primary'
-      : variant === 'secondary'
-        ? 'secondary'
-        : variant === 'danger'
-          ? 'danger'
-          : variant === 'ghost'
-            ? 'ghost'
-            : ''
+      : variant === 'danger'
+        ? 'danger'
+        : variant === 'ghost' || variant === 'secondary'
+          ? 'ghost'
+          : ''
 
   return (
     <button

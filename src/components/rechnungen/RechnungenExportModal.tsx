@@ -125,7 +125,7 @@ export function RechnungenExportModal({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={`rounded-full px-3 py-1 text-[length:var(--fs-text)] font-medium ${
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
               mode === 'csv'
                 ? 'bg-bw-primary text-white'
                 : 'bg-bw-bg text-bw-text-muted hover:bg-bw-hover'
@@ -136,7 +136,7 @@ export function RechnungenExportModal({
           </button>
           <button
             type="button"
-            className={`rounded-full px-3 py-1 text-[length:var(--fs-text)] font-medium ${
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
               mode === 'pdf_zip'
                 ? 'bg-bw-primary text-white'
                 : 'bg-bw-bg text-bw-text-muted hover:bg-bw-hover'
@@ -149,9 +149,9 @@ export function RechnungenExportModal({
 
         {mode === 'csv' ? (
           <>
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">Tabellenexport als CSV-Datei.</p>
+            <p className="text-sm text-bw-text-muted">Tabellenexport als CSV-Datei.</p>
             <div className="space-y-2">
-              <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="radio"
                   name="csv-scope"
@@ -161,7 +161,7 @@ export function RechnungenExportModal({
                 />
                 Aktuelle Ansicht (mit aktiven Filtern)
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="radio"
                   name="csv-scope"
@@ -174,10 +174,10 @@ export function RechnungenExportModal({
             </div>
 
             <div>
-              <p className="mb-2 text-[length:var(--fs-text)] font-medium text-bw-text">Felder auswählen</p>
+              <p className="mb-2 text-sm font-medium text-bw-text">Felder auswählen</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {fields.map((f) => (
-                  <label key={f.key} className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
+                  <label key={f.key} className="flex cursor-pointer items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={selected[f.key] ?? true}
@@ -206,7 +206,7 @@ export function RechnungenExportModal({
           </>
         ) : (
           <>
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+            <p className="text-sm text-bw-text-muted">
               Alle versendeten Rechnungen (Status Gesendet oder Bezahlt) im Zeitraum als PDFs in
               einer ZIP-Datei. Es wird das Rechnungsdatum verwendet.
             </p>
@@ -226,7 +226,7 @@ export function RechnungenExportModal({
                 onChange={(e) => setPdfBis(e.target.value)}
               />
             </div>
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            <p className="text-xs text-bw-text-muted">
               Maximal {RECHNUNGEN_PDF_ZIP_MAX} Rechnungen pro Export.
             </p>
             <div className="flex justify-end gap-2 border-t border-bw-border pt-4">

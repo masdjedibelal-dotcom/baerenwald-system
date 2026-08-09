@@ -1,63 +1,56 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { StatusBadge } from '@/components/ui/StatusBadge'
-import { primaryCta } from '@/lib/vorgang/primary-cta'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind, variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
-import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
-import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
-import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
-import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
+import {
+  leadKontaktAnzeigeName,
+} from '@/lib/lead-display-helpers'
+import { Timeline } from '@/components/ui/timeline'
+import { sortTimelineByCreatedAtAsc } from '@/lib/timeline-sort'
+import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
-import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
-import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
-import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
-import { toast } from '@/components/ui/app-toast'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { ActionsMenu } from '@/components/ui/actions-menu'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateAnfrage } from '@/lib/list-actions'
+import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
+import { mailComposeContextFromLead } from '@/app/(dashboard)/kommunikation/actions'
+import { AnfrageDetailsTab } from '@/components/anfragen/AnfrageDetailsTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
-import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
-import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
-import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
+import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
+import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 
 const AngebotWizard = dynamic(
   () =>
     import('@/components/angebote/AngebotWizard').then((mod) => ({
       default: mod.AngebotWizard,
     })),
-  {
-    ssr: false,
-    loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
-  }
+  { ssr: false }
 )
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
-import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { toast } from '@/components/ui/app-toast'
+import { deleteAnfrage } from '@/app/(dashboard)/anfragen/actions'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { openMieterStatusPreview } from '@/app/(dashboard)/impersonation/actions'
+import { MockVerlaufCard } from '@/components/mock-ui'
+import { ACTIVITY_SECTIONS, CTA } from '@/lib/crm-labels'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
-import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
+import { ergaenzeTimelineMitProjektKontext } from '@/lib/crm/build-projekt-timeline'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
@@ -69,82 +62,51 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum, kanalLabel } from '@/lib/utils'
-import { anfrageStatusDisplay } from '@/lib/status/status-display'
-import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
+import {
+  BEREICH_LABELS,
+  STATUS_LABELS,
+  formatDatum,
+  formatTimelineStamp,
+  kanalLabel,
+} from '@/lib/utils'
 
-type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AnfrageDetailTab = 'stammdaten' | 'details' | 'verlauf' | 'dokumente' | 'notizen'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
-  'uebersicht',
-  'leistungen',
-  'zahlung',
-  'akte',
-  'aktivitaet',
+  'stammdaten',
+  'details',
+  'verlauf',
+  'dokumente',
+  'notizen',
 ])
-const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'uebersicht'
 
 /** Query-/Hash-/Deep-Link-Aliase auf stabile interne IDs. */
 function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab | null {
   const tab = (raw ?? '').trim().toLowerCase().replace(/^#/, '')
-  if (!tab) return ANFRAGE_DETAIL_DEFAULT_TAB
-  if (tab === 'zahlung' || tab === 'zahlplan' || tab === 'finanzen') return 'zahlung'
-  if (
-    tab === 'leistungen' ||
-    tab === 'leistung' ||
-    tab === 'bedarf' ||
-    tab === 'positionen'
-  ) {
-    return 'leistungen'
+  if (!tab) return null
+  if (tab === 'schritte' || tab === 'naechste-schritte' || tab === 'naechste_schritte') {
+    return 'stammdaten'
   }
-  if (
-    tab === 'akte' ||
-    tab === 'dokumente' ||
-    tab === 'notizen'
-  ) {
-    return 'akte'
-  }
-  if (
-    tab === 'uebersicht' ||
-    tab === 'stammdaten' ||
-    tab === 'schritte' ||
-    tab === 'naechste-schritte' ||
-    tab === 'naechste_schritte' ||
-    tab === 'details' ||
-    tab === 'projekt' ||
-    tab === 'anfrage-details' ||
-    tab === 'anfragedetails' ||
-    tab === 'fotos' ||
-    tab === 'bilder' ||
-    tab === 'photos'
-  ) {
-    return 'uebersicht'
-  }
-  if (
-    tab === 'aktivitaet' ||
-    tab === 'verlauf' ||
-    tab === 'timeline' ||
-    tab === 'historie' ||
-    tab === 'projekt-historie' ||
-    tab === 'phasen'
-  ) {
-    return 'aktivitaet'
-  }
+  if (tab === 'projekt' || tab === 'anfrage-details' || tab === 'anfragedetails') return 'details'
+  if (tab === 'timeline') return 'verlauf'
   const cumulative = resolveCumulativeDetailTabAlias(tab)
-  if (cumulative === 'anfrage-details') return 'uebersicht'
+  if (cumulative === 'anfrage-details') return 'details'
   if (ANFRAGE_DETAIL_TAB_IDS.has(tab as AnfrageDetailTab)) return tab as AnfrageDetailTab
-  return ANFRAGE_DETAIL_DEFAULT_TAB
+  return null
 }
 
 function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
 }
 
-function leadVorhabenTitel(lead: LeadDetail): string {
-  return (
-    situationBereichTitel(lead.situation, bereicheFuerAnzeige(lead.bereiche, lead.situation)) ||
-    'Anfrage'
-  )
+function leadProjektMetaLabel(lead: LeadDetail): string {
+  const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
+  if (bereiche.length) {
+    return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
+  }
+  const sit = leadSituationDisplay(lead.situation)
+  if (sit) return sit
+  return 'Anfrage'
 }
 
 type AngebotKurz = {
@@ -178,8 +140,6 @@ export function AnfrageDetailClient({
   angebotFlowSnapshot = null,
   angeboteAuswahlInitial = false,
   angebotWizardInitial = false,
-  angebotWizardInitialStep = null,
-  angebotWizardFocus = null,
   projektKontext,
   dbAuftragId = null,
 }: {
@@ -197,66 +157,45 @@ export function AnfrageDetailClient({
   angeboteAuswahlInitial?: boolean
   /** z. B. nach Kunden-Aktion oder ?ziel=angebot — Wizard sofort öffnen */
   angebotWizardInitial?: boolean
-  /** Deep-Link ?wizard_step= */
-  angebotWizardInitialStep?: number | null
-  /** Deep-Link ?focus= */
-  angebotWizardFocus?: string | null
   projektKontext?: ProjektKontext
   dbAuftragId?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isMobile = useIsMobile()
   const { refresh, generation } = useCrmRefresh()
   const [lead, setLead] = useState(initial)
   const [pending, startTransition] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
-  const [wvOpen, setWvOpen] = useState(false)
-  const [zusammenfuehrenOpen, setZusammenfuehrenOpen] = useState(false)
   const [angebotWizardOpen, setAngebotWizardOpen] = useState(false)
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
-  const [liveGewerke, setLiveGewerke] = useState(wizardGewerke)
-  const [livePreislisten, setLivePreislisten] = useState(wizardPreislisten)
-  const [liveFirm, setLiveFirm] = useState(wizardFirm)
-  const [liveHandwerker, setLiveHandwerker] = useState(wizardHandwerker)
   const kopieQueryHandledRef = useRef(false)
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
-  const [direktWizardOpen, setDirektWizardOpen] = useState(false)
 
-  const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
+  const [tab, setTab] = useState<AnfrageDetailTab>('stammdaten')
+  const isCrmAdmin = useIsCrmAdmin()
+  const [impersonating, setImpersonating] = useState(false)
+  const [portalLinkModalOpen, setPortalLinkModalOpen] = useState(false)
 
   useEffect(() => {
-    const raw = searchParams.get('tab')
-    if (isLegacyDetailTabAlias(raw)) {
-      const resolved = resolveAnfrageDetailTabFromQuery(raw) ?? 'uebersicht'
-      const q = new URLSearchParams(searchParams.toString())
-      q.set('tab', resolved)
-      q.delete('segment')
-      router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
-      return
-    }
-    const fromQuery = resolveAnfrageDetailTabFromQuery(raw)
+    const fromQuery = resolveAnfrageDetailTabFromQuery(searchParams.get('tab'))
     if (fromQuery) {
       setTab(fromQuery)
-      if (searchParams.has('segment')) {
-        const q = new URLSearchParams(searchParams.toString())
-        q.delete('segment')
-        router.replace(`/anfragen/${lead.id}?${q.toString()}`, { scroll: false })
-      }
       return
     }
     if (typeof window !== 'undefined') {
       const fromHash = resolveAnfrageDetailTabFromQuery(window.location.hash)
       if (fromHash) setTab(fromHash)
     }
-  }, [searchParams, lead.id, router])
+  }, [searchParams])
 
   useEffect(() => {
     setLead(initial)
-  }, [initial])
+  }, [initial.id])
+
+  const history = sortTimelineByCreatedAtAsc(lead.leads_status_history ?? [])
 
   const leadStatusData = useMemo(() => {
     const fd = lead.funnel_daten
@@ -279,16 +218,82 @@ export function AnfrageDetailClient({
     }
   }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote, angeboteListe, dbAuftragId])
 
+  const timelineSorted = useMemo(
+    () => sortTimelineByCreatedAtAsc(lead.lead_timeline ?? []),
+    [lead.lead_timeline]
+  )
+
+  const notizenRows = useMemo(() => {
+    const raw = lead.lead_notizen
+    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
+    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [lead.lead_notizen])
+
   const timelineItems = useMemo(() => {
-    const base = buildLeadVerlaufItems(lead.lead_timeline ?? [], {
-      fallbackCreatedAt: lead.created_at,
-      fallbackCreatedLabel: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
-    })
+    type Row = {
+      id: string
+      text: string
+      time: string
+      state: 'done' | 'open' | 'active'
+      ts: number
+    }
+
+    const fromEvents: Row[] = timelineSorted.map((ev) => ({
+      id: ev.id,
+      text: ev.beschreibung ? `${ev.titel} — ${ev.beschreibung}` : ev.titel,
+      time: formatTimelineStamp(ev.created_at),
+      state: 'done',
+      ts: new Date(ev.created_at).getTime(),
+    }))
+    const fromHistory: Row[] = history.map((h) => ({
+      id: h.id,
+      text:
+        h.status_alt != null
+          ? `Status: ${STATUS_LABELS[h.status_alt]} → ${STATUS_LABELS[h.status_neu]}`
+          : `Status: ${STATUS_LABELS[h.status_neu]}`,
+      time: formatTimelineStamp(h.created_at),
+      state: 'done',
+      ts: new Date(h.created_at).getTime(),
+    }))
+    let basis: Row[] = [...fromEvents, ...fromHistory].sort((a, b) => a.ts - b.ts)
+
+    if (basis.length === 0 && lead.created_at) {
+      basis = [
+        {
+          id: 'lead-eingang',
+          text: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
+          time: formatTimelineStamp(lead.created_at),
+          state: 'done',
+          ts: new Date(lead.created_at).getTime(),
+        },
+      ]
+    }
+
+    let merged: Row[] = basis
+    if (projektKontext) {
+      const enriched = ergaenzeTimelineMitProjektKontext(
+        basis.map((b) => ({
+          id: b.id,
+          ts: b.ts,
+          text: b.text,
+          time: b.time,
+          state: b.state === 'active' ? 'active' : 'done',
+        })),
+        projektKontext
+      )
+      merged = enriched.map((item) => ({
+        id: item.id,
+        text: item.text,
+        time: item.time,
+        state: item.state,
+        ts: item.ts,
+      }))
+    }
 
     const hasAngebote = angeboteListe.length > 0
     const anKundeGesendet = Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet)
     const hatAuftrag = Boolean(leadStatusData.auftrag_id)
-    const openSteps: VerlaufBuiltItem[] = []
+    const openSteps: Row[] = []
     if (!hatAuftrag) {
       if (!hasAngebote || !anKundeGesendet) {
         openSteps.push({
@@ -296,9 +301,7 @@ export function AnfrageDetailClient({
           text: 'Angebot erstellen',
           time: 'offen',
           state: 'open',
-          inspect: null,
           ts: Number.MAX_SAFE_INTEGER - 1,
-          source: 'open',
         })
       }
       openSteps.push({
@@ -306,27 +309,21 @@ export function AnfrageDetailClient({
         text: 'Auftragsbestätigung',
         time: 'offen',
         state: 'open',
-        inspect: null,
         ts: Number.MAX_SAFE_INTEGER,
-        source: 'open',
       })
     }
 
-    return [...base, ...openSteps]
+    return [...merged, ...openSteps].map(({ ts: _ts, ...rest }) => rest)
   }, [
-    lead.lead_timeline,
+    timelineSorted,
+    history,
+    projektKontext,
     lead.created_at,
     lead.kanal,
     angeboteListe.length,
     angebotFlowSnapshot?.angebotAnKundeGesendet,
     leadStatusData.auftrag_id,
   ])
-
-  const notizenRows = useMemo(() => {
-    const raw = lead.lead_notizen
-    if (!Array.isArray(raw)) return [] as LeadNotizRow[]
-    return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [lead.lead_notizen])
 
   const dokumenteRows = useMemo(() => {
     const raw = lead.lead_dokumente
@@ -335,60 +332,21 @@ export function AnfrageDetailClient({
   }, [lead.lead_dokumente])
 
   const dokumenteCount = useMemo(
-    () =>
-      dokumenteRows.length +
-      angeboteListe.length +
-      (projektKontext?.rechnungen ?? []).filter((r) =>
-        rechnungIstAlsAkteUnterlage(r)
-      ).length,
-    [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen]
+    () => dokumenteRows.length + angeboteListe.length,
+    [dokumenteRows.length, angeboteListe.length]
   )
 
-  const leadEmail =
-    lead.auftraggeber?.email?.trim() ||
-    lead.kunden?.email ||
-    lead.kontakt_email ||
-    null
-  const leadTel =
-    lead.auftraggeber?.telefon?.trim() ||
-    lead.kunden?.telefon?.trim() ||
-    lead.kontakt_telefon?.trim() ||
-    null
+  const leadEmail = lead.kunden?.email ?? lead.kontakt_email ?? null
+  const leadTelefon = (lead.kunden?.telefon ?? lead.kontakt_telefon ?? '').trim()
+  const kundeId = lead.kunde_id ?? lead.kunden?.id ?? null
   const auftragId = leadStatusData.auftrag_id as string | undefined
-  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
-    telefon: leadTel,
-    email: leadEmail,
-    notiz: { kind: 'lead', leadId: lead.id },
-    dokument: { kind: 'lead', leadId: lead.id },
-    onSaved: () => refresh(),
-  })
+  const mailCompose = useKundenMailCompose({ onSent: () => refresh() })
 
-  const ensureWizardData = useCallback(async () => {
-    if (liveGewerke.length > 0 && liveHandwerker.length > 0 && liveFirm) return true
-    const res = await loadAnfrageWizardBootstrap()
-    if (!res.ok) {
-      toast.error(res.message)
-      return false
-    }
-    setLiveGewerke(res.gewerke)
-    setLivePreislisten(res.preislisten)
-    setLiveFirm(res.firm)
-    setLiveHandwerker(res.handwerker)
-    return true
-  }, [liveFirm, liveGewerke.length, liveHandwerker.length])
-
-  const openAngebotWizard = useCallback(
-    (bootstrap: AngebotWizardBootstrap | null) => {
-      void (async () => {
-        const ok = await ensureWizardData()
-        if (!ok) return
-        setAngebotWizardBootstrap(bootstrap)
-        setWizardSessionKey((k) => k + 1)
-        setAngebotWizardOpen(true)
-      })()
-    },
-    [ensureWizardData]
-  )
+  const openAngebotWizard = useCallback((bootstrap: AngebotWizardBootstrap | null) => {
+    setAngebotWizardBootstrap(bootstrap)
+    setWizardSessionKey((k) => k + 1)
+    setAngebotWizardOpen(true)
+  }, [])
 
   useEffect(() => {
     const kopieId = angebotKopieVonQuelleId?.trim()
@@ -452,152 +410,133 @@ export function AnfrageDetailClient({
     if (href) router.push(`${href}#angebot-versand-kunde`)
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
-  const matrixCta = primaryCta('anfrage', lead.status)
-  const istAkut = leadIstAkut(lead)
-  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
+  const canAcceptAngebot =
+    Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet) &&
+    Boolean(angebotFlowSnapshot?.angebotId) &&
+    !auftragId
 
-  const openDirektBeauftragen = useCallback(() => {
-    void (async () => {
-      const ok = await ensureWizardData()
-      if (!ok) return
-      setDirektWizardOpen(true)
-    })()
-  }, [ensureWizardData])
+  const primaryCtaLabel = canAcceptAngebot ? CTA.angebotAnnehmen : CTA.angebotErstellen
+  const primaryCtaIcon = canAcceptAngebot ? 'check' : 'file-invoice'
 
   const primaryCtaAction = useCallback(() => {
-    if (!matrixCta) return
-    if (matrixCta.id === 'angebot_erstellen') {
-      openAngebotErstellen()
+    if (canAcceptAngebot && angebotFlowSnapshot?.angebotId) {
+      const angebotId = angebotFlowSnapshot.angebotId
+      startTransition(async () => {
+        const start = new Date().toISOString().slice(0, 10)
+        const res = await acceptAngebotAndCreateAuftrag(angebotId, {
+          start_datum: start,
+          send_kunden_email: false,
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        toast.success('Auftrag erstellt')
+        router.push(`/auftraege/${res.auftragId}`)
+        refresh()
+      })
+      return
     }
-  }, [matrixCta, openAngebotErstellen])
-
-  const detailPrimary = useMemo(() => {
-    if (hatAuftrag) return null
-    if (istAkut) {
-      return {
-        label: 'Direkt beauftragen',
-        icon: 'alert-triangle',
-        onClick: openDirektBeauftragen,
-        disabled: pending,
-      }
-    }
-    if (!matrixCta) return null
-    return {
-      label: matrixCta.label,
-      icon: matrixCta.icon,
-      onClick: primaryCtaAction,
-      disabled: pending,
-    }
+    openAngebotErstellen()
   }, [
-    hatAuftrag,
-    istAkut,
-    matrixCta,
-    openDirektBeauftragen,
-    pending,
-    primaryCtaAction,
+    canAcceptAngebot,
+    angebotFlowSnapshot?.angebotId,
+    openAngebotErstellen,
+    router,
+    refresh,
+    startTransition,
   ])
-
-  const detailSecondary = useMemo(() => {
-    if (hatAuftrag || istAkut) return null
-    if (matrixCta?.id !== 'angebot_erstellen') return null
-    return {
-      label: 'Direkt beauftragen',
-      icon: 'alert-triangle',
-      onClick: openDirektBeauftragen,
-      disabled: pending,
-    }
-  }, [hatAuftrag, istAkut, matrixCta, openDirektBeauftragen, pending])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
     setAngebotWizardBootstrap(null)
   }, [])
 
-  const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
-  const kundeTitel = useMemo(() => kundenName(lead), [lead])
-  const portalKundeId = useMemo(() => leadVertragsKundeId(lead), [lead])
-
-  const statusActions = useMemo(() => {
-    const st = String(lead.status ?? '').trim().toLowerCase()
-    const hasAngenommen = angeboteListe.some((a) =>
-      isAngenommenesAngebotStatus(a.status, a.status_einfach)
-    )
-    const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] =
-      []
-    if (st === 'neu' || st === 'kontaktiert') {
-      actions.push({
-        id: 'termin',
-        label: 'Termin vereinbart',
-        icon: 'calendar-event',
-        onClick: () => setStatusModalKind('termin'),
-      })
-      actions.push({
-        id: 'nicht_erreichbar',
-        label: 'Nicht erreichbar',
-        icon: 'phone-off',
-        onClick: () => setStatusModalKind('nicht_erreichbar'),
-      })
-    }
-    if (!hasAngenommen && st !== 'abgebrochen') {
-      actions.push({
-        id: 'verloren',
-        label: 'Als verloren markieren',
-        icon: 'circle-x',
-        danger: true,
-        onClick: () => setStatusModalKind('verloren'),
-      })
-    }
-    return actions
-  }, [lead.status, angeboteListe])
-
-  const statusBadge = useMemo(() => {
-    const s = anfrageStatusDisplay(lead.status, {
-      orgFreigabeStatus: lead.org_freigabe_status,
-    })
-    const badge = <StatusBadge status={lead.status} label={s.label} />
-    return (
-      <span className="inline-flex flex-wrap items-center gap-1.5">
-        <StatusBadgeActionPopover badge={badge} actions={statusActions} title="Status" />
-      </span>
-    )
-  }, [lead.status, lead.org_freigabe_status, statusActions])
-
-  const statusMenuItems = useMemo((): ActionsMenuItem[] => {
-    if (!statusActions.length) return []
-    return statusActions.map((a) => ({
-      label: a.label,
-      danger: a.danger,
-      icon: a.icon ? <MockIcon ctx="btn" n={a.icon} size={16} /> : undefined,
-      onClick: a.onClick,
-    }))
-  }, [statusActions])
-
-  const noShowTerminHinweis = useMemo(
-    () =>
-      lead.status === 'termin' &&
-      hatOffenenVergangenenKalenderTermin(
-        (lead.kalender_termine ?? []) as KalenderTermin[]
+  const detailHeadMenuItems = useMemo(() => {
+    return entityMenuToActionItems(
+      buildEntityMenu(
+        'anfrage',
+        { name: kundenName(lead), status: lead.status },
+        {
+          onEdit: () => setBearbeitenOpen(true),
+          onCopy: () => runDuplicateAnfrage(lead.id, router),
+          onPortal: () => {
+            if (!isCrmAdmin) {
+              toast.error('Admin Login nur für CRM-Admins')
+              return
+            }
+            if (impersonating) return
+            setImpersonating(true)
+            void openMieterStatusPreview(lead.id).then((r) => {
+              setImpersonating(false)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              window.open(r.url, '_blank', 'noopener,noreferrer')
+            })
+          },
+          onPortalLink: () => {
+            if (!kundeId) {
+              toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+              return
+            }
+            setPortalLinkModalOpen(true)
+          },
+          onStatus: (k) => setStatusModalKind(k),
+          onAngebot: () => {
+            if (hasAngebote) setAngebotAuswahlOpen(true)
+            else openAngebotErstellen()
+          },
+          tel: leadTelefon || null,
+          mail: leadEmail?.trim() || null,
+          onCall: leadTelefon
+            ? () => {
+                window.location.href = `tel:${leadTelefon.replace(/\s/g, '')}`
+              }
+            : undefined,
+          onMail: () => mailCompose.openCompose(() => mailComposeContextFromLead(lead.id)),
+          onDelete: () => {
+            startTransition(async () => {
+              const r = await deleteAnfrage(lead.id)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              toast.success('Anfrage gelöscht')
+              router.push('/vorgaenge?tab=anfrage')
+              refresh()
+            })
+          },
+          deleteLabel: kundenName(lead),
+        }
       ),
-    [lead.status, lead.kalender_termine]
+      (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size)
+    )
+  }, [
+    lead,
+    leadEmail,
+    leadTelefon,
+    mailCompose,
+    openAngebotErstellen,
+    hasAngebote,
+    router,
+    startTransition,
+    isCrmAdmin,
+    impersonating,
+    refresh,
+    kundeId,
+  ])
+
+  const projektMetaLabel = useMemo(() => leadProjektMetaLabel(lead), [lead])
+
+  const headMeta = kundenName(lead)
+
+  const timelineTab = (
+    <MockVerlaufCard empty={timelineItems.length === 0}>
+      <Timeline items={timelineItems} />
+    </MockVerlaufCard>
   )
-
-  const headMeta = useMemo(() => {
-    const parts = [vorhabenTitel]
-    if (lead.created_at) {
-      const d = new Date(lead.created_at)
-      const time = Number.isNaN(d.getTime())
-        ? ''
-        : d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-      parts.push(
-        time
-          ? `Eingang ${formatDatum(lead.created_at)}, ${time}`
-          : `Eingang ${formatDatum(lead.created_at)}`
-      )
-    }
-    return parts.filter(Boolean).join(' · ')
-  }, [vorhabenTitel, lead.created_at])
-
-  const timelineTab = <VerlaufPanel items={timelineItems} />
 
   const stammdatenInhalt = (
     <>
@@ -606,14 +545,8 @@ export function AnfrageDetailClient({
     </>
   )
 
-  const leistungenInhalt = (
-    <LeistungenTab
-      phase="anfrage"
-      rows={leistungenFromAnfrage(lead.funnel_daten)}
-      onOpenDokument={istAkut || !hatAuftrag ? openDirektBeauftragen : openAngebotErstellen}
-      dokumentActionLabel={istAkut ? 'Direkt beauftragen' : 'Angebot erstellen'}
-      emptyTitle="Noch keine Leistungen"
-    />
+  const detailsInhalt = (
+    <AnfrageDetailsTab lead={lead} gewerke={wizardGewerke} onSaved={() => refresh()} />
   )
 
   const notizenInhalt = (
@@ -622,61 +555,44 @@ export function AnfrageDetailClient({
 
   const detailShellGroups: DetailShellGroup[] = [
     {
-      id: 'uebersicht',
-      label: entityDetailTabLabel('uebersicht'),
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
+      id: 'details',
+      label: 'Details',
       icon: 'list-details',
-      render: () => (
-        <div className="space-y-6">
-          {stammdatenInhalt}
-          <VorgangPhasenVerlauf
-            kontext={projektKontext}
-            fromRef={{ kind: 'anfrage', id: lead.id }}
-            lead={lead}
-            onSaved={() => refresh()}
-          />
-        </div>
-      ),
+      render: () => detailsInhalt,
     },
     {
-      id: 'leistungen',
-      label: entityDetailTabLabel('leistungen'),
-      icon: 'tool',
-      render: () => <div className="space-y-6">{leistungenInhalt}</div>,
+      id: 'verlauf',
+      label: ACTIVITY_SECTIONS.verlauf,
+      icon: 'history',
+      count: timelineItems.length || undefined,
+      render: () => timelineTab,
     },
     {
-      id: 'zahlung',
-      label: entityDetailTabLabel('zahlung'),
-      icon: 'receipt',
-      render: () => (
-        <AnfrageZahlungTab rechnungen={projektKontext?.rechnungen ?? []} />
-      ),
-    },
-    {
-      id: 'akte',
-      label: entityDetailTabLabel('akte'),
+      id: 'dokumente',
+      label: ACTIVITY_SECTIONS.dokumente,
       icon: 'files',
-      count: (dokumenteCount || 0) + (notizenRows.length || 0) || undefined,
+      count: dokumenteCount || undefined,
       render: () => (
-        <VorgangAkteTab
-          dateien={
-            <AnfrageDokumenteTab
-              leadId={lead.id}
-              dokumente={dokumenteRows}
-              angebote={angeboteListe}
-              rechnungen={projektKontext?.rechnungen ?? []}
-              onReload={() => refresh()}
-            />
-          }
-          notizen={notizenInhalt}
+        <AnfrageDokumenteTab
+          leadId={lead.id}
+          dokumente={dokumenteRows}
+          angebote={angeboteListe}
+          onReload={() => refresh()}
         />
       ),
     },
     {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => timelineTab,
+      id: 'notizen',
+      label: ACTIVITY_SECTIONS.notizen,
+      icon: 'messages',
+      count: notizenRows.length || undefined,
+      render: () => notizenInhalt,
     },
   ]
 
@@ -686,58 +602,41 @@ export function AnfrageDetailClient({
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=anfrage"
       crumbBackLabel="Zurück zu den Suchergebnissen"
-      crumbSectionLabel="Anfragen"
-      breadcrumbTitle={kundeTitel}
-      wiedervorlageDatum={lead.wiedervorlage_datum}
-      wiedervorlageNotiz={lead.wiedervorlage_notiz}
-      wiedervorlageEntity="lead"
-      wiedervorlageEntityId={lead.id}
-      onWiedervorlageSaved={() => refresh()}
-      wiedervorlageOpen={wvOpen}
-      onWiedervorlageOpenChange={setWvOpen}
-      quickBar={quickBar}
       head={{
-        title: kundeTitel,
-        titleBadges: isMobile ? statusBadge : undefined,
-        badges: isMobile ? undefined : statusBadge,
+        title: projektMetaLabel,
+        badges: (() => {
+          const s = anfrageStatusDisplay(lead.status)
+          if (lead.status === 'angebot') {
+            return <MockBadge kind={hubSpotStatusToMockBadgeKind('offer')}>{s.label}</MockBadge>
+          }
+          return <MockBadge kind={variantToMockBadgeKind(s.variant)}>{s.label}</MockBadge>
+        })(),
         meta: headMeta,
-        titleTrailing: <PortalLoginIconButton kundeId={portalKundeId} label="Kundenportal öffnen" />,
         actions: (
-          <DetailActionsBar
-            sheetTitle="Anfrage"
-            primary={detailPrimary}
-            secondary={detailSecondary}
-            menuItems={statusMenuItems}
-          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="btn primary sm inline-flex shrink-0 gap-1.5"
+              onClick={primaryCtaAction}
+              disabled={pending}
+            >
+              <MockIcon ctx="btn" n={primaryCtaIcon} size={14} />
+              {primaryCtaLabel}
+            </button>
+            <ActionsMenu
+              trigger={
+                <button type="button" className="qa-btn" aria-label="Weitere Aktionen" title="Aktionen">
+                  <MockIcon ctx="btn" n="dots" size={18} />
+                </button>
+              }
+              items={detailHeadMenuItems}
+              sheetTitle="Anfrage"
+            />
+          </div>
         ),
       }}
     >
       <div className="space-y-4">
-      <DuplikatBand
-        leadId={lead.id}
-        duplikatHinweis={Boolean((lead as { duplikat_hinweis?: boolean }).duplikat_hinweis)}
-        duplikatBandDismissed={Boolean(
-          (lead as { duplikat_band_dismissed?: boolean }).duplikat_band_dismissed
-        )}
-        zusammengefuehrtIn={(lead as { zusammengefuehrt_in?: string | null }).zusammengefuehrt_in}
-        forceOpen={zusammenfuehrenOpen}
-        onForceOpenHandled={() => setZusammenfuehrenOpen(false)}
-        onDismissed={() => refresh()}
-      />
-      {noShowTerminHinweis ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-          <p className="text-[length:var(--fs-text)] text-muted">
-            Kunde nicht erschienen? „Nicht erreichbar“ als Kontaktversuch speichern.
-          </p>
-          <button
-            type="button"
-            className="btn ghost sm shrink-0"
-            onClick={() => setStatusModalKind('nicht_erreichbar')}
-          >
-            Nicht erreichbar
-          </button>
-        </div>
-      ) : null}
       <DetailShell
         groups={detailShellGroups}
         value={tab}
@@ -748,14 +647,12 @@ export function AnfrageDetailClient({
         <AngebotWizard
           key={wizardSessionKey}
           lead={lead}
-          gewerke={liveGewerke}
-          preislisten={livePreislisten}
-          handwerker={liveHandwerker}
-          firm={liveFirm}
+          gewerke={wizardGewerke}
+          preislisten={wizardPreislisten}
+          handwerker={wizardHandwerker}
+          firm={wizardFirm}
           kundenObjekte={kundenObjekte}
           bootstrap={angebotWizardBootstrap}
-          initialStep={angebotWizardInitialStep}
-          focusField={angebotWizardFocus}
           onClose={closeAngebotWizard}
           onSaved={() => refresh()}
           onDone={() => {
@@ -794,6 +691,13 @@ export function AnfrageDetailClient({
         }}
       />
 
+      <KundenportalLinkVersendenModal
+        open={portalLinkModalOpen}
+        onClose={() => setPortalLinkModalOpen(false)}
+        kundeId={kundeId}
+        fallbackEmail={leadEmail}
+      />
+
       <StatusModal
         kind={statusModalKind}
         open={statusModalKind != null}
@@ -803,32 +707,9 @@ export function AnfrageDetailClient({
           setStatusModalKind(null)
           refresh()
         }}
-        onSuggestVerloren={() => {
-          toast.success('Drei Kontaktversuche — Vorschlag: als verloren markieren', {
-            action: {
-              label: 'Als verloren',
-              onClick: () => setStatusModalKind('verloren'),
-            },
-          })
-          setStatusModalKind('verloren')
-        }}
       />
 
-      {direktWizardOpen ? (
-        <DirektBeauftragenWizard
-          lead={lead}
-          gewerke={liveGewerke}
-          preislisten={livePreislisten}
-          firm={liveFirm}
-          onClose={() => setDirektWizardOpen(false)}
-          onDone={(auftragId) => {
-            setDirektWizardOpen(false)
-            router.push(`/auftraege/${auftragId}?tab=leistungen`)
-          }}
-        />
-      ) : null}
-
-      {quickActionSheets}
+      {mailCompose.modal}
       </div>
     </EntityDetailLayout>
   )

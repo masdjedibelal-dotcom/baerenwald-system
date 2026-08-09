@@ -636,10 +636,10 @@ export function AngebotVisualisierungClient({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner mx-auto max-w-3xl space-y-4 pb-8">
       {sessionError ? (
-        <div className="rounded-lg border border-status-cancel-bg bg-red-50 px-4 py-3 text-[length:var(--fs-text)] text-status-cancel-text">
+        <div className="rounded-lg border border-status-cancel-bg bg-red-50 px-4 py-3 text-sm text-status-cancel-text">
           <p className="font-medium">Visualisierung nicht bereit</p>
           <p className="mt-1">{sessionError}</p>
-          <p className="mt-2 text-[length:var(--fs-meta)] opacity-90">
+          <p className="mt-2 text-xs opacity-90">
             Falls die Tabelle fehlt: Migration{' '}
             <code className="rounded bg-white/80 px-1">20260620120000_ki_visualisierungen.sql</code> in Supabase
             ausführen.
@@ -652,8 +652,8 @@ export function AngebotVisualisierungClient({
 
       <div className="space-y-5 rounded-xl border border-bw-border bg-white p-4 md:p-5">
           <section>
-            <h2 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Ist-Zustand (Pflicht)</h2>
-            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">Max. {VIZ_MAX_IST_BILDER} Fotos — pro Render wird das aktive Bild genutzt</p>
+            <h2 className="text-sm font-semibold text-bw-text">Ist-Zustand (Pflicht)</h2>
+            <p className="mb-2 text-xs text-bw-text-muted">Max. {VIZ_MAX_IST_BILDER} Fotos — pro Render wird das aktive Bild genutzt</p>
 
             <VizImageDropzone
               inputId={istInputId}
@@ -669,7 +669,7 @@ export function AngebotVisualisierungClient({
               ) : (
                 <ImageIcon className="mb-2 h-8 w-8 text-bw-text-muted" aria-hidden />
               )}
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+              <p className="text-sm text-bw-text-muted">
                 {uploading
                   ? 'Wird hochgeladen…'
                   : istDragging
@@ -679,7 +679,7 @@ export function AngebotVisualisierungClient({
             </VizImageDropzone>
 
             {leadFotos.length > 0 ? (
-              <Button type="button" variant="secondary" className="mt-2 w-full text-[length:var(--fs-text)]" onClick={uebernehmeLeadFotos}>
+              <Button type="button" variant="secondary" className="mt-2 w-full text-sm" onClick={uebernehmeLeadFotos}>
                 Aus Angebot-Fotos übernehmen
               </Button>
             ) : null}
@@ -716,12 +716,12 @@ export function AngebotVisualisierungClient({
           </section>
 
           <section>
-            <h2 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Was soll entstehen?</h2>
+            <h2 className="text-sm font-semibold text-bw-text">Was soll entstehen?</h2>
             <div className="mt-2 flex gap-1 rounded-lg bg-bw-bg p-1">
               <button
                 type="button"
                 className={cn(
-                  'flex-1 rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium',
                   modus === 'prompt' ? 'bg-white text-bw-primary shadow-sm' : 'text-bw-text-muted'
                 )}
                 onClick={() => setModus('prompt')}
@@ -731,7 +731,7 @@ export function AngebotVisualisierungClient({
               <button
                 type="button"
                 className={cn(
-                  'flex-1 rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium',
                   modus === 'zielbild' ? 'bg-white text-bw-primary shadow-sm' : 'text-bw-text-muted'
                 )}
                 onClick={() => setModus('zielbild')}
@@ -741,7 +741,7 @@ export function AngebotVisualisierungClient({
             </div>
 
             {modus === 'prompt' ? (
-              <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+              <p className="mt-2 text-xs text-bw-text-muted">
                 Beschreiben Sie auf Deutsch, wie der Raum aussehen soll.
               </p>
             ) : (
@@ -752,7 +752,7 @@ export function AngebotVisualisierungClient({
                   disabled={sessionLoading && !sessionId}
                   onDragState={() => {}}
                   onFile={(f) => void uploadFile(f, 'ziel')}
-                  className="min-h-[80px] flex-row gap-2 p-3 text-[length:var(--fs-text)] text-bw-text-muted"
+                  className="min-h-[80px] flex-row gap-2 p-3 text-sm text-bw-text-muted"
                 >
                   {zielBildUrl ? 'Ziel-Bild ersetzen' : 'Ziel-Bild hochladen'}
                 </VizImageDropzone>
@@ -760,7 +760,7 @@ export function AngebotVisualisierungClient({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-lg border border-bw-border object-cover" />
                 ) : null}
-                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                <p className="text-xs text-bw-text-muted">
                   Stil-Referenz — nur Material, Farbe und Atmosphäre werden übernommen, nicht das Raumlayout.
                 </p>
                 <Button
@@ -777,12 +777,12 @@ export function AngebotVisualisierungClient({
           </section>
 
           <section>
-            <h2 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Render-Prompt (Deutsch)</h2>
-            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+            <h2 className="text-sm font-semibold text-bw-text">Render-Prompt (Deutsch)</h2>
+            <p className="mb-2 text-xs text-bw-text-muted">
               Wird serverseitig für die KI ins Englische übersetzt. Text anpassen und erneut auf Rendern klicken.
             </p>
             <textarea
-              className="input min-h-[120px] w-full text-[length:var(--fs-text)]"
+              className="input min-h-[120px] w-full text-sm"
               rows={5}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -794,7 +794,7 @@ export function AngebotVisualisierungClient({
                   <button
                     key={tag}
                     type="button"
-                    className="rounded-full border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
+                    className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
                     onClick={() => appendStilTag(tag)}
                   >
                     {tag}
@@ -846,7 +846,7 @@ export function AngebotVisualisierungClient({
                       key={v.version}
                       type="button"
                       className={cn(
-                        'rounded-md px-2.5 py-1 text-[length:var(--fs-meta)] font-medium',
+                        'rounded-md px-2.5 py-1 text-xs font-medium',
                         i === aktiveVersion
                           ? 'bg-bw-primary text-white'
                           : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
@@ -869,14 +869,14 @@ export function AngebotVisualisierungClient({
               />
 
               <div>
-                <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Feintuning (wie Website)</p>
+                <p className="mb-2 text-xs font-medium text-bw-text-muted">Feintuning (wie Website)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {VIZ_NACHPROMPT_TAGS.map((tag) => (
                     <button
                       key={tag}
                       type="button"
                       disabled={isRendering || isPreparing}
-                      className="rounded-full border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary disabled:opacity-50"
+                      className="rounded-full border border-bw-border px-2.5 py-0.5 text-xs text-bw-text-muted hover:border-bw-primary hover:text-bw-primary disabled:opacity-50"
                       onClick={() => renderWithNachprompt(tag)}
                     >
                       {tag}
@@ -927,21 +927,21 @@ export function AngebotVisualisierungClient({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Aktuell</p>
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Aktuell</p>
             {istBilderUrls[aktivesIstIndex] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={istBilderUrls[aktivesIstIndex]} alt="Vorher" className="rounded-lg border border-bw-border" />
             ) : null}
           </div>
           <div>
-            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-[#2E7D52]">Visualisierung</p>
+            <p className="mb-1 text-xs font-medium text-[#2E7D52]">Visualisierung</p>
             {aktiveErgebnis ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={aktiveErgebnis.ergebnis_url} alt="Nachher" className="rounded-lg border border-bw-border" />
             ) : null}
           </div>
         </div>
-        <label className="mt-4 flex items-center gap-2 text-[length:var(--fs-text)]">
+        <label className="mt-4 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={insAngebotPdf}

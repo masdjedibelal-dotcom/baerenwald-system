@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import {
   buildKundeWirtschaft,
   KUNDE_WIRTSCHAFT_ZEITRAUM,
@@ -88,12 +87,18 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
     <div className="kw-uebersicht">
       <div className="kw-head">
         <h2 className="kw-title">Wirtschaftliche Übersicht</h2>
-        <ZeitraumIconPopover
-          value={zeitraum}
-          options={KUNDE_WIRTSCHAFT_ZEITRAUM}
-          onChange={setZeitraum}
-          title="Zeitraum"
-        />
+        <div className="kw-seg" role="group" aria-label="Zeitraum">
+          {KUNDE_WIRTSCHAFT_ZEITRAUM.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={cn('kw-seg-btn', zeitraum === opt.id && 'is-active')}
+              onClick={() => setZeitraum(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="kw-kpi-row">
@@ -152,6 +157,21 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
           ) : (
             <UmsatzverlaufBars monate={snap.monate} />
           )}
+        </div>
+      </div>
+
+      <div className="kw-count-row">
+        <div className="card kw-count">
+          <div className="kw-count-label">Neue Anfragen</div>
+          <div className="kw-count-val">{snap.anfragen}</div>
+        </div>
+        <div className="card kw-count">
+          <div className="kw-count-label">Angebote</div>
+          <div className="kw-count-val">{snap.angebote}</div>
+        </div>
+        <div className="card kw-count">
+          <div className="kw-count-label">Aufträge</div>
+          <div className="kw-count-val">{snap.auftraege}</div>
         </div>
       </div>
     </div>

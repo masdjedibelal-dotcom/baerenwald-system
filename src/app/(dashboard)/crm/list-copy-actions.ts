@@ -20,21 +20,10 @@ export async function duplicateAnfrage(
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Anfrage nicht gefunden.' }
 
   const row = src as Record<string, unknown>
-  const situRaw = typeof row.situation === 'string' ? row.situation.trim() : ''
-  const situNext = situRaw
-    ? /\(Kopie(?:\s+\d+)?\)$/.test(situRaw)
-      ? situRaw.replace(/\(Kopie(?:\s+(\d+))?\)$/, (_, n) => {
-          const num = n ? Number(n) + 1 : 2
-          return `(Kopie ${num})`
-        })
-      : `${situRaw} (Kopie)`
-    : 'Anfrage (Kopie)'
-
   const { data: inserted, error: insErr } = await supabase
     .from('leads')
     .insert({
       ...row,
-      situation: situNext,
       status: 'neu',
       notizen: `Kopie von Anfrage ${leadId.slice(0, 8)}…`,
     })

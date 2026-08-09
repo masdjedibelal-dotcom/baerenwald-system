@@ -14,7 +14,6 @@ import {
 import type { AngebotPosition, Kunde, RechnungBelegTyp } from '@/lib/types'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import {
-  formatHinweis35aRechnung,
   rechnungZeigtHinweis35a,
   positionNettoZeile,
 } from '@/lib/rechnung-berechnung'
@@ -281,9 +280,8 @@ export function RechnungPdfDocument({
         rechnungZeigtHinweis35a(kunde.typ, lohnAnzeige, berechnung.kleinunternehmer) ? (
           <View style={styles.box}>
             <Text style={{ marginBottom: 4 }}>
-              {formatHinweis35aRechnung(lohnAnzeige, {
-                materialNetto: materialAnzeige > 0 ? materialAnzeige : 0,
-              })}
+              Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe
+              von {eur(lohnAnzeige)} kann bei der Einkommensteuer geltend gemacht werden.
             </Text>
           </View>
         ) : null}

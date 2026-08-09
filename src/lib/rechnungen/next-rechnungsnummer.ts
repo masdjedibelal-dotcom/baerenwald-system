@@ -130,37 +130,3 @@ export async function maybeUpgradeLegacyRechnungsnummer(
   }
   return numRes.nummer
 }
-
-/**
- * Eingabe aus dem Wizard: volle Nummer oder nur Suffix (z. B. 2070 → RE2026-2070).
- */
-export function normalizeRechnungsnummerInput(
-  raw: string,
-  typ: RechnungBelegNummerTyp = 'rechnung'
-): string | null {
-  const t = raw.trim().toUpperCase().replace(/\s+/g, '')
-  if (!t) return null
-  if (isRe2026FormatNummer(t, typ)) return t
-  if (/^\d{1,8}$/.test(t)) {
-    return `${rechnungsnummerPrefix(typ)}${t}`
-  }
-  return null
-}
-
-/** Prüft, ob die Nummer noch frei ist (außer der eigenen Entwurfs-ID). */
-export async function rechnungsnummerIstFrei(
-  supabase: SupabaseClient,
-  nummer: string,
-  exceptId?: string | null
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const nr = nummer.trim()
-  if (!nr) return { ok: false, message: 'Rechnungsnummer fehlt.' }
-  let q = supabase.from('rechnungen').select('id').eq('rechnungsnummer', nr).limit(1)
-  if (exceptId?.trim()) q = q.neq('id', exceptId.trim())
-  const { data, error } = await q
-  if (error) return { ok: false, message: error.message }
-  if ((data?.length ?? 0) > 0) {
-    return { ok: false, message: `Rechnungsnummer ${nr} ist bereits vergeben.` }
-  }
-  return { ok: true }
-}

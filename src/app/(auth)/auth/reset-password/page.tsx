@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase'
 import { Card } from '@/components/ui/Card'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import { verifyCrmStaffSession } from '@/app/(auth)/auth-actions'
-import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 
 function ResetPasswordContent() {
   const supabase = createClient()
@@ -48,7 +47,7 @@ function ResetPasswordContent() {
       }
       const crm = await verifyCrmStaffSession()
       if (!crm.ok) {
-        await supabase.auth.signOut({ scope: "local" })
+        await supabase.auth.signOut()
         setError(crm.message)
         setChecking(false)
         return
@@ -70,7 +69,6 @@ function ResetPasswordContent() {
       setError('Passwörter stimmen nicht überein.')
       return
     }
-    dismissSoftKeyboard()
     setLoading(true)
     setError(null)
     const { error: updErr } = await supabase.auth.updateUser({ password })

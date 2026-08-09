@@ -71,7 +71,10 @@ export function AngebotWizardVizBlock({
           </>
         }
       >
-        {null}
+        <p className="text-sm text-bw-text-muted">
+          Entwurf einmal speichern — dann kannst du Fotos visualisieren und die Ergebnisse ins Angebot
+          übernehmen.
+        </p>
       </Card>
     )
   }
@@ -89,7 +92,10 @@ export function AngebotWizardVizBlock({
         </>
       }
     >
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-bw-text-muted">
+          Vorher/Nachher aus Fotodokumentation — erscheint im PDF wenn „Ins Angebot übernommen“.
+        </p>
         <Button
           type="button"
           variant="secondary"
@@ -104,21 +110,21 @@ export function AngebotWizardVizBlock({
       </div>
 
       {loading ? (
-        <div className="mt-3 flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text-muted">
+        <div className="mt-3 flex items-center gap-2 text-sm text-bw-text-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Lädt …
         </div>
       ) : null}
 
       {!loading && sessions.length === 0 ? (
-        <p className="mt-3 text-[length:var(--fs-text)] text-bw-text-muted">
-          Noch keine Visualisierung.
+        <p className="mt-3 text-sm text-bw-text-muted">
+          Noch keine Visualisierung — bei einem Foto auf „Visualisieren“ klicken.
         </p>
       ) : null}
 
       {imAngebot.length > 0 ? (
         <div className="mt-4 space-y-3">
-          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">Im Angebot (PDF)</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#2E7D52]">Im Angebot (PDF)</p>
           {imAngebot.map((s) => {
             const { istUrl, nachherUrl } = sessionVorschau(s)
             return (
@@ -136,13 +142,13 @@ export function AngebotWizardVizBlock({
                     <img src={nachherUrl} alt="Nachher" className="h-14 w-14 rounded-md object-cover" />
                   ) : null}
                 </div>
-                <div className="min-w-0 flex-1 text-[length:var(--fs-meta)] text-bw-text-muted">
+                <div className="min-w-0 flex-1 text-xs text-bw-text-muted">
                   {formatDatumZeit(s.created_at)}
                   {s.prompt_history.length > 1 ? ` · ${s.prompt_history.length} Versionen` : ''}
                 </div>
                 <button
                   type="button"
-                  className="text-[length:var(--fs-meta)] text-bw-link hover:underline"
+                  className="text-xs text-bw-link hover:underline"
                   disabled={disabled}
                   onClick={() =>
                     window.open(
@@ -162,9 +168,9 @@ export function AngebotWizardVizBlock({
 
       {!loading && andere.length > 0 ? (
         <div className="mt-4 space-y-2">
-          <p className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Weitere Sessions</p>
+          <p className="text-xs font-medium text-bw-text-muted">Weitere Sessions</p>
           {andere.slice(0, 3).map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 text-[length:var(--fs-meta)]">
+            <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
               <span className="text-bw-text-muted">{formatDatumZeit(s.created_at)} · {s.status}</span>
               <button
                 type="button"

@@ -1,9 +1,9 @@
 'use client'
 
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockChip } from '@/components/mock-ui/MockPrimitives'
-import { WerkzeugPanel } from '@/components/crm/WerkzeugPanel'
-import { cn } from '@/lib/utils'
+import { Shield } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import type { FreigabeModus } from '@/lib/types'
 
 export type FreigabeRegelnValue = {
@@ -12,165 +12,77 @@ export type FreigabeRegelnValue = {
   notfall_direkt: boolean
 }
 
-/** UI-Auswahl für Angebots-Freigabe oberhalb der Schwelle */
-export type FreigabeBehandlung = 'freigabe' | 'direkt' | 'notfall'
+const FREIGABE_MODUS_OPTS = [
+  { value: 'direkt', label: 'Direkt — ohne Org-Freigabe' },
+  { value: 'freigabe', label: 'Freigabe — Organisation muss freigeben' },
+]
 
-type Props = {
+/** Spec Phase D — HV-Freigaberegeln (Autopass/Schwelle/Notfall). */
+export function FreigabeRegelnEditor({
+  value,
+  onChange,
+  disabled,
+  compact,
+}: {
   value: FreigabeRegelnValue
   onChange: (next: FreigabeRegelnValue) => void
   disabled?: boolean
-  className?: string
-}
-
-const SCHWELLE_CHIPS = [
-  { label: '250 €', value: '250' },
-  { label: '500 €', value: '500' },
-  { label: '1k €', value: '1000' },
-  { label: '2k €', value: '2000' },
-] as const
-
-export function freigabeBehandlungFromValue(
-  freigabeModus: FreigabeModus,
-  notfallDirekt: boolean
-): FreigabeBehandlung {
-  if (freigabeModus === 'direkt') return 'direkt'
-  if (notfallDirekt) return 'notfall'
-  return 'freigabe'
-}
-
-export function patchFromFreigabeBehandlung(
-  behandlung: FreigabeBehandlung
-): Pick<FreigabeRegelnValue, 'freigabe_modus' | 'notfall_direkt'> {
-  if (behandlung === 'direkt') {
-    return { freigabe_modus: 'direkt', notfall_direkt: false }
-  }
-  if (behandlung === 'notfall') {
-    return { freigabe_modus: 'freigabe', notfall_direkt: true }
-  }
-  return { freigabe_modus: 'freigabe', notfall_direkt: false }
-}
-
-function formatSchwelleLabel(raw: string): string {
-  const n = Number(String(raw).replace(',', '.'))
-  if (!Number.isFinite(n) || n <= 0) return '—'
-  return `${Math.round(n).toLocaleString('de-DE')} €`
-}
-
-/** HV-Freigaberegeln: immer Angebot; unter Schwelle Auto-Auftrag; darüber Freigabe/Annahme. */
-export function FreigabeRegelnEditor({ value, onChange, disabled, className }: Props) {
-  const behandlung = freigabeBehandlungFromValue(value.freigabe_modus, value.notfall_direkt)
-  const schwelleLabel = formatSchwelleLabel(value.freigabe_schwelle_eur)
-  const schwelleNum = Number(String(value.freigabe_schwelle_eur).replace(',', '.'))
-  const hatSchwelle = Number.isFinite(schwelleNum) && schwelleNum > 0
-
-  function patch(partial: Partial<FreigabeRegelnValue>) {
-    if (disabled) return
-    onChange({ ...value, ...partial })
-  }
-
-  const purpose =
-    behandlung === 'direkt'
-      ? 'Immer Angebot — unter und über der Schwelle wird ohne Freigabe automatisch beauftragt.'
-      : hatSchwelle
-        ? `Immer Angebot. Bis ${schwelleLabel} automatisch Auftrag (ohne Annahme) — darüber wartet Freigabe/Annahme.`
-        : 'Immer Angebot. Ohne gesetzte Schwelle braucht jedes Angebot Freigabe/Annahme.'
-
-  const tiles = [
-    {
-      id: 'freigabe' as const,
-      title: 'Freigabe oberhalb',
-      desc: hatSchwelle
-        ? `Über ${schwelleLabel}: Freigabe nötig. Darunter: Auto-Auftrag.`
-        : 'Jedes Angebot braucht Freigabe.',
-    },
-    {
-      id: 'direkt' as const,
-      title: 'Immer automatisch',
-      desc: 'Kein Warten auf Freigabe — Angebot wird direkt zum Auftrag.',
-    },
-    {
-      id: 'notfall' as const,
-      title: 'Akut ohne Angebot',
-      desc: 'Nur Notfall/Akut: Direktauftrag möglich. Sonst wie Freigabe oberhalb.',
-    },
-  ]
+  compact?: boolean
+}) {
+  const freigabeAktiv = value.freigabe_modus === 'freigabe'
 
   return (
-    <WerkzeugPanel
-      className={className}
-      title="Freigabe-Regeln"
-      icon="shield-check"
-      purpose={purpose}
+    <MockCard
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Shield className="h-4 w-4 text-bw-primary" aria-hidden />
+          Freigabe-Regeln
+        </span>
+      }
+      bodyClassName={compact ? 'p-3 space-y-3' : 'p-4 space-y-4'}
     >
-      <MockFormSection>
-        <MockField label="Automatisch beauftragen bis" full>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: 140 }}>
-              <input
-                className="txt"
-                type="number"
-                min={0}
-                step={50}
-                placeholder="500"
-                disabled={disabled}
-                value={value.freigabe_schwelle_eur}
-                onChange={(e) => patch({ freigabe_schwelle_eur: e.target.value })}
-                style={{ paddingRight: 28 }}
-              />
-              <span
-                aria-hidden
-                style={{
-                  position: 'absolute',
-                  right: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: 'var(--fs-text)',
-                  color: 'var(--text-3)',
-                  pointerEvents: 'none',
-                }}
-              >
-                €
+      <Select
+        label="Freigabe-Modus"
+        name="freigabe_modus"
+        value={value.freigabe_modus}
+        disabled={disabled}
+        onChange={(e) =>
+          onChange({
+            ...value,
+            freigabe_modus: e.target.value as FreigabeModus,
+          })
+        }
+        options={FREIGABE_MODUS_OPTS}
+      />
+      {freigabeAktiv ? (
+        <>
+          <Input
+            label="Freigabe-Schwelle (€ netto)"
+            type="number"
+            min={0}
+            step={100}
+            disabled={disabled}
+            value={value.freigabe_schwelle_eur}
+            onChange={(e) => onChange({ ...value, freigabe_schwelle_eur: e.target.value })}
+            hint="Leer = immer Freigabe nötig. Darüber = Freigabe, darunter = direkt."
+          />
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-bw-text">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              disabled={disabled}
+              checked={value.notfall_direkt}
+              onChange={(e) => onChange({ ...value, notfall_direkt: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Notfall bypass</span>
+              <span className="mt-0.5 block text-xs text-bw-text-muted">
+                Notfall-Meldungen (HV) ohne Org-Freigabe — auch über Schwelle.
               </span>
-            </div>
-            <div className="chiprow">
-              {SCHWELLE_CHIPS.map((c) => (
-                <MockChip
-                  key={c.value}
-                  active={value.freigabe_schwelle_eur === c.value}
-                  onClick={() => {
-                    if (disabled) return
-                    patch({ freigabe_schwelle_eur: c.value })
-                  }}
-                >
-                  {c.label}
-                </MockChip>
-              ))}
-            </div>
-          </div>
-        </MockField>
-
-        <MockField label="Oberhalb der Schwelle" full>
-          <div className="werkzeug-tiles" role="radiogroup" aria-label="Freigabe-Modus">
-            {tiles.map((opt) => {
-              const on = behandlung === opt.id
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  disabled={disabled}
-                  className={cn('werkzeug-tile', on && 'on')}
-                  onClick={() => patch(patchFromFreigabeBehandlung(opt.id))}
-                >
-                  <span className="werkzeug-tile-title">{opt.title}</span>
-                  <span className="werkzeug-tile-desc">{opt.desc}</span>
-                </button>
-              )
-            })}
-          </div>
-        </MockField>
-      </MockFormSection>
-    </WerkzeugPanel>
+            </span>
+          </label>
+        </>
+      ) : null}
+    </MockCard>
   )
 }

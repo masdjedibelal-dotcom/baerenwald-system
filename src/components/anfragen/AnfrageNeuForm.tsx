@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
-import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { Textarea } from '@/components/ui/Textarea'
 import { createAnfrage, updateAnfrageAusNeuForm } from '@/app/(dashboard)/anfragen/actions'
 import type { LeadDetail, LeadKanal } from '@/lib/types'
 import {
@@ -32,20 +32,8 @@ import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
 import { bereicheSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { namenAusFunnelDaten, splitDeutscherVollname } from '@/lib/kunde-namen'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
-import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
-import {
-  normalizeVorgangWiederkehr,
-  type VorgangWiederkehr,
-} from '@/lib/vorgang/wiederkehrend'
 
 const KANAL_VALUES = Object.keys(KANAL_LABELS) as LeadKanal[]
-
-function wiederkehrFromLead(L: LeadDetail | null | undefined): VorgangWiederkehr {
-  return normalizeVorgangWiederkehr({
-    ist_wiederkehrend: L?.ist_wiederkehrend,
-    wiederkehr_turnus: L?.wiederkehr_turnus,
-  })
-}
 
 export const ANFRAGE_NEU_FORM_ID = 'anfrage-neu-form'
 export const ANFRAGE_BEARBEITEN_FORM_ID = 'anfrage-bearbeiten-form'
@@ -191,10 +179,6 @@ export function AnfrageNeuForm({
   const [budgetMax, setBudgetMax] = useState('')
   const [istBauprojekt, setIstBauprojekt] = useState(false)
   const [bauprojektManuell, setBauprojektManuell] = useState(false)
-  const [alsAkut, setAlsAkut] = useState(false)
-  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
-    wiederkehrFromLead(bearbeitenLead)
-  )
   const [bestaetigungsmailSenden, setBestaetigungsmailSenden] = useState(false)
 
   const resolvedFormId = formId ?? ANFRAGE_NEU_FORM_ID
@@ -382,11 +366,6 @@ export function AnfrageNeuForm({
     } else setBudgetMax('')
     setIstBauprojekt(L.ist_bauprojekt === true)
     setBauprojektManuell(L.ist_bauprojekt === true)
-    setAlsAkut(
-      (L.freigabe_bypass_grund ?? '').trim() === 'akut' ||
-        (L.situation ?? '').trim() === 'notfall'
-    )
-    setWiederkehr(wiederkehrFromLead(L))
     // Absichtlich nicht `bearbeitenLead` gesamt: vermeidet Zurücksetzen bei jedem Parent-Render bei offenem Sheet.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Nur bei anderer Lead-Revision neu aufbauen
   }, [bearbeitenLead?.id, bearbeitenLead?.updated_at])
@@ -419,7 +398,6 @@ export function AnfrageNeuForm({
     setZugaenglichkeit('')
     setBadAusstattung('')
     if (val === 'gewerbe') setKundentyp('gewerbe')
-    if (val === 'notfall') setAlsAkut(true)
   }
 
   function clearFachdetailsForBereich(bereich: string) {
@@ -541,10 +519,6 @@ export function AnfrageNeuForm({
       funnel_daten,
       notizen: interneNotiz.trim(),
       ist_bauprojekt: istBauprojekt,
-      als_akut: !isBearbeiten && alsAkut,
-      bestaetigungsmail_senden: !isBearbeiten && bestaetigungsmailSenden,
-      ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
-      wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
     }
 
     setLoading(true)
@@ -588,7 +562,7 @@ export function AnfrageNeuForm({
 
   const formBody = (
     <div className="space-y-4">
-      <Card title="Kunde & Kontakt" collapsible defaultOpen>
+      <Card title="Kunde & Kontakt">
         <div className="space-y-4">
           {!isBearbeiten ? (
             <KundeAuswahlFeld
@@ -807,25 +781,13 @@ export function AnfrageNeuForm({
                 setIstBauprojekt(e.target.checked)
               }}
             />
-            <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
+            <span>
+              <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
+              <span className="mt-0.5 block text-xs text-bw-text-muted">
+                Aktiviert Bautagesberichte, Leistungs-Compliance und Baustellen-Unterlagen.
+              </span>
+            </span>
           </label>
-
-          {!isBearbeiten ? (
-            <label className="checkbox-row mt-4 rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
-              <input
-                type="checkbox"
-                checked={alsAkut}
-                onChange={(e) => setAlsAkut(e.target.checked)}
-              />
-              <span className="font-medium text-bw-text">Akut / Notfall</span>
-            </label>
-          ) : null}
-
-          <VorgangArtWiederkehrField
-            value={wiederkehr}
-            onChange={setWiederkehr}
-            className="mt-4"
-          />
         </div>
       </Card>
 
@@ -1006,7 +968,7 @@ export function AnfrageNeuForm({
           <Field label="Preisrahmen (optional)">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="mb-1 block text-[length:var(--fs-meta)] text-bw-text-muted">Von (€)</span>
+                <span className="mb-1 block text-[11px] text-bw-text-muted">Von (€)</span>
                 <input
                   type="number"
                   min={0}
@@ -1018,7 +980,7 @@ export function AnfrageNeuForm({
                 />
               </div>
               <div>
-                <span className="mb-1 block text-[length:var(--fs-meta)] text-bw-text-muted">Bis (€)</span>
+                <span className="mb-1 block text-[11px] text-bw-text-muted">Bis (€)</span>
                 <input
                   type="number"
                   min={0}
@@ -1036,29 +998,31 @@ export function AnfrageNeuForm({
 
       <Card title="Notizen">
         <div className="space-y-4">
-          <SheetEditableField
-            label="Anmerkungen vom Kunden"
-            value={freitext}
-            onSave={setFreitext}
-            multiline
-            rows={3}
-            placeholder="Was hat der Kunde noch erwähnt?"
-          />
-          <SheetEditableField
-            label="Interne Notiz"
-            value={interneNotiz}
-            onSave={setInterneNotiz}
-            multiline
-            rows={3}
-            placeholder="Interne Bemerkungen zum Gespräch…"
-          />
+          <Field label="Anmerkungen vom Kunden">
+            <Textarea
+              name="freitext"
+              value={freitext}
+              onChange={(e) => setFreitext(e.target.value)}
+              placeholder="Was hat der Kunde noch erwähnt?"
+              rows={3}
+            />
+          </Field>
+          <Field label="Interne Notiz">
+            <Textarea
+              name="interneNotiz"
+              value={interneNotiz}
+              onChange={(e) => setInterneNotiz(e.target.value)}
+              placeholder="Interne Bemerkungen zum Gespräch…"
+              rows={3}
+            />
+          </Field>
         </div>
       </Card>
 
       {!isBearbeiten ? (
         <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
           {email.trim() ? (
-            <label className="flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]">
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
               <input
                 type="checkbox"
                 className="mt-0.5"
@@ -1067,13 +1031,13 @@ export function AnfrageNeuForm({
               />
               <span>
                 <span className="font-medium text-bw-text">Bestätigungs-Mail an Kunden senden</span>
-                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                <span className="mt-0.5 block text-xs text-bw-text-muted">
                   An {email.trim()} — standardmäßig aus bei manuell erfassten Anfragen.
                 </span>
               </span>
             </label>
           ) : (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            <p className="text-xs text-bw-text-muted">
               Keine E-Mail beim Kontakt — Bestätigungs-Mail kann nicht gesendet werden.
             </p>
           )}
@@ -1081,7 +1045,7 @@ export function AnfrageNeuForm({
       ) : null}
 
       {error ? (
-        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
+        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       ) : null}

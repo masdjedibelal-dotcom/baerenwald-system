@@ -44,10 +44,6 @@ export type CrmRechnungResolveSlice = {
   faellig?: string | null
   created_at: string
   updated_at?: string | null
-  rechnung_art?: string | null
-  abschlag_index?: number | null
-  rechnungsnummer?: string | null
-  brutto?: number | null
 }
 
 export function resolveVorgangFromCrmEntities(args: {
@@ -97,10 +93,6 @@ export function resolveVorgangFromCrmEntities(args: {
       faellig: r.faellig,
       created_at: r.created_at,
       updated_at: r.updated_at,
-      rechnung_art: r.rechnung_art,
-      abschlag_index: r.abschlag_index,
-      rechnungsnummer: r.rechnungsnummer,
-      brutto: r.brutto,
     })),
   }
   return resolveVorgang(input)

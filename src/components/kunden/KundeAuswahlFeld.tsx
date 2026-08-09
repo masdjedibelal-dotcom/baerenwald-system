@@ -13,20 +13,8 @@ type Props = {
   onKundeIdChange: (id: string | null) => void
   onKundeGewaehlt?: (kunde: Kunde) => void
   disabled?: boolean
-  /** Leer lassen, wenn äußeres Label (z. B. MockField „Kunde suchen“) schon da ist */
   label?: string
   hint?: string
-}
-
-function kundeMetaLines(k: Kunde): string[] {
-  const lines: string[] = []
-  if (k.email?.trim()) lines.push(k.email.trim())
-  if (k.telefon?.trim()) lines.push(k.telefon.trim())
-  const ort = [k.plz, k.ort].filter(Boolean).join(' ').trim()
-  if (ort) lines.push(ort)
-  const strasse = [k.strasse, k.hausnummer].filter(Boolean).join(' ').trim()
-  if (strasse) lines.push(strasse)
-  return lines
 }
 
 export function KundeAuswahlFeld({
@@ -36,7 +24,7 @@ export function KundeAuswahlFeld({
   onKundeGewaehlt,
   disabled,
   label = 'Bestehender Kunde',
-  hint,
+  hint = 'Optional: Kunde suchen und Kontaktdaten übernehmen.',
 }: Props) {
   const [suche, setSuche] = useState('')
   const [treffer, setTreffer] = useState<Kunde[]>([])
@@ -94,22 +82,17 @@ export function KundeAuswahlFeld({
   const showResults = !ausgewaehlt && qLen >= 2
 
   return (
-    <div className="kunde-auswahl min-w-0 max-w-full space-y-2">
-      {hint ? <p className="text-xs text-bw-text-muted">{hint}</p> : null}
+    <div className="space-y-2">
+      <p className="text-xs text-bw-text-muted">{hint}</p>
       {ausgewaehlt ? (
-        <div className="kunde-auswahl__picked flex min-w-0 max-w-full items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
-          <div className="min-w-0 flex-1 overflow-hidden text-sm">
-            <p className="m-0 break-words font-medium text-bw-text">
-              {kundeDisplayName(ausgewaehlt)}
+        <div className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2">
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-bw-text">{kundeDisplayName(ausgewaehlt)}</p>
+            <p className="truncate text-xs text-bw-text-muted">
+              {[ausgewaehlt.email, ausgewaehlt.telefon, [ausgewaehlt.plz, ausgewaehlt.ort].filter(Boolean).join(' ')]
+                .filter(Boolean)
+                .join(' · ') || '—'}
             </p>
-            {kundeMetaLines(ausgewaehlt).map((line) => (
-              <p
-                key={line}
-                className="m-0 mt-0.5 break-words text-xs leading-snug text-bw-text-muted"
-              >
-                {line}
-              </p>
-            ))}
           </div>
           {!disabled ? (
             <button
@@ -123,9 +106,9 @@ export function KundeAuswahlFeld({
           ) : null}
         </div>
       ) : (
-        <div className="min-w-0 max-w-full space-y-2">
+        <div className="space-y-2">
           <Input
-            label={label || undefined}
+            label={label}
             name="kunde_suche"
             value={suche}
             onChange={(e) => setSuche(e.target.value)}
@@ -133,9 +116,10 @@ export function KundeAuswahlFeld({
             autoComplete="off"
             disabled={disabled}
           />
+          {/* In-flow (kein absolute) — bleibt im Modal, deckendes Weiß */}
           {showResults ? (
             <ul
-              className="kunde-auswahl__list m-0 max-h-56 list-none overflow-y-auto overflow-x-hidden rounded-lg border border-[var(--border)] bg-white py-1"
+              className="m-0 max-h-56 list-none overflow-y-auto rounded-lg border border-[var(--border)] bg-white py-1"
               role="listbox"
               aria-label="Kundenvorschläge"
             >
@@ -145,36 +129,20 @@ export function KundeAuswahlFeld({
               {!suchen && treffer.length === 0 ? (
                 <li className="px-3 py-2.5 text-sm text-bw-text-muted">Keine Kunden gefunden</li>
               ) : null}
-              {treffer.map((k) => {
-                const meta = kundeMetaLines(k)
-                return (
-                  <li key={k.id} role="option" className="min-w-0">
-                    <button
-                      type="button"
-                      className="w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--bg-soft)]"
-                      onClick={() => waehle(k)}
-                    >
-                      <span className="block break-words font-medium text-bw-text">
-                        {kundeDisplayName(k)}
-                      </span>
-                      {meta.length ? (
-                        <span className="mt-0.5 flex flex-col gap-0.5">
-                          {meta.map((line) => (
-                            <span
-                              key={line}
-                              className="block break-words text-xs leading-snug text-bw-text-muted"
-                            >
-                              {line}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <span className="block text-xs text-bw-text-muted">—</span>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
+              {treffer.map((k) => (
+                <li key={k.id} role="option">
+                  <button
+                    type="button"
+                    className="w-full border-0 bg-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--bg-soft)]"
+                    onClick={() => waehle(k)}
+                  >
+                    <span className="font-medium text-bw-text">{kundeDisplayName(k)}</span>
+                    <span className="block text-xs text-bw-text-muted">
+                      {[k.email, k.telefon, k.ort].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </button>
+                </li>
+              ))}
             </ul>
           ) : null}
         </div>

@@ -9,7 +9,7 @@ import type {
   AbschlussdokuHtmlInput,
   AbschlussdokuSummen,
 } from '@/lib/templates/abschlussdokumentation-template'
-import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
@@ -76,6 +76,9 @@ export function formatLeistungszeitraumText(
   return `${a} – ${b}`
 }
 
+function firmZeileAdresse(f: FirmenEinstellungen): string {
+  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join('\n')
+}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean).join(' · ')
@@ -109,7 +112,7 @@ export function buildAbschlussdokuHtmlInput(
       })
     : pdf.projektTitel
 
-  const summen = pdf.mitPreisen ? buildAbschlussSummen(pdf, firm, detail) : null
+  const summen = buildAbschlussSummen(pdf, firm, detail)
 
   const bautagebuch = [...pdf.bautagebuch]
     .sort((a, b) => {
@@ -161,13 +164,12 @@ export function buildAbschlussdokuHtmlInput(
       beschreibung: p.beschreibung,
       menge: p.menge,
       einheit: p.einheit,
-      preis_netto: pdf.mitPreisen ? p.preis_fix : null,
+      preis_netto: p.preis_fix,
     })),
     abnahmePunkte: pdf.abnahmePunkte,
     bautagebuch,
     fotoUrls,
     mitBautagebuch: pdf.mitBautagebuch,
     mitFotos: pdf.mitFotos,
-    mitPreisen: pdf.mitPreisen,
   }
 }

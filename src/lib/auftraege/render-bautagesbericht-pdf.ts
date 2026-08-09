@@ -2,7 +2,7 @@ import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import type { AuftragBautagesbericht } from '@/lib/auftraege/bautagesbericht-types'
-import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   buildBautagesberichtHtml,
   buildBautagesberichtPdfFooterTemplate,
@@ -11,6 +11,9 @@ import {
 import type { Kunde } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 
+function firmZeileAdresse(f: FirmenEinstellungen): string {
+  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join('\n')
+}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean).join(' · ')

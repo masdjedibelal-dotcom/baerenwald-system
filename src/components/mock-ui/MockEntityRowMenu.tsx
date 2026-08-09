@@ -7,9 +7,6 @@ import {
   MockPopoverMenu,
   type MockPopoverItem,
 } from '@/components/mock-ui/MockPopover'
-import { ActionSheet } from '@/components/ui/ActionSheet'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 
 function toPopoverItems(items: EntityMenuItem[]): MockPopoverItem[] {
@@ -24,19 +21,6 @@ function toPopoverItems(items: EntityMenuItem[]): MockPopoverItem[] {
   })
 }
 
-function toActionsMenuItems(items: EntityMenuItem[]): ActionsMenuItem[] {
-  return items.map((it) => {
-    if (it === 'sep') return 'sep'
-    return {
-      label: it.label,
-      hint: it.hint,
-      danger: it.danger,
-      icon: it.icon ? <MockIcon ctx="row" n={it.icon} size={15} /> : undefined,
-      onClick: it.onClick,
-    }
-  })
-}
-
 export function MockEntityRowMenu({
   items,
   title = 'Aktionen',
@@ -44,7 +28,6 @@ export function MockEntityRowMenu({
   items: EntityMenuItem[]
   title?: string
 }) {
-  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLSpanElement>(null)
 
@@ -66,22 +49,13 @@ export function MockEntityRowMenu({
           <MockIcon ctx="row" n="dots" size={16} />
         </button>
       </span>
-      {isMobile ? (
-        <ActionSheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title={title}
-          items={toActionsMenuItems(items)}
+      <MockPopover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right">
+        <MockPopoverMenu
+          items={toPopoverItems(items)}
+          iconFn={(n) => <MockIcon ctx="row" n={n} size={15} />}
+          onItemClick={() => setOpen(false)}
         />
-      ) : (
-        <MockPopover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right">
-          <MockPopoverMenu
-            items={toPopoverItems(items)}
-            iconFn={(n) => <MockIcon ctx="row" n={n} size={15} />}
-            onItemClick={() => setOpen(false)}
-          />
-        </MockPopover>
-      )}
+      </MockPopover>
     </>
   )
 }

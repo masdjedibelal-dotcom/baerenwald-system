@@ -1,7 +1,6 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { Check } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -38,7 +37,7 @@ export function FormularOeffentlichClient({
   const [daten, setDaten] = useState<Record<string, unknown>>(initial.felder_werte)
   const [done, setDone] = useState(initial.abgeschlossen)
   const [err, setErr] = useState<string | null>(null)
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
 
   const felder = initial.felder
   const total = felder.length

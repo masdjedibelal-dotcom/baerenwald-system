@@ -29,43 +29,6 @@ export function zahlfristAnzeigeText(seg: ZahlfristSeg, datumYmd: string): strin
   return `zahlbar innerhalb von ${seg} Tagen nach Rechnungserhalt`
 }
 
-/** Rechnungs-PDF: Zahlungsbedingungen-Text zum gewählten Zahlungsziel. */
-export function rechnungZahlungstextFromZahlfrist(seg: ZahlfristSeg, datumYmd: string): string {
-  if (seg === 'datum') {
-    return `Zahlbar bis ${formatDateDeYmd(datumYmd)} ohne Abzug.`
-  }
-  const tage = Math.max(1, Number(seg) || 14)
-  return `Zahlbar innerhalb von ${tage} Tagen nach Rechnungserhalt ohne Abzug.`
-}
-
-/**
- * Bestehende Zahlungsbedingungen an neues Zahlungsziel anpassen
- * (ersetzt die „Zahlbar …“-Zeile, behält optionalen Zahlplan-Block).
- */
-export function patchZahlungsbedingungenMitZahlfrist(
-  existing: string | null | undefined,
-  seg: ZahlfristSeg,
-  datumYmd: string
-): string {
-  const neu = rechnungZahlungstextFromZahlfrist(seg, datumYmd)
-  const cur = (existing ?? '').trim()
-  if (!cur) return neu
-
-  const ersetzt = cur
-    .replace(/Zahlbar innerhalb von \d+ Tagen nach Rechnungserhalt(?:\s*ohne Abzug\.?)*/gi, neu)
-    .replace(/Zahlbar bis [^\n]+?(?:\s*ohne Abzug\.?)+/gi, neu)
-    .replace(/zahlbar innerhalb von \d+ Tagen nach Rechnungserhalt\.?/gi, neu)
-    // Doppelte „ohne Abzug“-Fragmente aufräumen (ältere kaputte Strings)
-    .replace(/(?:\s*ohne Abzug\.?)+/gi, ' ohne Abzug.')
-    .replace(/\.\s*\./g, '.')
-
-  if (ersetzt !== cur) return ersetzt.trim()
-  if (cur.includes('Zahlungsplan')) {
-    return `${cur.replace(/\n\nZahlbar[\s\S]*$/i, '').trim()}\n\n${neu}`
-  }
-  return neu
-}
-
 /** Fälligkeitsdatum aus Segment (bei „Datum“ = freies Datum). */
 export function faelligAmFromZahlfrist(seg: ZahlfristSeg, datumYmd: string, from = new Date()): string {
   if (seg === 'datum') return datumYmd?.trim() || plusDaysIso(14, from)

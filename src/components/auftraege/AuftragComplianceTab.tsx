@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react'
 import { Shield } from 'lucide-react'
+import { resolveMockIcon } from '@/lib/mock-icons'
 import { Accordion } from '@/components/ui/Accordion'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { EmptyState } from '@/components/layout/EmptyState'
 import { AuftragPartnerCompliancePanel } from '@/components/auftraege/AuftragPartnerCompliancePanel'
 import { sammleAuftragCompliancePartner } from '@/lib/auftraege/auftrag-compliance-partners'
 import { gewerkSlugsAusPositionen } from '@/lib/handwerker/compliance-partner-profile'
@@ -13,6 +14,9 @@ import {
 import { partnerDokumentIstFreigegeben } from '@/lib/handwerker/partner-dokument-status'
 import type { AuftragDetail, ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+
+const ToolIcon = resolveMockIcon('tool')
 
 function partnerFortschrittBadge(
   fortschritt: { erfuellt: number; pflicht: number; gesamt: number },
@@ -82,20 +86,20 @@ export function AuftragComplianceTab({
 
   if (!complianceTypen.length) {
     return (
-      <MockEmpty
-        icon="shield-check"
+      <EmptyState
+        icon={Shield}
         title="Compliance nicht konfiguriert"
-        hint="Lege unter Einstellungen → Compliance Dokumenttypen an."
+        description="Legen Sie unter Einstellungen → Compliance Dokumenttypen an."
       />
     )
   }
 
   if (partners.length === 0) {
     return (
-      <MockEmpty
-        icon="tool"
+      <EmptyState
+        icon={ToolIcon}
         title="Keine Partner zugewiesen"
-        hint="Weise unter Positionen Handwerker zu — dann erscheinen hier die Compliance-Nachweise je Partner."
+        description="Weisen Sie unter Positionen Handwerker zu — dann erscheinen hier die Compliance-Nachweise je Partner."
       />
     )
   }
@@ -105,8 +109,8 @@ export function AuftragComplianceTab({
       <div className="flex items-start gap-3">
         <Shield className="mt-0.5 h-5 w-5 shrink-0 text-bw-primary" aria-hidden />
         <div>
-          <h2 className="text-[length:var(--fs-title)] font-semibold text-bw-text">Compliance-Nachweise</h2>
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+          <h2 className="text-base font-semibold text-bw-text">Compliance-Nachweise</h2>
+          <p className="text-sm text-bw-text-muted">
             Pro Partner: Leistungen, erforderliche Unterlagen hochladen, eingereichte Dokumente prüfen
             und mit OK bestätigen. Der Partner sieht den Status im Portal aktualisiert.
           </p>
@@ -143,7 +147,7 @@ export function AuftragComplianceTab({
               action={
                 <span
                   className={cn(
-                    'rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                    'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                     badge.className
                   )}
                 >

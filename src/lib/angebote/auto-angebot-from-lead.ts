@@ -2,7 +2,6 @@ import { createAngebot } from '@/app/(dashboard)/angebote/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import { wizardPositionsToAngebot } from '@/lib/angebote/angebot-wizard-types'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { Gewerk, Lead, Preisliste } from '@/lib/types'
 
@@ -22,7 +21,7 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kunde_id, auftraggeber_kunde_id, kunde_objekt_id, status, situation, bereiche, funnel_daten, kontakt_name, plz, org_freigabe_status'
+      'id, kunde_id, kunde_objekt_id, status, situation, bereiche, funnel_daten, kontakt_name, plz, org_freigabe_status'
     )
     .eq('id', id)
     .maybeSingle()
@@ -70,7 +69,7 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
   const res = await createAngebot(
     {
       lead_id: id,
-      kunde_id: leadVertragsKundeId(lead) ?? lead.kunde_id,
+      kunde_id: lead.kunde_id,
       kunde_objekt_id: lead.kunde_objekt_id,
       positionen,
       notizen: null,

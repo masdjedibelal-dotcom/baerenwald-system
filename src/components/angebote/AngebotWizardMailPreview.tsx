@@ -11,9 +11,6 @@ export function AngebotWizardMailPreview({
   einleitung,
   schluss,
   leistungsumfang,
-  gesamtBrutto,
-  gesamtNetto,
-  gueltigBis,
   empfaengerHint,
 }: {
   angebotId: string | null
@@ -21,10 +18,6 @@ export function AngebotWizardMailPreview({
   einleitung?: string | null
   schluss?: string | null
   leistungsumfang?: string | null
-  /** Live-Wizard-Summen (sonst DB-Stand = oft veraltet). */
-  gesamtBrutto?: number | null
-  gesamtNetto?: number | null
-  gueltigBis?: string | null
   empfaengerHint?: string
 }) {
   const [html, setHtml] = useState('')
@@ -49,9 +42,6 @@ export function AngebotWizardMailPreview({
         einleitung,
         schluss,
         leistungsumfang,
-        gesamtBrutto,
-        gesamtNetto,
-        gueltigBis,
       }).then((res) => {
         if (cancelled) return
         setLoading(false)
@@ -71,22 +61,13 @@ export function AngebotWizardMailPreview({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [
-    angebotId,
-    betreff,
-    einleitung,
-    schluss,
-    leistungsumfang,
-    gesamtBrutto,
-    gesamtNetto,
-    gueltigBis,
-  ])
+  }, [angebotId, betreff, einleitung, schluss, leistungsumfang])
 
   return (
     <div style={{ display: 'grid', gap: 8, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div
         style={{
-          fontSize: 'var(--fs-meta)',
+          fontSize: 12,
           color: 'var(--text-3)',
           display: 'flex',
           flexDirection: 'column',
@@ -110,7 +91,7 @@ export function AngebotWizardMailPreview({
             borderRadius: 8,
             border: '0.5px solid var(--border)',
             background: 'var(--bg-soft)',
-            fontSize: 'var(--fs-text)',
+            fontSize: 13,
             color: 'var(--text-2)',
           }}
         >

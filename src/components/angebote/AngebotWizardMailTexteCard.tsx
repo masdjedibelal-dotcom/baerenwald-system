@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock } from '@/components/ui/MobileEditSheet'
 import {
+  ANGEBOT_MAIL_BOX_MARKER,
   angebotMailBodyForEditor,
   parseAngebotMailBodyFromEditor,
 } from '@/lib/templates/angebot-mail'
@@ -48,6 +49,10 @@ export function AngebotWizardMailTexteCard({
         disabled={disabled}
         spellCheck
       />
+      <p className="wizard-projekt-field-hint">
+        Die Zeile „{ANGEBOT_MAIL_BOX_MARKER}“ nicht löschen — dort erscheinen Angebotsnummer, Preis und
+        Gültigkeit. PDF-Einleitung nutzt denselben Fließtext wie der Abschnitt davor.
+      </p>
     </label>
   )
 

@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AnfrageWizard } from '@/components/anfragen/AnfrageWizard'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 function NeueAnfrageWizardHost() {
   const router = useRouter()
@@ -17,19 +16,12 @@ function NeueAnfrageWizardHost() {
 
   function close() {
     setOpen(false)
-    // Deep-Link-Host: zurück wenn möglich, sonst Vorgänge
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back()
-      return
-    }
     router.replace('/vorgaenge?tab=anfrage')
   }
 
   return (
     <>
-      <div className="py-8">
-        <CrmInlineLoading label="Anfrage wird geöffnet …" minHeight={80} />
-      </div>
+      <div className="py-8 text-center text-sm text-bw-text-muted">Anfrage wird geöffnet…</div>
       <AnfrageWizard
         open={open}
         onClose={close}
@@ -45,7 +37,13 @@ function NeueAnfrageWizardHost() {
 
 export default function NeueAnfragePage() {
   return (
-    <Suspense fallback={<CrmInlineLoading label="Neue Anfrage wird geladen …" />}>
+    <Suspense
+      fallback={
+        <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Lädt…
+        </div>
+      }
+    >
       <NeueAnfrageWizardHost />
     </Suspense>
   )

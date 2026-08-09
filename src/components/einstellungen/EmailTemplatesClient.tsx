@@ -1,14 +1,12 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import { saveEmailTemplate, type EmailTemplateRow } from '@/app/(dashboard)/einstellungen/email/actions'
 import { applyEmailTemplateVars, type EmailPreviewVars } from '@/lib/email-template-preview-vars'
@@ -126,12 +124,12 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
 
   return (
     <div className="space-y-4">
-      <Card title="System-E-Mails" className="einst-list-card">
+      <Card title="System-E-Mails">
         <EinstellungenListBody empty={templates.length === 0 ? 'Keine Templates konfiguriert.' : undefined}>
           {templates.map((t) => (
             <EinstellungenListItem key={t.id}>
               <div className="min-w-0 flex-1">
-                <p className="einst-list-title">{t.name}</p>
+                <p className="text-[13.5px] font-medium text-bw-text">{t.name}</p>
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
               <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
@@ -143,14 +141,37 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
         </EinstellungenListBody>
       </Card>
 
-      <EditorSheet
+      <Modal
         open={Boolean(open)}
         onClose={() => setOpen(null)}
         title={open?.name ?? 'Template bearbeiten'}
-        context="detail"
         size="lg"
-        confirmBusy={pending}
-        onConfirm={() => save()}
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                label="Test-Mail senden an"
+                type="email"
+                className="min-w-[200px]"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+              />
+              <div className="flex items-end">
+                <Button type="button" variant="secondary" loading={testBusy} onClick={() => void sendTest()}>
+                  Test-Mail senden
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setOpen(null)}>
+                Abbrechen
+              </Button>
+              <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
+                Speichern
+              </Button>
+            </div>
+          </div>
+        }
       >
         {open ? (
           <div className="space-y-4">
@@ -158,7 +179,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
               <button
                 type="button"
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+                  'rounded-md px-3 py-1.5 text-sm font-medium',
                   tab === 'edit' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('edit')}
@@ -168,7 +189,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
               <button
                 type="button"
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+                  'rounded-md px-3 py-1.5 text-sm font-medium',
                   tab === 'preview' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
                 )}
                 onClick={() => setTab('preview')}
@@ -180,26 +201,19 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
             {tab === 'edit' ? (
               <>
                 <div>
-                  <KiAssistFieldLabel
+                  <Input
+                    ref={betreffRef}
                     label="Betreff"
                     value={betreff}
-                    onApply={setBetreff}
-                    extraHint="E-Mail-Vorlage Betreff (kann {{Variablen}} enthalten)."
-                    multiline={false}
-                  >
-                    <Input
-                      ref={betreffRef}
-                      value={betreff}
-                      onChange={(e) => setBetreff(e.target.value)}
-                    />
-                  </KiAssistFieldLabel>
-                  <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">Variablen:</p>
+                    onChange={(e) => setBetreff(e.target.value)}
+                  />
+                  <p className="mt-2 text-xs text-bw-text-muted">Variablen:</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {VARIABLES.map((v) => (
                       <button
                         key={v}
                         type="button"
-                        className="chip text-[length:var(--fs-meta)]"
+                        className="chip text-xs"
                         onClick={() => chipBetreff(v)}
                       >
                         {`{{${v}}}`}
@@ -208,32 +222,26 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   </div>
                 </div>
                 <div>
-                  <KiAssistFieldLabel
-                    label="Inhalt (HTML)"
+                  <p className="input-label">Inhalt (HTML)</p>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {VARIABLES.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className="chip text-xs"
+                        onClick={() => chipBody(v)}
+                      >
+                        {`{{${v}}}`}
+                      </button>
+                    ))}
+                  </div>
+                  <Textarea
+                    ref={bodyRef}
+                    rows={14}
                     value={bodyHtml}
-                    onApply={setBodyHtml}
-                    extraHint="E-Mail-Vorlage Inhalt. Variablen wie {{kundenname}} beibehalten."
-                  >
-                    <div className="mb-2 flex flex-wrap gap-1">
-                      {VARIABLES.map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          className="chip text-[length:var(--fs-meta)]"
-                          onClick={() => chipBody(v)}
-                        >
-                          {`{{${v}}}`}
-                        </button>
-                      ))}
-                    </div>
-                    <Textarea
-                      ref={bodyRef}
-                      rows={14}
-                      value={bodyHtml}
-                      onChange={(e) => setBodyHtml(e.target.value)}
-                      className="font-mono text-[length:var(--fs-text)]"
-                    />
-                  </KiAssistFieldLabel>
+                    onChange={(e) => setBodyHtml(e.target.value)}
+                    className="font-mono text-sm"
+                  />
                 </div>
               </>
             ) : (
@@ -243,27 +251,14 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   {previewSubject}
                 </EinstellungenMeta>
                 <div
-                  className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-[length:var(--fs-text)] leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
+                  className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-sm leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
                   dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
               </div>
             )}
-
-            <div className="flex flex-wrap items-end gap-3 border-t border-bw-border pt-4">
-              <Input
-                label="Test-Mail an"
-                type="email"
-                className="min-w-[200px] flex-1"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
-              <Button type="button" variant="secondary" loading={testBusy} onClick={() => void sendTest()}>
-                Test senden
-              </Button>
-            </div>
           </div>
         ) : null}
-      </EditorSheet>
+      </Modal>
     </div>
   )
 }

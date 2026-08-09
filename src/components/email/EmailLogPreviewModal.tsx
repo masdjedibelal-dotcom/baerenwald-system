@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Download, Mail } from 'lucide-react'
 import { loadEmailLogDetail, type EmailLogDetail } from '@/app/(dashboard)/email-log/actions'
 import { Modal } from '@/components/ui/Modal'
@@ -40,20 +39,13 @@ export function EmailLogPreviewModal({
     })
   }, [open, emailLogId])
 
-  const pdfHref = row?.angebot_id
-    ? `/api/angebote/${row.angebot_id}/pdf`
-    : row?.rechnung_id
-      ? `/api/rechnungen/${row.rechnung_id}/pdf`
-      : null
-
-  const title =
-    row?.richtung === 'empfangen' ? 'Empfangene E-Mail' : 'Gesendete E-Mail'
+  const pdfHref = row?.angebot_id ? `/api/angebote/${row.angebot_id}/pdf` : null
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title="Gesendete E-Mail"
       size="lg"
       footer={
         <Button type="button" variant="secondary" onClick={onClose}>

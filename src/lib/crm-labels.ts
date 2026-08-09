@@ -2,14 +2,11 @@
 
 export const ACTIVITY_TAB_LABEL = 'Aktivität'
 
-export const PROJEKT_PHASEN_TAB_LABEL = 'Projektphasen'
-
 export const ACTIVITY_SECTIONS = {
   kommunikation: 'Kommunikation',
-  verlauf: ACTIVITY_TAB_LABEL,
+  verlauf: 'Verlauf',
   notizen: 'Notizen',
   dokumente: 'Dokumente',
-  fotos: 'Fotos',
 } as const
 
 export const CTA = {

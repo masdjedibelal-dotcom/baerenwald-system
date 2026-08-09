@@ -3,26 +3,28 @@ import { createClient } from '@/lib/supabase-server'
 import { AuftragDetailClient } from '@/components/auftraege/AuftragDetailClient'
 import {
   loadAuftragDetail,
-  loadRechnungenForAuftrag,
 } from '@/app/(dashboard)/auftraege/auftraege-data'
+import { loadRechnungenForAuftrag } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { listVertraegeFuerAuftrag, loadRahmenVertraegeForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
 import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/actions'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
-import { loadWizardContext } from '@/lib/wizard-context'
-import type { AngebotDetail, Lead, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
+import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
+import { loadAngebotDetail } from '@/lib/angebote/load-angebot-detail'
+import type { Lead, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
 
 const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, bereiche, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at, org_freigabe_status, kundentyp, status'
+  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, bereiche, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
     const [
       detail,
-      wizardCtx,
+      gwRes,
+      plRes,
       rechnungenListe,
       vertraegeListe,
       firm,
@@ -30,8 +32,9 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       complianceTypen,
       partnerDokumente,
     ] = await Promise.all([
-      loadAuftragDetail(params.id, { mode: 'tabs' }),
-      loadWizardContext(supabase),
+      loadAuftragDetail(params.id),
+      supabase.from('gewerke').select('id, name, slug').eq('aktiv', true).order('name'),
+      supabase.from('preislisten').select('*').order('gewerk_id'),
       loadRechnungenForAuftrag(params.id),
       listVertraegeFuerAuftrag(params.id),
       fetchFirmenEinstellungen(supabase),
@@ -49,6 +52,7 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
           .filter(Boolean)
       )
     )
+    const rahmenVertraegeByHandwerker = await loadRahmenVertraegeForHandwerker(handwerkerIds)
 
     let lead: Pick<
       Lead,
@@ -69,10 +73,22 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       | 'preis_max'
       | 'created_at'
     > | null = null
-    let leadTimeline: LeadTimelineRow[] = []
 
-    const [rahmenVertraegeByHandwerker, projektKontext, leadBundle] = await Promise.all([
-      loadRahmenVertraegeForHandwerker(handwerkerIds),
+    const [leadTimeline, projektKontext, leadDetail, angebotDetail] = await Promise.all([
+      detail.lead_id
+        ? (async () => {
+            const [{ data: tlByLead }, { data: leadRow }] = await Promise.all([
+              supabase
+                .from('lead_timeline')
+                .select('*')
+                .eq('lead_id', detail.lead_id!)
+                .order('created_at', { ascending: true }),
+              supabase.from('leads').select(LEAD_STAMMDATEN_SELECT).eq('id', detail.lead_id!).maybeSingle(),
+            ])
+            lead = (leadRow as typeof lead) ?? null
+            return (tlByLead ?? []) as LeadTimelineRow[]
+          })()
+        : Promise.resolve([] as LeadTimelineRow[]),
       loadProjektKontext(supabase, {
         activeKind: 'auftrag',
         activeId: params.id,
@@ -82,28 +98,12 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         angebotId: detail.angebot_id,
       }),
       detail.lead_id
-        ? Promise.all([
-            supabase
-              .from('lead_timeline')
-              .select('*')
-              .eq('lead_id', detail.lead_id)
-              .order('created_at', { ascending: true }),
-            supabase
-              .from('leads')
-              .select(LEAD_STAMMDATEN_SELECT)
-              .eq('id', detail.lead_id)
-              .maybeSingle(),
-          ]).then(([tlRes, leadRes]) => ({
-            timeline: (tlRes.data ?? []) as LeadTimelineRow[],
-            lead: leadRes.data,
-          }))
-        : Promise.resolve({ timeline: [] as LeadTimelineRow[], lead: null }),
+        ? loadAnfrageDetail(supabase, detail.lead_id).then((d) => d as LeadDetail | null)
+        : Promise.resolve(null),
+      detail.angebot_id
+        ? loadAngebotDetail(supabase, detail.angebot_id)
+        : Promise.resolve(null),
     ])
-
-    leadTimeline = leadBundle.timeline
-    lead = (leadBundle.lead as typeof lead) ?? null
-    const leadDetail = lead as LeadDetail | null
-    const angebotDetail = (detail.angebote ?? null) as unknown as AngebotDetail | null
 
     return (
       <AuftragDetailClient
@@ -111,8 +111,8 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         lead={lead}
         leadDetail={leadDetail}
         angebotDetail={angebotDetail}
-        gewerke={wizardCtx.gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug }))}
-        preislisten={wizardCtx.preislisten as Preisliste[]}
+        gewerke={(gwRes.data ?? []) as { id: string; name: string; slug: string }[]}
+        preislisten={(plRes.data ?? []) as Preisliste[]}
         leadTimeline={leadTimeline}
         team={team}
         rechnungenListe={rechnungenListe}

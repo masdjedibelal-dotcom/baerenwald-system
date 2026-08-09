@@ -33,10 +33,6 @@ import {
   updateAuftragStatusFromUi,
 } from '@/app/(dashboard)/auftraege/actions'
 import {
-  assignAuftragHandwerkerGewerk,
-  assignAuftragHandwerkerPosition,
-} from '@/app/(dashboard)/auftraege/handwerker-actions'
-import {
   resolveAngebotId,
   resolveKundeId,
   previewSendAngebot,
@@ -520,8 +516,8 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'create_rechnung_entwurf',
       kategorie: 'rechnungen',
-      beschreibung: 'Rechnungs-Entwurf aus Auftrag erstellen (Positionen optional — sonst aus Auftrag laden)',
-      params: ['auftrag_id', 'positionen?'],
+      beschreibung: 'Rechnungs-Entwurf aus Auftrag anlegen',
+      params: ['auftrag_id'],
     },
     handler: async (p) => {
       const auftragId = str(p, 'auftrag_id')
@@ -531,32 +527,11 @@ export const CRM_ACTION_REGISTRY: Record<
         .eq('id', auftragId)
         .maybeSingle()
       if (!auftrag?.kunde_id) return { error: 'Auftrag/Kunde nicht gefunden' }
-
-      let positionen = Array.isArray(p.positionen) ? p.positionen : null
-      if (!positionen?.length) {
-        const { data: posRows } = await supabaseAdmin
-          .from('auftrag_positionen')
-          .select(
-            'id, leistung_name, beschreibung, menge, einheit, preis_kunde, gewerk_name, gewerk_slug, sort_order'
-          )
-          .eq('auftrag_id', auftragId)
-          .order('sort_order', { ascending: true })
-        positionen = (posRows ?? []).map((row) => ({
-          id: row.id,
-          name: row.leistung_name,
-          beschreibung: row.beschreibung,
-          menge: row.menge ?? 1,
-          einheit: row.einheit ?? 'Stk.',
-          preis: Number(row.preis_kunde) || 0,
-          gewerk_name: row.gewerk_name,
-          gewerk_slug: row.gewerk_slug,
-        }))
-      }
-      if (!positionen.length) {
+      if (!Array.isArray(p.positionen) || p.positionen.length === 0) {
         return {
-          error: 'Keine Positionen am Auftrag',
-          fehlende_felder: ['positionen'],
-          hinweis: 'Zuerst Positionen am Auftrag anlegen oder manuell übergeben.',
+          error: 'positionen fehlen',
+          fehlende_felder: ['positionen', 'leistungszeitraum_von', 'leistungszeitraum_bis', 'faellig_am'],
+          hinweis: 'Positionen und Zeiträume erfragen, dann erneut aufrufen',
         }
       }
       const heute = new Date().toISOString().slice(0, 10)
@@ -564,68 +539,12 @@ export const CRM_ACTION_REGISTRY: Record<
         auftrag_id: auftragId,
         angebot_id: (auftrag.angebot_id as string | null) ?? null,
         kunde_id: auftrag.kunde_id as string,
-        positionen: positionen as import('@/lib/types').AngebotPosition[],
+        positionen: p.positionen as import('@/lib/types').AngebotPosition[],
         leistungszeitraum_von: optionalStr(p, 'leistungszeitraum_von') ?? heute,
         leistungszeitraum_bis: optionalStr(p, 'leistungszeitraum_bis') ?? heute,
         faellig_am: optionalStr(p, 'faellig_am') ?? heute,
         hinweise: optionalStr(p, 'notizen') ?? null,
       })
-    },
-  },
-  assign_auftrag_handwerker_gewerk: {
-    meta: {
-      id: 'assign_auftrag_handwerker_gewerk',
-      kategorie: 'auftraege',
-      beschreibung: 'Handwerker einem Gewerk am Auftrag zuweisen',
-      params: ['auftrag_id', 'gewerk_id', 'handwerker_id', 'position_ids?'],
-      bestaetigung: true,
-    },
-    preview: async (p) => {
-      const { data: hw } = await supabaseAdmin
-        .from('handwerker')
-        .select('name, firma')
-        .eq('id', str(p, 'handwerker_id'))
-        .maybeSingle()
-      const { data: gw } = await supabaseAdmin
-        .from('gewerke')
-        .select('name')
-        .eq('id', str(p, 'gewerk_id'))
-        .maybeSingle()
-      return {
-        vorschau: true,
-        auftrag_id: str(p, 'auftrag_id'),
-        gewerk: gw?.name,
-        handwerker: hw?.firma || hw?.name,
-        hinweis: 'Mit bestaetigt: true zuweisen',
-      }
-    },
-    handler: async (p) => {
-      const res = await assignAuftragHandwerkerGewerk({
-        auftragId: str(p, 'auftrag_id'),
-        gewerkId: str(p, 'gewerk_id'),
-        handwerkerId: str(p, 'handwerker_id'),
-        positionIds: Array.isArray(p.position_ids) ? p.position_ids.map(String) : undefined,
-      })
-      if (!res.ok) return { error: res.message }
-      return { ok: true, auftrag_id: str(p, 'auftrag_id'), link: `/auftraege/${str(p, 'auftrag_id')}` }
-    },
-  },
-  assign_auftrag_handwerker_position: {
-    meta: {
-      id: 'assign_auftrag_handwerker_position',
-      kategorie: 'auftraege',
-      beschreibung: 'Handwerker einer einzelnen Auftragsposition zuweisen',
-      params: ['auftrag_id', 'position_id', 'handwerker_id'],
-      bestaetigung: true,
-    },
-    handler: async (p) => {
-      const res = await assignAuftragHandwerkerPosition({
-        auftragId: str(p, 'auftrag_id'),
-        positionId: str(p, 'position_id'),
-        handwerkerId: str(p, 'handwerker_id'),
-      })
-      if (!res.ok) return { error: res.message }
-      return { ok: true, auftrag_id: str(p, 'auftrag_id') }
     },
   },
   send_rechnung: {

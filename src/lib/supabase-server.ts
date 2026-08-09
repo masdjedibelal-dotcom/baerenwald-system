@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { crmAuthCookieOptions } from '@/lib/auth/crm-auth-cookie'
 
 export function createClient() {
   const cookieStore = cookies()
@@ -9,7 +8,6 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: crmAuthCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll()

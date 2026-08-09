@@ -1,12 +1,10 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { Home, Mail, Pencil, Phone, Plus, Trash2 } from 'lucide-react'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import {
@@ -14,11 +12,8 @@ import {
   deleteEinheitBewohner,
   updateEinheitBewohner,
 } from '@/app/actions/objektakte-actions'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
-
-const COLS = 'minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr) 44px'
 
 export function ObjektBewohnerSection({
   kundeId,
@@ -43,7 +38,6 @@ export function ObjektBewohnerSection({
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
 
   const einheitOptions = useMemo(
     () => [
@@ -64,7 +58,6 @@ export function ObjektBewohnerSection({
     setTelefon('')
     setEmail('')
     setErr(null)
-    setDirty(false)
     setModalOpen(true)
   }
 
@@ -75,7 +68,6 @@ export function ObjektBewohnerSection({
     setTelefon(b.telefon ?? '')
     setEmail(b.email ?? '')
     setErr(null)
-    setDirty(false)
     setModalOpen(true)
   }
 
@@ -119,7 +111,6 @@ export function ObjektBewohnerSection({
         setListe((prev) => [...prev, r.bewohner])
         toast.success('Bewohner angelegt')
       }
-      setDirty(false)
       setModalOpen(false)
       onChanged()
     })
@@ -139,145 +130,120 @@ export function ObjektBewohnerSection({
     })
   }
 
-  function rowMenuItems(b: EinheitBewohner): EntityMenuItem[] {
-    return [
-      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openBearbeiten(b) },
-      'sep',
-      {
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () => {
-          if (pending) return
-          entfernen(b)
-        },
-      },
-    ]
-  }
-
   return (
     <>
       <MockCard
-        title={liste.length ? `Bewohner · ${liste.length}` : 'Bewohner'}
-        icon="users"
+        collapsible
+        title={
+          <>
+            <Home className="inline h-4 w-4 text-bw-primary" aria-hidden /> Bewohner
+          </>
+        }
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openNeu} disabled={einheiten.length === 0}>
+          <button
+            type="button"
+            className="btn ghost sm gap-1"
+            onClick={openNeu}
+            disabled={einheiten.length === 0}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden />
             Hinzufügen
-          </MockBtn>
+          </button>
         }
       >
-        <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[12px] text-bw-text-muted">
           Bewohner je Einheit — Einheiten werden im HV-Portal gepflegt.
         </p>
         {einheiten.length === 0 ? (
-          <MockEmpty
-            icon="users"
-            title="Noch keine Einheiten"
-            hint="Bitte im Auftraggeber-Portal unter „Einheiten“ anlegen"
-          />
+          <p className="text-[13px] text-bw-text-muted">
+            Noch keine Einheiten für dieses Objekt. Bitte im Auftraggeber-Portal unter „Einheiten“ anlegen.
+          </p>
         ) : liste.length === 0 ? (
-          <MockEmpty icon="users" title="Noch keine Bewohner" hint="Bewohner hinzufügen" />
+          <p className="text-[13px] text-bw-text-muted">Noch keine Bewohner hinterlegt.</p>
         ) : (
-          <div className="listcard">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div>Name</div>
-              <div>Einheit</div>
-              <div>Kontakt</div>
-              <div />
-            </div>
-            {liste.map((b) => {
-              const kontaktZeile = [b.telefon?.trim(), b.email?.trim()].filter(Boolean).join(' · ') || '—'
-              return (
-                <div key={b.id} className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {b.name}
+          <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+            {liste.map((b) => (
+              <li key={b.id} className="flex gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] font-medium text-bw-text">{b.name}</span>
+                    <span className="text-[11px] text-bw-text-muted">
+                      {b.objekt_einheiten?.bezeichnung ?? 'Einheit'}
+                    </span>
                   </div>
-                  <div className="lc-sub" style={{ color: 'var(--text-2)' }}>
-                    {b.objekt_einheiten?.bezeichnung ?? 'Einheit'}
-                  </div>
-                  <div
-                    className="lc-sub"
-                    style={{
-                      color: 'var(--text-2)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={kontaktZeile}
-                  >
-                    {kontaktZeile}
-                  </div>
-                  <div
-                    className="row-actions always"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ justifyContent: 'flex-end' }}
-                  >
-                    <MockEntityRowMenu items={rowMenuItems(b)} title="Bewohner" />
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
+                    {b.telefon ? (
+                      <a href={`tel:${b.telefon}`} className="inline-flex items-center gap-1 text-bw-link">
+                        <Phone className="h-3 w-3" aria-hidden />
+                        {b.telefon}
+                      </a>
+                    ) : null}
+                    {b.email ? (
+                      <a href={`mailto:${b.email}`} className="inline-flex items-center gap-1 text-bw-link">
+                        <Mail className="h-3 w-3" aria-hidden />
+                        {b.email}
+                      </a>
+                    ) : null}
                   </div>
                 </div>
-              )
-            })}
-          </div>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    aria-label="Bearbeiten"
+                    onClick={() => openBearbeiten(b)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm text-danger"
+                    aria-label="Löschen"
+                    disabled={pending}
+                    onClick={() => entfernen(b)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </MockCard>
 
-      <EditorSheet
+      <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Bewohner"
-        context="detail"
-        dirty={dirty}
-        confirmBusy={pending}
-        confirmDisabled={pending || (!edit && !einheitId)}
-        onConfirm={speichern}
+        title={edit ? 'Bewohner bearbeiten' : 'Bewohner anlegen'}
       >
-        <div className="space-y-3">
+        <div className="space-y-3 p-1">
           {!edit ? (
             <Select
               label="Einheit"
               name="einheit"
               value={einheitId}
-              onChange={(e) => {
-                setDirty(true)
-                setEinheitId(e.target.value)
-              }}
+              onChange={(e) => setEinheitId(e.target.value)}
               options={einheitOptions}
             />
           ) : (
-            <p className="text-[length:var(--fs-text)]" style={{ color: 'var(--text-3)' }}>
+            <p className="text-sm text-bw-text-muted">
               Einheit: {edit.objekt_einheiten?.bezeichnung ?? '—'}
             </p>
           )}
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => {
-              setDirty(true)
-              setName(e.target.value)
-            }}
-            required
-          />
-          <Input
-            label="Telefon"
-            value={telefon}
-            onChange={(e) => {
-              setDirty(true)
-              setTelefon(e.target.value)
-            }}
-            type="tel"
-          />
-          <Input
-            label="E-Mail"
-            value={email}
-            onChange={(e) => {
-              setDirty(true)
-              setEmail(e.target.value)
-            }}
-            type="email"
-          />
-          {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
+          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <Input label="Telefon" value={telefon} onChange={(e) => setTelefon(e.target.value)} type="tel" />
+          <Input label="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+          {err ? <p className="text-sm text-danger">{err}</p> : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" onClick={speichern} disabled={pending || (!edit && !einheitId)}>
+              Speichern
+            </Button>
+          </div>
         </div>
-      </EditorSheet>
+      </Modal>
     </>
   )
 }

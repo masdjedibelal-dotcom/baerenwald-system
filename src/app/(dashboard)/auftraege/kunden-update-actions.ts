@@ -155,13 +155,6 @@ export async function createKundenUpdateAndSend(input: {
       auftragId: input.auftragId,
     })
     if (!sent.success) return { ok: false, message: sent.error ?? 'Mail fehlgeschlagen' }
-
-    if (timelineId && sent.emailLogId) {
-      await supabaseAdmin
-        .from('auftrag_timeline')
-        .update({ email_log_id: sent.emailLogId })
-        .eq('id', timelineId)
-    }
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)

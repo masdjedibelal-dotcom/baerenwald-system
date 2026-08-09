@@ -7,8 +7,7 @@ export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undef
 }
 
 export function handwerkerZuweisungAktiv(z: AngebotHandwerkerRow): boolean {
-  const s = (z.status ?? 'ausstehend').toLowerCase()
-  return s !== 'abgelehnt' && s !== 'ersetzt'
+  return (z.status ?? 'ausstehend').toLowerCase() !== 'abgelehnt'
 }
 
 export function aktiveHandwerkerZuweisungen(rows: AngebotHandwerkerRow[]): AngebotHandwerkerRow[] {

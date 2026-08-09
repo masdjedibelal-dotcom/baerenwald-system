@@ -6,7 +6,6 @@ import { OBJEKT_KONTAKT_ROLLEN } from '@/lib/objektakte/labels'
 import type {
   EinheitBewohner,
   EinheitBewohnerInput,
-  ObjektEinheit,
   ObjektKontakt,
   ObjektKontaktInput,
   ObjektKontaktRolle,
@@ -213,102 +212,6 @@ export async function deleteEinheitBewohner(
     .update({ aktiv: false, updated_at: new Date().toISOString() })
     .eq('id', bewohnerId)
     .eq('kunde_id', kundeId)
-
-  if (error) return { ok: false, message: error.message }
-  revalidateObjektAkte(kundeId, objektId)
-  return { ok: true }
-}
-
-export async function createObjektEinheit(
-  kundeId: string,
-  objektId: string,
-  input: { bezeichnung: string; wohnflaeche_m2?: number | null }
-): Promise<{ ok: true; einheit: ObjektEinheit } | { ok: false; message: string }> {
-  const bez = input.bezeichnung?.trim()
-  if (!bez) return { ok: false, message: 'Bezeichnung ist erforderlich.' }
-  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
-    return { ok: false, message: 'Objekt nicht gefunden.' }
-  }
-
-  const supabase = createClient()
-  const { data: maxRow } = await supabase
-    .from('objekt_einheiten')
-    .select('sort_order')
-    .eq('kunde_objekt_id', objektId)
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const { data, error } = await supabase
-    .from('objekt_einheiten')
-    .insert({
-      kunde_objekt_id: objektId,
-      bezeichnung: bez,
-      wohnflaeche_m2:
-        input.wohnflaeche_m2 != null && Number.isFinite(input.wohnflaeche_m2)
-          ? input.wohnflaeche_m2
-          : null,
-      sort_order: (maxRow?.sort_order ?? -1) + 1,
-    })
-    .select('*')
-    .single()
-
-  if (error || !data) {
-    return { ok: false, message: error?.message ?? 'Einheit konnte nicht angelegt werden.' }
-  }
-
-  revalidateObjektAkte(kundeId, objektId)
-  return { ok: true, einheit: data as ObjektEinheit }
-}
-
-export async function updateObjektEinheit(
-  kundeId: string,
-  objektId: string,
-  einheitId: string,
-  input: { bezeichnung?: string; wohnflaeche_m2?: number | null }
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
-    return { ok: false, message: 'Einheit nicht gefunden.' }
-  }
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.bezeichnung != null) {
-    const bez = input.bezeichnung.trim()
-    if (!bez) return { ok: false, message: 'Bezeichnung ist erforderlich.' }
-    patch.bezeichnung = bez
-  }
-  if (input.wohnflaeche_m2 !== undefined) {
-    patch.wohnflaeche_m2 =
-      input.wohnflaeche_m2 != null && Number.isFinite(input.wohnflaeche_m2)
-        ? input.wohnflaeche_m2
-        : null
-  }
-
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('objekt_einheiten')
-    .update(patch)
-    .eq('id', einheitId)
-    .eq('kunde_objekt_id', objektId)
-
-  if (error) return { ok: false, message: error.message }
-  revalidateObjektAkte(kundeId, objektId)
-  return { ok: true }
-}
-
-export async function deleteObjektEinheit(
-  kundeId: string,
-  objektId: string,
-  einheitId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
-    return { ok: false, message: 'Einheit nicht gefunden.' }
-  }
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('objekt_einheiten')
-    .update({ aktiv: false, updated_at: new Date().toISOString() })
-    .eq('id', einheitId)
-    .eq('kunde_objekt_id', objektId)
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)

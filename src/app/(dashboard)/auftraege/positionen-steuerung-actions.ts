@@ -404,7 +404,7 @@ export async function sendKundeInformierenMail(input: {
   const token = await ensureKundenTokenForAuftrag(input.auftragId)
   const statusLink = token ? projektUrlFromToken(token) : ''
 
-  const sent = await sendMail({
+  await sendMail({
     typ: 'projekt_update',
     an: built.kundeEmail,
     anName: built.kundeName,
@@ -415,9 +415,6 @@ export async function sendKundeInformierenMail(input: {
     ),
     auftragId: input.auftragId,
   })
-  if (!sent.success) {
-    return { ok: false, message: sent.error ?? 'E-Mail fehlgeschlagen' }
-  }
 
   const scopeTitel =
     input.scope.type === 'phase'
@@ -433,7 +430,6 @@ export async function sendKundeInformierenMail(input: {
     beschreibung: `${scopeTitel} — ${built.betreff}`,
     sichtbar_fuer_kunde: true,
     erstellt_von: gate.userId,
-    email_log_id: sent.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)

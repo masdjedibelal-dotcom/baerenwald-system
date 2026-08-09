@@ -15,11 +15,7 @@ import {
   gewerkById,
   resolveIstFachbetriebInPdf,
 } from '@/lib/gewerke-ausfuehrung'
-import {
-  angebotGewerkNameAnzeige,
-  istGesamtrabattPosition,
-  ZEILE_SLUG_FREITEXT,
-} from '@/lib/dokument-zeilen'
+import { angebotGewerkNameAnzeige, ZEILE_SLUG_FREITEXT } from '@/lib/dokument-zeilen'
 import { richTextToPlain } from '@/lib/rich-text'
 
 export type { AngebotPdfFreitext, AngebotBlockPdfEntry, AngebotPositionBlockGroup }
@@ -42,21 +38,17 @@ export function mapAngebotPositionenToTemplateRows(
 ): AngebotTemplatePosition[] {
   let posNr = 0
   return anPos
-    .filter(
-      (p) => (p.gewerk_slug ?? '') !== ZEILE_SLUG_FREITEXT && !istGesamtrabattPosition(p)
-    )
+    .filter((p) => (p.gewerk_slug ?? '') !== ZEILE_SLUG_FREITEXT)
     .map((p) => {
       posNr += 1
       const menge = Math.max(Number(p.menge) || 1, 0.01)
       const einzel =
         (() => {
           const unit = Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0)
-          if (Math.abs(unit) > 0.0001) return Math.round(unit * 100) / 100
+          if (unit > 0) return Math.round(unit * 100) / 100
           const a = Number(p.gesamt_min ?? 0)
           const b = Number(p.gesamt_max ?? 0)
-          if (Math.abs(a) < 0.0001 && Math.abs(b) < 0.0001) return 0
-          if (Math.abs(a) > 0.0001 && Math.abs(b) < 0.0001) return Math.round(a * 100) / 100
-          if (Math.abs(b) > 0.0001 && Math.abs(a) < 0.0001) return Math.round(b * 100) / 100
+          if (a <= 0 && b <= 0) return 0
           return a === b ? Math.round(a * 100) / 100 : Math.round(((a + b) / 2) * 100) / 100
         })()
       const gesamt = Math.round(einzel * menge * 100) / 100
@@ -94,13 +86,6 @@ function summenToTemplate(s: ReturnType<typeof summenAusPositionen>, mwstSatz = 
     mwst_prozent: mwstSatz,
     mwst_betrag: Math.round(s.mwstBetragMin * 100) / 100,
     brutto: Math.round(s.bruttoMin * 100) / 100,
-    ...(s.nachlassNetto > 0
-      ? {
-          nachlass_netto: Math.round(s.nachlassNetto * 100) / 100,
-          nachlass_label: s.nachlassLabel,
-          netto_vor_nachlass: Math.round(s.nettoVorNachlass * 100) / 100,
-        }
-      : {}),
   }
 }
 

@@ -99,11 +99,9 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
 
 export const VERLOREN_GRUND_LABELS: Record<string, string> = {
   zu_teuer: 'Zu teuer',
-  anderer_anbieter: 'Anderer Anbieter',
-  kein_bedarf: 'Kein Bedarf',
-  nicht_erreichbar: 'Nicht erreichbar',
   kein_interesse: 'Kein Interesse mehr',
   konkurrenz: 'Konkurrenz gewählt',
+  nicht_erreichbar: 'Nicht mehr erreichbar',
   sonstiges: 'Sonstiges',
 }
 
@@ -346,20 +344,7 @@ export function formatWebsiteLeadPreis(
   return basis || '—'
 }
 
-function funnelQuelle(funnel: unknown): string | null {
-  if (!funnel || typeof funnel !== 'object') return null
-  const f = funnel as Record<string, unknown>
-  const q = f.funnel_quelle ?? f.quelle
-  return typeof q === 'string' && q.trim() ? q.trim() : null
-}
-
-/** CRM-Staff-Funnel (selbst angelegt) — Preiseinschätzung wie Website (von–bis). */
-export function isCrmStaffFunnel(funnel?: unknown): boolean {
-  const q = funnelQuelle(funnel)
-  return q === 'crm_staff_funnel' || q === 'crm_manuell'
-}
-
-/** Listen- und Detail-Anzeige: Website/Staff = von–bis, sonst Budget-Logik. */
+/** Listen- und Detail-Anzeige: Website = Funnel-Preis, sonst Budget-Logik. */
 export function formatAnfragePreisAnzeige(
   kanal: LeadKanal,
   budget_ca: number | null | undefined,
@@ -367,14 +352,7 @@ export function formatAnfragePreisAnzeige(
   preis_max: number | null | undefined,
   funnel?: unknown
 ): string {
-  if (kanal === 'website' || isCrmStaffFunnel(funnel)) {
-    return formatWebsiteLeadPreis(budget_ca, preis_min, preis_max, funnel)
-  }
-  // Min/Max vorhanden → von–bis statt Mittelwert-„Budget“
-  if (
-    (preis_min != null && Number(preis_min) > 0) ||
-    (preis_max != null && Number(preis_max) > 0)
-  ) {
+  if (kanal === 'website') {
     return formatWebsiteLeadPreis(budget_ca, preis_min, preis_max, funnel)
   }
   return formatBudget(budget_ca ?? undefined, preis_min ?? undefined, preis_max ?? undefined)
@@ -385,9 +363,9 @@ export function anfragenPreisSpaltenLabel(): string {
   return 'Preisrahmen'
 }
 
-/** Detail-Ansicht: Staff = Preiseinschätzung, sonst Preisrahmen. */
-export function anfragePreisDetailLabel(_kanal: LeadKanal, funnel?: unknown): string {
-  return isCrmStaffFunnel(funnel) ? 'Preiseinschätzung' : 'Preisrahmen'
+/** Detail-Ansicht: einheitlich Preisrahmen. */
+export function anfragePreisDetailLabel(_kanal: LeadKanal): string {
+  return 'Preisrahmen'
 }
 
 /** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */

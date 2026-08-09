@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -99,10 +98,10 @@ export function BaustelleRegiearbeitenCard({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="text-sm text-bw-text-muted">
           {regiearbeiten.length} Regiearbeit{regiearbeiten.length === 1 ? '' : 'en'}
         </p>
-        <Button type="button" variant="primary" size="sm" className="gap-1" onClick={openCreate}>
+        <Button type="button" variant="secondary" size="sm" className="gap-1" onClick={openCreate}>
           <Plus className="h-3.5 w-3.5" />
           Hinzufügen
         </Button>
@@ -149,12 +148,12 @@ export function BaustelleRegiearbeitenCard({
             value={form.material}
             onChange={(e) => setForm((f) => ({ ...f, material: e.target.value }))}
           />
-          <div className="flex justify-between gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>
-              Abbrechen
-            </Button>
+          <div className="flex gap-2">
             <Button type="button" variant="primary" size="sm" disabled={pending} onClick={save}>
               Speichern
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+              Abbrechen
             </Button>
           </div>
         </div>
@@ -165,12 +164,12 @@ export function BaustelleRegiearbeitenCard({
           {regiearbeiten.map((r) => (
             <div key={r.id} className="flex items-start gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{r.bezeichnung}</p>
-                <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                <p className="text-sm font-medium text-bw-text">{r.bezeichnung}</p>
+                <p className="text-xs text-bw-text-muted">
                   {formatDatum(r.datum)} · {r.personen_anzahl} Pers. · {r.stunden} Std.
                 </p>
                 {r.beschreibung?.trim() ? (
-                  <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">{r.beschreibung}</p>
+                  <p className="mt-1 text-xs text-bw-text-muted">{r.beschreibung}</p>
                 ) : null}
               </div>
               <div className="flex shrink-0 gap-1">
@@ -185,7 +184,7 @@ export function BaustelleRegiearbeitenCard({
           ))}
         </div>
       ) : (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Regiearbeiten erfasst.</p>
+        <p className="text-sm text-bw-text-muted">Noch keine Regiearbeiten erfasst.</p>
       )}
     </div>
   )

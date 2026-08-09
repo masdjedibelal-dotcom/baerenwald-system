@@ -3,62 +3,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check, FileText } from 'lucide-react'
-import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import {
-  MetaCrowButton,
-  TotBand,
-} from '@/components/angebote/AngebotWizardCanvasMeta'
+import { WizardShell } from '@/components/layout/WizardShell'
 import { MockField } from '@/components/mock-ui/MockForm'
-import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { DateInput } from '@/components/ui/DateInput'
-import { ActionsMenu } from '@/components/ui/actions-menu'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { KundeModal } from '@/components/kunden/KundeModal'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import { toast } from '@/components/ui/app-toast'
-import { kundentypLabel } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen } from '@/lib/kunde-namen'
-import {
-  istKundeFirmaPflichtTyp,
-  kundeStrasseHausnummerZeile,
-} from '@/lib/kunde-stammdaten'
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
-  previewNaechsteRechnungsnummer,
   saveRechnungWizardDraft,
   sendRechnungWizard,
   syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import {
-  createAbschlussberichtPdf,
-  loadAbschlussberichtWizardHint,
-} from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   dokumentZeilenToAngebotPositionen,
   formatEurBetrag,
-  neueArtikelZeile,
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
-  berechneHinweis35aAnteil,
   berechneRechnung,
   parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
-import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
@@ -71,11 +47,9 @@ import type {
   RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  berechneSchlussAbrechnung,
   berechneZahlungsplan,
   emptyZahlungsplan,
   neueZahlungsplanZeile,
-  zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
   zahlungsplanVorlage50_50,
@@ -83,47 +57,51 @@ import {
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
-import {
-  normalizeVorgangWiederkehr,
-  WIEDERKEHR_TURNUS_LABELS,
-  WIEDERKEHR_TURNUS_VALUES,
-  type VorgangWiederkehr,
-  type WiederkehrTurnus,
-} from '@/lib/vorgang/wiederkehrend'
-import { cn } from '@/lib/utils'
+import type { Gewerk, Preisliste } from '@/lib/types'
 import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
-  patchZahlungsbedingungenMitZahlfrist,
   type ZahlfristSeg,
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
-import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
-import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 
 type Rechnungsart = 'abschlag' | 'schluss'
+type AnlagenKey = 'rechnung' | 'leistungsnachweis' | 'bautagebuch' | 'abnahme' | 'fotos'
+
+const ANLAGEN_DEF: Array<{
+  key: AnlagenKey
+  label: string
+  sub: string
+  locked?: boolean
+}> = [
+  { key: 'rechnung', label: 'Rechnung (PDF)', sub: 'Pflichtdokument', locked: true },
+  {
+    key: 'leistungsnachweis',
+    label: 'Leistungsnachweis',
+    sub: 'Positionen & Mengen aus dem Auftrag',
+  },
+  {
+    key: 'bautagebuch',
+    label: 'Bautagebuch-Export',
+    sub: 'Einträge & Fotos der Baustelle',
+  },
+  { key: 'abnahme', label: 'Abnahmeprotokoll', sub: 'Unterschriebene Abnahme' },
+  { key: 'fotos', label: 'Fotodokumentation', sub: 'Vorher/Nachher-Bilder' },
+]
+
+const WIZARD_STEPS = [
+  { id: 1, label: 'Positionen' },
+  { id: 2, label: 'Individualisieren' },
+  { id: 3, label: 'Paket' },
+  { id: 4, label: 'Versand' },
+]
 
 const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
   { name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
   { name: '50 / 50', build: zahlungsplanVorlage50_50 },
   { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
 ]
-
-/** Form ohne IDs/Titel — zum Erkennen der aktiven Vorlage. */
-function planShapeKey(plan: Zahlungsplan): string {
-  return plan.zeilen.map((z) => `${z.typ}:${Number(z.wert) || 0}`).join('|')
-}
-
-function matchingPlanPresetName(plan: Zahlungsplan): string | null {
-  if (!plan.zeilen.length) return null
-  const key = planShapeKey(plan)
-  for (const p of PLAN_PRESETS) {
-    if (planShapeKey(p.build()) === key) return p.name
-  }
-  return null
-}
 
 function formatDateDe(ymd: string): string {
   return formatDateDeYmd(ymd)
@@ -145,7 +123,7 @@ function planIstOk(plan: Zahlungsplan): boolean {
 
 /**
  * Rechnungs-Wizard:
- * Positionen → Rechnungsdetails → Versand (nur Rechnung-PDF, kein Dokumentpaket)
+ * Positionen → Individualisieren → Paket → Versand
  */
 export function RechnungWizard({
   bootstrap,
@@ -166,40 +144,16 @@ export function RechnungWizard({
 }) {
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
-  const [kunde, setKunde] = useState(bootstrap.kunde)
-  const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
-  const [kundeEditOpen, setKundeEditOpen] = useState(false)
-  const kundeNamen = normalizeKundeNamen({
-    typ: kunde?.typ,
-    name: kunde?.name,
-    vorname: kunde?.vorname,
-    nachname: kunde?.nachname,
-  })
-  const kundeFirma = istKundeFirmaPflichtTyp(kunde?.typ)
-    ? kunde?.name?.trim() || kundeNamen.name.trim() || ''
-    : ''
   const kundeName =
-    kundeFirma ||
-    [kundeNamen.vorname, kundeNamen.nachname].filter(Boolean).join(' ') ||
-    kunde?.name?.trim() ||
-    'Kunde wählen'
-  const kundeEmail = (kunde?.email || '').trim()
-  const kundeTelefon = (kunde?.telefon || '').trim()
-  const kundeAnschrift = kunde
-    ? kundeStrasseHausnummerZeile(kunde) || kunde.adresse?.trim() || null
-    : null
-  const kundeStadt = [kunde?.plz?.trim(), kunde?.ort?.trim()].filter(Boolean).join(' ')
-  const kundeTypLabel = kundentypLabel(kunde?.typ)
-  const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
-  const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
-  /** Neu: Art der Leistung vor dem Wizard (nicht im Dokument-Sheet). */
-  const needsArtGate = !bootstrap.rechnungId
-  const [artGateOpen, setArtGateOpen] = useState(needsArtGate)
+    bootstrap.kunde?.name?.trim() ||
+    [bootstrap.kunde?.vorname, bootstrap.kunde?.nachname].filter(Boolean).join(' ') ||
+    'Kunde'
+  const kundeEmail = (bootstrap.kunde?.email || '').trim()
   const auftragLabel =
     bootstrap.auftragsReferenz?.trim() ||
     bootstrap.projektTitel?.trim() ||
     bootstrap.auftragId?.slice(0, 8)?.toUpperCase() ||
-    (istDirektrechnung ? 'Direktrechnung' : '—')
+    '—'
 
   const initialZeilen = useMemo(
     () =>
@@ -215,17 +169,7 @@ export function RechnungWizard({
   const [step, setStep] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
-  const [rechnungTitel, setRechnungTitel] = useState(
-    () => bootstrap.projektTitel?.trim() || ''
-  )
-  const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
-    normalizeVorgangWiederkehr({
-      ist_wiederkehrend: bootstrap.ist_wiederkehrend,
-      wiederkehr_turnus: bootstrap.wiederkehr_turnus,
-    })
-  )
   const [rechnungsart, setRechnungsart] = useState<Rechnungsart>(() => {
-    if (!bootstrap.auftragId?.trim()) return 'schluss'
     if (bootstrap.abschlag?.istSchluss) return 'schluss'
     if (
       bootstrap.modus === 'abschlag' ||
@@ -236,12 +180,11 @@ export function RechnungWizard({
     }
     return 'schluss'
   })
-  const [plan, setPlan] = useState<Zahlungsplan>(() => {
-    if (!bootstrap.auftragId?.trim()) return emptyZahlungsplan()
-    return bootstrap.zahlungsplan?.zeilen?.length
+  const [plan, setPlan] = useState<Zahlungsplan>(() =>
+    bootstrap.zahlungsplan?.zeilen?.length
       ? bootstrap.zahlungsplan
       : emptyZahlungsplan()
-  })
+  )
   const [aktivRate, setAktivRate] = useState<string | null>(
     () => bootstrap.abschlag?.zeileId ?? bootstrap.meta.abschlag_zeile_id ?? null
   )
@@ -251,14 +194,24 @@ export function RechnungWizard({
       bootstrap.zahlungsplan?.zeilen?.length &&
       bootstrap.zahlungsplanBearbeiten !== true
   )
-  const [einleitung, setEinleitung] = useState(() => {
-    const existing = bootstrap.meta.einleitung?.trim()
-    if (existing) return existing
-    if (istDirektrechnung) {
-      return `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen erlauben wir uns, folgende Rechnung zu stellen:`
+  const [anlagen, setAnlagen] = useState<Record<AnlagenKey, boolean>>(() => {
+    const istSchlussInit = Boolean(
+      bootstrap.abschlag?.istSchluss ||
+        (bootstrap.abschlag?.rechnungArt === 'schluss')
+    )
+    return {
+      rechnung: true,
+      leistungsnachweis: true,
+      bautagebuch: false,
+      abnahme: istSchlussInit,
+      fotos: false,
     }
-    return `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
   })
+  const [einleitung, setEinleitung] = useState(
+    () =>
+      bootstrap.meta.einleitung?.trim() ||
+      `Sehr geehrte Damen und Herren,\n\nfür die erbrachten Leistungen zum Auftrag „${bootstrap.projektTitel || auftragLabel}" erlauben wir uns, folgende Rechnung zu stellen:`
+  )
   const [mailBetreff, setMailBetreff] = useState(
     () => bootstrap.meta.mail_betreff?.trim() || ''
   )
@@ -266,23 +219,13 @@ export function RechnungWizard({
     kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
   )
   const [mailCc, setMailCc] = useState<string[]>([])
-  const [abschlussHint, setAbschlussHint] = useState<{
-    showBlock: boolean
-    hasBericht: boolean
-    berichtUrl: string | null
-  } | null>(null)
-  const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
-  const [abschlussBusy, setAbschlussBusy] = useState(false)
-  const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | null
-  >(null)
-  const [planEditorOpen, setPlanEditorOpen] = useState(false)
+  const [docPreviewTab, setDocPreviewTab] = useState<AnlagenKey>('rechnung')
+  const [docAccordionOpen, setDocAccordionOpen] = useState(true)
 
   const zahlfristInit = zahlfristSegFromFaelligAm(bootstrap.meta.faellig_am)
   const [zahlfrist, setZahlfrist] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
-  const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
   const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
@@ -290,9 +233,9 @@ export function RechnungWizard({
   )
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
-  const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
+  const kundeId = bootstrap.kundeId
   const hasPlan = plan.zeilen.length > 0
   const planOk = planIstOk(plan)
 
@@ -302,54 +245,6 @@ export function RechnungWizard({
     return () => {
       document.body.style.overflow = ''
     }
-  }, [])
-
-  useEffect(() => {
-    if (rechnungsnummer.trim()) return
-    let cancelled = false
-    void previewNaechsteRechnungsnummer().then((r) => {
-      if (cancelled || !r.ok) return
-      setRechnungsnummer((cur) => cur.trim() || r.nummer)
-    })
-    return () => {
-      cancelled = true
-    }
-    // einmalig beim Öffnen ohne Nummer
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
-    setZahlfrist(seg)
-    if (seg === 'datum') setZahlfristDatum(datum)
-    setDraftDirty(true)
-  }
-  useEffect(() => {
-    const aid = bootstrap.auftragId?.trim()
-    if (!aid || istDirektrechnung) {
-      setAbschlussHint(null)
-      return
-    }
-    let cancelled = false
-    void loadAbschlussberichtWizardHint(aid).then((h) => {
-      if (cancelled) return
-      setAbschlussHint({
-        showBlock: h.showBlock,
-        hasBericht: h.hasBericht,
-        berichtUrl: h.berichtUrl,
-      })
-      if (h.hasBericht) setAbschlussMitVersand(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [bootstrap.auftragId, istDirektrechnung])
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    const sync = () => setHintsOpen(!mq.matches)
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
   }, [])
 
   useEffect(() => {
@@ -386,129 +281,98 @@ export function RechnungWizard({
   const brutto = berechnung.brutto
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
   const gewerkNamen = useMemo(() => gewerke.map((g) => g.name).filter(Boolean), [gewerke])
-
-  const vkNettoPlan = bootstrap.gesamtNetto ?? bootstrap.abschlag?.gesamtNetto ?? netto
-
   const planKontext = useMemo(
-    () =>
-      berechneZahlungsplan(
-        plan,
-        vkNettoPlan,
-        defaultMwst,
-        zahlplanAbgerechnetAusLinks(bootstrap.rechnungenAbschlag ?? [])
-      ),
-    [plan, vkNettoPlan, defaultMwst, bootstrap.rechnungenAbschlag]
+    () => berechneZahlungsplan(plan, netto, defaultMwst),
+    [plan, netto, defaultMwst]
   )
 
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
   const selRate = plan.zeilen.find((z) => z.id === aktivRate) ?? null
   const selBerechnet = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
-  const schlussAbrechnung = useMemo(() => {
-    if (!selBerechnet?.istSchluss) return null
-    return berechneSchlussAbrechnung(
-      positionenBerechnet,
-      bootstrap.rechnungenAbschlag ?? [],
-      {
-        reverseCharge13b: meta.reverse_charge_13b,
-        kleinunternehmer,
-        defaultMwstSatz: defaultMwst,
-        ausserRechnungId: rechnungId,
-        ausserZeileId: selBerechnet.id,
-      }
-    )
-  }, [
-    selBerechnet,
-    positionenBerechnet,
-    bootstrap.rechnungenAbschlag,
-    meta.reverse_charge_13b,
-    kleinunternehmer,
-    defaultMwst,
-    rechnungId,
-  ])
   const rTitel =
     hasPlan && selRate
-      ? `${rechnungTitel || auftragLabel} — ${selRate.titel}`
-      : istDirektrechnung
-        ? rechnungTitel.trim() || `Rechnung · ${kundeName}`
-        : `${rechnungTitel || auftragLabel} — ${
-            rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
-          }`
+      ? `${bootstrap.projektTitel || auftragLabel} — ${selRate.titel}`
+      : `${bootstrap.projektTitel || auftragLabel} — ${
+          rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
+        }`
   const rBrutto = hasPlan && selBerechnet ? selBerechnet.brutto : brutto
   const rFaellig =
     hasPlan && selRate?.faellig_am?.trim()
       ? selRate.faellig_am.trim().slice(0, 10)
       : einzelFaellig
-  /** Rechnung versendet immer nur die Rechnung — kein Abschluss-/Dokumentpaket-Frage. */
-  const previewNr = rechnungsnummer.trim() || 'Rechnung'
+  /** Abschluss-Paket (Abnahme o. ä.) nur bei Schluss-/Endrechnung — nicht bei laufenden Abschlägen. */
+  const istEndrechnung = Boolean(
+    selBerechnet?.istSchluss ||
+      bootstrap.abschlag?.istSchluss ||
+      bootstrap.abschlag?.rechnungArt === 'schluss' ||
+      (!hasPlan && rechnungsart === 'schluss' && bootstrap.modus !== 'voll')
+  )
+  const showAbschlussPaket = istEndrechnung
+  const wizardSteps = showAbschlussPaket
+    ? WIZARD_STEPS
+    : [
+        { id: 1, label: 'Positionen' },
+        { id: 2, label: 'Individualisieren' },
+        { id: 3, label: 'Versand' },
+      ]
+  /** Anzeige-Schritt für Stepper (bei Abschlag ohne Paket: 1→2→3 statt 1→2→4). */
+  const shellStep = showAbschlussPaket ? step : step >= 4 ? 3 : step
+  const anlagenCount = ANLAGEN_DEF.filter((a) => anlagen[a.key]).length
+  const selectedAnlagen = ANLAGEN_DEF.filter((a) => anlagen[a.key])
+  const previewNr = rechnungsnummer.trim() || 'RE-Entwurf'
   const activeVersandId = versandRechnungId ?? rechnungId
   const defaultBetreff = `${previewNr} · ${rTitel}`
 
-  function scrollToSection(sec: number) {
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`section-${sec}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  function goToSection(sec: number) {
-    setStep(sec)
-    scrollToSection(sec)
-  }
+  useEffect(() => {
+    if (showAbschlussPaket) return
+    setAnlagen((a) => ({
+      ...a,
+      abnahme: false,
+      bautagebuch: false,
+      fotos: false,
+    }))
+  }, [showAbschlussPaket])
 
   function goPrevStep() {
-    const next = step === 4 ? 2 : Math.max(1, step - 1)
-    goToSection(next)
+    setStep((s) => {
+      if (s === 4 && !showAbschlussPaket) return 2
+      return Math.max(1, s - 1)
+    })
   }
 
   async function goNextStep() {
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Noch keine Position — Erstellen/Senden erst mit mindestens einer Position.')
+        toast.error('Mindestens eine Position erforderlich.')
+        return
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Abschlagsplan noch nicht 100 % — vor Versand anpassen.')
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      return
     }
-    const next = step === 2 ? 4 : Math.min(4, step + 1)
-    const enteringVersand = next === 4
-    if (enteringVersand) {
+    const leavingToVersand =
+      step === 3 || (step === 2 && !showAbschlussPaket)
+    if (leavingToVersand) {
       const id = await persistDraft()
-      if (!id) {
-        toast.error(
-          'Entwurf noch nicht gespeichert — Mail-Vorschau ggf. unvollständig. Pflichtfelder vor Erstellen prüfen.'
-        )
-      }
+      if (!id) return
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
-      if (!einleitung.trim()) {
-        setEinleitung(
-          defaultRechnungMailEinleitung(
-            istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
-          )
-        )
-      }
+      const firstDoc = selectedAnlagen[0]?.key ?? 'rechnung'
+      setDocPreviewTab(firstDoc)
     }
-    goToSection(next)
+    setStep((s) => {
+      if (s === 2 && !showAbschlussPaket) return 4
+      return Math.min(4, s + 1)
+    })
   }
 
-  function buildMetaForSave(): RechnungWizardMeta {
-    const planAktiv = hatAuftrag && hasPlan
-    const zb = patchZahlungsbedingungenMitZahlfrist(
-      meta.zahlungsbedingungen,
-      zahlfrist,
-      zahlfrist === 'datum' ? zahlfristDatum : rFaellig
-    )
-    return {
-      ...meta,
-      einleitung,
-      mail_einleitung: einleitung,
-      mail_betreff: mailBetreff.trim() || defaultBetreff,
-      zahlungsart: planAktiv ? 'abschlaege' : 'standard',
-      abschlag_zeile_id: planAktiv ? aktivRate : null,
-      faellig_am: rFaellig,
-      zahlungsbedingungen: zb,
-    }
+  function applyZahlfrist(seg: ZahlfristSeg, datum = zahlfristDatum) {
+    setZahlfrist(seg)
+    const nextDatum = seg === 'datum' ? datum : faelligAmFromZahlfrist(seg, datum)
+    if (seg === 'datum') setZahlfristDatum(nextDatum)
+    else setZahlfristDatum(nextDatum)
+    setMeta((m) => ({ ...m, faellig_am: faelligAmFromZahlfrist(seg, nextDatum) }))
   }
 
   const draftSnapshot = useMemo(
@@ -520,11 +384,9 @@ export function RechnungWizard({
         plan,
         einleitung,
         mailBetreff,
-        rechnungsnummer,
-        zahlfrist,
-        zahlfristDatum,
+        anlagen,
       }),
-    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, rechnungsnummer, zahlfrist, zahlfristDatum]
+    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, anlagen]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -571,11 +433,7 @@ export function RechnungWizard({
   }
 
   function enablePlan() {
-    if (!hatAuftrag) {
-      toast.error('Abschlagspläne sind nur mit Auftrag möglich.')
-      return
-    }
-    setPlanEditorOpen(true)
+    setPlan(zahlungsplanVorlage30_40_30())
   }
 
   function clearPlan() {
@@ -583,18 +441,24 @@ export function RechnungWizard({
     setAktivRate(null)
   }
 
-  function applyCustomPlan(next: Zahlungsplan) {
-    setPlan(next)
-    setAktivRate((cur) => {
-      if (cur && next.zeilen.some((z) => z.id === cur)) return cur
-      return next.zeilen[0]?.id ?? null
-    })
-    setPlanEditorOpen(false)
+  function toggleAnlage(k: AnlagenKey) {
+    setAnlagen((a) => ({ ...a, [k]: !a[k] }))
+  }
+
+  function buildMetaForSave(): RechnungWizardMeta {
+    return {
+      ...meta,
+      einleitung,
+      mail_einleitung: einleitung,
+      mail_betreff: mailBetreff.trim() || defaultBetreff,
+      zahlungsart: hasPlan ? 'abschlaege' : 'standard',
+      abschlag_zeile_id: hasPlan ? aktivRate : null,
+      faellig_am: rFaellig,
+    }
   }
 
   const persistEinzel = useCallback(
-    async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
-      const planAktiv = hatAuftrag && hasPlan && Boolean(aktivRate)
+    async (): Promise<string | null> => {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
         toast.error('Mindestens eine Position erforderlich.')
@@ -609,54 +473,30 @@ export function RechnungWizard({
         return null
       }
       const nextMeta = buildMetaForSave()
-      const sel = planKontext.zeilen.find((z) => z.id === aktivRate) ?? null
-      const manageBusy = opts?.manageBusy !== false
-      if (manageBusy) setSaving(true)
-      try {
-        const res = await saveRechnungWizardDraft({
-          rechnungId,
-          auftrag_id: bootstrap.auftragId,
-          angebot_id: bootstrap.angebotId,
-          kunde_id: kundeId,
-          positionen: positionenBerechnet,
-          meta: nextMeta,
-          rechnungsnummer: rechnungsnummer.trim() || null,
-          modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
-          abschlag:
-            planAktiv && sel
-              ? {
-                  zeileId: sel.id,
-                  zeileIndex: sel.index,
-                  rechnungArt: sel.istSchluss ? 'schluss' : 'abschlag',
-                }
-              : null,
-          zahlungsplan: planAktiv ? plan : null,
-          zahlungsplanSpeichern: planAktiv,
-          ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
-          wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
-        })
-        if (!res.ok) {
-          toast.error(res.message)
-          return null
-        }
-        const switched = Boolean(korrekturKontext && res.rechnungId !== rechnungId)
-        setRechnungId(res.rechnungId)
-        setVersandRechnungId(res.rechnungId)
-        if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
-        if (switched) {
-          setKorrekturKontext(null)
-          toast.success('Storno angelegt — Korrektur als neue Rechnung gespeichert')
-        }
-        setMeta(nextMeta)
-        savedSnapshotRef.current = draftSnapshot
-        setDraftDirty(false)
-        return res.rechnungId
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      setSaving(true)
+      const res = await saveRechnungWizardDraft({
+        rechnungId,
+        auftrag_id: bootstrap.auftragId,
+        angebot_id: bootstrap.angebotId,
+        kunde_id: kundeId,
+        positionen: positionenBerechnet,
+        meta: nextMeta,
+        modus: rechnungsart === 'abschlag' ? 'abschlag' : bootstrap.modus ?? 'voll',
+        zahlungsplan: null,
+        zahlungsplanSpeichern: false,
+      })
+      setSaving(false)
+      if (!res.ok) {
+        toast.error(res.message)
         return null
-      } finally {
-        if (manageBusy) setSaving(false)
       }
+      setRechnungId(res.rechnungId)
+      setVersandRechnungId(res.rechnungId)
+      if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
+      setMeta(nextMeta)
+      savedSnapshotRef.current = draftSnapshot
+      setDraftDirty(false)
+      return res.rechnungId
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildMeta uses current closure
     [
@@ -665,7 +505,7 @@ export function RechnungWizard({
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
-      hatAuftrag,
+      bootstrap.modus,
       positionenBerechnet,
       draftSnapshot,
       meta,
@@ -673,20 +513,13 @@ export function RechnungWizard({
       mailBetreff,
       hasPlan,
       aktivRate,
-      plan,
-      planKontext.zeilen,
       rFaellig,
-      rechnungsnummer,
-      zahlfrist,
-      zahlfristDatum,
       rechnungsart,
       defaultBetreff,
-      wiederkehr,
-      korrekturKontext,
     ]
   )
 
-  const persistPlan = useCallback(async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
+  const persistPlan = useCallback(async (): Promise<string | null> => {
     if (!bootstrap.auftragId?.trim()) {
       toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
       return null
@@ -696,48 +529,40 @@ export function RechnungWizard({
       return null
     }
     if (!planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return null
     }
     const nextMeta = buildMetaForSave()
-    const manageBusy = opts?.manageBusy !== false
-    if (manageBusy) setSaving(true)
-    try {
-      const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
-      if (!planSave.ok) {
-        toast.error(planSave.message)
-        return null
-      }
-      const res = await createAllAbschlagRechnungenFromWizard({
-        auftrag_id: bootstrap.auftragId,
-        angebot_id: bootstrap.angebotId,
-        kunde_id: kundeId,
-        positionen: positionenBerechnet,
-        meta: nextMeta,
-        zahlungsplan: plan,
-        versandZeileId: aktivRate,
-        ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
-        wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return null
-      }
-      setAbschlagRechnungen(res.rechnungen)
-      setVersandRechnungId(res.versandRechnungId)
-      setRechnungId(res.versandRechnungId)
-      const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
-      if (nr?.trim()) setRechnungsnummer(nr.trim())
-      setMeta(nextMeta)
-      savedSnapshotRef.current = draftSnapshot
-      setDraftDirty(false)
-      return res.versandRechnungId
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+    setSaving(true)
+    const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
+    if (!planSave.ok) {
+      setSaving(false)
+      toast.error(planSave.message)
       return null
-    } finally {
-      if (manageBusy) setSaving(false)
     }
+    const res = await createAllAbschlagRechnungenFromWizard({
+      auftrag_id: bootstrap.auftragId,
+      angebot_id: bootstrap.angebotId,
+      kunde_id: kundeId,
+      positionen: positionenBerechnet,
+      meta: nextMeta,
+      zahlungsplan: plan,
+      versandZeileId: aktivRate,
+    })
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return null
+    }
+    setAbschlagRechnungen(res.rechnungen)
+    setVersandRechnungId(res.versandRechnungId)
+    setRechnungId(res.versandRechnungId)
+    const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
+    if (nr?.trim()) setRechnungsnummer(nr.trim())
+    setMeta(nextMeta)
+    savedSnapshotRef.current = draftSnapshot
+    setDraftDirty(false)
+    return res.versandRechnungId
   }, [
     bootstrap.auftragId,
     bootstrap.angebotId,
@@ -755,217 +580,165 @@ export function RechnungWizard({
     defaultBetreff,
   ])
 
-  async function persistDraft(opts?: { manageBusy?: boolean }): Promise<string | null> {
-    if (hasPlan && !hatAuftrag) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
-      return null
-    }
-    // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
-    if (hasPlan && aktivRate) {
-      return persistEinzel(opts)
-    }
-    if (hasPlan) return persistPlan(opts)
-    return persistEinzel(opts)
+  async function persistDraft(): Promise<string | null> {
+    return hasPlan ? persistPlan() : persistEinzel()
   }
 
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Zahlplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
       return
     }
-    if (sendMail) {
-      const to = mailTo.filter((e) => isValidEmail(e))
-      if (!to.length) {
-        toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
-        setSheet('versand')
-        return
-      }
-    }
+    const id = await persistDraft()
+    if (!id) return
+
+    const nextMeta = buildMetaForSave()
+    const nrLabel = () =>
+      abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
+      (id === activeVersandId ? rechnungsnummer.trim() : '') ||
+      previewNr
+
     setSaving(true)
-    try {
-      const id = await persistDraft({ manageBusy: false })
-      if (!id) return
+    await syncRechnungWizardMetaToEntwurf(id, { kunde_id: kundeId, meta: nextMeta })
 
-      const nextMeta = buildMetaForSave()
-      const nrLabel = () =>
-        abschlagRechnungen.find((r) => r.id === id)?.rechnungsnummer?.trim() ||
-        (id === activeVersandId ? rechnungsnummer.trim() : '') ||
-        previewNr
-
-      const sync = await syncRechnungWizardMetaToEntwurf(id, {
-        kunde_id: kundeId,
-        meta: nextMeta,
-      })
-      if (!sync.ok) {
-        toast.error(sync.message)
-        return
-      }
-
-      if (!sendMail) {
-        const res = await finalizeRechnungWizardWithoutMail(id)
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        toast.success(
-          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
-        )
-        onDone?.(id)
-        onClose()
-        router.refresh()
-        return
-      }
-
-      const to = mailTo.filter((e) => isValidEmail(e))
-      const res = await sendRechnungWizard({
-        rechnungId: id,
-        mailTo: to,
-        mailCc: mailCc.filter((e) => isValidEmail(e)),
-        mitAbschlussbericht: Boolean(
-          abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
-        ),
-      })
+    if (!sendMail) {
+      const res = await finalizeRechnungWizardWithoutMail(id)
+      setSaving(false)
       if (!res.ok) {
         toast.error(res.message)
         return
       }
       toast.success(
-        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+        `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
       )
       onDone?.(id)
       onClose()
       router.refresh()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
-    } finally {
-      setSaving(false)
+      return
     }
+
+    const to = mailTo.filter((e) => isValidEmail(e))
+    if (!to.length) {
+      setSaving(false)
+      toast.error('Mindestens eine gültige Empfänger-E-Mail erforderlich.')
+      return
+    }
+    const res = await sendRechnungWizard({
+      rechnungId: id,
+      mailTo: to,
+      mailCc: mailCc.filter((e) => isValidEmail(e)),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success(
+      `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+    )
+    onDone?.(id)
+    onClose()
+    router.refresh()
   }
 
-  async function handleCanvasClose() {
+  function handleRequestClose() {
     if (draftDirty && !saving) {
-      /* S9: Auto-Entwurf best-effort — RE speichert oft über goNextStep */
+      const ok = window.confirm(
+        'Es gibt ungespeicherte Änderungen. Wizard schließen und Änderungen verwerfen?'
+      )
+      if (!ok) return
     }
     onClose()
   }
 
-  function handleRequestClose() {
-    void handleCanvasClose()
-  }
-
   async function handleWeiter() {
-    if (saving) return
-    try {
-      await goNextStep()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
-    }
+    await goNextStep()
   }
 
   if (!mounted) return null
 
-  const displayBrutto = schlussAbrechnung
-    ? schlussAbrechnung.rest_brutto
-    : rBrutto
-  const displayNetto = schlussAbrechnung
-    ? schlussAbrechnung.rest_netto
-    : hasPlan && selBerechnet
-      ? selBerechnet.netto
-      : netto
-  const displayMwst = schlussAbrechnung
-    ? schlussAbrechnung.rest_mwst
-    : Math.max(0, displayBrutto - displayNetto)
-  const anteil35a = berechneHinweis35aAnteil(
-    positionenBerechnet,
-    schlussAbrechnung ? schlussAbrechnung.rest_netto : berechnung.netto,
-    {
-      ...(schlussAbrechnung ? { vollNetto: schlussAbrechnung.netto } : {}),
-      rechnungBrutto: schlussAbrechnung
-        ? schlussAbrechnung.rest_brutto
-        : berechnung.brutto,
-    }
+  const desktopActions = (
+    <div className="wizard-nav-actions">
+      {step > 1 ? (
+        <MockBtn kind="ghost" icon="chevron-left" onClick={goPrevStep}>
+          Zurück
+        </MockBtn>
+      ) : null}
+      {step < 4 ? (
+        <MockBtn kind="primary" icon="chevron-right" onClick={() => void handleWeiter()}>
+          Weiter
+        </MockBtn>
+      ) : (
+        <>
+          <MockBtn
+            kind="ghost"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(false)}
+          >
+            Erstellen
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            icon="send"
+            disabled={saving || (hasPlan && !planOk)}
+            onClick={() => void handleFinish(true)}
+          >
+            Erstellen und versenden
+          </MockBtn>
+        </>
+      )}
+    </div>
   )
-  const ustLabel = meta.reverse_charge_13b
-    ? 'MwSt 0% (§13b)'
-    : berechnung.mwst_satz === 0
-      ? 'MwSt 0%'
-      : `MwSt ${berechnung.mwst_satz}%`
 
-  const dokumentCrowValue = [
-    rechnungsnummer.trim() || 'Nummer folgt',
-    rechnungTitel.trim() || null,
-    selBerechnet?.istSchluss || rechnungsart === 'schluss'
-      ? 'Schlussrechnung'
-      : hasPlan || rechnungsart === 'abschlag'
-        ? 'Abschlag'
-        : 'Rechnung',
-  ]
-    .filter(Boolean)
-    .join(' · ')
-
-  const zahlplanCrowValue = hasPlan
-    ? [
-        selRate?.titel || 'Abschlagsplan',
-        rFaellig ? `fällig ${formatDateDe(rFaellig)}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : [
-        'Einzelrechnung',
-        zahlfrist === 'datum' ? null : `${zahlfrist} Tage`,
-        rFaellig ? `fällig ${formatDateDe(rFaellig)}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-
-  const versandCrowValue = mailTo[0]?.trim() || 'Kundenportal'
-
-  const abschlussCrowValue = !abschlussHint?.showBlock
-    ? null
-    : [
-        abschlussHint.hasBericht ? 'PDF vorhanden' : 'Noch nicht erstellt',
-        abschlussMitVersand ? 'mit Versand' : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-
-  const wizardTitel =
-    selBerechnet?.istSchluss
-      ? 'Schlussrechnung'
-      : rateLocked && selBerechnet
-        ? 'Abschlagsrechnung'
-        : 'Rechnung'
-
-  const wizardSubtitle = kundeName?.trim() || undefined
-
-  function onKundeSaved(_id?: string, saved?: Partial<Kunde>) {
-    setKundeEditOpen(false)
-    if (!saved) return
-    setKunde((prev) => ({ ...(prev ?? {}), ...saved, id: saved.id || prev?.id || kundeId } as typeof kunde))
-    if (saved.id) setKundeId(saved.id)
-    const email = saved.email?.trim()
-    if (email && isValidEmail(email)) setMailTo([email])
-    setDraftDirty(true)
-  }
+  const mobileActions =
+    step < 4 ? (
+      <>
+        {step > 1 ? (
+          <MockBtn sm kind="ghost" icon="chevron-left" onClick={goPrevStep} title="Zurück" />
+        ) : null}
+        <MockBtn sm kind="primary" onClick={() => void handleWeiter()}>
+          Weiter
+        </MockBtn>
+      </>
+    ) : (
+      <>
+        <MockBtn sm kind="ghost" icon="chevron-left" onClick={goPrevStep} title="Zurück" />
+        <MockBtn
+          sm
+          kind="primary"
+          icon="send"
+          disabled={saving || (hasPlan && !planOk)}
+          onClick={() => void handleFinish(true)}
+        >
+          Versenden
+        </MockBtn>
+      </>
+    )
 
   const steuernBlock = (
-    <div className="rw-tax">
-      <div className="document-section__label" style={{ marginBottom: 10 }}>
+    <>
+      <div
+        className="section-h"
+        style={{
+          marginBottom: 10,
+          marginTop: 18,
+          textTransform: 'none',
+          letterSpacing: 0,
+          fontSize: 14,
+          fontWeight: 600,
+          color: 'var(--text)',
+        }}
+      >
         Steuerliche Hinweise
       </div>
-      <div className="rw-tax__list">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {(
           [
             {
               on: meta.hinweis_35a,
               set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
               label: '§35a EStG-Hinweis ausweisen',
-              sub:
-                anteil35a.lohn_netto > 0
-                  ? anteil35a.hat_materialausweis
-                    ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
-                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
-                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
+              sub: 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
             },
             {
               on: meta.reverse_charge_13b,
@@ -978,790 +751,763 @@ export function RechnungWizard({
           <button
             key={c.label}
             type="button"
-            className={c.on ? 'rw-tax__opt on' : 'rw-tax__opt'}
             onClick={() => c.set(!c.on)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 11,
+              padding: '10px 12px',
+              border: `1px solid ${c.on ? 'var(--green)' : 'var(--border)'}`,
+              background: c.on ? 'var(--green-50)' : 'var(--card)',
+              borderRadius: 9,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
           >
-            <span className="rw-tax__check" aria-hidden>
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 5,
+                border: `1.5px solid ${c.on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                background: c.on ? 'var(--green)' : 'transparent',
+                display: 'grid',
+                placeItems: 'center',
+                flex: '0 0 auto',
+                color: '#fff',
+              }}
+            >
               {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
             </span>
-            <span className="rw-tax__txt">
-              <span className="rw-tax__lab">{c.label}</span>
-              <span className="rw-tax__sub">{c.sub}</span>
-            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{c.sub}</div>
+            </div>
           </button>
         ))}
       </div>
-    </div>
-  )
-
-  const documentColumn = (
-    <div className="dc-doc flex flex-col gap-4">
-      <PosBoard
-        title={
-          rechnungTitel.trim() ||
-          (hasPlan && selRate?.titel?.trim()) ||
-          (istDirektrechnung ? 'Rechnung' : auftragLabel) ||
-          'Rechnung'
-        }
-        positionen={posBoardLines}
-        onChange={onPosBoardChange}
-        showUst
-        showTotals={false}
-        gewerke={gewerkNamen}
-        preislisten={preislisten}
-        badgeOf={(p) =>
-          p.regieSchein
-            ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
-            : null
-        }
-      />
-
-      <TotBand
-        className="totband--green"
-        netto={schlussAbrechnung?.netto ?? displayNetto}
-        ust={schlussAbrechnung?.mwst_betrag ?? displayMwst}
-        brutto={schlussAbrechnung?.brutto ?? displayBrutto}
-        ustLabel={
-          schlussAbrechnung
-            ? `MwSt ${schlussAbrechnung.mwst_prozent}%`
-            : ustLabel
-        }
-        bereitsGezahlt={
-          schlussAbrechnung?.bereits_gezahlt_brutto
-            ? schlussAbrechnung.bereits_gezahlt.map((z) => ({
-                label: z.label,
-                brutto: z.brutto,
-              }))
-            : null
-        }
-        restBrutto={schlussAbrechnung?.rest_brutto ?? null}
-      />
-
-    </div>
-  )
-
-  const metaColumn = (
-    <div className="dc-meta-stack">
-      <div className="document-section__label" style={{ marginBottom: 10 }}>
-        Rechnungsdaten
-      </div>
-      <MetaCrowButton
-        label="Kunde"
-        value={kundeName}
-        onClick={() => setSheet('kunde')}
-      />
-      <MetaCrowButton
-        label="Dokument"
-        value={dokumentCrowValue}
-        onClick={() => setSheet('dokument')}
-      />
-      <MetaCrowButton
-        label="Zahlung"
-        value={zahlplanCrowValue}
-        onClick={() => setSheet('zahlung')}
-      />
-      {abschlussHint?.showBlock ? (
-        <MetaCrowButton
-          label="Abschlussbericht"
-          value={abschlussCrowValue || 'Anhang'}
-          onClick={() => setSheet('abschluss')}
-        />
-      ) : null}
-      <MetaCrowButton
-        label="Versand"
-        value={versandCrowValue}
-        onClick={() => setSheet('versand')}
-      />
-    </div>
-  )
-
-  const headerEnd = (
-    <>
-      <button
-        type="button"
-        className="editor-sheet__icon-btn"
-        disabled={saving}
-        onClick={() => {
-          void persistDraft().then(() => setSheet('vorschau'))
-        }}
-        aria-label="Vorschau"
-        title="Vorschau"
-      >
-        <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-      <ActionsMenu
-        sheetTitle="Rechnung"
-        align="right"
-        trigger={
-          <span
-            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Speichern oder senden"
-            title="Speichern oder senden"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </span>
-        }
-        items={[
-          {
-            label: saving ? 'Speichern…' : 'Speichern',
-            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            hint: 'Speichert und schließt',
-            onClick: () => {
-              if (saving || (hasPlan && !planOk)) return
-              void handleFinish(false)
-            },
-          },
-          {
-            label: saving ? 'Senden…' : 'Senden',
-            icon: <MockIcon ctx="btn" n="send" size={16} />,
-            hint: 'Versendet und schließt',
-            onClick: () => {
-              if (saving) return
-              void handleFinish(true)
-            },
-          },
-        ]}
-      />
     </>
   )
 
-  const closeSheet = () => {
-    setKundeEditOpen(false)
-    setSheet(null)
-  }
-
   const wizard = (
-    <>
-      <DocumentCanvas
-        title={wizardTitel}
-        subtitle={wizardSubtitle}
-        onClose={handleRequestClose}
-        headerEnd={headerEnd}
-        busy={saving}
-        busyLabel="Bitte warten…"
-        document={documentColumn}
-        meta={metaColumn}
-        className="wizard-flow"
-        manageHistory={false}
-      />
-
-      <EditorSheet
-        open={sheet === 'kunde'}
-        onClose={closeSheet}
-        title="Kunde"
-        context="canvas"
-        headerEnd={
-          kunde ? (
-            <button
-              type="button"
-              className="editor-sheet__confirm-text"
-              onClick={() => setKundeEditOpen(true)}
+    <WizardShell
+      className="wizard-flow"
+      title="Rechnung erstellen"
+      steps={wizardSteps}
+      currentStep={shellStep}
+      onClose={handleRequestClose}
+      mobileActions={mobileActions}
+      desktopActions={desktopActions}
+    >
+      {step === 1 ? (
+        <>
+          {rateLocked && selBerechnet ? (
+            <div
+              style={{
+                marginBottom: 14,
+                padding: '12px 14px',
+                border: '0.5px solid var(--border)',
+                borderRadius: 8,
+                background: 'var(--bg-soft)',
+              }}
             >
-              Bearbeiten
-            </button>
-          ) : null
-        }
-      >
-        <div className="gfc">
-          <div className="gfc-row">
-            <span className="gfc-l">Kundentyp</span>
-            <span className="gfc-v">{kundeTypLabel || '—'}</span>
-          </div>
-          {kundeFirma ? (
-            <div className="gfc-row">
-              <span className="gfc-l">Firma</span>
-              <span className="gfc-v">{kundeFirma}</span>
-            </div>
-          ) : null}
-          <div className="gfc-row">
-            <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
-            <span className="gfc-v">{kundeNamen.vorname || '—'}</span>
-          </div>
-          <div className="gfc-row">
-            <span className="gfc-l">{kundeFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
-            <span className="gfc-v">{kundeNamen.nachname || '—'}</span>
-          </div>
-          <div className="gfc-row">
-            <span className="gfc-l">Anschrift</span>
-            <span className="gfc-v">{kundeAnschrift || '—'}</span>
-          </div>
-          <div className="gfc-row">
-            <span className="gfc-l">Stadt</span>
-            <span className="gfc-v">{kundeStadt || '—'}</span>
-          </div>
-          <div className="gfc-row">
-            <span className="gfc-l">E-Mail</span>
-            <span className="gfc-v">{kundeEmail || <em>fehlt</em>}</span>
-          </div>
-          <div className="gfc-row">
-            <span className="gfc-l">Telefon</span>
-            <span className="gfc-v">{kundeTelefon || <em>fehlt</em>}</span>
-          </div>
-        </div>
-      </EditorSheet>
-
-      <KundeModal
-        open={kundeEditOpen}
-        onClose={() => setKundeEditOpen(false)}
-        editKunde={(kunde as Kunde | null) ?? null}
-        stayOnPage
-        context="canvas"
-        onSaved={onKundeSaved}
-      />
-
-      <EditorSheet
-        open={sheet === 'dokument'}
-        onClose={closeSheet}
-        title="Dokument"
-        context="canvas"
-      >
-        <div className="form-grid form-grid--sheet">
-          <SheetEditableField
-            label="Rechnungsnummer"
-            value={rechnungsnummer}
-            placeholder="RE2026-2069"
-            sheetContext="detail"
-            onSave={(v) => {
-              setRechnungsnummer(v.trim())
-              setDraftDirty(true)
-            }}
-          />
-          <p className="full m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Ändern setzt die nächste Rechnung fortlaufend darüber (z.&nbsp;B. 2070 → danach 2071).
-          </p>
-          <SheetEditableField
-            label="Rechnungstitel"
-            value={rechnungTitel}
-            placeholder="z.B. Badsanierung München"
-            sheetContext="detail"
-            onSave={(v) => {
-              setRechnungTitel(v)
-              setDraftDirty(true)
-            }}
-          />
-        </div>
-      </EditorSheet>
-
-      <EditorSheet
-        open={sheet === 'zahlung'}
-        onClose={closeSheet}
-        title="Zahlung"
-        context="canvas"
-      >
-        <div className="form-grid form-grid--sheet">
-          <div className="full">
-            <MockField label="Zahlungsziel" full>
-              <div className="space-y-2">
-                <MockZahlfristSeg value={zahlfrist} onChange={(v) => applyZahlfrist(v)} />
-                {zahlfrist === 'datum' ? (
-                  <DateInput
-                    size="sm"
-                    value={zahlfristDatum}
-                    onChange={(e) => applyZahlfrist('datum', e.target.value)}
-                  />
-                ) : null}
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {selBerechnet.istSchluss ? 'Schlussrechnung' : 'Abschlagsrechnung'} ·{' '}
+                {selBerechnet.titel}
               </div>
-            </MockField>
-          </div>
-          <div className="full wizard-zahlung-dates">
-            <MockField label="Rechnungsdatum">
-              <DateInput
-                size="sm"
-                value={meta.rechnungsdatum}
-                onChange={(e) => {
-                  setMeta((m) => ({ ...m, rechnungsdatum: e.target.value }))
-                  setDraftDirty(true)
-                }}
-              />
-            </MockField>
-            <MockField label="Leistungszeitraum von">
-              <DateInput
-                size="sm"
-                value={meta.leistungszeitraum_von}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-                }
-              />
-            </MockField>
-            <MockField label="Leistungszeitraum bis">
-              <DateInput
-                size="sm"
-                value={meta.leistungszeitraum_bis}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-                }
-              />
-            </MockField>
-          </div>
-          {!hatAuftrag ? (
-            <div className="full card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
-                Direktrechnung ohne Auftrag
-              </div>
-              <p
-                className="text-[length:var(--fs-meta)] leading-relaxed"
-                style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
-              >
-                Abschlagspläne sind nur mit Auftrag möglich.
-              </p>
-            </div>
-          ) : !hasPlan ? (
-            <div className="full card" style={{ padding: 20 }}>
-              <div className="zahlplan-empty">
-                <MockIcon ctx="empty" n="calculator" size={26} />
-                <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
-                <div className="zahlplan-empty__text">
-                  Optional: Teile die Auftragssumme in Abschläge auf.
-                </div>
-                <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
-                  Abschlagsplan hinzufügen
-                </MockBtn>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.45 }}>
+                Auf der Rechnung steht der Planbetrag als Pauschale (
+                {formatEurBetrag(selBerechnet.brutto)} brutto). Die Positionen unten sind die
+                Auftragsleistungen — als Leistungsnachweis-Anhang sinnvoll, auf der Abschlagsrechnung
+                selbst nicht zeilenweise nötig.
               </div>
             </div>
           ) : (
-            <div className="full">
-              {rateLocked && selBerechnet ? (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    border: '1px solid var(--green)',
-                    background: 'var(--green-50)',
-                    borderRadius: 8,
-                    marginBottom: 12,
-                  }}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div className="section-h" style={{ marginBottom: 0, textTransform: 'none' }}>
+                Rechnungsart
+              </div>
+              <div className="seg" role="group" aria-label="Rechnungsart">
+                <button
+                  type="button"
+                  className={rechnungsart === 'abschlag' ? 'on' : undefined}
+                  onClick={() => setRechnungsart('abschlag')}
                 >
-                  <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
-                    {selBerechnet.titel}
+                  Abschlag
+                </button>
+                <button
+                  type="button"
+                  className={rechnungsart === 'schluss' ? 'on' : undefined}
+                  onClick={() => setRechnungsart('schluss')}
+                >
+                  Schlussrechnung
+                </button>
+              </div>
+              <div style={{ flex: 1 }} />
+              <span style={{ color: 'var(--text-3)', fontSize: 12.5 }}>
+                Auftrag {auftragLabel} · {kundeName}
+              </span>
+            </div>
+          )}
+          <PosBoard
+            positionen={posBoardLines}
+            onChange={onPosBoardChange}
+            showUst
+            gewerke={gewerkNamen}
+            preislisten={preislisten}
+          />
+        </>
+      ) : null}
+
+      {step === 2 ? (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Individualisieren
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+                Zahlungsziel, optionaler Zahlplan und steuerliche Hinweise
+              </div>
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+              Gesamt{' '}
+              <b style={{ color: 'var(--green)' }}>
+                {formatEurBetrag(hasPlan && selBerechnet ? selBerechnet.brutto : brutto)}
+              </b>{' '}
+              brutto
+            </div>
+          </div>
+
+          <MockField label="Zahlungsziel / Zahlfrist" hint="Frist nach Rechnungsstellung">
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <MockZahlfristSeg
+                value={zahlfrist}
+                onChange={(v) => applyZahlfrist(v)}
+                aria-label="Zahlungsziel / Zahlfrist"
+              />
+              {zahlfrist === 'datum' ? (
+                <div style={{ width: 180 }}>
+                  <input
+                    type="date"
+                    className="input"
+                    value={zahlfristDatum}
+                    onChange={(e) => applyZahlfrist('datum', e.target.value)}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </MockField>
+
+          <div style={{ marginTop: 18 }}>
+            {!hasPlan ? (
+              <div className="card" style={{ padding: 20 }}>
+                <div className="zahlplan-empty">
+                  <MockIcon ctx="empty" n="calculator" size={26} />
+                  <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
+                  <div className="zahlplan-empty__text">
+                    Optional: Teile die Auftragssumme von{' '}
+                    <b>{formatEurBetrag(netto)}</b> netto in Abschläge auf — z. B. 30 % bei Beginn,
+                    40 % nach Rohbau, 30 % zur Schlussrechnung.
                   </div>
-                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
-                    {formatEurBetrag(selBerechnet.brutto)} brutto
+                  <MockBtn kind="primary" icon="plus" onClick={enablePlan}>
+                    Zahlplan hinzufügen
+                  </MockBtn>
+                </div>
+              </div>
+            ) : rateLocked && selBerechnet ? (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  border: '1px solid var(--green)',
+                  background: 'var(--green-50)',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <MockIcon ctx="btn" n="check" size={16} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {selBerechnet.titel}
+                    {selBerechnet.istSchluss ? ' · Schlussrechnung' : ' · Abschlagsrechnung'}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                    Vorgewählt aus dem Zahlplan — Betrag{' '}
+                    <b>{formatEurBetrag(selBerechnet.brutto)}</b> brutto (Pauschale laut Plan).
+                    Die volle Leistungsaufstellung kannst du als Leistungsnachweis mitsenden.
                   </div>
                 </div>
-              ) : (
-                <>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 10,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div
+                    className="section-h"
+                    style={{ marginBottom: 0, textTransform: 'none', flex: 1 }}
+                  >
+                    Zahlplan
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>
+                    Vorlage:
+                  </span>
+                  {PLAN_PRESETS.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      className="zahlplan-preset-chip"
+                      onClick={() => setPlan(p.build())}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                  <MockBtn sm kind="ghost" onClick={clearPlan}>
+                    Entfernen
+                  </MockBtn>
+                </div>
+
+                <div
+                  style={{
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'var(--card)',
+                    boxShadow: 'var(--shadow)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
+                      gap: 10,
+                      padding: '9px 14px',
+                      background: 'var(--bg-soft)',
+                      borderBottom: '0.5px solid var(--border)',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: 'var(--text-2)',
+                    }}
+                  >
+                    <div>Bezeichnung</div>
+                    <div>Art</div>
+                    <div style={{ textAlign: 'right' }}>Anteil</div>
+                    <div style={{ textAlign: 'right' }}>Betrag brutto</div>
+                    <div>Fällig</div>
+                    <div />
+                  </div>
+                  {plan.zeilen.map((z) => {
+                    const berech = planKontext.zeilen.find((x) => x.id === z.id)
+                    return (
+                      <div
+                        key={z.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 110px 100px 120px 150px 34px',
+                          gap: 10,
+                          padding: '8px 14px',
+                          borderBottom: '0.5px solid var(--border)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <input
+                          className="input"
+                          value={z.titel}
+                          onChange={(e) => patchPlanZeile(z.id, { titel: e.target.value })}
+                          style={{ height: 32 }}
+                        />
+                        <select
+                          className="input"
+                          value={z.typ}
+                          onChange={(e) =>
+                            patchPlanZeile(z.id, {
+                              typ: e.target.value as ZahlungsplanAbschlagTyp,
+                            })
+                          }
+                          style={{ height: 32, fontSize: 12 }}
+                        >
+                          <option value="prozent">Prozent</option>
+                          <option value="betrag">Euro netto</option>
+                          <option value="rest">Rest</option>
+                        </select>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            className="input"
+                            type="number"
+                            disabled={z.typ === 'rest'}
+                            value={z.typ === 'rest' ? '' : z.wert}
+                            placeholder={z.typ === 'rest' ? 'auto' : undefined}
+                            onChange={(e) =>
+                              patchPlanZeile(z.id, { wert: Number(e.target.value) || 0 })
+                            }
+                            style={{ textAlign: 'right', paddingRight: 28, height: 32 }}
+                          />
+                          <span
+                            style={{
+                              position: 'absolute',
+                              right: 8,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              fontSize: 12,
+                              color: 'var(--text-3)',
+                            }}
+                          >
+                            {z.typ === 'prozent' ? '%' : z.typ === 'betrag' ? '€' : ''}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            textAlign: 'right',
+                            fontWeight: 600,
+                            fontVariantNumeric: 'tabular-nums',
+                            fontSize: 13,
+                          }}
+                        >
+                          {formatEurBetrag(berech?.brutto ?? 0)}
+                        </div>
+                        <input
+                          className="input"
+                          type="date"
+                          value={z.faellig_am?.slice(0, 10) ?? ''}
+                          onChange={(e) =>
+                            patchPlanZeile(z.id, { faellig_am: e.target.value || null })
+                          }
+                          style={{ height: 32, fontSize: 12 }}
+                        />
+                        <MockBtn
+                          sm
+                          kind="ghost"
+                          icon="trash"
+                          title="Entfernen"
+                          onClick={() => removePlanZeile(z.id)}
+                        />
+                      </div>
+                    )
+                  })}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 10,
-                      flexWrap: 'wrap',
+                      padding: '8px 14px',
+                      gap: 10,
                     }}
                   >
-                    <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                      Vorlage:
-                    </span>
-                    {PLAN_PRESETS.map((p) => (
-                      <button
-                        key={p.name}
-                        type="button"
-                        className={cn(
-                          'zahlplan-preset-chip',
-                          matchingPlanPresetName(plan) === p.name && 'is-on'
-                        )}
-                        onClick={() => {
-                          const next = p.build()
-                          setPlan(next)
-                          setAktivRate(next.zeilen[0]?.id ?? null)
-                        }}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
                     <button
                       type="button"
-                      className={cn(
-                        'zahlplan-preset-chip',
-                        hasPlan && !matchingPlanPresetName(plan) && 'is-on'
-                      )}
-                      onClick={() => setPlanEditorOpen(true)}
+                      className="pt-add"
+                      style={{ border: 'none', padding: 0, width: 'auto' }}
+                      onClick={addPlanZeile}
                     >
-                      Individuell
+                      <MockIcon ctx="default" n="plus" size={13} /> Abschlag hinzufügen
                     </button>
-                    <MockBtn sm kind="ghost" onClick={clearPlan}>
-                      Entfernen
-                    </MockBtn>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {planKontext.zeilen.map((z) => {
-                      const on = aktivRate === z.id
-                      return (
-                        <button
-                          key={z.id}
-                          type="button"
-                          onClick={() => {
-                            setAktivRate(z.id)
-                            setRechnungsart(z.istSchluss ? 'schluss' : 'abschlag')
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: '10px 12px',
-                            border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
-                            background: on ? 'var(--green-50)' : 'var(--card)',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>
-                              {z.titel}
-                            </div>
-                            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                              {z.istSchluss ? 'Schlussrechnung' : 'Abschlag'}
-                            </div>
-                          </div>
-                          <b style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {formatEurBetrag(z.brutto)}
-                          </b>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="full">{steuernBlock}</div>
-        </div>
-      </EditorSheet>
-
-      <AbschlagsplanEditorModal
-        open={planEditorOpen}
-        onClose={() => setPlanEditorOpen(false)}
-        gesamtNetto={vkNettoPlan}
-        gesamtBrutto={
-          bootstrap.abschlag?.gesamtBrutto ??
-          (vkNettoPlan > 0
-            ? Math.round(vkNettoPlan * (1 + defaultMwst / 100) * 100) / 100
-            : brutto)
-        }
-        initial={hasPlan ? plan : null}
-        onSave={applyCustomPlan}
-      />
-
-      <EditorSheet
-        open={sheet === 'vorschau'}
-        onClose={closeSheet}
-        title="Vorschau"
-        context="canvas"
-        size="lg"
-      >
-        {activeVersandId ? (
-          <RechnungWizardPdfPreview
-            rechnungId={activeVersandId}
-            kundeName={kundeName}
-          />
-        ) : (
-          <div className="rw-preview-card">
-            <div className="rw-preview-card__banner">
-              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
-              {rTitel ? ` · ${rTitel}` : ''}
-            </div>
-            <div className="rw-preview-card__body">
-              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
-                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
-              </p>
-              <ul className="rw-preview-card__pos">
-                {positionenBerechnet.slice(0, 6).map((p, i) => (
-                  <li key={`${p.leistung}-${i}`}>
-                    <span>
-                      {p.leistung}
-                      {p.menge != null
-                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
-                        : ''}
+                    <div style={{ flex: 1 }} />
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: planOk ? 'var(--green)' : 'var(--danger, #c0392b)',
+                      }}
+                    >
+                      {plan.zeilen.every((z) => z.typ === 'prozent')
+                        ? `Summe ${planProzentSumme(plan)}%${planOk ? '' : ' · muss 100% sein'}`
+                        : planOk
+                          ? 'Plan ok'
+                          : 'Plan prüfen'}
                     </span>
-                    <b>
-                      {formatEurBetrag(
-                        (p.vk_netto ??
-                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
-                          (p.menge ?? 1) *
-                          1.19
-                      )}
-                    </b>
-                  </li>
-                ))}
-              </ul>
-              <div className="rw-preview-card__sum">
-                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
-                <b>{formatEurBetrag(displayBrutto)}</b>
-              </div>
-              {rFaellig ? (
-                <div className="rw-preview-card__faellig">
-                  Fällig am {formatDateDe(rFaellig)}
+                  </div>
                 </div>
-              ) : null}
-            </div>
-            <div className="rw-preview-card__foot">
-              Bärenwald · an {kundeName}
+
+                {bootstrap.auftragId ? (
+                  <div style={{ marginTop: 14 }}>
+                    <div
+                      className="section-h"
+                      style={{
+                        marginBottom: 8,
+                        textTransform: 'none',
+                        letterSpacing: 0,
+                        fontSize: 14,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Welche Rechnung jetzt erstellen?
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {planKontext.zeilen.map((z) => {
+                        const on = aktivRate === z.id
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => setAktivRate(z.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '10px 12px',
+                              border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                              background: on ? 'var(--green-50)' : 'var(--card)',
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 17,
+                                height: 17,
+                                borderRadius: 20,
+                                border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                                background: on ? 'var(--green)' : 'transparent',
+                                display: 'grid',
+                                placeItems: 'center',
+                                color: '#fff',
+                              }}
+                            >
+                              {on ? <MockIcon ctx="btn" n="check" size={11} /> : null}
+                            </span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{z.titel}</div>
+                              <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                                {z.typ === 'prozent'
+                                  ? `${z.wert}%`
+                                  : z.typ === 'betrag'
+                                    ? formatEurBetrag(z.wert)
+                                    : 'Rest'}
+                                {z.faellig_am
+                                  ? ` · fällig ${formatDateDe(z.faellig_am.slice(0, 10))}`
+                                  : ''}
+                              </div>
+                            </div>
+                            <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {formatEurBetrag(z.brutto)}
+                            </b>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          {steuernBlock}
+        </>
+      ) : null}
+
+      {step === 3 && showAbschlussPaket ? (
+        <>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Paket</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              Schlussrechnung: optional Abnahme und weitere Unterlagen mitsenden. Abschläge laufen
+              ohne dieses Paket — Abschlussbericht und Abnahme gehören zum Auftragsabschluss.
             </div>
           </div>
-        )}
-      </EditorSheet>
-
-      <EditorSheet
-        open={sheet === 'abschluss'}
-        onClose={closeSheet}
-        title="Abschlussbericht"
-        context="canvas"
-      >
-        <div className="form-grid form-grid--sheet">
-          <div className="full" style={{ display: 'grid', gap: 12 }}>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 'var(--fs-meta)',
-                color: 'var(--bw-text-muted, #6b7280)',
-              }}
-            >
-              Dokumentationsbericht (Leistungen, Bautagebuch, Abnahme, Fotos) —{' '}
-              <strong>keine</strong> Endabrechnung. Preise und Zahlbetrag bleiben auf der
-              Rechnung.
-              {abschlussHint?.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
-            </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <MockBtn
-                kind="primary"
-                disabled={saving || abschlussBusy || !bootstrap.auftragId}
-                onClick={() => {
-                  const aid = bootstrap.auftragId?.trim()
-                  if (!aid) return
-                  setAbschlussBusy(true)
-                  void createAbschlussberichtPdf(aid)
-                    .then((r) => {
-                      if (!r.ok) {
-                        toast.error(r.message)
-                        return
-                      }
-                      setAbschlussHint({
-                        showBlock: true,
-                        hasBericht: true,
-                        berichtUrl: r.publicUrl,
-                      })
-                      setAbschlussMitVersand(true)
-                      toast.success('Abschlussbericht erstellt')
-                    })
-                    .finally(() => setAbschlussBusy(false))
-                }}
-              >
-                {abschlussBusy
-                  ? '…'
-                  : abschlussHint?.hasBericht
-                    ? 'PDF neu erzeugen'
-                    : 'PDF erzeugen'}
-              </MockBtn>
-            </div>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                cursor: 'pointer',
-                fontSize: 'var(--fs-text)',
-              }}
-            >
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={abschlussMitVersand}
-                disabled={saving}
-                onChange={(e) => setAbschlussMitVersand(e.target.checked)}
-              />
-              <span>
-                <span style={{ fontWeight: 500 }}>Als Anhang zur Rechnung mitsenden</span>
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, #6b7280)',
-                  }}
-                >
-                  Ja = Abschlussbericht zusätzlich zur Endabrechnung / Rechnung. Nein = nur die
-                  Rechnung. Fehlt noch ein PDF, wird es beim Senden erzeugt.
-                </span>
-              </span>
-            </label>
-            <div
-              className="full"
-              style={{
-                border: '1px solid var(--bw-border, #e5e7eb)',
-                borderRadius: 10,
-                overflow: 'hidden',
-                minHeight: 280,
-                background: 'var(--bw-bg, #f9fafb)',
-              }}
-            >
-              {abschlussHint?.berichtUrl ? (
-                <iframe
-                  title="Abschlussbericht Vorschau"
-                  src={abschlussHint.berichtUrl}
-                  style={{ width: '100%', height: 420, border: 0, display: 'block' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: 24,
-                    textAlign: 'center',
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, #6b7280)',
-                  }}
-                >
-                  Noch keine Vorschau — zuerst PDF erzeugen.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </EditorSheet>
-
-      <EditorSheet
-        open={sheet === 'versand'}
-        onClose={closeSheet}
-        title="Versand"
-        context="canvas"
-      >
-        <div className="form-grid form-grid--sheet">
-          <EmailPillsField
-            label="An"
-            required
-            emails={mailTo}
-            onChange={setMailTo}
-            placeholder="kunde@beispiel.de"
-            hint="Mindestens eine Empfänger-Adresse"
-            disabled={saving}
-          />
-          <EmailPillsField
-            label="Cc"
-            emails={mailCc}
-            onChange={setMailCc}
-            placeholder="optional"
-            disabled={saving}
-          />
-          <SheetEditableField
-            label="Betreff"
-            value={mailBetreff || defaultBetreff}
-            onSave={setMailBetreff}
-            kiExtraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
-            sheetContext="detail"
-          />
-          <SheetEditableField
-            label="Einleitung"
-            value={einleitung}
-            onSave={setEinleitung}
-            multiline
-            rows={5}
-            kiExtraHint="Anschreiben in der Mail und auf der Rechnung."
-            placeholder="Einleitung…"
-            sheetContext="detail"
-          />
-          <div className="full">
-            <RechnungWizardMailPreview
-              rechnungId={activeVersandId}
-              kundeId={kundeId}
-              betreff={mailBetreff || defaultBetreff}
-              einleitung={einleitung}
-              rechnungsnummer={previewNr}
-              brutto={displayBrutto}
-              faelligAm={rFaellig}
-              projektTitel={rechnungTitel || rTitel}
-              empfaengerHint={mailTo[0] || kundeEmail || kundeName}
-            />
-          </div>
-        </div>
-      </EditorSheet>
-    </>
-  )
-
-  return createPortal(
-    artGateOpen ? (
-      <EditorSheet
-        open
-        onClose={onClose}
-        title="Art der Leistung"
-        context="canvas"
-        manageHistory={false}
-      >
-        <p
-          style={{
-            margin: '0 0 14px',
-            fontSize: 'var(--fs-meta)',
-            color: 'var(--text-3)',
-            lineHeight: 1.45,
-          }}
-        >
-          Einmalig = Projekt/Auftrag mit Abschluss. Wiederkehrend = Bestand wie Wartung,
-          Winterdienst oder Hausmeisterservice.
-        </p>
-        <div className="doctype-row doctype-row--stack">
-          <button
-            type="button"
-            className="doctype-radio-opt doctype-radio-opt--block"
-            onClick={() => {
-              setWiederkehr({ ist_wiederkehrend: false, wiederkehr_turnus: null })
-              setArtGateOpen(false)
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 10,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--text)',
             }}
           >
-            <span className="dot" />
-            <span className="doctype-radio-opt__copy">
-              <span className="lbl">Einmalig</span>
-              <span className="hint">Projekt oder einmaliger Auftrag</span>
+            Dokumentpaket{' '}
+            <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+              · {anlagenCount} Anlage{anlagenCount === 1 ? '' : 'n'}
             </span>
-          </button>
-          <button
-            type="button"
-            className={
-              wiederkehr.ist_wiederkehrend
-                ? 'doctype-radio-opt doctype-radio-opt--block on'
-                : 'doctype-radio-opt doctype-radio-opt--block'
-            }
-            onClick={() =>
-              setWiederkehr({
-                ist_wiederkehrend: true,
-                wiederkehr_turnus: wiederkehr.wiederkehr_turnus ?? 'monatlich',
-              })
-            }
-          >
-            <span className="dot" />
-            <span className="doctype-radio-opt__copy">
-              <span className="lbl">Wiederkehrend</span>
-              <span className="hint">Wartung, Winterdienst, Pflege — Bestand</span>
-            </span>
-          </button>
-        </div>
-        {wiederkehr.ist_wiederkehrend ? (
-          <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
-            <label className="field">
-              <span className="field-label">Zeitintervall</span>
-              <select
-                className="sel"
-                value={wiederkehr.wiederkehr_turnus ?? 'monatlich'}
-                onChange={(e) =>
-                  setWiederkehr({
-                    ist_wiederkehrend: true,
-                    wiederkehr_turnus: e.target.value as WiederkehrTurnus,
-                  })
-                }
-              >
-                {WIEDERKEHR_TURNUS_VALUES.map((v) => (
-                  <option key={v} value={v}>
-                    {WIEDERKEHR_TURNUS_LABELS[v]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="btn primary" onClick={() => setArtGateOpen(false)}>
-              Weiter
-            </button>
           </div>
-        ) : null}
-      </EditorSheet>
-    ) : (
-      wizard
-    ),
-    document.body
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {ANLAGEN_DEF.map((a) => {
+              const on = !!anlagen[a.key]
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  disabled={a.locked}
+                  onClick={() => !a.locked && toggleAnlage(a.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 11,
+                    padding: '10px 12px',
+                    border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                    background: on ? 'var(--green-50)' : 'var(--card)',
+                    borderRadius: 9,
+                    cursor: a.locked ? 'default' : 'pointer',
+                    textAlign: 'left',
+                    opacity: a.locked && !on ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 5,
+                      border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong, var(--border))'}`,
+                      background: on ? 'var(--green)' : 'transparent',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flex: '0 0 auto',
+                      color: '#fff',
+                    }}
+                  >
+                    {on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {a.label}
+                      {a.locked ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: 'var(--text-3)',
+                            fontWeight: 400,
+                            marginLeft: 6,
+                          }}
+                        >
+                          (immer dabei)
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{a.sub}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      ) : null}
+
+      {step === 4 ? (
+        <div style={{ display: 'grid', gap: 18, maxWidth: 760, margin: '0 auto' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Versand</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+              E-Mail prüfen — Vorschau zeigt die echte Versand-Vorlage. Erstellen legt die Rechnung
+              an (Portal), Erstellen und versenden schickt zusätzlich die Mail
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <MockField label="Rechnungstitel" full>
+                <input className="input" value={rTitel} readOnly />
+              </MockField>
+              <EmailPillsField
+                label="An"
+                required
+                emails={mailTo}
+                onChange={setMailTo}
+                placeholder="kunde@beispiel.de"
+                hint="Mindestens eine Empfänger-Adresse"
+                disabled={saving}
+              />
+              <EmailPillsField
+                label="CC"
+                emails={mailCc}
+                onChange={setMailCc}
+                placeholder="weitere@beispiel.de"
+                hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
+                disabled={saving}
+              />
+              <MockField label="Betreff" full required>
+                <input
+                  className="input"
+                  value={mailBetreff}
+                  onChange={(e) => setMailBetreff(e.target.value)}
+                  disabled={saving}
+                  placeholder={defaultBetreff}
+                />
+              </MockField>
+              <MockField label="Beschreibung / Einleitung" full>
+                <textarea
+                  className="input ta"
+                  rows={4}
+                  value={einleitung}
+                  onChange={(e) => setEinleitung(e.target.value)}
+                  disabled={saving}
+                />
+              </MockField>
+            </div>
+            <div className="wz-overview" style={{ marginTop: 14 }}>
+              <div>
+                <span className="k">Kunde</span>
+                <b>{kundeName}</b>
+              </div>
+              <div>
+                <span className="k">Fällig am</span>
+                <b>{formatDateDe(rFaellig)}</b>
+              </div>
+              <div>
+                <span className="k">Betrag</span>
+                <b>{formatEurBetrag(rBrutto)} brutto</b>
+              </div>
+              <div>
+                <span className="k">Art</span>
+                <b>{rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'}</b>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="section-h"
+            style={{
+              marginBottom: 0,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            E-Mail-Vorschau
+          </div>
+          <RechnungWizardMailPreview
+            rechnungId={activeVersandId}
+            betreff={mailBetreff.trim() || defaultBetreff}
+            einleitung={einleitung}
+            brutto={rBrutto}
+            faelligAm={rFaellig}
+            projektTitel={bootstrap.projektTitel || rTitel}
+            rechnungsnummer={rechnungsnummer.trim() || previewNr}
+            empfaengerHint={mailTo[0] || kundeEmail || kundeName}
+          />
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setDocAccordionOpen((o) => !o)}
+              style={{
+                display: 'flex',
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              <span
+                className="section-h"
+                style={{
+                  marginBottom: 0,
+                  textTransform: 'none',
+                  letterSpacing: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                Dokument-Vorschauen
+              </span>
+              <MockIcon
+                ctx="default"
+                n={docAccordionOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+              />
+            </button>
+
+            {docAccordionOpen ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginBottom: 12,
+                  }}
+                >
+                  {selectedAnlagen.map((a) => {
+                    const on = docPreviewTab === a.key
+                    return (
+                      <button
+                        key={a.key}
+                        type="button"
+                        onClick={() => setDocPreviewTab(a.key)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                          background: on ? 'var(--green-50)' : 'var(--card)',
+                          fontSize: 12.5,
+                          fontWeight: on ? 600 : 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {docPreviewTab === 'rechnung' ? (
+                  <RechnungWizardPdfPreview
+                    rechnungId={activeVersandId}
+                    loading={saving && !activeVersandId}
+                    kundeName={kundeName}
+                  />
+                ) : (
+                  <div className="card" style={{ padding: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <MockIcon ctx="default" n="file-text" size={22} />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            color: 'var(--text-3)',
+                            marginTop: 4,
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {ANLAGEN_DEF.find((a) => a.key === docPreviewTab)?.sub}. Wird mit dem
+                          Rechnungsversand als Anlage vorbereitet — Live-PDF-Vorschau folgt, sobald
+                          das Dokument erzeugt ist.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </WizardShell>
   )
+
+  return createPortal(wizard, document.body)
 }

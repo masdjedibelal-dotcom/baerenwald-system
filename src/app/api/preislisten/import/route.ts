@@ -182,6 +182,7 @@ export async function POST(req: Request) {
 
   if (importiert > 0) {
     revalidatePath('/preislisten')
+  revalidatePath('/einstellungen/preise')
   }
 
   const body: PreislistenImportResponse = { importiert, uebersprungen, fehler }

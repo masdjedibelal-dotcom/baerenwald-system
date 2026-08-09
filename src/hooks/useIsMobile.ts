@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-function readIsMobile(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia('(max-width: 767px)').matches
-}
-
-/** SoT: Viewport &lt; 768px (Tailwind `md` / max-width 767). */
+/** Viewport &lt; 768px (Tailwind `md`). */
 export function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState(readIsMobile)
+  const [mobile, setMobile] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')

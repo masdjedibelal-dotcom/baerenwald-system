@@ -1,9 +1,6 @@
-import type { AuftragListeEintrag, AuftragStatus, AuftragDetail } from '@/lib/types'
+import type { AuftragListeEintrag, AuftragStatus } from '@/lib/types'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { formatDatum, formatPreis } from '@/lib/utils'
-import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
-import { nettoZuBrutto } from '@/lib/angebot-einfach'
-import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 
 export type AuftragListenPhase = '' | 'aktiv' | 'fertig'
 
@@ -35,24 +32,18 @@ export function auftragOrt(a: AuftragListeEintrag): string {
   return plz || '—'
 }
 
-/** Auftragswert als Brutto (wie Abschlagsplan / Rechnungen / Listen). */
-export function auftragWertNum(a: AuftragListeEintrag, mwstSatz = DEFAULT_MWST_SATZ): number {
-  const pos = (a as AuftragDetail).auftrag_positionen
-  if (Array.isArray(pos) && pos.length) {
-    const netto = auftragPositionenFuerSumme(pos).reduce((s, p) => s + (p.preis_fix ?? 0), 0)
-    return nettoZuBrutto(netto, mwstSatz)
-  }
+export function auftragWertNum(a: AuftragListeEintrag): number {
   if (!a.angebote) return 0
-  const netto = a.angebote.gesamt_fix ?? a.angebote.gesamt_max ?? a.angebote.gesamt_min ?? 0
-  return nettoZuBrutto(netto, mwstSatz)
+  return a.angebote.gesamt_fix ?? a.angebote.gesamt_max ?? a.angebote.gesamt_min ?? 0
 }
 
-export function auftragWertAnzeige(a: AuftragListeEintrag, mwstSatz = DEFAULT_MWST_SATZ): string {
-  const brutto = auftragWertNum(a, mwstSatz)
-  if (brutto <= 0) {
-    if (!a.angebote && !(a as AuftragDetail).auftrag_positionen?.length) return '—'
-  }
-  return formatPreis(brutto, null, null)
+export function auftragWertAnzeige(a: AuftragListeEintrag): string {
+  if (!a.angebote) return '—'
+  return formatPreis(
+    a.angebote.gesamt_fix ?? null,
+    a.angebote.gesamt_min ?? null,
+    a.angebote.gesamt_max ?? null
+  )
 }
 
 export function auftragFortschritt(a: AuftragListeEintrag): number {

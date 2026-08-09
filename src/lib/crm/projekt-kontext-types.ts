@@ -26,30 +26,13 @@ export type ProjektRechnungKurz = {
   brutto: number | null
   rechnungsdatum: string
   auftrag_id: string | null
-  rechnung_art?: string | null
-  abschlag_index?: number | null
-  beleg_typ?: string | null
-  pdf_url?: string | null
-  gesendet_at?: string | null
-  created_at?: string | null
 }
 
 export type ProjektKontext = {
   kunde: { id: string; name: string } | null
-  lead: {
-    id: string
-    label: string
-    status: string
-    org_freigabe_status?: string | null
-    created_at?: string | null
-  } | null
+  lead: { id: string; label: string; status: string } | null
   angebote: ProjektAngebotKurz[]
-  auftrag: {
-    id: string
-    titel: string | null
-    status: string
-    created_at?: string | null
-  } | null
+  auftrag: { id: string; titel: string | null; status: string } | null
   rechnungen: ProjektRechnungKurz[]
   activeKind: ProjektKetteKind
   activeId: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { FileText } from 'lucide-react'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { EmptyState } from '@/components/layout/EmptyState'
 import { formatDatum } from '@/lib/utils'
 
 export type CrmDokumentZeile = {
@@ -21,7 +21,9 @@ export function CrmDokumenteTabelle({
   emptyDescription?: string
 }) {
   if (!zeilen.length) {
-    return <MockEmpty icon="file-text" title={emptyTitle} hint={emptyDescription} />
+    return (
+      <EmptyState icon={FileText} title={emptyTitle} description={emptyDescription} />
+    )
   }
 
   return (

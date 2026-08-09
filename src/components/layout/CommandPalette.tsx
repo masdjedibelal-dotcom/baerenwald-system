@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 const RECENT_KEY = 'bw-crm-recent-search'
@@ -21,13 +20,12 @@ const NAV_HITS: SearchHit[] = [
   { id: 'nav-vg', icon: 'folders', label: 'Vorgänge', sub: 'Navigation', href: '/vorgaenge' },
   { id: 'nav-k', icon: 'users', label: 'Kunden', sub: 'Navigation', href: '/kunden' },
   { id: 'nav-hw', icon: 'tool', label: 'Handwerker', sub: 'Navigation', href: '/handwerker' },
+  { id: 'nav-p', icon: 'building', label: 'Partner', sub: 'Navigation', href: '/partner' },
   { id: 'nav-kal', icon: 'calendar', label: 'Kalender', sub: 'Navigation', href: '/kalender' },
-  { id: 'nav-ki', icon: 'sparkles', label: 'KI Analytics', sub: 'Navigation', href: '/ki-analytics' },
   { id: 'nav-set', icon: 'settings', label: 'Einstellungen', sub: 'Navigation', href: '/einstellungen' },
 ]
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
-  useOverlayChromeLock(open)
   const router = useRouter()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)

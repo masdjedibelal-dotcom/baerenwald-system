@@ -1,34 +1,26 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Select } from '@/components/ui/Select'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { Building2, Copy, ExternalLink, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Plus } from 'lucide-react'
+import { Select } from '@/components/ui/Select'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
-import {
-  deleteKundenObjekt,
-  fetchKundenObjektListenStats,
-  type KundenObjektListenStats,
-} from '@/app/actions/kunden-objekte'
+import { deleteKundenObjekt } from '@/app/actions/kunden-objekte'
 import {
   filterObjekteFuerKunde,
   kundenObjektKurzlabel,
   kundenObjektStrasseZeile,
 } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import type { KundenObjekt } from '@/lib/types'
-import { cn } from '@/lib/utils'
 
 type Props = {
   kundeId: string
   objekte: KundenObjekt[]
-  verwaltungName?: string
+  /** Org-Kennung für Melde-Links */
+  orgKennung?: string | null
   /** Anfrage/Wizard: aktuell gewähltes Objekt */
   selectedId?: string | null
   onSelect?: (objektId: string | null) => void
@@ -41,19 +33,17 @@ type Props = {
 export function KundenObjekteCard({
   kundeId,
   objekte,
-  verwaltungName,
+  orgKennung,
   selectedId,
   onSelect,
   onChanged,
   variant = 'full',
   className,
 }: Props) {
-  const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [editObjekt, setEditObjekt] = useState<KundenObjekt | null>(null)
   const [pending, startTransition] = useTransition()
   const [localObjekte, setLocalObjekte] = useState(() => filterObjekteFuerKunde(objekte, kundeId))
-  const [statsById, setStatsById] = useState<Record<string, KundenObjektListenStats>>({})
 
   useEffect(() => {
     setLocalObjekte(filterObjekteFuerKunde(objekte, kundeId))
@@ -70,19 +60,14 @@ export function KundenObjekteCard({
     return merged.sort((a, b) => a.titel.localeCompare(b.titel, 'de'))
   }, [localObjekte, objekte, kundeId])
 
-  useEffect(() => {
-    if (variant !== 'full' || liste.length === 0) return
-    let cancelled = false
-    void fetchKundenObjektListenStats(
-      kundeId,
-      liste.map((o) => o.id)
-    ).then((next) => {
-      if (!cancelled) setStatsById(next)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [liste, variant, kundeId])
+  function kopierenLink(url: string) {
+    void navigator.clipboard.writeText(url).then(
+      () => toast.success('Melde-Link kopiert'),
+      () => toast.error('Kopieren fehlgeschlagen')
+    )
+  }
+
+  const orgSlug = orgKennung?.trim().toLowerCase() || null
 
   const selectOptions = useMemo(
     () => [
@@ -97,8 +82,9 @@ export function KundenObjekteCard({
     setModalOpen(true)
   }
 
-  function openAkte(o: KundenObjekt) {
-    router.push(`/kunden/${kundeId}/objekte/${o.id}`)
+  function openBearbeiten(o: KundenObjekt) {
+    setEditObjekt(o)
+    setModalOpen(true)
   }
 
   function onObjektSaved(o: KundenObjekt) {
@@ -143,105 +129,129 @@ export function KundenObjekteCard({
           options={selectOptions}
         />
       </div>
-      <Button type="button" variant="primary" size="sm" className="shrink-0 gap-1.5" onClick={openNeu}>
+      <Button type="button" variant="secondary" size="sm" className="shrink-0 gap-1.5" onClick={openNeu}>
         <Plus className="h-4 w-4" aria-hidden />
         Objekt hinzufügen
       </Button>
     </div>
   )
 
-  const modal = (
-    <KundenObjektModal
-      open={modalOpen}
-      onClose={() => setModalOpen(false)}
-      kundeId={kundeId}
-      verwaltungName={verwaltungName}
-      editObjekt={editObjekt}
-      onSaved={onObjektSaved}
-    />
-  )
-
   if (variant === 'select') {
     return (
-      <MockCard title="Objekt" icon="building" className={className}>
+      <Card collapsible title="Objekt" className={className}>
+        <p className="mb-3 text-[12px] leading-relaxed text-bw-text-muted">
+          Ausführungsort für das Angebot (erscheint im PDF unter „Durchführung in:“).
+        </p>
         {selectBlock}
-        {modal}
-      </MockCard>
+        <KundenObjektModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          kundeId={kundeId}
+          editObjekt={editObjekt}
+          onSaved={onObjektSaved}
+        />
+      </Card>
     )
   }
 
   return (
-    <div className={cn('objekte-tab', className)}>
-      <div className="objekte-tab__head">
-        <span className="objekte-tab__title">Objekte</span>
-        <div style={{ flex: 1 }} />
-        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Objekt
-        </MockBtn>
-      </div>
+    <Card
+      collapsible
+      title={
+        <>
+          <Building2 className="inline h-4 w-4 text-bw-primary" aria-hidden /> Objekte
+        </>
+      }
+      className={className}
+      action={
+        <button type="button" className="btn ghost sm gap-1" onClick={openNeu}>
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+          Hinzufügen
+        </button>
+      }
+    >
+      <p className="mb-3 text-[12px] leading-relaxed text-bw-text-muted">
+        Gebäude, WEGs und weitere Objekte dieses Kunden — für Angebote und Ausführungsort.
+      </p>
 
       {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
 
       {liste.length === 0 ? (
-        <MockEmpty
-          icon="building"
-          title="Noch keine Objekte"
-          hint="Objekt anlegen für Gebäude, WEGs und Melde-Links"
-          action={
-            <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Objekt anlegen
-            </MockBtn>
-          }
-        />
+        <p className="text-[13px] text-bw-text-muted">Noch keine Objekte hinterlegt.</p>
       ) : (
-        <div className="objekte-cards">
-          {liste.map((o) => {
-            const strasse = kundenObjektStrasseZeile(o) || '—'
-            const st = statsById[o.id]
-            const einheitenAnzahl =
-              st && st.einheitenTotal > 0
-                ? st.einheitenTotal
-                : (() => {
-                    const m = o.einheiten_hinweis?.match(/\d+/)
-                    return m ? Number(m[0]) : null
-                  })()
-
-            return (
-              <button
-                key={o.id}
-                type="button"
-                className={cn('card objekte-card', selectedId === o.id && 'is-sel')}
-                onClick={() => openAkte(o)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  if (pending) return
-                  if (confirm(`Objekt „${o.titel}“ löschen?`)) entfernen(o)
-                }}
-              >
-                <div className="objekte-card__body">
-                  <div className="objekte-card__main">
-                    <div className="objekte-card__name">{o.titel}</div>
-                    <div className="objekte-card__sub" title={strasse}>
-                      {strasse}
-                    </div>
-                    {einheitenAnzahl != null ? (
-                      <div className="objekte-card__meta">{einheitenAnzahl}</div>
-                    ) : null}
+        <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+          {liste.map((o) => (
+            <li key={o.id} className="flex gap-3 px-3 py-2.5">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-bw-text">{o.titel}</p>
+                <p className="text-[12px] text-bw-text-muted">
+                  {[kundenObjektStrasseZeile(o), [o.plz, o.ort].filter(Boolean).join(' ')]
+                    .filter(Boolean)
+                    .join(', ') || '—'}
+                </p>
+                {orgSlug && o.melde_slug?.trim() ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        o.melde_aktiv !== false
+                          ? 'bg-emerald-100 text-emerald-900'
+                          : 'bg-bw-muted text-bw-text-muted'
+                      }`}
+                    >
+                      {o.melde_aktiv !== false ? 'Melde-Link aktiv' : 'Melde-Link inaktiv'}
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] text-bw-primary hover:underline"
+                      onClick={() => kopierenLink(buildMeldeLink(orgSlug, o.melde_slug))}
+                    >
+                      <Copy className="h-3 w-3" aria-hidden />
+                      Link kopieren
+                    </button>
+                    <a
+                      href={buildMeldeLink(orgSlug, o.melde_slug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-bw-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                      Öffnen
+                    </a>
                   </div>
-                  <MockIcon
-                    ctx="default"
-                    n="chevron-right"
-                    size={16}
-                    className="objekte-card__chevron"
-                  />
-                </div>
-              </button>
-            )
-          })}
-        </div>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  aria-label="Bearbeiten"
+                  onClick={() => openBearbeiten(o)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost sm text-danger"
+                  aria-label="Löschen"
+                  disabled={pending}
+                  onClick={() => entfernen(o)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {modal}
-    </div>
+      <KundenObjektModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        kundeId={kundeId}
+        editObjekt={editObjekt}
+        onSaved={onObjektSaved}
+      />
+    </Card>
   )
 }

@@ -49,16 +49,8 @@ export type DokumentArtikelZeile = {
   /** Gruppierung im Gewerk-Wizard (eindeutig pro Abschnitt, auch bei gleichem gewerk_id) */
   gewerk_block_key?: string
   preisliste_id?: string | null
-  /** Katalog-Variante */
-  variante_id?: string | null
-  /** katalog | frei */
-  position_quelle?: 'katalog' | 'frei' | string | null
   /** Zusatztext unter Leistung (z. B. Fachbetrieb-Hinweis) */
   positionBeschreibung?: string
-  /** Kundennotiz / Regie-Meta aus Auftrag (CRM) */
-  notizExtern?: string
-  /** Regieschein als sichtbare Anlage/Chip auf Rechnung */
-  regieSchein?: boolean
   /** Fachbetrieb-Hinweis im PDF (Standard aus Gewerk-Einstellungen) */
   fachbetriebHinweisAnzeigen?: boolean
   /** Steuerliche Aufteilung + Anfahrt */
@@ -151,46 +143,6 @@ export function istPreisPosition(p: AngebotPosition): boolean {
   return !istFreitextPosition(p) && !istGesamtrabattPosition(p)
 }
 
-/** Meta aus gespeicherter Nachlass-Position (`beschreibung` = `prozent:10` / `betrag:200`). */
-export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
-  modus: 'prozent' | 'betrag'
-  wert: number
-  bezeichnung: string
-} {
-  const besch = (p.beschreibung ?? '').trim()
-  const colon = besch.indexOf(':')
-  const modusRaw = colon >= 0 ? besch.slice(0, colon).trim().toLowerCase() : ''
-  const wertRaw = colon >= 0 ? besch.slice(colon + 1).trim() : ''
-  const modus: 'prozent' | 'betrag' = modusRaw === 'betrag' ? 'betrag' : 'prozent'
-  let wert = Math.abs(Number(String(wertRaw).replace(',', '.')))
-  if (!Number.isFinite(wert) || wert <= 0) {
-    wert =
-      Math.abs(Number(p.gesamt_min) || 0) ||
-      Math.abs(Number(p.lohn_netto) || 0) ||
-      Math.abs(Number(p.vk_netto) || 0)
-  }
-  return {
-    modus,
-    wert: Number.isFinite(wert) ? wert : 0,
-    bezeichnung: (p.leistung || p.leistung_name || 'Nachlass').trim() || 'Nachlass',
-  }
-}
-
-/** Nachlass-Abzug (positiv) aus Angebots-Positionen — auch wenn Beträge beim Laden auf 0 gesetzt wurden. */
-export function gesamtrabattAbzugAusAngebotPositionen(
-  positionen: AngebotPosition[],
-  artikelNetto: number
-): number {
-  const r = positionen.find(istGesamtrabattPosition)
-  if (!r) return 0
-  const { modus, wert } = parseGesamtrabattMetaFromPosition(r)
-  if (wert <= 0) return 0
-  if (modus === 'prozent') {
-    return Math.round(artikelNetto * (Math.min(100, wert) / 100) * 100) / 100
-  }
-  return Math.round(Math.min(Math.max(0, artikelNetto), wert) * 100) / 100
-}
-
 export function artikelZeilenNetto(z: DokumentArtikelZeile): number {
   const m = Math.max(z.menge, 0.0001)
   const bruttoZeile = z.vkNetto * m
@@ -274,7 +226,6 @@ export function dokumentZeilenToAngebotPositionen(
         kostenart,
         kostenverteilung,
       })
-      const isRegie = Boolean(z.regieSchein)
       out.push({
         id: z.id,
         gewerk_id: z.gewerk_id ?? '',
@@ -301,16 +252,6 @@ export function dokumentZeilenToAngebotPositionen(
         mwst_satz: z.mwstSatz as number,
         vk_netto: stueck,
         kostenart,
-        verguetung: isRegie ? 'aufwand' : 'festpreis',
-        ...(isRegie
-          ? {
-              geschaetzt_std: m,
-              stundensatz: stueck,
-              notiz_extern: z.notizExtern?.trim() || 'nach Aufwand',
-            }
-          : z.notizExtern?.trim()
-            ? { notiz_extern: z.notizExtern.trim() }
-            : {}),
         ...(kostenart !== 'anfahrt' ? { kostenverteilung } : {}),
         ...(z.preisliste_id ? { leistung_id: z.preisliste_id } : {}),
         ...(z.fachbetriebHinweisAnzeigen !== undefined
@@ -403,20 +344,11 @@ export function angebotPositionenToDokumentZeilen(
     ).trim()
     const kostenart: KostenartZeile =
       p.kostenart === 'anfahrt' || p.gewerk_slug === GEWERK_SLUG_ANFAHRT ? 'anfahrt' : 'leistung'
-    const notizExtern = p.notiz_extern?.trim() || undefined
-    const regieSchein =
-      String(p.verguetung ?? '').toLowerCase() === 'aufwand' ||
-      Boolean(
-        notizExtern &&
-          (/regieschein/i.test(notizExtern) || /nach aufwand/i.test(notizExtern))
-      )
     out.push({
       id: p.id,
       typ: 'artikel',
       bezeichnung: leistung || besch || 'Position',
       positionBeschreibung: besch && besch !== leistung ? besch : undefined,
-      notizExtern: regieSchein ? notizExtern || 'nach Aufwand' : notizExtern,
-      regieSchein,
       menge: m,
       einheit: p.einheit || 'Stk.',
       vkNetto: Math.round(vk * 100) / 100,

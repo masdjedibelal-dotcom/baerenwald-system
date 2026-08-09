@@ -25,7 +25,7 @@ export function MockDetailCrumb({
         gap: 4,
         flexWrap: 'wrap',
         marginBottom: 14,
-        fontSize: 'var(--fs-text)',
+        fontSize: 13,
       }}
     >
       <Link

@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { FileText, UserPlus } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
@@ -28,6 +27,7 @@ import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
 import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
 
 type GewerkOpt = { id: string; name: string; slug: string }
+
 
 const ToolIcon = resolveMockIcon('tool')
 
@@ -189,11 +189,11 @@ export function AuftragHandwerkerPanel({
   if (gruppen.length === 0) {
     return (
       <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
-        <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
           Handwerker
         </h3>
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="text-sm text-bw-text-muted">
           Noch keine Gewerke oder Positionen — zuerst Leistungen anlegen, dann Handwerker zuweisen.
         </p>
       </div>
@@ -203,11 +203,11 @@ export function AuftragHandwerkerPanel({
   return (
     <>
       <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
-        <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
           Handwerker zuweisen
         </h3>
-        <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
+        <p className="mb-4 text-xs text-bw-text-muted">
           Pro Gewerk oder einzelne Leistung — Nachricht mit Ort, Zeitraum und Leistungen wird automatisch befüllt.
         </p>
 
@@ -221,7 +221,7 @@ export function AuftragHandwerkerPanel({
             return (
               <div key={gruppe.gewerkId || gruppe.gewerkName} className="rounded-lg border border-bw-border p-3">
                 {abgelehnt && z ? (
-                  <div className="mb-3 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)]">
+                  <div className="mb-3 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm">
                     <p className="font-medium text-danger">
                       Partner {hwName ?? '—'} hat abgelehnt
                       {ablehnungGrund ? `: ${labelHandwerkerAblehnung(ablehnungGrund)}` : ''}
@@ -242,7 +242,7 @@ export function AuftragHandwerkerPanel({
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-bw-text">{gruppe.gewerkName}</p>
-                    <p className="mt-0.5 text-[length:var(--fs-text)] text-bw-text-muted">
+                    <p className="mt-0.5 text-sm text-bw-text-muted">
                       {hwName ? (
                         <>
                           {hwName}
@@ -262,7 +262,7 @@ export function AuftragHandwerkerPanel({
                     {z ? (
                       <span
                         className={cn(
-                          'mt-2 inline-block rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                          'mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
                           auftragHwStatusBadgeClass(hwStatus)
                         )}
                       >
@@ -315,16 +315,16 @@ export function AuftragHandwerkerPanel({
                       return (
                         <li
                           key={p.id}
-                          className="flex flex-col gap-2 rounded-md bg-bw-hover/50 px-3 py-2 text-[length:var(--fs-text)] md:flex-row md:items-center md:justify-between"
+                          className="flex flex-col gap-2 rounded-md bg-bw-hover/50 px-3 py-2 text-sm md:flex-row md:items-center md:justify-between"
                         >
                           <div className="min-w-0">
                             <p className="font-medium text-bw-text">{p.leistung_name}</p>
-                            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                            <p className="text-xs text-bw-text-muted">
                               {p.handwerker?.name ?? 'Kein Handwerker'}
                               {' · '}
                               <span
                                 className={cn(
-                                  'inline rounded px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                                  'inline rounded px-1.5 py-0.5 text-[11px] font-medium',
                                   auftragHwStatusBadgeClass(posStatus)
                                 )}
                               >

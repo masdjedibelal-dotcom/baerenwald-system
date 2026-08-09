@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   ChevronDown,
   Circle,
@@ -13,7 +12,7 @@ import {
   Trash2,
   UserPlus } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { EmptyState } from '@/components/layout/EmptyState'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
 import {
   HandwerkerZuweisenModal,
@@ -36,12 +35,11 @@ import {
   auftragHwStatusLabel,
   type AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { nettoZuBrutto } from '@/lib/angebot-einfach'
-import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { AuftragHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
 
 type PosVisualState = 'done' | 'wait' | 'open'
+
 
 const ToolIcon = resolveMockIcon('tool')
 
@@ -117,10 +115,10 @@ export function AuftragPositionenGewerkView({
     [positionen, gewerke]
   )
 
-  const gesamt = useMemo(() => {
-    const netto = sorted.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
-    return nettoZuBrutto(netto, DEFAULT_MWST_SATZ)
-  }, [sorted])
+  const gesamt = useMemo(
+    () => sorted.reduce((s, p) => s + (p.preis_fix ?? 0), 0),
+    [sorted]
+  )
 
   const indexByPosId = useMemo(() => {
     const m = new Map<string, number>()
@@ -192,10 +190,10 @@ export function AuftragPositionenGewerkView({
 
   if (sorted.length === 0) {
     return (
-      <MockEmpty
-        icon="tool"
+      <EmptyState
+        icon={ToolIcon}
         title="Keine Leistungen"
-        hint="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
+        description="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
         action={
           <button type="button" className="btn primary sm" onClick={() => onAddLeistung('')}>
             + Leistung
@@ -209,8 +207,8 @@ export function AuftragPositionenGewerkView({
     <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-[length:var(--fs-head)] font-semibold tracking-tight text-bw-text">Leistungspositionen</h2>
-          <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+          <h2 className="text-lg font-semibold tracking-tight text-bw-text">Leistungspositionen</h2>
+          <p className="mt-0.5 text-[12.5px] text-bw-text-muted">
             {sorted.length} Leistung{sorted.length === 1 ? '' : 'en'} · nach Gewerk gruppiert
           </p>
         </div>
@@ -236,14 +234,14 @@ export function AuftragPositionenGewerkView({
               <div className="flex items-stretch bg-bw-card">
                 <div className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[length:var(--fs-text)] font-semibold text-bw-text">{block.gewerkName}</p>
+                    <p className="truncate text-[13px] font-semibold text-bw-text">{block.gewerkName}</p>
                     {gewerkHwName ? (
-                      <p className="mt-0.5 truncate text-[length:var(--fs-meta)] text-bw-text-muted">
+                      <p className="mt-0.5 truncate text-[11px] text-bw-text-muted">
                         Gewerk-HW: {gewerkHwName}
                         {zuweisung?.status ? (
                           <span
                             className={cn(
-                              'ml-1.5 inline rounded px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                              'ml-1.5 inline rounded px-1.5 py-0.5 text-[10px] font-medium',
                               auftragHwStatusBadgeClass(zuweisung.status)
                             )}
                           >
@@ -252,7 +250,7 @@ export function AuftragPositionenGewerkView({
                         ) : null}
                       </p>
                     ) : null}
-                    <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+                    <div className="mt-0.5 text-[11px] text-bw-text-muted">
                       {posCount} Leistung{posCount === 1 ? '' : 'en'}
                     </div>
                   </div>
@@ -263,7 +261,7 @@ export function AuftragPositionenGewerkView({
                     aria-expanded={open}
                     aria-label={open ? 'Gewerk einklappen' : 'Gewerk aufklappen'}
                   >
-                    <span className="text-[length:var(--fs-text)] font-semibold tabular-nums text-bw-text">
+                    <span className="text-[13px] font-semibold tabular-nums text-bw-text">
                       {formatEurBetrag(netto)}
                     </span>
                     <ChevronDown
@@ -304,19 +302,19 @@ export function AuftragPositionenGewerkView({
                               {pos.handwerker?.name ? ` · ${pos.handwerker.name}` : ''}
                             </div>
                             {pos.beschreibung ? (
-                              <p className="mt-1 text-[length:var(--fs-meta)] leading-snug text-bw-text-muted">
+                              <p className="mt-1 text-[11px] leading-snug text-bw-text-muted">
                                 {pos.beschreibung}
                               </p>
                             ) : null}
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               {eigenleistung ? (
-                                <span className="inline rounded-full bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
+                                <span className="inline rounded-full bg-bw-green-bg px-2 py-0.5 text-[11px] font-medium text-bw-primary">
                                   Eigenleistung
                                 </span>
                               ) : (
                                 <span
                                   className={cn(
-                                    'inline rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                                    'inline rounded-full px-2 py-0.5 text-[11px] font-medium',
                                     auftragHwStatusBadgeClass(posStatus)
                                   )}
                                 >
@@ -324,12 +322,12 @@ export function AuftragPositionenGewerkView({
                                 </span>
                               )}
                               {eigenleistung && einkaufIntern > 0 ? (
-                                <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                                <span className="text-[11px] text-bw-text-muted">
                                   EK intern: {formatPreis(einkaufIntern, null, null)}
                                 </span>
                               ) : null}
                               {!eigenleistung && pos.preis_partner != null && pos.preis_partner > 0 ? (
-                                <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                                <span className="text-[11px] text-bw-text-muted">
                                   EK Partner: {formatPreis(pos.preis_partner, null, null)}
                                 </span>
                               ) : null}
@@ -339,7 +337,7 @@ export function AuftragPositionenGewerkView({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-2 text-[length:var(--fs-meta)]"
+                                className="h-7 px-2 text-xs"
                                 disabled={!block.gewerkId || pending}
                                 onClick={() => openPositionModal(block, pos)}
                               >
@@ -352,7 +350,7 @@ export function AuftragPositionenGewerkView({
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 px-2 text-[length:var(--fs-meta)]"
+                                    className="h-7 px-2 text-xs"
                                     disabled={pending}
                                     onClick={() => setDetailsOpen({ mode: 'position', position: pos })}
                                   >
@@ -371,7 +369,7 @@ export function AuftragPositionenGewerkView({
                                     options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
                                       value: o.value,
                                       label: o.label }))}
-                                    className="!h-7 !min-w-[130px] !py-0 text-[length:var(--fs-meta)]"
+                                    className="!h-7 !min-w-[130px] !py-0 text-xs"
                                     disabled={pending}
                                   />
                                 </>
@@ -380,7 +378,7 @@ export function AuftragPositionenGewerkView({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-2 text-[length:var(--fs-meta)]"
+                                className="h-7 px-2 text-xs"
                                 onClick={() => onEditPosition(pos)}
                               >
                                 <Pencil className="mr-1 h-3 w-3" aria-hidden />
@@ -390,7 +388,7 @@ export function AuftragPositionenGewerkView({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-2 text-[length:var(--fs-meta)] text-status-cancel-text hover:text-status-cancel-text"
+                                className="h-7 px-2 text-xs text-status-cancel-text hover:text-status-cancel-text"
                                 disabled={pending}
                                 onClick={() => onDeletePosition(pos.id)}
                               >

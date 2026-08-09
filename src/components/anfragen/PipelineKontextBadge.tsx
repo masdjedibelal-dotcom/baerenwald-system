@@ -17,7 +17,7 @@ export function PipelineKontextBadge({ lead }: { lead: PipelineKontextLead }) {
         : 'bg-bw-surface-alt text-bw-muted border-bw-border'
 
   return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium ${cls}`}>
+    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-xs font-medium ${cls}`}>
       {label}
     </span>
   )
@@ -32,7 +32,7 @@ export function PortalSyncWarning({
 }) {
   if (!portalSyncDivergiert(lead, auftragStatus)) return null
   return (
-    <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+    <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
       Portal-Status weicht vom CRM-Auftrag ab. Nach Deploy/Sync: Auftrag erneut abschließen oder kurz warten,
       bis die Synchronisation greift.
     </p>

@@ -2,7 +2,6 @@ import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -84,8 +83,6 @@ export type AngebotMailInput = KundeAnredeKontext & {
   portalAudience?: PortalMailAudience
   /** Vorschau-Bild KI-Visualisierung (wenn ins Angebot) */
   visualisierung_vorschau_url?: string | null
-  /** Reverse Charge (§13b) — Betrag netto */
-  reverseCharge?: boolean
 }
 
 /** Platzhalter / Standard, wenn Felder in Schritt 2 leer bleiben */
@@ -130,10 +127,8 @@ export function angebotKorrekturEinleitungPrefix(anrede: AngebotMailAnrede): str
 
 /** Noch Standard- oder Kurztext / leer — dann bei Anrede-Wechsel mit neuem Standard überschreiben. */
 export function isDefaultAngebotEinleitung(text: string, leistungsumfang: string): boolean {
-  const raw = text.trim()
-  if (!raw) return true
-  /** Optional gespeicherte Mail-Begrüßung ignorieren. */
-  const t = splitAngebotMailGreeting(raw).body.trim() || raw
+  const t = text.trim()
+  if (!t) return true
   if (t === ANGEBOT_MAIL_EINLEITUNG_STANDARD.du || t === ANGEBOT_MAIL_EINLEITUNG_STANDARD.sie) {
     return true
   }
@@ -207,22 +202,6 @@ export function angebotMailGreetingLine(
   return kundeAngebotBegruessung(anrede, kunde)
 }
 
-/** Begrüßungszeile am Anfang abtrennen (Hallo … / Guten Tag …). */
-export function splitAngebotMailGreeting(text: string): {
-  greeting: string | null
-  body: string
-} {
-  const normalized = text.replace(/\r\n/g, '\n')
-  const lines = normalized.split('\n')
-  const first = (lines[0] ?? '').trim()
-  if (!/^(Hallo|Guten Tag)\b/i.test(first)) {
-    return { greeting: null, body: normalized }
-  }
-  let i = 1
-  while (i < lines.length && !lines[i].trim()) i++
-  return { greeting: first, body: lines.slice(i).join('\n') }
-}
-
 /** Fließtext für den kombinierten E-Mail-Editor (ohne Begrüßung & ohne Angebotsbox). */
 export function angebotMailBodyForEditor(
   einleitung: string | undefined,
@@ -230,29 +209,9 @@ export function angebotMailBodyForEditor(
   anrede: AngebotMailAnrede,
   leistungsumfang: string
 ): string {
-  const einlRaw = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
-  const { body: einl } = splitAngebotMailGreeting(einlRaw)
+  const einl = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
   const sch = resolveAngebotMailSchluss(schluss, anrede)
-  return `${(einl || einlRaw).trim()}\n\n${ANGEBOT_MAIL_BOX_MARKER}\n\n${sch}`
-}
-
-/**
- * Kompletter Mail-Text inkl. Begrüßung für den Versand-Editor.
- * Angebotsbox bleibt als Marker in der Mitte.
- */
-export function angebotMailFullTextForEditor(
-  einleitung: string | undefined,
-  schluss: string | undefined,
-  anrede: AngebotMailAnrede,
-  leistungsumfang: string,
-  kunde: KundeAnredeKontext
-): string {
-  const einlRaw = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
-  const { greeting: storedGreet, body: einlBody } = splitAngebotMailGreeting(einlRaw)
-  const greet = storedGreet || angebotMailGreetingLine(anrede, kunde)
-  const core = (storedGreet ? einlBody : einlRaw).trim()
-  const sch = resolveAngebotMailSchluss(schluss, anrede)
-  return `${greet}\n\n${core}\n\n${ANGEBOT_MAIL_BOX_MARKER}\n\n${sch}`
+  return `${einl}\n\n${ANGEBOT_MAIL_BOX_MARKER}\n\n${sch}`
 }
 
 export function parseAngebotMailBodyFromEditor(
@@ -278,28 +237,6 @@ export function parseAngebotMailBodyFromEditor(
   return {
     einleitung,
     schluss: schluss || defaultAngebotSchlussText(anrede),
-  }
-}
-
-/** Parser für den kompletten Mail-Text (Begrüßung + Einleitung + Marker + Schluss). */
-export function parseAngebotMailFullTextFromEditor(
-  text: string,
-  anrede: AngebotMailAnrede,
-  leistungsumfang: string,
-  kunde: KundeAnredeKontext
-): { einleitung: string; schluss: string } {
-  const { greeting, body } = splitAngebotMailGreeting(text)
-  const parsed = parseAngebotMailBodyFromEditor(body, anrede, leistungsumfang)
-  const defaultGreet = angebotMailGreetingLine(anrede, kunde)
-  if (greeting && greeting.trim() !== defaultGreet.trim()) {
-    return {
-      einleitung: `${greeting}\n\n${parsed.einleitung}`.trim(),
-      schluss: parsed.schluss,
-    }
-  }
-  return {
-    einleitung: splitAngebotMailGreeting(parsed.einleitung).body.trim() || parsed.einleitung,
-    schluss: parsed.schluss,
   }
 }
 
@@ -332,11 +269,8 @@ export function resolveAngebotPdfEinleitung(
   anrede: AngebotMailAnrede
 ): string {
   const t = einleitung?.trim()
-  if (!t) return defaultAngebotPdfEinleitungText(anrede)
-  /** Mail-Begrüßung nicht ins PDF übernehmen. */
-  const { body } = splitAngebotMailGreeting(t)
-  const core = body.trim()
-  return core || defaultAngebotPdfEinleitungText(anrede)
+  if (t) return t
+  return defaultAngebotPdfEinleitungText(anrede)
 }
 
 export function angebotMailBetreff(
@@ -377,13 +311,12 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       maximumFractionDigits: 2,
     })
 
+  const anredeText = esc(kundeAngebotBegruessung(anrede, data))
+
   const einleitungResolved = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
-  const { greeting: customGreet, body: einleitungBody } = splitAngebotMailGreeting(einleitungResolved)
-  const anredeText = esc(customGreet || kundeAngebotBegruessung(anrede, data))
-  const einleitungCore = (customGreet ? einleitungBody : einleitungResolved).trim()
   const einleitungFinal = istKorrektur
-    ? `${angebotKorrekturEinleitungPrefix(anrede)}\n\n${einleitungCore}`
-    : einleitungCore
+    ? `${angebotKorrekturEinleitungPrefix(anrede)}\n\n${einleitungResolved}`
+    : einleitungResolved
   const einleitungHtml = textToHtmlParagraphs(einleitungFinal)
 
   const ctaDu =
@@ -406,7 +339,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
   const summaryHtml = mailSummaryBlock({
     label: `${boxLabel} · ${esc(angebotsnr)}`,
     title: esc(leistungsumfang),
-    priceHtml: mailBetragPriceHtml(gesamt_brutto, { reverseCharge: data.reverseCharge }),
+    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(gesamt_brutto)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
     metaHtml: `<p style="font-size:12px;color:#6B7280;margin:8px 0 0;">Gültig bis: <strong style="color:#374151;">${esc(gueltig_bis)}</strong></p>`,
   })
 

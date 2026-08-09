@@ -1,8 +1,8 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { saveKunde } from '@/app/actions/kunden'
 import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
@@ -14,20 +14,17 @@ import {
   istKundeHausverwaltungTyp,
   istKundeNurGewerbeTyp,
 } from '@/lib/kunde-stammdaten'
-import {
-  createAngebotHref,
-  createRechnungHref,
-} from '@/lib/crm/create-entry'
-import { openFabCreate } from '@/components/neu/FabCreateHost'
+import type { LeadKanal } from '@/lib/types'
 
 type Art = '' | 'vorgang' | 'kunde' | 'handwerker'
-type VorgangTyp = '' | 'anfrage' | 'angebot' | 'rechnung'
-type Preset = 'anfrage' | 'angebot' | 'rechnung' | 'kunde' | 'handwerker' | 'partner'
+type VorgangTyp = '' | 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
+type Preset = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung' | 'kunde' | 'handwerker' | 'partner'
 type GewerkOpt = { id: string; name: string; slug: string }
 
 const PRESET_MAP: Record<Preset, [Art, VorgangTyp]> = {
   anfrage: ['vorgang', 'anfrage'],
   angebot: ['vorgang', 'angebot'],
+  auftrag: ['vorgang', 'auftrag'],
   rechnung: ['vorgang', 'rechnung'],
   kunde: ['kunde', ''],
   /** Sidepanel „Partner“ = Handwerker-Entity */
@@ -38,6 +35,7 @@ const PRESET_MAP: Record<Preset, [Art, VorgangTyp]> = {
 const TITEL_MAP: Record<Preset, string> = {
   anfrage: 'Neue Anfrage',
   angebot: 'Neues Angebot',
+  auftrag: 'Neuer Auftrag',
   rechnung: 'Neue Rechnung',
   kunde: 'Neuer Kunde',
   handwerker: 'Neuer Partner',
@@ -45,14 +43,15 @@ const TITEL_MAP: Record<Preset, string> = {
 }
 
 const ART_OPTIONS = [
-  { v: 'vorgang' as const, ic: 'folders', label: 'Vorgang' },
-  { v: 'kunde' as const, ic: 'users', label: 'Kunde' },
-  { v: 'handwerker' as const, ic: 'tool', label: 'Partner' },
+  { v: 'vorgang' as const, ic: 'folders', label: 'Vorgang', d: 'Anfrage, Angebot, Auftrag, Rechnung' },
+  { v: 'kunde' as const, ic: 'users', label: 'Kunde', d: 'Neuen Kunden anlegen' },
+  { v: 'handwerker' as const, ic: 'tool', label: 'Partner', d: 'Partnerbetrieb anlegen' },
 ]
 
 const VORGANG_OPTIONS = [
   { v: 'anfrage' as const, ic: 'inbox', label: 'Anfrage' },
   { v: 'angebot' as const, ic: 'file-invoice', label: 'Angebot' },
+  { v: 'auftrag' as const, ic: 'briefcase', label: 'Auftrag' },
   { v: 'rechnung' as const, ic: 'receipt', label: 'Rechnung' },
 ]
 
@@ -67,6 +66,17 @@ const KUNDE_QUELLE_OPTS = [
 
 function isPreset(v: string | null): v is Preset {
   return v != null && v in PRESET_MAP
+}
+
+function kanalFromUi(v: string): LeadKanal {
+  const m: Record<string, LeadKanal> = {
+    Website: 'website',
+    Telefon: 'telefon',
+    WhatsApp: 'whatsapp',
+    'E-Mail': 'email',
+    Empfehlung: 'sonstiges',
+  }
+  return m[v] ?? 'sonstiges'
 }
 
 function kundeTypFromUi(v: string): 'privat' | 'hausverwaltung' | 'gewerbe' {
@@ -120,6 +130,33 @@ export function NeuErstellenClient({
       if (n.has(slug)) n.delete(slug)
       else n.add(slug)
       return n
+    })
+  }
+
+  function submitAnfrage() {
+    const name = (f.name ?? '').trim()
+    const tel = (f.tel ?? '').trim()
+    if (!name && !tel) {
+      toast.error('Bitte Name oder Telefon angeben.')
+      return
+    }
+    startTransition(async () => {
+      const r = await createAnfrage({
+        name: name || 'Unbekannt',
+        email: '',
+        telefon: tel,
+        plz: '',
+        kanal: kanalFromUi(f.kanal ?? ''),
+        situation: (f.project ?? '').trim(),
+        bereiche: (f.project ?? '').trim() ? [(f.project ?? '').trim()] : [],
+        notizen: (f.area ?? '').trim() ? `Region: ${f.area}` : '',
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Anfrage angelegt')
+      router.push(`/anfragen/${r.id}`)
     })
   }
 
@@ -226,14 +263,6 @@ export function NeuErstellenClient({
                   type="button"
                   className={`neu-vorgang-tile${art === o.v ? ' sel' : ''}`}
                   onClick={() => {
-                    if (o.v === 'kunde') {
-                      openFabCreate('kunde')
-                      return
-                    }
-                    if (o.v === 'handwerker') {
-                      openFabCreate('handwerker')
-                      return
-                    }
                     setArt(o.v)
                     setVorgangTyp('')
                   }}
@@ -242,6 +271,7 @@ export function NeuErstellenClient({
                     <MockIcon ctx="emphasis" n={o.ic} size={22} />
                   </div>
                   <div className="t">{o.label}</div>
+                  <div className="d">{o.d}</div>
                 </button>
               ))}
             </div>
@@ -255,19 +285,169 @@ export function NeuErstellenClient({
               {VORGANG_OPTIONS.map((o) => (
                 <MockChip
                   key={o.v}
-                  active={false}
+                  active={vorgangTyp === o.v}
                   icon={o.ic}
-                  onClick={() => {
-                    if (o.v === 'anfrage') openFabCreate('anfrage')
-                    else if (o.v === 'angebot') router.push(createAngebotHref())
-                    else if (o.v === 'rechnung') router.push(createRechnungHref())
-                  }}
+                  onClick={() => setVorgangTyp(o.v)}
                 >
                   {o.label}
                 </MockChip>
               ))}
             </div>
           </>
+        ) : null}
+
+        {art === 'vorgang' && vorgangTyp === 'anfrage' ? (
+          <div className="neu-fields">
+            <div className="form-section-h">Anfrage-Daten</div>
+            <div className="form-grid">
+              <label className="field">
+                <span className="field-label">
+                  Name <span className="req">*</span>
+                </span>
+                <input
+                  className="field-inp"
+                  value={f.name ?? ''}
+                  onChange={(e) => set('name', e.target.value)}
+                  placeholder="Kundenname"
+                  autoFocus
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Telefon</span>
+                <input
+                  className="field-inp"
+                  value={f.tel ?? ''}
+                  onChange={(e) => set('tel', e.target.value)}
+                  placeholder="089 …"
+                />
+              </label>
+              <label className="field full">
+                <span className="field-label">Projekt / Leistung</span>
+                <input
+                  className="field-inp"
+                  value={f.project ?? ''}
+                  onChange={(e) => set('project', e.target.value)}
+                  placeholder="z.B. Badsanierung"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Region</span>
+                <input
+                  className="field-inp"
+                  value={f.area ?? ''}
+                  onChange={(e) => set('area', e.target.value)}
+                  placeholder="Stadtteil"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Kanal</span>
+                <select
+                  className="field-inp"
+                  value={f.kanal ?? ''}
+                  onChange={(e) => set('kanal', e.target.value)}
+                >
+                  <option value="">wählen…</option>
+                  {['Website', 'Telefon', 'WhatsApp', 'E-Mail', 'Empfehlung'].map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="neu-actions">
+              <MockBtn kind="ghost" onClick={() => router.push('/vorgaenge')}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitAnfrage}>
+                Anfrage anlegen
+              </MockBtn>
+            </div>
+          </div>
+        ) : null}
+
+        {art === 'vorgang' && vorgangTyp === 'auftrag' ? (
+          <div className="neu-fields">
+            <div className="form-section-h">Auftrags-Daten</div>
+            <div className="form-grid">
+              <label className="field full">
+                <span className="field-label">
+                  Titel <span className="req">*</span>
+                </span>
+                <input
+                  className="field-inp"
+                  value={f.title ?? ''}
+                  onChange={(e) => set('title', e.target.value)}
+                  placeholder="z.B. Badsanierung Koch"
+                  autoFocus
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Auftragswert (€)</span>
+                <input
+                  className="field-inp"
+                  type="number"
+                  value={f.value ?? ''}
+                  onChange={(e) => set('value', e.target.value)}
+                  placeholder="0"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Region</span>
+                <input
+                  className="field-inp"
+                  value={f.area ?? ''}
+                  onChange={(e) => set('area', e.target.value)}
+                  placeholder="Stadtteil"
+                />
+              </label>
+            </div>
+            <div className="neu-actions">
+              <MockBtn kind="ghost" onClick={() => router.push('/vorgaenge')}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                kind="primary"
+                icon="check"
+                disabled={pending}
+                onClick={() => {
+                  toast.message('Auftrag', {
+                    description: 'Aufträge entstehen aus angenommenen Angeboten — bitte zuerst Angebot anlegen.',
+                  })
+                  router.push('/vorgaenge?tab=auftrag')
+                }}
+              >
+                Auftrag anlegen
+              </MockBtn>
+            </div>
+          </div>
+        ) : null}
+
+        {art === 'vorgang' && (vorgangTyp === 'angebot' || vorgangTyp === 'rechnung') ? (
+          <div className="neu-fields">
+            <div style={{ padding: '16px 0', fontSize: 13, color: 'var(--text-2)' }}>
+              {vorgangTyp === 'angebot'
+                ? 'Angebote werden im mehrstufigen Angebots-Wizard erstellt.'
+                : 'Rechnungen werden aus einem Auftrag erstellt.'}
+            </div>
+            <div className="neu-actions">
+              <MockBtn kind="ghost" onClick={() => router.push('/vorgaenge')}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              {vorgangTyp === 'angebot' ? (
+                <MockBtn kind="primary" icon="arrow-right" onClick={() => finishList('/anfragen')}>
+                  Angebots-Wizard öffnen
+                </MockBtn>
+              ) : (
+                <MockBtn kind="primary" icon="arrow-right" onClick={() => finishList('/rechnungen/neu')}>
+                  Rechnungs-Wizard öffnen
+                </MockBtn>
+              )}
+            </div>
+          </div>
         ) : null}
 
         {art === 'kunde' ? (
@@ -286,7 +466,7 @@ export function NeuErstellenClient({
                 </select>
               </MockField>
               {firmaPflicht ? (
-                <MockField label="Firma" required full>
+                <MockField label={istHausverwaltung ? 'Firma' : 'Firma / Name'} required>
                   <input
                     className="txt"
                     value={f.name ?? ''}
@@ -295,8 +475,10 @@ export function NeuErstellenClient({
                     autoFocus
                   />
                 </MockField>
-              ) : null}
-              <MockField label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'} required>
+              ) : (
+                <div />
+              )}
+              <MockField label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'} required={!firmaPflicht}>
                 <input
                   className="txt"
                   value={f.vorname ?? ''}
@@ -305,7 +487,7 @@ export function NeuErstellenClient({
                   autoFocus={!firmaPflicht}
                 />
               </MockField>
-              <MockField label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'} required>
+              <MockField label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'} required={!firmaPflicht}>
                 <input
                   className="txt"
                   value={f.nachname ?? ''}
@@ -439,9 +621,10 @@ export function NeuErstellenClient({
             </div>
 
             <div className="neu-actions">
-              <MockBtn kind="secondary" onClick={() => router.push('/kunden')}>
+              <MockBtn kind="ghost" onClick={() => router.push('/kunden')}>
                 Abbrechen
               </MockBtn>
+              <div style={{ flex: 1 }} />
               <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitKunde}>
                 Kunde anlegen
               </MockBtn>
@@ -533,7 +716,7 @@ export function NeuErstellenClient({
                         checked={gewerkSlugs.has(g.slug)}
                         onChange={() => toggleGewerk(g.slug)}
                       />
-                      <span style={{ fontSize: 'var(--fs-text)' }}>{g.name}</span>
+                      <span style={{ fontSize: 13 }}>{g.name}</span>
                     </label>
                   ))}
                 </div>
@@ -601,9 +784,10 @@ export function NeuErstellenClient({
             </div>
 
             <div className="neu-actions">
-              <MockBtn kind="secondary" onClick={() => router.push('/handwerker')}>
+              <MockBtn kind="ghost" onClick={() => router.push('/handwerker')}>
                 Abbrechen
               </MockBtn>
+              <div style={{ flex: 1 }} />
               <MockBtn kind="primary" icon="check" disabled={pending} onClick={submitHandwerker}>
                 Partner anlegen
               </MockBtn>

@@ -1,145 +1,34 @@
-import {
-  endOfDay,
-  endOfMonth,
-  endOfWeek,
-  endOfYear,
-  parseISO,
-  startOfDay,
-  startOfMonth,
-  startOfWeek,
-  startOfYear,
-} from 'date-fns'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
-export type DashboardZeitraumPreset =
-  | 'heute'
-  | 'diese_woche'
-  | 'dieser_monat'
-  | 'dieses_jahr'
-  | 'gesamt'
-  | 'benutzerdefiniert'
+export type DashboardZeitraum = '30d' | '90d' | 'year' | 'all'
 
-/** @deprecated Alias — nutze DashboardZeitraumPreset */
-export type DashboardZeitraum = DashboardZeitraumPreset
-
-export type DashboardZeitraumFilter = {
-  preset: DashboardZeitraumPreset
-  von: string
-  bis: string
+export function parseDashboardZeitraum(raw: string | null | undefined): DashboardZeitraum {
+  if (raw === '30d' || raw === '90d' || raw === 'year' || raw === 'all') return raw
+  return 'all'
 }
 
-export const DASHBOARD_ZEITRAUM_OPTIONS: { value: DashboardZeitraumPreset; label: string }[] = [
-  { value: 'heute', label: 'Heute' },
-  { value: 'diese_woche', label: 'Diese Woche' },
-  { value: 'dieser_monat', label: 'Dieser Monat' },
-  { value: 'dieses_jahr', label: 'Dieses Jahr' },
-  { value: 'gesamt', label: 'Gesamt' },
-  { value: 'benutzerdefiniert', label: 'Individuell' },
-]
-
-const LEGACY_ZEITRAUM: Record<string, DashboardZeitraumPreset> = {
-  all: 'gesamt',
-  year: 'dieses_jahr',
-  '30d': 'dieser_monat',
-  '90d': 'dieses_jahr',
+export function zeitraumStartIso(z: DashboardZeitraum, now = new Date()): string | null {
+  if (z === 'all') return null
+  const d = new Date(now)
+  if (z === '30d') {
+    d.setDate(d.getDate() - 30)
+    return d.toISOString()
+  }
+  if (z === '90d') {
+    d.setDate(d.getDate() - 90)
+    return d.toISOString()
+  }
+  // year
+  return new Date(d.getFullYear(), 0, 1).toISOString()
 }
 
-export function parseDashboardZeitraum(
-  raw: string | null | undefined,
-  von?: string | null,
-  bis?: string | null
-): DashboardZeitraumFilter {
-  const presetRaw = raw?.trim() ?? ''
-  const preset = (
-    DASHBOARD_ZEITRAUM_OPTIONS.some((o) => o.value === presetRaw)
-      ? presetRaw
-      : LEGACY_ZEITRAUM[presetRaw] ?? 'gesamt'
-  ) as DashboardZeitraumPreset
-
-  return {
-    preset,
-    von: von?.trim() ?? '',
-    bis: bis?.trim() ?? '',
-  }
-}
-
-/** Liefert [from, to] in lokaler Zeit oder null bei „Gesamt“ / ungültigem Individuell. */
-export function getDashboardZeitraumRange(
-  filter: DashboardZeitraumFilter,
-  now = new Date()
-): { from: Date; to: Date } | null {
-  const { preset, von, bis } = filter
-  if (preset === 'gesamt') return null
-  if (preset === 'heute') {
-    return { from: startOfDay(now), to: endOfDay(now) }
-  }
-  if (preset === 'diese_woche') {
-    return {
-      from: startOfWeek(now, { weekStartsOn: 1 }),
-      to: endOfWeek(now, { weekStartsOn: 1 }),
-    }
-  }
-  if (preset === 'dieser_monat') {
-    return { from: startOfMonth(now), to: endOfMonth(now) }
-  }
-  if (preset === 'dieses_jahr') {
-    return { from: startOfYear(now), to: endOfYear(now) }
-  }
-  if (preset === 'benutzerdefiniert') {
-    if (!von.trim() || !bis.trim()) return null
-    const from = startOfDay(parseISO(von))
-    const to = endOfDay(parseISO(bis))
-    if (from.getTime() > to.getTime()) return null
-    return { from, to }
-  }
-  return null
-}
-
-/** @deprecated Nutze getDashboardZeitraumRange */
-export function zeitraumStartIso(
-  z: DashboardZeitraumPreset | DashboardZeitraumFilter,
-  now = new Date()
-): string | null {
-  const filter =
-    typeof z === 'string' ? parseDashboardZeitraum(z) : z
-  const range = getDashboardZeitraumRange(filter, now)
-  return range?.from.toISOString() ?? null
-}
-
-export function inZeitraum(
-  iso: string | null | undefined,
-  rangeOrStartIso: { from: Date; to: Date } | string | null
-): boolean {
-  if (!rangeOrStartIso) return true
+export function inZeitraum(iso: string | null | undefined, startIso: string | null): boolean {
+  if (!startIso) return true
   if (!iso) return false
-  const t = new Date(iso).getTime()
-  if (typeof rangeOrStartIso === 'string') {
-    return t >= new Date(rangeOrStartIso).getTime()
-  }
-  return t >= rangeOrStartIso.from.getTime() && t <= rangeOrStartIso.to.getTime()
-}
-
-export function dashboardZeitraumLabel(filter: DashboardZeitraumFilter): string {
-  if (filter.preset === 'benutzerdefiniert' && filter.von && filter.bis) {
-    const fmt = (d: string) =>
-      parseISO(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    return `${fmt(filter.von)} – ${fmt(filter.bis)}`
-  }
-  return DASHBOARD_ZEITRAUM_OPTIONS.find((o) => o.value === filter.preset)?.label ?? 'Gesamt'
-}
-
-export function buildDashboardZeitraumHref(filter: DashboardZeitraumFilter): string {
-  if (filter.preset === 'gesamt') return '/'
-  const params = new URLSearchParams()
-  params.set('zeitraum', filter.preset)
-  if (filter.preset === 'benutzerdefiniert') {
-    if (filter.von) params.set('von', filter.von)
-    if (filter.bis) params.set('bis', filter.bis)
-  }
-  return `/?${params.toString()}`
+  return new Date(iso).getTime() >= new Date(startIso).getTime()
 }
 
 export function angebotNetto(
@@ -195,39 +84,26 @@ export function auftragNetto(auftrag: {
 export type UmsatzMonat = {
   key: string
   label: string
-  /** Aktive Aufträge (offen / in Arbeit / Abnahme) */
   offen: number
   abgeschlossen: number
-  rechnungen: number
 }
 
-export function umsatzMonatGesamt(m: Pick<UmsatzMonat, 'offen' | 'abgeschlossen' | 'rechnungen'>): number {
-  return (Number(m.offen) || 0) + (Number(m.abgeschlossen) || 0) + (Number(m.rechnungen) || 0)
-}
-
-/** Letzte `monateCount` Kalendermonate inkl. aktueller Monat (default 6). */
-export function buildUmsatzverlauf(
+/** Letzte 12 Kalendermonate inkl. aktueller Monat. */
+export function buildUmsatzverlauf12m(
   auftraege: Array<{
     status: string
     created_at: string
     angebote?: unknown
     auftrag_positionen?: AngebotPosition[] | null
   }>,
-  rechnungen: Array<{
-    status?: string | null
-    created_at: string
-    netto?: number | null
-  }> = [],
-  monateCount = 6,
   now = new Date()
 ): UmsatzMonat[] {
-  const n = Math.max(1, Math.floor(monateCount))
   const months: UmsatzMonat[] = []
-  for (let i = n - 1; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
-    months.push({ key, label, offen: 0, abgeschlossen: 0, rechnungen: 0 })
+    months.push({ key, label, offen: 0, abgeschlossen: 0 })
   }
   const byKey = new Map(months.map((m) => [m.key, m]))
 
@@ -245,25 +121,7 @@ export function buildUmsatzverlauf(
     }
   }
 
-  for (const r of rechnungen) {
-    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    const created = new Date(r.created_at)
-    if (Number.isNaN(created.getTime())) continue
-    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
-    const bucket = byKey.get(key)
-    if (!bucket) continue
-    bucket.rechnungen += Number(r.netto) || 0
-  }
-
   return months
-}
-
-/** @deprecated Nutze buildUmsatzverlauf(..., [], 12) */
-export function buildUmsatzverlauf12m(
-  auftraege: Parameters<typeof buildUmsatzverlauf>[0],
-  now = new Date()
-): UmsatzMonat[] {
-  return buildUmsatzverlauf(auftraege, [], 12, now)
 }
 
 export type GewerkUmsatzZeile = {
@@ -287,31 +145,13 @@ export function gewerkColor(index: number): string {
   return GEWERK_COLORS[index % GEWERK_COLORS.length]!
 }
 
-function addGewerkPositionen(map: Map<string, number>, positionen: unknown) {
-  const pos = normalizeAngebotPositionen(positionen)
-  for (const p of pos) {
-    const name = (p.gewerk_name || p.gewerk_slug || 'Sonstiges').trim() || 'Sonstiges'
-    const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
-    if (line <= 0) continue
-    map.set(name, (map.get(name) ?? 0) + line)
-  }
-}
-
-/**
- * Umsatz nach Gewerk:
- * - abgeschlossene Aufträge/Leads über Angebotspositionen
- * - plus Rechnungspositionen (nicht storniert)
- */
+/** Umsatz nach Gewerk aus Angebotspositionen — nur abgeschlossene Vorgänge. */
 export function buildGewerkUmsatz(
   angebote: Array<{
     positionen?: unknown
     leads?: { status?: string | null } | { status?: string | null }[] | null
     auftraege?: { status?: string | null } | { status?: string | null }[] | null
-  }>,
-  rechnungen: Array<{
-    positionen?: unknown
-    status?: string | null
-  }> = []
+  }>
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
   const map = new Map<string, number>()
 
@@ -321,12 +161,14 @@ export function buildGewerkUmsatz(
     const leadDone = String(lead?.status ?? '').toLowerCase() === 'abgeschlossen'
     const auftragDone = String(auftrag?.status ?? '').toLowerCase() === 'abgeschlossen'
     if (!leadDone && !auftragDone) continue
-    addGewerkPositionen(map, ang.positionen)
-  }
 
-  for (const r of rechnungen) {
-    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    addGewerkPositionen(map, r.positionen)
+    const pos = normalizeAngebotPositionen(ang.positionen)
+    for (const p of pos) {
+      const name = (p.gewerk_name || p.gewerk_slug || 'Sonstiges').trim() || 'Sonstiges'
+      const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
+      if (line <= 0) continue
+      map.set(name, (map.get(name) ?? 0) + line)
+    }
   }
 
   const gesamt = Array.from(map.values()).reduce((a, b) => a + b, 0)
@@ -404,8 +246,8 @@ export function buildHandwerkerRanking(
     .map(([id, a]) => ({
       id,
       name: a.name,
-      sub: '',
-      vorgaenge: a.auftraege.size,
+      sub: Array.from(a.gewerke).slice(0, 2).join(' · ') || '—',
+      vorgaenge: a.leads.size + a.angebote.size + a.auftraege.size,
       umsatz: a.umsatz,
       ek: a.ek,
     }))
@@ -413,21 +255,21 @@ export function buildHandwerkerRanking(
     .slice(0, 8)
 }
 
-/** Top-Kunden: nur Aufträge + Rechnungen (keine Anfragen/Angebote). */
 export function buildKundenRanking(
   rows: Array<{
     kunde_id: string
     kunde_name: string
-    auftrag_id?: string | null
-    auftrag_netto?: number
-    rechnung_id?: string | null
-    rechnung_netto?: number
+    lead_id: string | null
+    angebot_id: string | null
+    auftrag_id: string | null
+    auftrag_netto: number
   }>
 ): RankingZeile[] {
   type Acc = {
     name: string
+    leads: Set<string>
+    angebote: Set<string>
     auftraege: Set<string>
-    rechnungen: Set<string>
     umsatz: number
   }
   const map = new Map<string, Acc>()
@@ -437,22 +279,20 @@ export function buildKundenRanking(
     if (!acc) {
       acc = {
         name: r.kunde_name,
+        leads: new Set(),
+        angebote: new Set(),
         auftraege: new Set(),
-        rechnungen: new Set(),
         umsatz: 0,
       }
       map.set(r.kunde_id, acc)
     }
-    if (r.kunde_name && r.kunde_name !== 'Kunde') acc.name = r.kunde_name
-    const auftragId = (r.auftrag_id ?? '').trim()
-    if (auftragId && !acc.auftraege.has(auftragId)) {
-      acc.auftraege.add(auftragId)
-      acc.umsatz += Number(r.auftrag_netto) || 0
-    }
-    const rechnungId = (r.rechnung_id ?? '').trim()
-    if (rechnungId && !acc.rechnungen.has(rechnungId)) {
-      acc.rechnungen.add(rechnungId)
-      acc.umsatz += Number(r.rechnung_netto) || 0
+    if (r.lead_id) acc.leads.add(r.lead_id)
+    if (r.angebot_id) acc.angebote.add(r.angebot_id)
+    if (r.auftrag_id) {
+      if (!acc.auftraege.has(r.auftrag_id)) {
+        acc.auftraege.add(r.auftrag_id)
+        acc.umsatz += r.auftrag_netto
+      }
     }
   }
 
@@ -460,11 +300,16 @@ export function buildKundenRanking(
     .map(([id, a]) => ({
       id,
       name: a.name,
-      sub: '',
-      vorgaenge: a.auftraege.size + a.rechnungen.size,
+      sub: [
+        a.leads.size ? `${a.leads.size} Anfragen` : null,
+        a.angebote.size ? `${a.angebote.size} Angebote` : null,
+        a.auftraege.size ? `${a.auftraege.size} Aufträge` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || '—',
+      vorgaenge: a.leads.size + a.angebote.size + a.auftraege.size,
       umsatz: a.umsatz,
     }))
-    .filter((r) => r.vorgaenge > 0)
     .sort((a, b) => b.umsatz - a.umsatz || b.vorgaenge - a.vorgaenge)
     .slice(0, 8)
 }
@@ -479,38 +324,50 @@ export type FunnelStufe = {
 
 export function buildVertriebsFunnel(input: {
   anfragen: number
-  /** Erstellte Angebote (Lead-eindeutig empfohlen). */
+  /** Angenommene Angebote (Lead-eindeutig empfohlen). */
   angebote: number
-  /** Aufträge gesamt (aktiv + erledigt, Lead-eindeutig empfohlen). */
+  /** Aktive oder abgeschlossene Aufträge (Lead-eindeutig empfohlen). */
   auftraege: number
-}): { stufen: FunnelStufe[]; conversionGesamt: number } {
-  // Monoton: Anfragen ≥ Angebote ≥ Aufträge
+}): { stufen: FunnelStufe[]; conversionGesamt: number; dropoffs: { after: string; lost: number; rate: number }[] } {
+  // Monoton halten: Folge-Stufen dürfen die vorherige nicht übersteigen (1:n-Schutz)
   const a = Math.max(0, input.anfragen)
   const b = Math.min(Math.max(0, input.angebote), a)
   const c = Math.min(Math.max(0, input.auftraege), b)
-
-  const rateOf = (n: number) => (a > 0 ? Math.round((n / a) * 100) : 0)
 
   const stufen: FunnelStufe[] = [
     { key: 'anfrage', label: 'Anfragen', count: a, rate: 100, color: '#3B82F6' },
     {
       key: 'angebot',
-      label: 'Angebote erstellt',
+      label: 'Angebote angenommen',
       count: b,
-      rate: rateOf(b),
+      rate: a > 0 ? Math.round((b / a) * 100) : 0,
       color: '#F59E0B',
     },
     {
       key: 'auftrag',
-      label: 'Aufträge',
+      label: 'Aufträge aktiv/fertig',
       count: c,
-      rate: rateOf(c),
+      rate: a > 0 ? Math.round((c / a) * 100) : 0,
       color: '#2E7D52',
     },
   ]
 
+  const dropoffs: { after: string; lost: number; rate: number }[] = []
+  if (a > 0) {
+    const lost1 = Math.max(0, a - b)
+    dropoffs.push({ after: 'anfrage', lost: lost1, rate: Math.round((lost1 / a) * 100) })
+  }
+  if (b > 0) {
+    const lost2 = Math.max(0, b - c)
+    dropoffs.push({
+      after: 'angebot',
+      lost: lost2,
+      rate: Math.round((lost2 / b) * 100),
+    })
+  }
+
   const conversionGesamt = a > 0 ? Math.round((c / a) * 100) : 0
-  return { stufen, conversionGesamt }
+  return { stufen, conversionGesamt, dropoffs }
 }
 
 /** Zählt eindeutige Vorgänge (Lead-ID), Fallback ohne Lead = eigene ID. */

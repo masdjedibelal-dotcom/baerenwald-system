@@ -1,4 +1,3 @@
-import { ANFRAGE_WARTE_AUF_HV_LABEL } from '@/lib/status/status-display'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
@@ -18,11 +17,6 @@ import type {
  * - Storno-Regel: neueste nicht-stornierte Entität gewinnt (Rechnung > Auftrag > Angebot > Anfrage)
  * - Actor-Priorität: freigabe > handwerker > kunde > bw
  * - Output-Shape: `ResolvedVorgang` in `@/lib/vorgang/types`
- *
- * A7 Parität: Fixtures in `shared/crm-vorgang/resolve-vorgang.fixtures.json`
- * (+ Kopie `resolve-vorgang.fixtures.json` hier) — Portal und CRM byte-identisch halten.
- * Fine-Stages: `mapAngebotStatusEinfach` (status_einfach vor Legacy-status).
- * Rechnungs-Gewinn: `isPhaseWinningRechnung` (Voll/Schluss, keine Abschläge als Stamm).
  */
 
 /** Actor-Priorität (höher = wichtiger). */
@@ -83,28 +77,6 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
   return rechnung.status === 'storniert'
 }
 
-/**
- * Weitere Rechnungszeilen in der Liste (nicht der Stamm-Vorgang).
- * Nur laufende Abschläge sind Satelliten — Auftrag bleibt unter „Aufträge“ sichtbar.
- * Schlussrechnung ist Endabrechnung wie Vollrechnung (kein Satellit).
- */
-export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
-  const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
-  return art === 'abschlag'
-}
-
-/**
- * Vollrechnung und Schlussrechnung (versendet/bezahlt) ziehen den Stamm in die
- * Rechnungsphase — analog Endabrechnung. Abschläge allein lassen den offenen
- * Auftrag unter „Aufträge“ sichtbar.
- */
-export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
-  const st = (rechnung.status ?? '').trim().toLowerCase()
-  if (!st || st === 'storniert' || st === 'entwurf') return false
-  if (isSatellitenRechnung(rechnung)) return false
-  return true
-}
-
 function pickNewestActive<T>(
   items: T[],
   isStorniert: (x: T) => boolean,
@@ -119,8 +91,6 @@ function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): st
   if (forceStorniert) return 'storniert'
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
-  // Lead schon weiter (Angebot/Auftrag/…) — nicht als offene Anfrage „Neu“ anzeigen
-  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen') return 'abgeschlossen'
   return 'neu'
 }
 
@@ -130,17 +100,10 @@ function funnelKategorie(funnelDaten: unknown): string | null {
   return typeof kat === 'string' ? kat : null
 }
 
-function funnelIstAkut(funnelDaten: unknown): boolean {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return false
-  const fd = funnelDaten as { notfall?: unknown; havarie?: unknown }
-  return fd.notfall === true || fd.havarie === true
-}
-
 function isNotfall(input: ResolveVorgangInput): boolean {
   const lead = input.lead
   if ((lead.hv_meldung_status ?? '').trim() === 'notmassnahme') return true
   if (lead.situation === 'notfall') return true
-  if (funnelIstAkut(lead.funnel_daten)) return true
   return funnelKategorie(lead.funnel_daten) === 'notfall'
 }
 
@@ -212,16 +175,14 @@ type PhasePick = {
   updatedAt: string
 }
 
-/** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage).
- * Versendete Voll- und Schlussrechnung gewinnen die Stamm-Phase; Abschläge bleiben Satelliten. */
+/** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage). */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []
   const auftraege = input.auftraege ?? []
   const rechnungen = input.rechnungen ?? []
-  const phaseRechnungen = rechnungen.filter(isPhaseWinningRechnung)
 
-  const rechnungAktiv = pickNewestActive(phaseRechnungen, isRechnungStorniert, entityTs)
+  const rechnungAktiv = pickNewestActive(rechnungen, isRechnungStorniert, entityTs)
   if (rechnungAktiv) {
     return {
       phase: 'rechnung',
@@ -251,8 +212,8 @@ function resolvePhase(input: ResolveVorgangInput): PhasePick {
     }
   }
 
-  if (phaseRechnungen.length > 0 && phaseRechnungen.every(isRechnungStorniert)) {
-    const r = pickNewest(phaseRechnungen, entityTs)!
+  if (rechnungen.length > 0 && rechnungen.every(isRechnungStorniert)) {
+    const r = pickNewest(rechnungen, entityTs)!
     return {
       phase: 'rechnung',
       entityId: r.id,
@@ -340,8 +301,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const badges: ResolvedVorgangBadges = {}
   if (isNotfall(input)) badges.notfall = true
-  const wartetFreigabe = (lead.org_freigabe_status ?? '').trim() === 'ausstehend'
-  if (wartetFreigabe) {
+  if ((lead.org_freigabe_status ?? '').trim() === 'ausstehend') {
     badges.wartet_freigabe = true
   }
 
@@ -363,10 +323,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
   return {
     phase: pick.phase,
     unterstatus,
-    // Status-Spalte: Freigabe sichtbar, Pipeline-Key (unterstatus) bleibt unverändert
-    unterstatusLabel: wartetFreigabe
-      ? ANFRAGE_WARTE_AUF_HV_LABEL
-      : unterstatusLabel(pick.phase, unterstatus),
+    unterstatusLabel: unterstatusLabel(pick.phase, unterstatus),
     needsAction,
     actor,
     badges,
@@ -377,71 +334,4 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
     entityType: pick.phase,
     updatedAt: pick.updatedAt,
   }
-}
-
-/** Eigener Rechnungs-Vorgang für eine weitere Rechnung (neben dem Stamm). */
-export function resolveSatellitenRechnungVorgang(
-  input: ResolveVorgangInput,
-  rechnung: VorgangRechnungInput
-): ResolvedVorgang {
-  const forced: VorgangRechnungInput = { ...rechnung, rechnung_art: 'voll' }
-  const resolved = resolveVorgang({
-    lead: input.lead,
-    angebote: input.angebote,
-    auftraege: [],
-    rechnungen: [forced],
-    titel: input.titel,
-  })
-  return {
-    ...resolved,
-    titel: satellitenRechnungTitel(rechnung, resolved.titel),
-  }
-}
-
-/**
- * FAB-/Direktrechnung ohne Lead/Auftrag: immer Rechnungsphase —
- * auch als Entwurf (sonst fällt resolveVorgang auf synthetische Anfrage zurück).
- */
-export function resolveStandaloneDirektrechnung(input: {
-  rechnung: VorgangRechnungInput
-  titel: string
-  kundeName?: string | null
-}): ResolvedVorgang {
-  const r = input.rechnung
-  const st = (r.status ?? '').trim().toLowerCase() || 'entwurf'
-  const unterstatus = st === 'storniert' ? 'storniert' : st
-  const ueberfaellig =
-    unterstatus === 'gesendet' && isUeberfaellig(r.faellig)
-  return {
-    phase: 'rechnung',
-    unterstatus,
-    unterstatusLabel: unterstatusLabel('rechnung', unterstatus),
-    needsAction: false,
-    actor: null,
-    badges: {},
-    ueberfaellig,
-    kanalMeta: 'Direktkunde',
-    titel: input.titel,
-    entityId: r.id,
-    entityType: 'rechnung',
-    updatedAt: entityTs(r),
-  }
-}
-
-export function satellitenRechnungTitel(
-  rechnung: VorgangRechnungInput,
-  fallbackTitel: string
-): string {
-  const art = (rechnung.rechnung_art ?? '').trim().toLowerCase()
-  const nr = rechnung.rechnungsnummer?.trim()
-  if (art === 'schluss') {
-    return nr ? `Schlussrechnung ${nr}` : 'Schlussrechnung'
-  }
-  if (art === 'abschlag') {
-    const idx = rechnung.abschlag_index
-    const base =
-      idx != null && Number.isFinite(Number(idx)) ? `Abschlag ${idx}` : 'Abschlagsrechnung'
-    return nr ? `${base} · ${nr}` : base
-  }
-  return nr || fallbackTitel
 }

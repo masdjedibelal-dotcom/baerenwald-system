@@ -1,7 +1,6 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { de as deLocale } from 'date-fns/locale'
 import { ExternalLink, Mail } from 'lucide-react'
@@ -45,7 +44,7 @@ export function MailUebersicht({
   emailLog: EmailLogRow[]
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [showQr, setShowQr] = useState(false)
 
   const projektUrl = useMemo(() => {
@@ -76,12 +75,12 @@ export function MailUebersicht({
   return (
     <>
       <section className="mb-6 rounded-lg border border-border bg-surface p-4 shadow-card">
-        <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Kunden-Kommunikation</h2>
-        <p className="text-[length:var(--fs-text)] text-muted">Öffentliche Status-Seite, E-Mail-Protokoll und Freigaben.</p>
+        <h2 className="mb-1 text-lg font-semibold text-ink">Kunden-Kommunikation</h2>
+        <p className="text-sm text-muted">Öffentliche Status-Seite, E-Mail-Protokoll und Freigaben.</p>
 
         <div className="mt-4 rounded-lg border border-border bg-canvas/40 p-3">
-          <h3 className="text-[length:var(--fs-text)] font-semibold text-ink">Kunden-Status-Seite</h3>
-          <p className="mt-2 text-[length:var(--fs-text)] text-muted">
+          <h3 className="text-sm font-semibold text-ink">Kunden-Status-Seite</h3>
+          <p className="mt-2 text-sm text-muted">
             Aufrufe: <span className="font-medium text-ink">{aufrufe}</span>
             <span className="mx-2">·</span>
             Letzter Aufruf: <span className="font-medium text-ink">{letzterRel}</span>
@@ -139,39 +138,39 @@ export function MailUebersicht({
             </Button>
           </div>
           {projektUrl ? (
-            <p className="mt-3 break-all text-[length:var(--fs-meta)] text-muted">
+            <p className="mt-3 break-all text-xs text-muted">
               <span className="font-medium text-ink">URL:</span> {projektUrl}
             </p>
           ) : (
-            <p className="mt-3 text-[length:var(--fs-meta)] text-muted">Noch kein Token — „Link erzeugen“ antippen.</p>
+            <p className="mt-3 text-xs text-muted">Noch kein Token — „Link erzeugen“ antippen.</p>
           )}
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 text-[length:var(--fs-text)] font-semibold text-ink">Gesendete E-Mails</h3>
+          <h3 className="mb-2 text-sm font-semibold text-ink">Gesendete E-Mails</h3>
           {emailLog.length === 0 ? (
-            <p className="text-[length:var(--fs-text)] text-muted">Noch keine E-Mails zu diesem Auftrag protokolliert.</p>
+            <p className="text-sm text-muted">Noch keine E-Mails zu diesem Auftrag protokolliert.</p>
           ) : (
             <ul className="space-y-2">
               {emailLog.map((row) => (
                 <li
                   key={row.id}
-                  className="flex flex-col gap-0.5 rounded-lg border border-border bg-canvas/30 px-3 py-2 text-[length:var(--fs-text)]"
+                  className="flex flex-col gap-0.5 rounded-lg border border-border bg-canvas/30 px-3 py-2 text-sm"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Mail className="h-4 w-4 shrink-0 text-muted" aria-hidden />
                     <span className="font-medium text-ink">{typLabel(row.typ)}</span>
                     {row.status === 'fehler' ? (
-                      <span className="rounded bg-red-100 px-1.5 text-[length:var(--fs-meta)] text-red-800">Fehler</span>
+                      <span className="rounded bg-red-100 px-1.5 text-xs text-red-800">Fehler</span>
                     ) : null}
                   </div>
-                  <p className="text-[length:var(--fs-meta)] text-muted">
+                  <p className="text-xs text-muted">
                     {row.an_email}
                     <span className="mx-1">·</span>
                     {formatDatumZeit(row.created_at)}
                   </p>
                   {row.status === 'fehler' && row.fehler_nachricht ? (
-                    <p className="text-[length:var(--fs-meta)] text-red-700">{row.fehler_nachricht}</p>
+                    <p className="text-xs text-red-700">{row.fehler_nachricht}</p>
                   ) : null}
                 </li>
               ))}
@@ -181,7 +180,7 @@ export function MailUebersicht({
       </section>
 
       <Modal open={showQr} onClose={() => setShowQr(false)} title="QR-Code" size="sm">
-        <p className="text-center text-[length:var(--fs-meta)] text-muted">
+        <p className="text-center text-xs text-muted">
           Kundin kann den Code scannen, um den Projekt-Status zu öffnen.
         </p>
         {projektUrl ? (

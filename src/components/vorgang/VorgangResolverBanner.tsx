@@ -4,13 +4,6 @@ import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import { ACTOR_LABELS } from '@/lib/vorgang/vorgang-labels'
 import { cn } from '@/lib/utils'
 
-/** Resolver-Banner nur bei echter Dringlichkeit (W6-01). */
-export function vorgangResolverBannerVisible(resolved: ResolvedVorgang): boolean {
-  return Boolean(
-    resolved.badges.notfall || resolved.ueberfaellig || resolved.needsAction
-  )
-}
-
 export function VorgangResolverBanner({
   resolved,
   className,
@@ -18,20 +11,20 @@ export function VorgangResolverBanner({
   resolved: ResolvedVorgang
   className?: string
 }) {
-  if (!vorgangResolverBannerVisible(resolved)) {
+  if (!resolved.needsAction && !resolved.ueberfaellig && !resolved.badges.notfall) {
     return null
   }
 
   const hints: string[] = []
   if (resolved.badges.notfall) hints.push('Notfall')
-  if (resolved.badges.wartet_freigabe) hints.push(ACTOR_LABELS.freigabe)
-  else if (resolved.actor) hints.push(ACTOR_LABELS[resolved.actor] ?? resolved.actor)
+  if (resolved.badges.wartet_freigabe) hints.push('Wartet auf Freigabe (HV)')
+  if (resolved.actor) hints.push(ACTOR_LABELS[resolved.actor] ?? resolved.actor)
   if (resolved.ueberfaellig) hints.push('Rechnung überfällig')
 
   return (
     <div
       className={cn(
-        'mb-4 rounded-xl border px-4 py-3 text-[length:var(--fs-text)]',
+        'mb-4 rounded-xl border px-4 py-3 text-sm',
         resolved.badges.notfall
           ? 'border-red-200 bg-red-50 text-red-950'
           : 'border-amber-200 bg-amber-50 text-amber-950',

@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { Mail } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { KundenMailComposeModal } from '@/components/kommunikation/KundenMailComposeModal'

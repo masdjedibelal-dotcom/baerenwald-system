@@ -526,7 +526,7 @@ export async function sendBautagebuchAnKunde(input: {
   if (!toList.length) return { ok: false, message: 'Bitte mindestens eine An-Adresse eingeben.' }
   const ccList = input.cc?.map((v) => v.trim()).filter(Boolean)
 
-  const sent = await sendMail({
+  await sendMail({
     typ: 'projekt_update',
     an: toList.length === 1 ? toList[0]! : toList,
     anName: built.kundeName,
@@ -538,9 +538,6 @@ export async function sendBautagebuchAnKunde(input: {
     auftragId: input.auftragId,
     kontextTyp: 'auftrag',
   })
-  if (!sent.success) {
-    return { ok: false, message: sent.error ?? 'E-Mail fehlgeschlagen' }
-  }
 
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
@@ -549,7 +546,6 @@ export async function sendBautagebuchAnKunde(input: {
     beschreibung: `${eintrag.titel} — ${built.betreff}`,
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
-    email_log_id: sent.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)
@@ -604,7 +600,6 @@ export async function anfrageHandwerkerBautagebuchEintrag(input: {
   auftragId: string
   handwerkerId: string
   notiz?: string | null
-  positionIds?: string[] | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId.trim())
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -617,22 +612,17 @@ export async function anfrageHandwerkerBautagebuchEintrag(input: {
     auftragId: input.auftragId.trim(),
     handwerkerId: input.handwerkerId.trim(),
     notiz: input.notiz,
-    positionIds: input.positionIds,
     angefordertVonUserId: gate.userId,
   })
   if (!res.ok) return res
 
-  const posCount = (input.positionIds ?? []).filter(Boolean).length
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId.trim(),
     typ: 'mail_handwerker',
     titel: 'Tagebucheintrag angefordert',
-    beschreibung: posCount
-      ? `Partner zur Bautagebuch-Dokumentation aufgefordert (${posCount} Leistung${posCount === 1 ? '' : 'en'}).`
-      : 'Partner per E-Mail und Portal zur Bautagebuch-Dokumentation aufgefordert.',
+    beschreibung: 'Partner per E-Mail zur Bautagebuch-Dokumentation aufgefordert.',
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
-    email_log_id: res.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId.trim()}`)

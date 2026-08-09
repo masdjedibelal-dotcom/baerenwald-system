@@ -3,7 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { crmAuthCookieOptions } from '@/lib/auth/crm-auth-cookie'
 import { getDevCrmCredentials, isDevAuthSkipEnabled } from '@/lib/dev-auth'
 
 async function signInWithPassword(email: string, password: string) {
@@ -12,7 +11,6 @@ async function signInWithPassword(email: string, password: string) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: crmAuthCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -79,7 +77,6 @@ async function signInWithServiceOtp() {
 
   const cookieStore = cookies()
   const supabase = createServerClient(url, anonKey, {
-    cookieOptions: crmAuthCookieOptions,
     cookies: {
       getAll() {
         return cookieStore.getAll()

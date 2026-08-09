@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
-import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
 export function MobileListFilterSheet({
@@ -23,29 +22,26 @@ export function MobileListFilterSheet({
   footer?: ReactNode
   className?: string
 }) {
-  useOverlayChromeLock(open)
-
   useEffect(() => {
-    if (!open) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    if (open) {
+      document.addEventListener('keydown', handler)
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
   }, [open, onClose])
 
   if (!open) return null
 
   return (
-    <div
-      className={cn('mobile-filter-sheet md:hidden', className)}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
+    <div className={cn('mobile-filter-sheet md:hidden', className)} role="dialog" aria-modal="true">
       <button type="button" className="mobile-filter-sheet__backdrop" aria-label="Schließen" onClick={onClose} />
       <div className="mobile-filter-sheet__panel">
-        <div className="sheet-grabber" aria-hidden />
         <header className="mobile-filter-sheet__header">
           <button type="button" onClick={onClose} className="mobile-filter-sheet__close" aria-label="Schließen">
             <X className="h-5 w-5" aria-hidden />

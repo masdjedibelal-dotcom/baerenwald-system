@@ -33,6 +33,7 @@ export function AngebotWizardProjektBeschreibungCard({
           placeholder="z. B. Badsanierung"
           disabled={disabled}
         />
+        <p className="wizard-projekt-field-hint">Leistungsumfang im Angebotskopf (PDF)</p>
       </label>
       <div className="wizard-projekt-field">
         <span className="wizard-projekt-field-label">Beschreibung</span>
@@ -43,6 +44,7 @@ export function AngebotWizardProjektBeschreibungCard({
           placeholder={beschreibungPlaceholder}
           disabled={disabled}
         />
+        <p className="wizard-projekt-field-hint">Fließtext unter „Projektbeschreibung“ im PDF</p>
       </div>
     </div>
   )

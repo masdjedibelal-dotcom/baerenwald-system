@@ -1,6 +1,5 @@
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailTeamGruss } from '@/lib/mail/anrede'
 import type { LeadAnlass } from '@/lib/types'
 
 function esc(s: string): string {
@@ -145,20 +144,17 @@ export function mailOrgNeueMeldung(
     mailDataRow('Referenz', input.referenz),
   ].join('')
 
-  const begr = 'Guten Tag,'
-  const gruss = mailTeamGruss('sie', b.firmenname)
   const body = `
-    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${einleitung}</p>
+    <p>Guten Tag,</p>
+    <p>${einleitung}</p>
     ${mailSummaryTable(rows)}
-    <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.55;">Bitte prüfen Sie den Vorgang im Auftraggeber-Portal und wählen Sie den nächsten Schritt (z.&nbsp;B. Angebot einfordern oder Kleinreparatur).</p>
-    <p style="font-size:13px;color:#6B7280;margin:0 0 20px;">Status: Neu · Bereich Meldungen</p>
-    <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>
+    <p style="font-size:14px;color:#374151;line-height:1.55">Bitte prüfen Sie den Vorgang im Auftraggeber-Portal und wählen Sie den nächsten Schritt (z.&nbsp;B. Angebot einfordern oder Kleinreparatur).</p>
+    <p style="font-size:13px;color:#6B7280">Status: Neu · Bereich Meldungen</p>
   `
 
   return {
     betreff: buildOrgNeueMeldungSubject(input.objektTitel),
-    html: mailHtmlBase(body, 'Neuer Vorgang', b, 'Sie erhalten diese Mail, weil für Ihr Objekt ein Vorgang im Auftraggeber-Portal angelegt wurde.', {
+    html: mailHtmlBase(body, 'Neuer Vorgang', b, undefined, {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: input.portalLink,
@@ -208,99 +204,6 @@ export function mailOrgFreigabeAngefordert(
   return {
     betreff,
     html: mailHtmlBase(body, 'Freigabe erforderlich', b, undefined, {
-      anrede: 'sie',
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
-    }),
-  }
-}
-
-/** Unter Schwelle / Notfall: Angebot nur zur Information — kein Freigabe-Request. */
-export function mailOrgAngebotZurInfo(
-  data: {
-    orgName: string
-    objektTitel: string
-    betragEur: number
-    portalLink: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const betreff = `Angebot zur Information — ${data.objektTitel.trim() || 'Objekt'}`
-  const body = `
-    <p>Guten Tag,</p>
-    <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
-      data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
-    )}</strong> vor.</p>
-    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Der Auftrag wird automatisch angelegt — diese Mail dient nur der Information.</p>
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Angebot zur Information', b, undefined, {
-      anrede: 'sie',
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
-    }),
-  }
-}
-
-/** Direktauftrag: HV nur zur Info — wir kümmern uns; Portal-Zugang wie gewohnt. */
-export function mailOrgNotfallDirektInfo(
-  data: {
-    orgName: string
-    objektTitel: string
-    /** @deprecated Nicht mehr in der Mail; optional für Aufrufer-Kompatibilität. */
-    stundensatz?: number
-    portalLink: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const objekt = data.objektTitel.trim() || 'Ihr Objekt'
-  const firma = b.firmenname.trim() || 'Bärenwald'
-  const betreff = `Direktauftrag — ${objekt}`
-  const gruss = mailTeamGruss('sie', firma)
-  const body = `
-    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">Guten Tag,</p>
-    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
-      für <strong>${esc(objekt)}</strong> haben wir einen <strong>Direktauftrag</strong> angelegt.
-      <strong>${esc(firma)}</strong> kümmert sich darum — Sie müssen nichts freigeben.
-    </p>
-    <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
-      Den aktuellen Stand sehen Sie jederzeit im Auftraggeber-Portal.
-    </p>
-    <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Direktauftrag angelegt', b, undefined, {
-      anrede: 'sie',
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
-    }),
-  }
-}
-
-/** Abnahmeprotokoll liegt in den Unterlagen. */
-export function mailOrgAbnahmeDokument(
-  data: {
-    orgName: string
-    objektTitel: string
-    portalLink: string
-    abschlussberichtUrl?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const betreff = `Abnahmedokument verfügbar — ${data.objektTitel.trim() || 'Objekt'}`
-  const bericht = data.abschlussberichtUrl?.trim()
-    ? `<p>Optionaler Abschlussbericht: <a href="${esc(data.abschlussberichtUrl.trim())}">Bericht öffnen</a></p>`
-    : ''
-  const body = `
-    <p>Guten Tag,</p>
-    <p>für <strong>${esc(data.objektTitel)}</strong> liegt das <strong>Abnahmeprotokoll</strong> in den Unterlagen bereit.</p>
-    ${bericht}
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Abnahmedokument verfügbar', b, undefined, {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: data.portalLink,

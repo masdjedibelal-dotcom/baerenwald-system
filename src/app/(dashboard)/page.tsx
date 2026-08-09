@@ -5,6 +5,8 @@ import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
   isAktiverAuftragStatus,
+  isAngenommenesAngebotStatus,
+  isFunnelAuftragStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
 } from '@/lib/dashboard-mock-mapping'
@@ -12,19 +14,19 @@ import {
   buildGewerkUmsatz,
   buildHandwerkerRanking,
   buildKundenRanking,
-  buildUmsatzverlauf,
+  buildUmsatzverlauf12m,
   buildVertriebsFunnel,
   countUniqueVorgaengeByLead,
-  getDashboardZeitraumRange,
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
-  type DashboardZeitraumFilter,
+  zeitraumStartIso,
+  type DashboardZeitraum,
 } from '@/lib/dashboard/dashboard-analytics'
 import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 type SupabaseErr = { message: string } | null
 
@@ -36,13 +38,6 @@ async function safeRows<T>(
     if (error) throw error
     return data ?? []
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    // Abgelaufene Session: nicht still als „0 Einträge“ maskieren
-    if (
-      /jwt expired|invalid jwt|not authenticated|pgrst301|auth session/i.test(msg)
-    ) {
-      throw e
-    }
     console.error(e)
     return []
   }
@@ -61,9 +56,9 @@ async function safeMaybeSingle<T>(
   }
 }
 
-async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
+async function DashboardData({ zeitraum }: { zeitraum: DashboardZeitraum }) {
   const supabase = createClient()
-  const zeitraumRange = getDashboardZeitraumRange(zeitraumFilter)
+  const startIso = zeitraumStartIso(zeitraum)
 
   let user: { id: string } | null = null
   try {
@@ -80,15 +75,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       )
     : null
 
-  const [
-    leadsRaw,
-    angeboteRaw,
-    auftraegeRaw,
-    rechnungenRaw,
-    rechnungenGewerkRaw,
-    zuweisungenRaw,
-    marketing,
-  ] = await Promise.all([
+  const [leadsRaw, angeboteRaw, auftraegeRaw, rechnungenRaw, zuweisungenRaw, marketing] =
+    await Promise.all([
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db
@@ -120,8 +108,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .from('auftraege')
           .select(
             `
-            id, status, kunde_id, lead_id, angebot_id, created_at, titel, ist_wiederkehrend,
-            letzte_aktivitaet, fortschritt,
+            id, status, kunde_id, lead_id, angebot_id, created_at, titel,
             angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
             kunden(id, name, vorname, nachname)
           `
@@ -134,25 +121,9 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select(
-            `
-            id, status, created_at, faellig_am, kunde_id, netto, brutto,
-            kunden(id, name, vorname, nachname)
-          `
-          )
+          .select('id, status, created_at')
           .order('created_at', { ascending: false })
           .limit(2000)
-      )
-    ),
-    /* Separat + limitiert: positionen sind groß — nicht in der Haupt-Query (sonst Netlify „Connection closed“) */
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
-          .from('rechnungen')
-          .select('id, status, created_at, positionen')
-          .neq('status', 'storniert')
-          .order('created_at', { ascending: false })
-          .limit(800)
       )
     ),
     safeRows(() =>
@@ -171,7 +142,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .limit(3000)
       )
     ),
-    loadDashboardMarketing(zeitraumFilter),
+    loadDashboardMarketing(zeitraum),
   ])
 
   const leads = filterOutLegacyDemoLeads(
@@ -186,33 +157,15 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   )
   const angebote = angeboteRaw as Array<Record<string, unknown>>
   const auftraege = auftraegeRaw as Array<Record<string, unknown>>
-  const rechnungen = rechnungenRaw as Array<{
-    id: string
-    status: string
-    created_at: string
-    faellig_am?: string | null
-    kunde_id?: string | null
-    netto?: number | null
-    brutto?: number | null
-    kunden?:
-      | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }
-      | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }[]
-      | null
-  }>
-  const rechnungenGewerk = rechnungenGewerkRaw as Array<{
-    id: string
-    status: string
-    created_at: string
-    positionen?: unknown
-  }>
+  const rechnungen = rechnungenRaw as Array<{ id: string; status: string; created_at: string }>
 
   const leadsZ = leads.filter((l) => {
-    if (!inZeitraum(l.created_at, zeitraumRange)) return false
+    if (!inZeitraum(l.created_at, startIso)) return false
     return String(l.status ?? '').toLowerCase() !== 'abgebrochen'
   })
-  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
-  const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
-  const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, zeitraumRange))
+  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
+  const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), startIso))
+  const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, startIso))
 
   const neueAnfragenCount = leadsZ.filter(
     (l) => String(l.status ?? '').toLowerCase() === 'neu'
@@ -232,77 +185,70 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       icon: 'inbox',
       label: 'Neue Anfragen',
       value: neueAnfragenCount,
-      href: '/vorgaenge?tab=anfrage&lifecycle=offen',
+      href: '/vorgaenge?tab=anfrage',
     },
     {
       icon: 'file-invoice',
       label: 'Offene Angebote',
       value: offeneAngeboteCount,
-      href: '/vorgaenge?tab=angebot&lifecycle=offen',
+      href: '/vorgaenge?tab=angebot',
     },
     {
       icon: 'tool',
       label: 'Aktive Aufträge',
       value: aktiveAuftraegeCount,
-      href: '/vorgaenge?tab=auftrag&lifecycle=offen',
+      href: '/vorgaenge?tab=auftrag',
     },
     {
       icon: 'receipt',
       label: 'Offene Rechnungen',
       value: offeneRechnungenCount,
-      href: '/vorgaenge?tab=rechnung&lifecycle=offen',
+      href: '/vorgaenge?tab=rechnung',
     },
   ]
 
-  // Umsatzverlauf: letzte 6 Monate — aktive/abgeschlossene Aufträge + Rechnungen
-  const umsatzMonate = buildUmsatzverlauf(
+  // Umsatzverlauf: immer letzte 12 Monate (unabhängig vom KPI-Filter), Auftragssummen
+  const umsatzMonate = buildUmsatzverlauf12m(
     auftraege.map((a) => ({
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
       angebote: a.angebote as never,
-    })),
-    rechnungen.map((r) => ({
-      status: r.status,
-      created_at: r.created_at,
-      netto: r.netto,
-    })),
-    6
+    }))
   )
 
-  const auftraegeFunnelZ = auftraegeZ.filter(
-    (a) =>
-      isAktiverAuftragStatus(a.status as string) ||
-      String(a.status ?? '').toLowerCase() === 'abgeschlossen'
-  )
+  const angeboteAngenommen = angeboteZ.filter((a) => {
+    if (!isAngenommenesAngebotStatus(a.status as string, a.status_einfach as string | null)) {
+      return false
+    }
+    // Nur angenommene Angebote, die zu einem Auftrag gehören
+    if (a.auftrag_id) return true
+    const aufs = a.auftraege
+    if (Array.isArray(aufs)) return aufs.length > 0
+    return Boolean(aufs)
+  })
+  const auftraegeFunnel = auftraegeZ.filter((a) => isFunnelAuftragStatus(a.status as string))
 
   const funnel = buildVertriebsFunnel({
     anfragen: leadsZ.length,
     angebote: countUniqueVorgaengeByLead(
-      angeboteZ.map((a) => ({
+      angeboteAngenommen.map((a) => ({
         id: String(a.id ?? ''),
         lead_id: (a.lead_id as string | null) ?? null,
       }))
     ),
     auftraege: countUniqueVorgaengeByLead(
-      auftraegeFunnelZ.map((a) => ({
+      auftraegeFunnel.map((a) => ({
         id: String(a.id ?? ''),
         lead_id: (a.lead_id as string | null) ?? null,
       }))
     ),
   })
 
-  const rechnungenGewerkZ = rechnungenGewerk.filter((r) =>
-    inZeitraum(r.created_at, zeitraumRange)
-  )
   const gewerk = buildGewerkUmsatz(
     angeboteZ.map((a) => ({
       positionen: a.positionen,
       leads: a.leads as never,
       auftraege: a.auftraege as never,
-    })),
-    rechnungenGewerkZ.map((r) => ({
-      positionen: r.positionen,
-      status: r.status,
     }))
   )
 
@@ -312,7 +258,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     const auftrag = Array.isArray(z.auftraege) ? z.auftraege[0] : z.auftraege
     const auf = auftrag as Record<string, unknown> | null
     if (!auf?.id) continue
-    if (!inZeitraum(String(auf.created_at ?? ''), zeitraumRange)) continue
+    if (!inZeitraum(String(auf.created_at ?? ''), startIso)) continue
     if (String(auf.status ?? '') === 'storniert') continue
     const hw = Array.isArray(z.handwerker) ? z.handwerker[0] : z.handwerker
     const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
@@ -353,7 +299,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     const ang = Array.isArray(row.angebote) ? row.angebote[0] : row.angebote
     const a = ang as Record<string, unknown> | null
     if (!a?.id) continue
-    if (!inZeitraum(String(a.created_at ?? ''), zeitraumRange)) continue
+    if (!inZeitraum(String(a.created_at ?? ''), startIso)) continue
     const hw = Array.isArray(row.handwerker) ? row.handwerker[0] : row.handwerker
     const h = hw as { id?: string; name?: string | null; firma?: string | null } | null
     const hwId = String(row.handwerker_id ?? h?.id ?? '')
@@ -376,38 +322,61 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const rankingHandwerker = buildHandwerkerRanking(hwRows.filter((r) => r.auftrag_id || r.angebot_id || r.lead_id))
 
   const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
+  for (const l of leadsZ) {
+    const kid = (l as { kunde_id?: string | null }).kunde_id
+    if (!kid) continue
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: 'Kunde',
+      lead_id: l.id,
+      angebot_id: null,
+      auftrag_id: null,
+      auftrag_netto: 0,
+    })
+  }
+  for (const a of angeboteZ) {
+    const kid = a.kunde_id as string | null
+    if (!kid) continue
+    kundenRows.push({
+      kunde_id: kid,
+      kunde_name: 'Kunde',
+      lead_id: (a.lead_id as string | null) ?? null,
+      angebot_id: String(a.id),
+      auftrag_id: null,
+      auftrag_netto: 0,
+    })
+  }
   for (const a of auftraegeZ) {
     const kid = a.kunde_id as string | null
     if (!kid) continue
-    if (String(a.status ?? '') === 'storniert') continue
     const k = Array.isArray(a.kunden) ? a.kunden[0] : a.kunden
     const name = k ? kundeDisplayName(k as never) : 'Kunde'
     kundenRows.push({
       kunde_id: kid,
       kunde_name: name,
+      lead_id: (a.lead_id as string | null) ?? null,
+      angebot_id: (a.angebot_id as string | null) ?? null,
       auftrag_id: String(a.id),
       auftrag_netto: auftragNetto({ angebote: a.angebote as never }),
     })
   }
-  for (const r of rechnungenZ) {
-    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    const kid = (r.kunde_id ?? '').trim()
-    if (!kid) continue
-    const k = Array.isArray(r.kunden) ? r.kunden[0] : r.kunden
-    const name = k ? kundeDisplayName(k as never) : 'Kunde'
-    kundenRows.push({
-      kunde_id: kid,
-      kunde_name: name,
-      rechnung_id: r.id,
-      rechnung_netto: Number(r.netto) || 0,
-    })
+
+  // Namen für Kunden nachziehen aus Aufträgen
+  const nameByKunde = new Map<string, string>()
+  for (const r of kundenRows) {
+    if (r.kunde_name !== 'Kunde') nameByKunde.set(r.kunde_id, r.kunde_name)
   }
-  const rankingKunden = buildKundenRanking(kundenRows)
+  const rankingKunden = buildKundenRanking(
+    kundenRows.map((r) => ({
+      ...r,
+      kunde_name: nameByKunde.get(r.kunde_id) ?? r.kunde_name,
+    }))
+  )
 
   return (
     <DashboardClient
       vorname={vorname}
-      zeitraumFilter={zeitraumFilter}
+      zeitraum={zeitraum}
       kpis={kpis}
       marketing={marketing}
       umsatzMonate={umsatzMonate}
@@ -422,12 +391,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { zeitraum?: string; von?: string; bis?: string }
+  searchParams: { zeitraum?: string }
 }) {
-  const zeitraumFilter = parseDashboardZeitraum(
-    searchParams?.zeitraum,
-    searchParams?.von,
-    searchParams?.bis
-  )
-  return <DashboardData zeitraumFilter={zeitraumFilter} />
+  const zeitraum = parseDashboardZeitraum(searchParams?.zeitraum)
+  return <DashboardData zeitraum={zeitraum} />
 }

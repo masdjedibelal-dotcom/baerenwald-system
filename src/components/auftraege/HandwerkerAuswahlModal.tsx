@@ -1,12 +1,13 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
+import { FormSheet } from '@/components/ui/FormSheet'
 import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   assignAuftragHandwerkerPosition,
   listHandwerkerAuswahlFuerGewerk,
@@ -53,7 +54,7 @@ function HandwerkerPickRow({
           {h.verfuegbar ? 'Verfügbar' : 'Im Einsatz'}
         </span>
       </div>
-      <Button type="button" variant="primary" size="sm" disabled={disabled} onClick={onAdd}>
+      <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={onAdd}>
         Hinzufügen
       </Button>
     </div>
@@ -115,6 +116,7 @@ export function HandwerkerAuswahlModal({
   /** Nach erfolgreicher Zuweisung: Partner-Mail-Vorschau öffnen */
   onMailOpen: (mail: HandwerkerZuweisungMailTarget) => void
 }) {
+  const isMobile = useIsMobile()
   const [, startTransition] = useTransition()
   const [loading, setLoading] = useState(false)
   const [listErr, setListErr] = useState<string | null>(null)
@@ -171,6 +173,12 @@ export function HandwerkerAuswahlModal({
 
   const leistungLabel = target?.position.leistung_name ?? 'Leistung'
 
+  const footer = (
+    <Button type="button" variant="secondary" onClick={onClose}>
+      Schließen
+    </Button>
+  )
+
   const body = (
     <div className="hw-pick-modal auftrag-pos-compact">
       <p className="hw-pick-intro">
@@ -181,9 +189,9 @@ export function HandwerkerAuswahlModal({
         ) : null}
       </p>
 
-      {listErr ? <p className="mb-2 text-[length:var(--fs-text)] text-danger">{listErr}</p> : null}
+      {listErr ? <p className="mb-2 text-sm text-danger">{listErr}</p> : null}
       {loading ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Handwerker werden geladen…</p>
+        <p className="text-sm text-bw-text-muted">Handwerker werden geladen…</p>
       ) : (
         <div className="max-h-[min(56vh,480px)] space-y-2 overflow-y-auto pr-0.5">
           <HandwerkerPickAccordion
@@ -210,9 +218,17 @@ export function HandwerkerAuswahlModal({
     </div>
   )
 
+  if (isMobile) {
+    return (
+      <FormSheet open={open} onClose={onClose} breadcrumb="Auftrag" title="Handwerker wählen" footer={footer}>
+        {body}
+      </FormSheet>
+    )
+  }
+
   return (
-    <EditorSheet open={open} onClose={onClose} title="Partner" context="detail" size="md">
+    <Modal open={open} onClose={onClose} title="Handwerker wählen" size="md" footer={footer}>
       {body}
-    </EditorSheet>
+    </Modal>
   )
 }

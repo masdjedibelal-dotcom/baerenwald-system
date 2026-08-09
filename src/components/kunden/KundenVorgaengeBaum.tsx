@@ -127,7 +127,12 @@ export function KundenVorgaengeBaum({ kunde }: Props) {
 
   if (!baeume.length) {
     return (
-      <p className="py-4 text-center text-sm text-bw-text-muted">Noch keine Vorgänge.</p>
+      <p className="py-4 text-center text-sm text-bw-text-muted">
+        Noch keine Vorgänge.{' '}
+        <Link href={`/anfragen/neu?kunde_id=${kunde.id}`} className="text-bw-link hover:underline">
+          Anfrage anlegen
+        </Link>
+      </p>
     )
   }
 

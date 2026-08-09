@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -11,26 +11,24 @@ import {
   previewKundenPortalMail,
   sendKundenPortalLinkMail,
 } from '@/app/actions/mails'
+import { KUNDE_MAIL_BCC_HINT } from '@/lib/mail-constants'
 import { parseEmailTokens } from '@/lib/email-recipients'
 
 /**
  * Modal „Kundenportal-Link versenden“:
- * Vorschau + An/CC/Betreff/Text + Versenden (Kundenportal-Link).
+ * Vorschau + An/CC/Betreff/Text + Versenden (MeinBärenwald-Einladung).
  */
 export function KundenportalLinkVersendenModal({
   open,
   onClose,
   kundeId,
   fallbackEmail,
-  onSent,
 }: {
   open: boolean
   onClose: () => void
   kundeId: string | null | undefined
   /** Wenn Draft keine Mail hat, z. B. Lead-Kontakt */
   fallbackEmail?: string | null
-  /** Nach erfolgreichem Versand (z. B. Stammdaten-Portal-Zeile → „eingeladen“) */
-  onSent?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -112,7 +110,6 @@ export function KundenportalLinkVersendenModal({
       return
     }
     toast.success('Kundenportal-Link versendet')
-    onSent?.()
     onClose()
   }
 
@@ -122,7 +119,7 @@ export function KundenportalLinkVersendenModal({
       onClose={onClose}
       icon="send"
       title="Kundenportal-Link versenden"
-      sub="Einladung mit Login-Link und Vorschau"
+      sub="MeinBärenwald-Einladung mit Vorschau"
       footer={
         <>
           <MockBtn sm kind="ghost" onClick={onClose} disabled={sending}>
@@ -160,31 +157,18 @@ export function KundenportalLinkVersendenModal({
             emails={mailCc}
             onChange={setMailCc}
             placeholder="weitere@beispiel.de"
+            hint={`Optional — ${KUNDE_MAIL_BCC_HINT}`}
             disabled={sending}
           />
-          <KiAssistFieldLabel
-            label="Betreff"
-            value={betreff}
-            onApply={setBetreff}
-            extraHint={`Portal-Einladung. Anrede: ${anrede}.`}
-            multiline={false}
-            required
-            disabled={sending}
-          >
+          <MockField label="Betreff" full required>
             <input
               className="txt"
               value={betreff}
               onChange={(e) => setBetreff(e.target.value)}
               disabled={sending}
             />
-          </KiAssistFieldLabel>
-          <KiAssistFieldLabel
-            label="Text"
-            value={text}
-            onApply={setText}
-            extraHint="Portal-Einladungsmail an den Kunden."
-            disabled={sending}
-          >
+          </MockField>
+          <MockField label="Text" full>
             <textarea
               className="ta"
               rows={5}
@@ -192,7 +176,7 @@ export function KundenportalLinkVersendenModal({
               onChange={(e) => setText(e.target.value)}
               disabled={sending}
             />
-          </KiAssistFieldLabel>
+          </MockField>
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>
               Mail-Vorschau
@@ -211,15 +195,9 @@ export function KundenportalLinkVersendenModal({
             />
           </div>
           {portalLink ? (
-            <div>
-              <div className="field-label" style={{ marginBottom: 6 }}>
-                Portal-Login
-              </div>
+            <MockField label="Portal-Login" full hint="Button in der Mail führt auf diese Adresse.">
               <input className="txt" value={portalLink} readOnly />
-              <p className="field-hint" style={{ marginTop: 6 }}>
-                Button in der Mail führt auf diese Adresse.
-              </p>
-            </div>
+            </MockField>
           ) : null}
         </div>
       )}

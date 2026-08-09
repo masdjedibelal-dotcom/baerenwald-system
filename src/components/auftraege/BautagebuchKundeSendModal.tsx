@@ -1,11 +1,10 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useCallback, useEffect, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { useCallback, useEffect, useState, useTransition } from 'react'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
+import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
@@ -19,27 +18,6 @@ import { defaultBautagebuchKundenNachricht } from '@/lib/mail/bautagebuch-kunden
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
 
-function VersandFooter({
-  pending,
-  onSubmit,
-}: {
-  pending: boolean
-  onSubmit: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="kunde-create-footer">
-      <button type="button" className="btn ghost" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="send" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : 'Senden'}
-      </MockBtn>
-    </div>
-  )
-}
-
-/** Bautagebuch an Kunden — EditorSheet Split-over (Mock Surface B). */
 export function BautagebuchKundeSendModal({
   open,
   onClose,
@@ -64,13 +42,11 @@ export function BautagebuchKundeSendModal({
   const [mailTo, setMailTo] = useState<string[]>([])
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailReady, setMailReady] = useState(false)
-  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     if (!open || !eintrag) return
     setPreviewHtml(null)
     setMailReady(false)
-    setDirty(false)
     void getBautagebuchMailDefaults(auftragId, eintrag.id).then((r) => {
       if (!r.ok) {
         toast.error(r.message)
@@ -86,25 +62,28 @@ export function BautagebuchKundeSendModal({
     })
   }, [open, auftragId, eintrag])
 
-  const refreshPreview = useCallback(() => {
-    if (!mailReady || !eintrag || !betreff.trim() || !nachricht.trim()) return
-    startTransition(async () => {
-      const r = await previewBautagebuchKundenMail({
-        auftragId,
-        eintragId: eintrag.id,
-        betreff,
-        nachricht,
-        anrede,
+  const refreshPreview = useCallback(
+    () => {
+      if (!mailReady || !eintrag || !betreff.trim() || !nachricht.trim()) return
+      startTransition(async () => {
+        const r = await previewBautagebuchKundenMail({
+          auftragId,
+          eintragId: eintrag.id,
+          betreff,
+          nachricht,
+          anrede,
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        setPreviewHtml(r.html)
+        if (mailTo.length === 0 && r.defaultTo.length) setMailTo(r.defaultTo)
+        if (mailCc.length === 0 && r.defaultCc.length) setMailCc(r.defaultCc)
       })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setPreviewHtml(r.html)
-      if (mailTo.length === 0 && r.defaultTo.length) setMailTo(r.defaultTo)
-      if (mailCc.length === 0 && r.defaultCc.length) setMailCc(r.defaultCc)
-    })
-  }, [mailReady, betreff, nachricht, anrede, auftragId, eintrag, mailTo.length, mailCc.length])
+    },
+    [mailReady, betreff, nachricht, anrede, auftragId, eintrag, mailTo.length, mailCc.length]
+  )
 
   useEffect(() => {
     if (!open || !mailReady) return
@@ -115,7 +94,6 @@ export function BautagebuchKundeSendModal({
     if (!eintrag) return
     setAnrede(next)
     setNachricht(defaultBautagebuchKundenNachricht(next, eintrag, projektTitel || kundeName))
-    setDirty(true)
   }
 
   function senden() {
@@ -142,7 +120,6 @@ export function BautagebuchKundeSendModal({
         return
       }
       toast.success('Eintrag veröffentlicht und E-Mail gesendet')
-      setDirty(false)
       onSent()
       onClose()
     })
@@ -151,40 +128,36 @@ export function BautagebuchKundeSendModal({
   if (!eintrag) return null
 
   return (
-    <EditorSheet
+    <Modal
       open={open}
       onClose={onClose}
-      title="Versand"
-      crumb="Bautagebuch >"
-      context="detail"
-      dirty={dirty}
+      title="Kunden-Vorschau & versenden"
       size="lg"
-      compose
-      composeLabel="Senden"
-      onConfirm={senden}
-      confirmBusy={pending}
-      footer={<VersandFooter pending={pending} onSubmit={senden} />}
+      footer={
+        <ModalFormFooter
+          onCancel={onClose}
+          onSubmit={senden}
+          submitLabel="Veröffentlichen & senden"
+          loading={pending}
+        />
+      }
     >
       <div className="space-y-4">
-        <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
-          <strong>{eintrag.titel}</strong> · {kundeName}
+        <p className="text-sm text-bw-text-muted">
+          <strong>{eintrag.titel}</strong> — E-Mail an <strong>{kundeName}</strong> mit Gewerk-Phase und
+          Bautagebuch-Update.
         </p>
 
         <AngebotWizardVersandEmpfaengerCard
           mailTo={mailTo}
-          onMailToChange={(v) => {
-            setMailTo(v)
-            setDirty(true)
-          }}
+          onMailToChange={setMailTo}
           mailCc={mailCc}
-          onMailCcChange={(v) => {
-            setMailCc(v)
-            setDirty(true)
-          }}
+          onMailCcChange={setMailCc}
           disabled={pending}
+          dokumentLabel="Projekt-Update"
         />
 
-        <div className="flex gap-4 border-b border-bw-border pb-4 text-[length:var(--fs-text)]">
+        <div className="flex gap-4 border-b border-bw-border pb-4 text-sm">
           <label className="flex items-center gap-2">
             <input type="radio" checked={anrede === 'sie'} onChange={() => onAnredeChange('sie')} />
             Sie
@@ -195,53 +168,23 @@ export function BautagebuchKundeSendModal({
           </label>
         </div>
 
-        <KiAssistFieldLabel
-          label="Betreff"
-          value={betreff}
-          onApply={(text) => {
-            setBetreff(text)
-            setDirty(true)
-          }}
-          extraHint={`Bautagebuch-Mail an ${kundeName}.`}
-          multiline={false}
-        >
-          <Input
-            value={betreff}
-            onChange={(e) => {
-              setBetreff(e.target.value)
-              setDirty(true)
-            }}
-          />
-        </KiAssistFieldLabel>
+        <Input label="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
 
         {previewHtml ? (
           <CollapsibleMailPreview previewHtml={previewHtml} />
         ) : mailReady ? (
-          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">
-            E-Mail-Vorschau wird geladen…
-          </p>
+          <p className="py-6 text-center text-[13px] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
         ) : null}
 
-        <KiAssistFieldLabel
+        <Textarea
           label="Nachricht"
+          plain
+          rows={6}
           value={nachricht}
-          onApply={(text) => {
-            setNachricht(text)
-            setDirty(true)
-          }}
-          extraHint={`Bautagebuch-Mailtext. Anrede: ${anrede}.`}
-        >
-          <Textarea
-            plain
-            rows={6}
-            value={nachricht}
-            onChange={(e) => {
-              setNachricht(e.target.value)
-              setDirty(true)
-            }}
-          />
-        </KiAssistFieldLabel>
+          onChange={(e) => setNachricht(e.target.value)}
+          hint="Begrüßung, Gewerk-Phase und Update werden automatisch ergänzt — hier den Fließtext anpassen."
+        />
       </div>
-    </EditorSheet>
+    </Modal>
   )
 }

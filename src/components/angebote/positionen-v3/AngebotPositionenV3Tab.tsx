@@ -1,9 +1,8 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { useMemo, useState, useTransition } from 'react'
+import { ClipboardList, Plus, Trash2, X } from 'lucide-react'
+import { EmptyState } from '@/components/layout/EmptyState'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
@@ -45,7 +44,7 @@ function FreitextRow({ entry }: { entry: Extract<AngebotBlockPdfEntry, { kind: '
           {entry.freitext.text ? (
             <RichTextContent
               html={entry.freitext.text}
-              className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted"
+              className="mt-0.5 text-xs text-bw-text-muted"
             />
           ) : null}
         </div>
@@ -217,10 +216,10 @@ export function AngebotPositionenV3Tab({
   if (!editable && !anzeigePositionen.length) {
     return (
       <div className="pos-v3">
-        <MockEmpty
-          icon="clipboard-list"
+        <EmptyState
+          icon={ClipboardList}
           title="Noch keine Positionen"
-          hint="Dieses Angebot enthält noch keine Leistungen."
+          description="Dieses Angebot enthält noch keine Leistungen."
         />
       </div>
     )
@@ -229,10 +228,10 @@ export function AngebotPositionenV3Tab({
   if (editable && !anzeigePositionen.length && extraBlocks.length === 0) {
     return (
       <div className="pos-v3">
-        <MockEmpty
-          icon="clipboard-list"
+        <EmptyState
+          icon={ClipboardList}
           title="Noch keine Gewerke"
-          hint="Lege zuerst ein Gewerk an und füge danach Positionen hinzu."
+          description="Legen Sie zuerst ein Gewerk an und fügen Sie danach Positionen hinzu."
           action={
             <AuftragGewerkAddRow
               gewerke={gewerkOpts}
@@ -253,6 +252,7 @@ export function AngebotPositionenV3Tab({
       </div>
     )
   }
+
 
   return (
     <div className="pos-v3">
@@ -305,7 +305,7 @@ export function AngebotPositionenV3Tab({
 
       {editable && selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
-          <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{selectedCount} ausgewählt</span>
+          <span className="text-sm font-medium text-bw-text">{selectedCount} ausgewählt</span>
           <Button type="button" variant="danger" size="sm" disabled={disabled} onClick={bulkDelete}>
             <Trash2 className="h-4 w-4" />
             Entfernen

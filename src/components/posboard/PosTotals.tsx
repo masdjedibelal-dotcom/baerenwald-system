@@ -7,22 +7,19 @@ export function PosTotals({
   ust,
   brutto,
   showUst = true,
-  ustLabel = 'MwSt 19%',
   className,
 }: {
   netto: number
   ust: number
   brutto: number
   showUst?: boolean
-  /** z. B. „MwSt 0% (§13b)“ bei Reverse Charge */
-  ustLabel?: string
   className?: string
 }) {
   const su = showUst !== false
   const row: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: 'var(--fs-text)',
+    fontSize: 13,
   }
 
   return (
@@ -35,11 +32,11 @@ export function PosTotals({
         marginLeft: 'auto',
         maxWidth: 300,
         marginTop: 12,
-        padding: '10px 2px 2px',
-        background: 'transparent',
-        border: 'none',
-        borderRadius: 0,
-        boxShadow: 'none',
+        padding: '12px 14px',
+        background: 'var(--card)',
+        border: '0.5px solid var(--border)',
+        borderRadius: 10,
+        boxShadow: 'var(--shadow)',
       }}
     >
       {su ? (
@@ -49,7 +46,7 @@ export function PosTotals({
             <b style={{ fontVariantNumeric: 'tabular-nums' }}>{formatEurBetrag(netto)}</b>
           </div>
           <div style={row}>
-            <span style={{ color: 'var(--text-3)' }}>{ustLabel}</span>
+            <span style={{ color: 'var(--text-3)' }}>MwSt 19%</span>
             <b style={{ fontVariantNumeric: 'tabular-nums' }}>{formatEurBetrag(ust)}</b>
           </div>
         </>
@@ -58,7 +55,7 @@ export function PosTotals({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          fontSize: 'var(--fs-title)',
+          fontSize: 15,
           paddingTop: su ? 6 : 0,
           borderTop: su ? '0.5px solid var(--border)' : 'none',
         }}

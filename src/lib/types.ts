@@ -89,11 +89,6 @@ export type Kunde = {
   freigabe_modus?: FreigabeModus | null
   freigabe_schwelle_eur?: number | null
   notfall_direkt?: boolean | null
-  /** HV: Kleinreparaturen bis Schwelle ohne vorheriges Angebot */
-  kleinreparaturen_ohne_angebot?: boolean | null
-  /** Spam: kein Rechner, kein Portal-Login/-Register mit dieser E-Mail */
-  ist_spam?: boolean | null
-  spam_markiert_am?: string | null
 }
 
 /** WEG / Gebäude unter Gewerbe- oder Hausverwaltungs-Kunden */
@@ -112,10 +107,6 @@ export type KundenObjekt = {
   einheiten_hinweis?: string | null
   notizen_intern?: string | null
   created_by?: 'crm' | 'portal' | null
-  /** Override Org-Schwelle; null = erben */
-  freigabe_schwelle_eur?: number | null
-  /** Override Org-Notfall-Direkt; null = erben */
-  notfall_direkt?: boolean | null
 }
 
 export type KundenNotizRow = {
@@ -217,32 +208,17 @@ export type Lead = {
   einladung_token?: string | null
   einladung_status?: EinladungStatus | null
   org_freigabe_status?: OrgFreigabeStatus | null
-  /** Q5: schwelle | akut wenn nicht_noetig durch Bypass */
-  freigabe_bypass_grund?: 'schwelle' | 'akut' | null
   service_modus?: ServiceModus | null
   /** HV-Plattform: Meldungs-Workflow-Status */
   hv_meldung_status?: string | null
   kostentraeger?: string | null
   kostentraeger_vorgeschlagen?: boolean | null
   versicherungs_nr?: string | null
-  duplikat_hinweis?: boolean | null
-  /** Nutzer hat Duplikat-Band geschlossen — Zusammenführen bleibt im ⋯ */
-  duplikat_band_dismissed?: boolean | null
-  /** Spec zusammengefuehrtIn — Ziel-Lead; duplikat_hinweis bleibt Vorstufe */
-  zusammengefuehrt_in?: string | null
-  /** Soft-delete; Listen filtern geloescht_am IS NULL */
-  geloescht_am?: string | null
-  /** Spec Wiedervorlage (lokal am Vorgang) */
-  wiedervorlage_datum?: string | null
-  wiedervorlage_notiz?: string | null
-  /** CACHE only — Phase aus Existenz Angebot/Auftrag/RE ableiten, nie als einzige Quelle */
   vorgang_phase?: string | null
   melde_tracking_token?: string | null
+  duplikat_hinweis?: boolean | null
   /** Bauprojekt — erweiterte Unterlagen & Bautagesberichte */
   ist_bauprojekt?: boolean
-  /** Bestand: wiederkehrende Leistung */
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
   ki_session_id?: string | null
   ki_zusammenfassung?: string | null
   erstellt_von: string | null
@@ -254,7 +230,6 @@ export type Lead = {
 
 export type LeadWithAngebote = Lead & {
   angebote?: LeadListAngebot[] | null
-  auftraggeber?: LeadAuftraggeberEmbed | null
 }
 
 export type LeadTimelineRow = {
@@ -283,25 +258,7 @@ export type OrgFreigabeLogRow = {
 
 export type LeadAuftraggeberEmbed = Pick<
   Kunde,
-  | 'id'
-  | 'name'
-  | 'vorname'
-  | 'nachname'
-  | 'email'
-  | 'telefon'
-  | 'plz'
-  | 'ort'
-  | 'strasse'
-  | 'hausnummer'
-  | 'typ'
-  | 'org_anzeigename'
-  | 'org_kennung'
-  | 'ansprechpartner'
-  | 'webseite'
-  | 'portal_modus'
-  | 'freigabe_modus'
-  | 'freigabe_schwelle_eur'
-  | 'notfall_direkt'
+  'id' | 'name' | 'email' | 'org_anzeigename' | 'org_kennung'
 >
 
 /** Lead inkl. Status-Historie (Detailansicht) */
@@ -352,14 +309,10 @@ export type AngebotPosition = {
   gewerk_slug?: string
   /** Abschnitt im Projektangebot (mehrere Blöcke pro Gewerk möglich) */
   gewerk_block_key?: string
-  /** interne Zuordnung Preisliste / Katalog-Variante (Snapshot-Herkunft) */
+  /** interne Zuordnung Preisliste */
   leistung: string
   leistung_id?: string
   leistung_name?: string
-  /** Katalog-Variante (nullable) — Snapshot bleibt bei Katalog-Preisänderung stabil */
-  variante_id?: string | null
-  /** katalog = aus Katalog übernommen; frei = manuell (für KI-Lernsignale) */
-  position_quelle?: 'katalog' | 'frei' | string | null
   /** Kundentext / Gesamtwerk, nicht nur Handwerksleistung */
   beschreibung: string
   /** Festpreis Lohn netto / Einheit */
@@ -391,15 +344,6 @@ export type AngebotPosition = {
   kostenart?: 'leistung' | 'anfahrt'
   /** PDF: Ausführung über Fachbetrieb (aus Gewerk.ausfuehrung) */
   ist_fachbetrieb?: boolean
-  /**
-   * festpreis = feste Menge×Preis · aufwand = Regie (Stunden×Satz, Final vom Handwerker).
-   * Sync → auftrag_positionen.verguetung / typ=regie
-   */
-  verguetung?: 'festpreis' | 'aufwand' | string | null
-  /** Bei Regie: geschätzte Stunden (oft = menge) */
-  geschaetzt_std?: number | null
-  /** Bei Regie: €/h netto (oft = vk_netto) */
-  stundensatz?: number | null
 }
 
 export type RechnungPosition = AngebotPosition
@@ -449,17 +393,6 @@ export type Angebot = {
   gueltig_bis?: string | null
   /** einfach | projekt — Layout & Zusatzfelder */
   dokument_typ?: 'einfach' | 'projekt' | null
-  /** Bestand: wiederkehrendes Angebot */
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
-  /** Unverbindlicher Zahlplan-Vorschlag (Spec Q2) — Entscheidung im RE-Flow */
-  zahlungsplan?: unknown
-  /** Spec Ketten */
-  ersetzt_durch?: string | null
-  korrektur_von?: string | null
-  korrektur_art?: 'ueberarbeitet' | string | null
-  wiedervorlage_datum?: string | null
-  wiedervorlage_notiz?: string | null
   projektbeschreibung?: string | null
   /** Öffentliche Bild-URLs (JSON-Array in DB) */
   fotos_urls?: string[] | unknown | null
@@ -481,9 +414,6 @@ export type Angebot = {
     | 'ersetzt'
     | string
     | null
-  /** V2: Freigabe-Erforderlich-Snapshot (CRM berechnet, Portal liest) */
-  org_freigabe_erforderlich?: boolean | null
-  org_freigabe_berechnet_at?: string | null
   /** Erster / letzter Versand an Kunde */
   gesendet_am?: string | null
   /** Automatische Nachfass-Mail */
@@ -530,10 +460,6 @@ export type AngebotHandwerkerRow = {
   hw_angebot_anhang_urls?: string[] | null
   hw_rechnung_pdf_url?: string | null
   hw_rechnung_eingereicht_at?: string | null
-  /** eingereicht | bezahlt | abgelehnt — NULL = eingereicht wenn PDF vorhanden */
-  hw_rechnung_status?: string | null
-  hw_rechnung_bezahlt_at?: string | null
-  hw_rechnung_betrag_brutto?: number | null
   hw_eingereicht_at?: string | null
   hw_status?: string | null
   hw_notiz?: string | null
@@ -545,9 +471,6 @@ export type AngebotHandwerkerRow = {
     name: string
     email: string | null
     telefon: string | null
-    iban?: string | null
-    steuernummer?: string | null
-    ustid?: string | null
   } | null
   gewerke?: {
     id: string
@@ -608,19 +531,6 @@ export type Auftrag = {
   kunden_seite_letzter_aufruf?: string | null
   /** Bauprojekt — Bautagesbericht statt kurzem Bautagebuch */
   ist_bauprojekt?: boolean
-  /** Bestand: wiederkehrender Wartungs-/Service-Auftrag */
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
-  /** Spec letzteAktivitaet — persistiert beim Erledigen einer Position */
-  letzte_aktivitaet?: string | null
-  wiedervorlage_datum?: string | null
-  wiedervorlage_notiz?: string | null
-  /** Positions-IDs, die im Bautagebuch ausgeblendet sind */
-  bautagebuch_hidden_position_ids?: string[] | null
-  /** Notfall-Direktbeauftragung — CRM-Banner (§4) */
-  ist_notfall?: boolean
-  /** Nur aufwand (Spec Q3) */
-  notfall_verguetung?: 'aufwand' | string | null
   /** HV-Plattform: Kostenträger (Rechnung/Versicherungsakte) */
   kostentraeger?: string | null
   versicherungs_nr?: string | null
@@ -724,18 +634,8 @@ export type AuftragPosition = {
   aenderung_typ?: 'neu' | 'geaendert' | 'entfernt' | string | null
   /** Alter preis_partner vor Preisänderung (Netto-Zeile) */
   preis_alt?: number | null
-  /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt / Spec-status */
+  /** offen | in_arbeit | erledigt — preisgewichteter Fortschritt */
   leistung_status?: string | null
-  /** lv | regie | material */
-  typ?: string | null
-  /** festpreis | aufwand */
-  verguetung?: string | null
-  geschaetzt_std?: number | null
-  stundensatz?: number | null
-  gestartet_am?: string | null
-  erledigt_am?: string | null
-  /** Weitere Arbeit / Regie: nicht_noetig | in_pruefung | anerkannt | abgelehnt */
-  anerkennung_status?: string | null
   absprachen?: string | null
   notizen_intern?: string | null
   sort_order: number | null
@@ -799,7 +699,6 @@ export type AuftragTimelineEvent = {
   sichtbar_fuer_kunde: boolean
   fuer_kunde_freigegeben?: boolean
   freigegeben_at?: string | null
-  email_log_id?: string | null
   created_at: string
 }
 
@@ -1038,10 +937,6 @@ export type Handwerker = {
   iban: string | null
   partner_kategorie_id: string | null
   adresse: string | null
-  strasse?: string | null
-  hausnummer?: string | null
-  plz?: string | null
-  ort?: string | null
   aktiv: boolean
   notizen: string | null
   created_at: string
@@ -1055,11 +950,6 @@ export type Handwerker = {
   partner_kategorien?: PartnerKategorie | null
   partner_dokumente?: PartnerDokument[] | null
   auth_user_id?: string | null
-  /** partner = aus Tabelle partner migriert; null/handwerker = nativ */
-  herkunft?: 'handwerker' | 'partner' | string | null
-  /** Partner vom Portal ausgeschlossen — Login/Register gesperrt */
-  ist_portal_gesperrt?: boolean | null
-  portal_gesperrt_am?: string | null
 }
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'
@@ -1094,23 +984,9 @@ export type KalenderTermin = {
   id: string
   lead_id: string | null
   auftrag_id: string | null
-  kunde_id?: string | null
   titel: string
   beschreibung: string | null
-  /** Kategorie-Slug (z. B. vor_ort, abnahme) — Legacy: besichtigung, beginn, intern */
-  typ:
-    | 'besichtigung'
-    | 'beginn'
-    | 'abnahme'
-    | 'sonstiges'
-    | 'intern'
-    | 'vor_ort'
-    | 'kundentermin'
-    | 'projekttermin'
-    | 'aufmass'
-    | 'kundengespraech'
-    | 'allgemein'
-    | 'privat'
+  typ: 'besichtigung' | 'beginn' | 'abnahme' | 'sonstiges' | 'intern'
   datum: string
   uhrzeit_von: string | null
   uhrzeit_bis: string | null
@@ -1123,30 +999,6 @@ export type KalenderTermin = {
     titel: string | null
     kunden?: { name: string } | null
   } | null
-}
-
-export type TodoPrioritaet = 'niedrig' | 'normal' | 'hoch'
-
-export type CrmTodo = {
-  id: string
-  titel: string
-  beschreibung: string | null
-  erledigt: boolean
-  erledigt_at: string | null
-  faellig_am: string | null
-  prioritaet: TodoPrioritaet
-  zugewiesen_an: string | null
-  kunde_id: string | null
-  lead_id: string | null
-  auftrag_id: string | null
-  handwerker_id: string | null
-  created_by: string | null
-  created_at: string
-  updated_at: string
-  kunden?: { id: string; name: string | null } | null
-  leads?: { id: string; kontakt_name: string | null } | null
-  auftraege?: { id: string; titel: string | null } | null
-  handwerker?: { id: string; name: string | null; firma: string | null } | null
 }
 
 export type FormularSubtyp =
@@ -1252,23 +1104,11 @@ export type Rechnung = {
   rechnungsnummer: string
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
-  /** Spec Ketten */
-  ersetzt_durch?: string | null
-  korrektur_von?: string | null
-  korrektur_art?: 'ersetzt' | 'gutschrift' | string | null
-  /** Spec Rate-Reklamation — strittig ohne Statuswechsel */
-  reklamation_am?: string | null
-  reklamation_grund?: string | null
-  wiedervorlage_datum?: string | null
-  wiedervorlage_notiz?: string | null
   reverse_charge_13b?: boolean
   hinweis_35a?: boolean | null
   mwst_aufschluesselung?: MwstAufschluesselungJson[] | null
   status: RechnungStatus
   positionen: RechnungPosition[]
-  /** Bestand: Abrechnung zu wiederkehrendem Auftrag */
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
   lohn_netto: number | null
   material_netto: number | null
   netto: number | null
@@ -1291,27 +1131,7 @@ export type Rechnung = {
   erstellt_von: string | null
   created_at: string
   updated_at: string
-  kunden?:
-    | Kunde
-    | Pick<
-        Kunde,
-        | 'id'
-        | 'name'
-        | 'email'
-        | 'telefon'
-        | 'adresse'
-        | 'strasse'
-        | 'hausnummer'
-        | 'plz'
-        | 'ort'
-        | 'typ'
-        | 'ust_id'
-        | 'vorname'
-        | 'nachname'
-        | 'ansprechpartner'
-        | 'webseite'
-      >
-    | null
+  kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ' | 'ust_id'> | null
   angebote?: Pick<
     Angebot,
     'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max' | 'leistungsumfang' | 'notizen'

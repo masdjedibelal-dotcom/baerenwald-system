@@ -1,5 +1,5 @@
 /**
- * CRM → Portal: Lead-Phase nach Angebot-Versand / Auftrag abgeschlossen/storniert.
+ * CRM → Portal: Lead-Phase nach Auftrag abgeschlossen/storniert.
  * Shared DB: lokal leads patchen + optional Portal-Notify via internal API.
  * @see handwerks-plattform/src/lib/vorgang/sync-lead-from-crm.ts
  * @see handwerks-plattform/src/app/api/internal/sync-lead-phase/route.ts
@@ -8,10 +8,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AuftragStatus } from '@/lib/types'
 
-type SyncEvent =
-  | 'angebot_gesendet'
-  | 'auftrag_abgeschlossen'
-  | 'auftrag_storniert'
+type SyncEvent = 'auftrag_abgeschlossen' | 'auftrag_storniert'
 
 function partnerSiteBaseUrl(): string {
   return (
@@ -28,15 +25,11 @@ function eventForStatus(status: string): SyncEvent | null {
   return null
 }
 
-/** Gleiche Semantik wie Portal syncLeadFromCrm. */
+/** Gleiche Semantik wie Portal syncLeadFromCrm für Abschluss/Storno. */
 function leadPatchForEvent(event: SyncEvent): {
   vorgang_phase: string
-  hv_meldung_status?: string
-  status?: string
+  hv_meldung_status: string
 } {
-  if (event === 'angebot_gesendet') {
-    return { vorgang_phase: 'in_bearbeitung', status: 'angebot' }
-  }
   if (event === 'auftrag_abgeschlossen') {
     return { vorgang_phase: 'abgeschlossen', hv_meldung_status: 'abgeschlossen' }
   }
@@ -88,38 +81,6 @@ async function notifyPortalSyncLeadPhase(input: {
 }
 
 /**
- * Nach Angebotsversand an den Kunden: Lead → Status „Angebot“, Portal-Flow „Angebot“.
- */
-export async function syncPortalLeadStatusAfterAngebotGesendet(input: {
-  leadId: string
-  skipMieterMail?: boolean
-}): Promise<void> {
-  try {
-    const leadId = input.leadId.trim()
-    if (!leadId) return
-    const skipMieterMail = input.skipMieterMail !== false
-    const event: SyncEvent = 'angebot_gesendet'
-    const patch = leadPatchForEvent(event)
-
-    const update: Record<string, unknown> = {
-      vorgang_phase: patch.vorgang_phase,
-      updated_at: new Date().toISOString(),
-    }
-    if (patch.status) update.status = patch.status
-
-    const { error: upErr } = await supabaseAdmin.from('leads').update(update).eq('id', leadId)
-    if (upErr) {
-      console.error('[syncPortalLeadStatus] Angebot Lead-Update:', upErr.message)
-    }
-
-    await notifyPortalSyncLeadPhase({ leadId, event, skipMieterMail })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error('[syncPortalLeadStatus] angebot_gesendet', msg)
-  }
-}
-
-/**
  * Nach Auftragsabschluss/-storno: Portal-Lead (HV) synchronisieren.
  * Fehler blockieren den Auftrag-Update nie.
  */
@@ -164,13 +125,14 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
     if (!(lead.auftraggeber_kunde_id as string | null)?.trim()) return
 
     const patch = leadPatchForEvent(event)
+    // Storno: hv_meldung_status nur patchen wenn schon HV-Status vorhanden
     const update: Record<string, unknown> = {
       vorgang_phase: patch.vorgang_phase,
       updated_at: new Date().toISOString(),
     }
     const prevHv = (lead.hv_meldung_status as string | null)?.trim()
     if (event === 'auftrag_abgeschlossen' || prevHv) {
-      if (patch.hv_meldung_status) update.hv_meldung_status = patch.hv_meldung_status
+      update.hv_meldung_status = patch.hv_meldung_status
     }
 
     const { error: upErr } = await supabaseAdmin.from('leads').update(update).eq('id', leadId)

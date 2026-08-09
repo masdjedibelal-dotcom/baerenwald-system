@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   buildHandwerkerStammDbPayload,
   validateHandwerkerStammPflicht,
@@ -16,9 +15,6 @@ import {
 } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
 
-/** Lange Auth-Sperre (gleiche Dauer wie bei Spam-Kunden / deaktivierten CRM-Mitarbeitern). */
-const AUTH_BAN_DURATION = '876600h'
-
 export type HandwerkerFormInput = {
   firma: string | null
   vorname: string | null
@@ -28,10 +24,6 @@ export type HandwerkerFormInput = {
   whatsapp: string | null
   webseite: string | null
   adresse: string | null
-  strasse?: string | null
-  hausnummer?: string | null
-  plz?: string | null
-  ort?: string | null
   gewerke: string[]
   subkategorie: string | null
   ist_fachbetrieb: boolean
@@ -70,10 +62,6 @@ export async function createHandwerker(
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
-      strasse: input.strasse?.trim() || null,
-      hausnummer: input.hausnummer?.trim() || null,
-      plz: input.plz?.trim() || null,
-      ort: input.ort?.trim() || null,
       gewerke: input.gewerke,
       subkategorie: input.subkategorie?.trim() || null,
       ist_fachbetrieb: input.ist_fachbetrieb,
@@ -112,10 +100,6 @@ export async function updateHandwerker(
       whatsapp: input.whatsapp?.trim() || null,
       webseite: input.webseite?.trim() || null,
       adresse: input.adresse?.trim() || null,
-      strasse: input.strasse?.trim() || null,
-      hausnummer: input.hausnummer?.trim() || null,
-      plz: input.plz?.trim() || null,
-      ort: input.ort?.trim() || null,
       gewerke: input.gewerke,
       subkategorie: input.subkategorie?.trim() || null,
       ist_fachbetrieb: input.ist_fachbetrieb,
@@ -156,7 +140,7 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
       `
       id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
       ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-      adresse, strasse, hausnummer, plz, ort, partner_kategorie_id,
+      adresse, partner_kategorie_id,
       partner_kategorien ( id, name, slug, sort_order )
     `
     )
@@ -214,18 +198,7 @@ export type HandwerkerDetailPayload = {
 const HANDWERKER_DETAIL_SELECT_BASE = `
   id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
   ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-  adresse, strasse, hausnummer, plz, ort, partner_kategorie_id, auth_user_id, ist_portal_gesperrt, portal_gesperrt_am,
-  partner_kategorien ( id, name, slug, sort_order ),
-  partner_dokumente (
-    id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
-    status, freigegeben_am, ablehnung_grund
-  )
-`
-
-const HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL = `
-  id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, gewerke, subkategorie,
-  ist_fachbetrieb, compliance_status, steuernummer, ustid, iban, aktiv, notizen, created_at,
-  adresse, strasse, hausnummer, plz, ort, partner_kategorie_id,
+  adresse, partner_kategorie_id,
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
     id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
@@ -265,13 +238,7 @@ async function fetchHandwerkerDetailRow(
   id: string
 ): Promise<{ data: Handwerker | null; error: { message: string } | null }> {
   const fullSelect = `${HANDWERKER_DETAIL_SELECT_BASE}, ${HANDWERKER_BEWERTUNG_SELECT}`
-  const fullNoPortal = `${HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL}, ${HANDWERKER_BEWERTUNG_SELECT}`
-  const attempts = [
-    fullSelect,
-    fullNoPortal,
-    HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL,
-    HANDWERKER_DETAIL_SELECT_MINIMAL,
-  ]
+  const attempts = [fullSelect, HANDWERKER_DETAIL_SELECT_BASE, HANDWERKER_DETAIL_SELECT_MINIMAL]
 
   let lastError: { message: string } | null = null
   for (const select of attempts) {
@@ -778,8 +745,6 @@ export async function duplicateHandwerker(
   delete payload.created_at
   delete payload.updated_at
   delete payload.auth_user_id
-  delete payload.portal_gesperrt_am
-  payload.ist_portal_gesperrt = false
   payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
   if (payload.email) payload.email = null
 
@@ -792,74 +757,4 @@ export async function duplicateHandwerker(
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
   revalidatePath('/handwerker')
   return { ok: true, id: inserted.id as string }
-}
-
-/**
- * Partner vom Portal ausschließen / wieder freigeben.
- * Gesperrt → kein Login/Register; bestehendes Auth-Konto wird gebannt.
- */
-export async function setHandwerkerPortalGesperrt(
-  handwerkerId: string,
-  gesperrt: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const id = handwerkerId?.trim()
-  if (!id) return { ok: false, message: 'Handwerker fehlt.' }
-
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('handwerker').select('id, auth_user_id, email').eq('id', id).maybeSingle()
-  )
-  if (loadErr || !row) {
-    return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
-  }
-
-  const { error: upErr } = await withCrmReadFallback(async (db) =>
-    db
-      .from('handwerker')
-      .update({
-        ist_portal_gesperrt: gesperrt,
-        portal_gesperrt_am: gesperrt ? new Date().toISOString() : null,
-      })
-      .eq('id', id)
-  )
-  if (upErr) {
-    const msg = upErr.message ?? ''
-    if (
-      msg.includes('ist_portal_gesperrt') ||
-      msg.includes('does not exist') ||
-      msg.includes('schema cache')
-    ) {
-      return {
-        ok: false,
-        message:
-          'Portal-Sperre-Spalte fehlt in der Datenbank — bitte Migration handwerker_portal_gesperrt ausführen.',
-      }
-    }
-    return { ok: false, message: upErr.message }
-  }
-
-  const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
-  if (authUserId) {
-    const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-      ban_duration: gesperrt ? AUTH_BAN_DURATION : 'none',
-    })
-    if (banErr) {
-      console.error('[setHandwerkerPortalGesperrt] Auth-Ban fehlgeschlagen:', banErr.message)
-    }
-    if (gesperrt) {
-      try {
-        const admin = supabaseAdmin.auth.admin as {
-          signOut?: (uid: string, scope?: string) => Promise<unknown>
-        }
-        if (typeof admin.signOut === 'function') {
-          await admin.signOut(authUserId, 'global')
-        }
-      } catch (e) {
-        console.error('[setHandwerkerPortalGesperrt] Sign-out fehlgeschlagen:', e)
-      }
-    }
-  }
-
-  revalidatePath('/handwerker')
-  revalidatePath(`/handwerker/${id}`)
-  return { ok: true }
 }

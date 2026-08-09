@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   buildPartnerWirtschaft,
@@ -94,12 +93,18 @@ export function HandwerkerWirtschaftlicheUebersicht({
     <div className="kw-uebersicht">
       <div className="kw-head">
         <h2 className="kw-title">Wirtschaftliche Übersicht</h2>
-        <ZeitraumIconPopover
-          value={zeitraum}
-          options={PARTNER_WIRTSCHAFT_ZEITRAUM}
-          onChange={setZeitraum}
-          title="Zeitraum"
-        />
+        <div className="kw-seg" role="group" aria-label="Zeitraum">
+          {PARTNER_WIRTSCHAFT_ZEITRAUM.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={cn('kw-seg-btn', zeitraum === opt.id && 'is-active')}
+              onClick={() => setZeitraum(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="kw-kpi-row">
@@ -162,40 +167,57 @@ export function HandwerkerWirtschaftlicheUebersicht({
         </div>
       </div>
 
-      <div className="card pw-gewerk">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="activity" size={16} />
-            Volumen nach Gewerk
+      <div className="pw-bottom">
+        <div className="pw-counts">
+          <div className="card kw-count">
+            <div className="kw-count-label">Neue Anfragen</div>
+            <div className="kw-count-val">{snap.neueAnfragen}</div>
+          </div>
+          <div className="card kw-count">
+            <div className="kw-count-label">Angebote</div>
+            <div className="kw-count-val">{snap.angebote}</div>
+          </div>
+          <div className="card kw-count">
+            <div className="kw-count-label">Aufträge</div>
+            <div className="kw-count-val">{snap.auftraege}</div>
           </div>
         </div>
-        <div className="card-b">
-          {snap.gewerke.length === 0 ? (
-            <p className="kw-chart-empty" style={{ padding: '12px 0' }}>
-              Noch kein Volumen nach Gewerk.
-            </p>
-          ) : (
-            <ul className="pw-gewerk-list">
-              {snap.gewerke.map((g) => (
-                <li key={g.name} className="pw-gewerk-row">
-                  <div className="pw-gewerk-top">
-                    <span className="pw-gewerk-name" title={g.name}>
-                      {g.name}
-                    </span>
-                    <span className="pw-gewerk-val">{formatEurGanz(g.betrag)}</span>
-                  </div>
-                  <div className="pw-gewerk-track">
-                    <div
-                      className="pw-gewerk-bar"
-                      style={{
-                        width: `${Math.max(6, Math.round((g.betrag / gewerkMax) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+
+        <div className="card pw-gewerk">
+          <div className="card-h">
+            <div className="card-title title">
+              <MockIcon ctx="emphasis" n="activity" size={16} />
+              Volumen nach Gewerk
+            </div>
+          </div>
+          <div className="card-b">
+            {snap.gewerke.length === 0 ? (
+              <p className="kw-chart-empty" style={{ padding: '12px 0' }}>
+                Noch kein Volumen nach Gewerk.
+              </p>
+            ) : (
+              <ul className="pw-gewerk-list">
+                {snap.gewerke.map((g) => (
+                  <li key={g.name} className="pw-gewerk-row">
+                    <div className="pw-gewerk-top">
+                      <span className="pw-gewerk-name" title={g.name}>
+                        {g.name}
+                      </span>
+                      <span className="pw-gewerk-val">{formatEurGanz(g.betrag)}</span>
+                    </div>
+                    <div className="pw-gewerk-track">
+                      <div
+                        className="pw-gewerk-bar"
+                        style={{
+                          width: `${Math.max(6, Math.round((g.betrag / gewerkMax) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -4,10 +4,9 @@ import { useState, type ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import type { DokumentPdfMusterEintrag } from '@/lib/templates/dokument-pdf-muster'
 
-const COLS = '28px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.4fr) 70px'
+const COLS = '28px 1.6fr 1fr 1.4fr 70px'
 
 function Sec({
   title,
@@ -21,15 +20,26 @@ function Sec({
   children: ReactNode
 }) {
   return (
-    <section className="formulare-sec">
-      <div className="formulare-sec__head">
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
         {icon ? <MockIcon ctx="nav" n={icon} size={16} style={{ color: 'var(--text-3)' }} /> : null}
-        <span className="formulare-sec__title formulare-sec__title--plain">{title}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
         <div style={{ flex: 1 }} />
-        {hint ? <span className="formulare-sec__hint">{hint}</span> : null}
+        {hint ? (
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{hint}</span>
+        ) : null}
       </div>
       <div>{children}</div>
-    </section>
+    </div>
   )
 }
 
@@ -40,7 +50,6 @@ export function DokumentPdfVorlagenSection({
   vorlagen: DokumentPdfMusterEintrag[]
 }) {
   const [preview, setPreview] = useState<DokumentPdfMusterEintrag | null>(null)
-  const isMobile = useIsMobile()
 
   return (
     <>
@@ -49,12 +58,12 @@ export function DokumentPdfVorlagenSection({
         icon="file-invoice"
         hint="Muster: Max Mustermann"
       >
-        <p className="formulare-sec__lead">
-          Alle PDFs, die an Kunden versendet werden — Vorschau mit Beispieldaten (nicht speicherbar,
-          Layout kommt aus dem System).
+        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 12px', lineHeight: 1.45 }}>
+          Alle PDFs, die an Kunden versendet werden — Vorschau mit Beispieldaten (nicht
+          speicherbar, Layout kommt aus dem System).
         </p>
-        <div className="listcard listcard--cols" style={{ ['--list-cols' as string]: COLS }}>
-          <div className="list-row head" aria-hidden>
+        <div style={{ margin: 0 }}>
+          <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
             <div />
             <div>Dokument</div>
             <div>Art</div>
@@ -63,92 +72,67 @@ export function DokumentPdfVorlagenSection({
           </div>
           {vorlagen.map((v) => {
             const canPreview = Boolean(v.html?.trim())
-            const openPreview = () => canPreview && setPreview(v)
             return (
+            <div
+              key={v.id}
+              className="list-row"
+              style={{
+                gridTemplateColumns: COLS,
+                cursor: canPreview ? 'pointer' : 'default',
+                alignItems: 'center',
+                opacity: canPreview ? 1 : 0.65,
+              }}
+              onClick={() => canPreview && setPreview(v)}
+              onKeyDown={(e) => {
+                if (!canPreview) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setPreview(v)
+                }
+              }}
+              role="button"
+              tabIndex={canPreview ? 0 : -1}
+            >
+              <MockIcon ctx="row" n={v.icon} size={18} style={{ color: 'var(--text-3)' }} />
               <div
-                key={v.id}
-                className="list-row"
                 style={{
-                  cursor: canPreview ? 'pointer' : 'default',
-                  alignItems: 'center',
-                  opacity: canPreview ? 1 : 0.65,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
                 }}
-                onClick={openPreview}
-                onKeyDown={(e) => {
-                  if (!canPreview) return
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setPreview(v)
-                  }
-                }}
-                role="button"
-                tabIndex={canPreview ? 0 : -1}
               >
-                {isMobile ? (
-                  <>
-                    <div className="lc-title">{v.title}</div>
-                    <div className="lc-pills">
-                      <span className="pill-tag">{v.art}</span>
-                    </div>
-                    <div className="lc-sub">{v.description}</div>
-                    <div
-                      className="row-actions"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="eye"
-                        title={canPreview ? 'Vorschau' : 'Keine Vorschau'}
-                        disabled={!canPreview}
-                        onClick={() => canPreview && setPreview(v)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <MockIcon ctx="row" n={v.icon} size={18} style={{ color: 'var(--text-3)' }} />
-                    <div
-                      style={{
-                        fontSize: 'var(--fs-text)',
-                        fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        minWidth: 0,
-                      }}
-                    >
-                      {v.title}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{v.art}</div>
-                    <div
-                      style={{
-                        fontSize: 'var(--fs-meta)',
-                        color: 'var(--text-3)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        minWidth: 0,
-                      }}
-                    >
-                      {v.description}
-                    </div>
-                    <div
-                      style={{ display: 'flex', justifyContent: 'flex-end' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="eye"
-                        title={canPreview ? 'Vorschau' : 'Keine Vorschau'}
-                        disabled={!canPreview}
-                        onClick={() => canPreview && setPreview(v)}
-                      />
-                    </div>
-                  </>
-                )}
+                {v.title}
               </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{v.art}</div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-3)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                }}
+              >
+                {v.description}
+              </div>
+              <div
+                style={{ display: 'flex', justifyContent: 'flex-end' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MockBtn
+                  sm
+                  kind="ghost"
+                  icon="eye"
+                  title={canPreview ? 'Vorschau' : 'Keine Vorschau'}
+                  disabled={!canPreview}
+                  onClick={() => canPreview && setPreview(v)}
+                />
+              </div>
+            </div>
             )
           })}
         </div>

@@ -1,7 +1,6 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
 import { Input } from '@/components/ui/Input'
@@ -33,7 +32,7 @@ export function HandwerkerDetailsModal({
   onSaved: () => void
 }) {
   const isMobile = useIsMobile()
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [preis, setPreis] = useState('')
   const [absprachen, setAbsprachen] = useState('')
   const [notizen, setNotizen] = useState('')
@@ -99,7 +98,7 @@ export function HandwerkerDetailsModal({
 
   const body = (
     <>
-      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+      <p className="mb-3 text-sm text-bw-text-muted">
         Intern: Preis, Absprachen und Notizen zur Handwerker-Zuweisung.
       </p>
       <div className="space-y-3">

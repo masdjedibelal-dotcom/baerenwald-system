@@ -58,8 +58,7 @@ const FORTSCHRITT_BY_STATUS: Record<AuftragStatus, number> = {
 
 async function setAuftragStatus(
   auftragId: string,
-  status: AuftragStatus,
-  opts?: { timelineBeschreibung?: string }
+  status: AuftragStatus
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const fortschritt = FORTSCHRITT_BY_STATUS[status] ?? 0
@@ -123,7 +122,6 @@ async function setAuftragStatus(
     auftrag_id: auftragId,
     typ: 'status_change',
     titel: `Status: ${AUFTRAG_STATUS_LABELS[status] ?? status}`,
-    beschreibung: opts?.timelineBeschreibung,
     erstellt_von: uid,
   })
 
@@ -137,51 +135,6 @@ export async function updateAuftragStatusFromUi(
   status: AuftragStatus
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   return setAuftragStatus(auftragId, status)
-}
-
-/**
- * Nach aktiver Voll- oder Schlussrechnung Auftrag auf „abgeschlossen“ setzen.
- * Abschläge und Gutschriften ändern den Auftragsstatus nicht.
- */
-export async function completeAuftragNachEndabrechnung(input: {
-  auftragId: string | null | undefined
-  rechnungArt: string | null | undefined
-  rechnungsnummer?: string | null
-  belegTyp?: string | null
-}): Promise<{ ok: true; changed: boolean } | { ok: false; message: string }> {
-  const auftragId = input.auftragId?.trim()
-  if (!auftragId) return { ok: true, changed: false }
-
-  const beleg = (input.belegTyp ?? 'rechnung').trim().toLowerCase()
-  if (beleg === 'gutschrift') return { ok: true, changed: false }
-
-  const art = (input.rechnungArt ?? 'voll').trim().toLowerCase()
-  if (art !== 'voll' && art !== 'schluss') return { ok: true, changed: false }
-
-  const supabase = createClient()
-  const { data: row, error } = await supabase
-    .from('auftraege')
-    .select('id, status')
-    .eq('id', auftragId)
-    .maybeSingle()
-
-  if (error) return { ok: false, message: error.message }
-  if (!row) return { ok: true, changed: false }
-
-  const st = String(row.status ?? '').trim().toLowerCase()
-  if (st === 'abgeschlossen' || st === 'storniert') return { ok: true, changed: false }
-
-  const nr = input.rechnungsnummer?.trim()
-  const label = art === 'schluss' ? 'Schlussrechnung' : 'Vollrechnung'
-  const res = await setAuftragStatus(auftragId, 'abgeschlossen', {
-    timelineBeschreibung: nr
-      ? `Automatisch nach ${label} ${nr}.`
-      : `Automatisch nach ${label}.`,
-  })
-  if (!res.ok) return res
-
-  revalidatePath('/vorgaenge')
-  return { ok: true, changed: true }
 }
 
 export async function updateAuftragFortschrittManual(
@@ -228,8 +181,6 @@ export async function updateAuftragProjektFelder(
     start_datum?: string | null
     end_datum?: string | null
     ist_bauprojekt?: boolean | null
-    ist_wiederkehrend?: boolean | null
-    wiederkehr_turnus?: string | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -240,16 +191,10 @@ export async function updateAuftragProjektFelder(
   if (patch.ist_bauprojekt !== undefined) {
     db.ist_bauprojekt = patch.ist_bauprojekt === true ? true : patch.ist_bauprojekt === false ? false : null
   }
-  if (patch.ist_wiederkehrend !== undefined) {
-    const ist = patch.ist_wiederkehrend === true
-    db.ist_wiederkehrend = ist
-    db.wiederkehr_turnus = ist ? patch.wiederkehr_turnus?.trim() || null : null
-  }
   const { error } = await supabase.from('auftraege').update(db).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
@@ -492,10 +437,7 @@ async function logAuftragTimeline(
   if (!r.ok) console.warn('[auftrag_timeline]', r.message)
 }
 
-export async function startAuftragArbeit(
-  auftragId: string,
-  options?: { notifyKunde?: boolean }
-) {
+export async function startAuftragArbeit(auftragId: string) {
   const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
     await serverRuntime()
   const detail = await fetchAuftragDetail(auftragId)
@@ -508,16 +450,14 @@ export async function startAuftragArbeit(
   if (!st.ok) return st
 
   const rows = detail.auftrag_handwerker ?? []
-  const notifyKunde = options?.notifyKunde === true
-  const email = notifyKunde ? detail.kunden.email : null
-  let mailGesendet = false
-  let mailLogId: string | null = null
 
+  const email = detail.kunden.email
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
     const projektLink = token ? projektUrlFromToken(token) : getPublicAppUrl()
     const gewerkNamen = rows.map((r) => r.gewerke?.name).filter(Boolean) as string[]
     const branding = await getMailBranding(supabaseAdmin)
+    const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
     const tpl = mailAuftragsbestaetigung(
       {
         name: detail.kunden.name.trim(),
@@ -538,12 +478,7 @@ export async function startAuftragArbeit(
       kundeId: detail.kunde_id,
       auftragId,
     })
-    if (!sent.success) {
-      console.warn('[startAuftragArbeit] Mail:', sent.error)
-    } else {
-      mailGesendet = true
-      mailLogId = sent.emailLogId ?? null
-    }
+    if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
   }
 
   const uid = await getAuthUserId()
@@ -551,21 +486,17 @@ export async function startAuftragArbeit(
     auftrag_id: auftragId,
     typ: 'arbeit_gestartet',
     titel: 'Arbeit gestartet',
-    beschreibung: mailGesendet
+    beschreibung: email
       ? 'Status „In Arbeit“, Auftragsbestätigung per E-Mail an die Kundin gesendet.'
-      : 'Status „In Arbeit“ (ohne Kunden-Mail).',
+      : 'Status „In Arbeit“ (keine Kunden-E-Mail hinterlegt).',
     erstellt_von: uid,
-    sichtbar_fuer_kunde: mailGesendet,
-    email_log_id: mailLogId,
+    sichtbar_fuer_kunde: Boolean(email),
   })
 
   return { ok: true as const }
 }
 
-export async function setAuftragZurAbnahme(
-  auftragId: string,
-  options?: { notifyKunde?: boolean }
-) {
+export async function setAuftragZurAbnahme(auftragId: string) {
   const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag, projektUrlFromToken } =
     await serverRuntime()
   const detail = await fetchAuftragDetail(auftragId)
@@ -577,14 +508,11 @@ export async function setAuftragZurAbnahme(
   const st = await setAuftragStatus(auftragId, 'abnahme')
   if (!st.ok) return st
 
-  const notifyKunde = options?.notifyKunde === true
-  const email = notifyKunde ? detail.kunden.email : null
-  let mailGesendet = false
-  let mailLogId: string | null = null
-
+  const email = detail.kunden.email
   if (email) {
     const token = await ensureKundenTokenForAuftrag(auftragId)
     if (token) {
+      const vorname = detail.kunden.name.trim().split(/\s+/)[0] || detail.kunden.name.trim()
       const branding = await getMailBranding(supabaseAdmin)
       const tpl = mailUpdateHinweis(
         {
@@ -603,12 +531,7 @@ export async function setAuftragZurAbnahme(
         kundeId: detail.kunde_id,
         auftragId,
       })
-      if (!sent.success) {
-        console.warn('[setAuftragZurAbnahme] Mail:', sent.error)
-      } else {
-        mailGesendet = true
-        mailLogId = sent.emailLogId ?? null
-      }
+      if (!sent.success) return { ok: false as const, message: sent.error ?? 'E-Mail fehlgeschlagen' }
     }
   }
 
@@ -617,12 +540,11 @@ export async function setAuftragZurAbnahme(
     auftrag_id: auftragId,
     typ: 'zur_abnahme',
     titel: 'Zur Abnahme',
-    beschreibung: mailGesendet
+    beschreibung: email
       ? 'Status „Abnahme“, Kundin per E-Mail informiert.'
-      : 'Status „Abnahme“ (ohne Kunden-Mail).',
+      : 'Status „Abnahme“ (keine Kunden-E-Mail hinterlegt).',
     erstellt_von: uid,
-    sichtbar_fuer_kunde: mailGesendet,
-    email_log_id: mailLogId,
+    sichtbar_fuer_kunde: Boolean(email),
   })
 
   return { ok: true as const }
@@ -802,7 +724,6 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     beschreibung: `Phase „${phaseLabel}“, E-Mail an Handwerker`,
     handwerker_id: input.handwerkerId,
     erstellt_von: uid,
-    email_log_id: sent.emailLogId ?? null,
   })
 
   revalidatePath(`/auftraege/${input.auftragId}`)

@@ -66,15 +66,11 @@ export function Sidebar({
           type="button"
           className="sidebar-toggle"
           title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
-          aria-label={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
+          aria-label="Sidebar umschalten"
           aria-expanded={expanded}
           onClick={toggleExpanded}
         >
-          <MockIcon
-            ctx="sidebar"
-            n={expanded ? 'layout-sidebar-left-collapse' : 'layout-sidebar-left-expand'}
-            size={18}
-          />
+          <MockIcon ctx="sidebar" n={expanded ? 'chevron-left' : 'chevron-right'} size={18} />
         </button>
       </div>
 

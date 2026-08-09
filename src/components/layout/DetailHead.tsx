@@ -12,24 +12,18 @@ export type DetailHeadProps = {
   /** Meta-Zeile (.dh-meta) — Badges gehören hierhin (inline), nicht darunter */
   meta?: ReactNode
   badges?: ReactNode
-  /** Badges direkt neben dem Titel (Mock: Freigabe) */
-  titleBadges?: ReactNode
-  /** Icon-Aktionen rechts im Titel (z. B. Portal-Login) — immer sichtbar, nicht im ⋯ */
-  titleTrailing?: ReactNode
   actions?: ReactNode
   /** Stärkerer Projekt-Kopf mit Trennlinie */
   variant?: 'default' | 'project'
   className?: string
 }
 
-/** Kompakter Detail-Kopf: Titel + Badges/Meta (Mock `.vgid` / `.detail-head`). */
+/** Kompakter Detail-Kopf: Titel + Badges/Meta inline (Mock `.detail-head` / `.dh-*`). */
 export function DetailHead({
   title,
   sub,
   meta,
   badges,
-  titleBadges,
-  titleTrailing,
   actions,
   variant = 'project',
   className,
@@ -38,18 +32,12 @@ export function DetailHead({
 
   return (
     <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
-      <div className="detail-head-main vgid min-w-0 flex-1">
+      <div className="detail-head-main min-w-0 flex-1">
         <div className="dh-titlerow">
-          <div className="dh-title vgid-name">{title}</div>
-          {titleBadges ? <div className="dh-title-badges">{titleBadges}</div> : null}
-          {titleTrailing ? (
-            <div className="dh-title-trailing ml-auto flex shrink-0 items-center gap-1">
-              {titleTrailing}
-            </div>
-          ) : null}
+          <div className="dh-title">{title}</div>
         </div>
         {hasMetaRow ? (
-          <div className="dh-meta vgid-meta">
+          <div className="dh-meta">
             {badges}
             {badges && meta ? <span className="sep" aria-hidden>
               ·
@@ -84,9 +72,9 @@ export function DetailVisual({
   }[tone]
 
   const sizeClass = {
-    sm: 'h-[26px] w-[26px] text-[length:var(--fs-meta)]',
-    md: 'h-11 w-11 text-[length:var(--fs-text)]',
-    lg: 'h-11 w-11 text-[length:var(--fs-text)] md:h-[44px] md:w-[44px] md:text-[length:var(--fs-text)]',
+    sm: 'h-[26px] w-[26px] text-[10px]',
+    md: 'h-11 w-11 text-sm',
+    lg: 'h-11 w-11 text-sm md:h-[44px] md:w-[44px] md:text-sm',
   }[size]
 
   return (

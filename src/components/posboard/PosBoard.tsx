@@ -5,20 +5,12 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { PositionModal } from '@/components/posboard/PositionModal'
-import { PositionAddSheet, type PositionAddMode } from '@/components/posboard/PositionAddSheet'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import type { PosAddKind } from '@/components/posboard/PosAddRow'
-import { guardSheetPointerFallthrough } from '@/lib/surfaces/editor-sheet-history'
 import {
   PosTable,
   type PosTableBadge,
   type PosTableGroup,
 } from '@/components/posboard/PosTable'
-import {
-  PosBoardKiSuggestions,
-  type PosBoardSuggestContext,
-} from '@/components/posboard/PosBoardKiSuggestions'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -29,8 +21,6 @@ import {
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { Preisliste } from '@/lib/types'
-import { useIsMobile } from '@/hooks/useIsMobile'
-import { toast } from '@/components/ui/app-toast'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -44,8 +34,6 @@ export type PosBoardProps = {
   positionen: PosBoardLine[]
   onChange?: (next: PosBoardLine[]) => void
   showUst?: boolean
-  /** Summenfuß unter der Tabelle — default: wie showUst */
-  showTotals?: boolean
   title?: string
   renderEditor?: (
     position: PosBoardLine,
@@ -72,8 +60,6 @@ export type PosBoardProps = {
   /** Für „Aus Preisliste“ — ohne Liste wird die Option deaktiviert */
   preislisten?: Preisliste[]
   headerAction?: ReactNode
-  /** Anfrage-/Projekttext für Katalog-KI-Vorschläge */
-  suggestContext?: PosBoardSuggestContext | null
   className?: string
 }
 
@@ -108,7 +94,6 @@ export function PosBoard({
   positionen: positionenProp,
   onChange,
   showUst = true,
-  showTotals,
   title,
   renderEditor,
   lineOf,
@@ -124,20 +109,15 @@ export function PosBoard({
   gewerke = [],
   preislisten = [],
   headerAction,
-  suggestContext = null,
   className,
 }: PosBoardProps) {
-  const isMobile = useIsMobile()
   const positionen = Array.isArray(positionenProp) ? positionenProp : []
   const editable = Boolean(onChange)
-  const unifiedAdd = isMobile && editable
   const [editId, setEditId] = useState<string | null>(null)
   const [gEdit, setGEdit] = useState<string | null>(null)
   const [gName, setGName] = useState('')
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [preislisteOpen, setPreislisteOpen] = useState(false)
-  const [addSheetOpen, setAddSheetOpen] = useState(false)
-  const [addSheetMode, setAddSheetMode] = useState<PositionAddMode>('preisliste')
   const [preislistePick, setPreislistePick] = useState('')
   const [preislisteTargetGewerk, setPreislisteTargetGewerk] = useState<string | null>(null)
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
@@ -183,114 +163,24 @@ export function PosBoard({
     return gewerkOf(positionen[positionen.length - 1])
   }
 
-  const addPosition = (gewerk: string, draft?: {
-    name: string
-    beschreibung: string
-    menge: number
-    einheit: string
-    preis: number
-    ust: number
-    regieSchein?: boolean
-  }) => {
+  const addPosition = (gewerk: string) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np: PosBoardLine = makeNew
-      ? {
-          ...makeNew(gewerk),
-          id,
-          kind: 'position',
-          position_quelle: 'frei',
-          variante_id: null,
-          preisliste_id: null,
-          ...(draft
-            ? {
-                name: draft.name,
-                beschreibung: draft.beschreibung,
-                menge: draft.menge,
-                einheit: draft.einheit,
-                preis: draft.preis,
-                ust: draft.ust,
-                regieSchein: draft.regieSchein,
-                notizExtern: draft.regieSchein ? 'nach Aufwand' : undefined,
-              }
-            : {}),
-        }
-      : neuePosBoardLine({
-          gewerk: gewerk || '',
-          id,
-          kind: 'position',
-          name: draft?.name ?? '',
-          beschreibung: draft?.beschreibung ?? '',
-          menge: draft?.menge ?? 1,
-          einheit: draft?.einheit ?? 'Stück',
-          preis: draft?.preis ?? 0,
-          ust: draft?.ust ?? 19,
-          position_quelle: 'frei',
-          variante_id: null,
-          preisliste_id: null,
-          regieSchein: draft?.regieSchein,
-          notizExtern: draft?.regieSchein ? 'nach Aufwand' : undefined,
-        })
+      ? { ...makeNew(gewerk), id, kind: 'position' }
+      : neuePosBoardLine({ gewerk: gewerk || '', id, kind: 'position', name: 'Neue Position' })
     onChange([...positionen, np])
-    setEditId(draft?.name?.trim() ? null : id)
+    setEditId(id)
   }
 
-  // KI „Positionen“-Chat → mehrere freie Positionen auf einmal
-  useKiAssistDraftConsumer(editable && !addSheetOpen, ['positionen', 'position'], (d) => {
-    if (!onChange) return
-    if (d.type === 'positionen') {
-      const fallbackGewerk = defaultGewerk()
-      const added = d.items.map((it) =>
-        neuePosBoardLine({
-          gewerk: it.gewerk?.trim() || fallbackGewerk,
-          name: it.name,
-          beschreibung: it.beschreibung?.trim() || '',
-          menge: it.menge && it.menge > 0 ? it.menge : 1,
-          einheit: it.einheit?.trim() || 'Stück',
-          preis: it.preis != null && it.preis >= 0 ? it.preis : 0,
-          ust: 19,
-          kind: 'position',
-          position_quelle: 'frei',
-          variante_id: null,
-          preisliste_id: null,
-        })
-      )
-      if (!added.length) return
-      onChange([...positionen, ...added])
-      toast.success(
-        added.length === 1 ? 'Position übernommen' : `${added.length} Positionen übernommen`
-      )
-      return
-    }
-    if (d.type === 'position') {
-      addPosition(d.gewerk?.trim() || defaultGewerk(), {
-        name: d.name,
-        beschreibung: d.beschreibung?.trim() || '',
-        menge: d.menge && d.menge > 0 ? d.menge : 1,
-        einheit: d.einheit?.trim() || 'Stück',
-        preis: d.preis != null && d.preis >= 0 ? d.preis : 0,
-        ust: 19,
-      })
-    }
-  })
-
-  const openAddSheet = (gewerk: string, mode: PositionAddMode = 'preisliste') => {
-    setPreislisteTargetGewerk(gewerk)
-    setAddSheetMode(mode)
-    setAddSheetOpen(true)
-  }
-
-  const addFreitext = (
-    gewerk?: string,
-    draft?: { name?: string; beschreibung?: string }
-  ) => {
+  const addFreitext = (gewerk?: string) => {
     if (!onChange) return
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
       gewerk: gewerk?.trim() || defaultGewerk(),
-      name: draft?.name?.trim() || '',
-      beschreibung: draft?.beschreibung?.trim() || '',
+      name: '',
+      beschreibung: '',
       menge: 0,
       einheit: '',
       preis: 0,
@@ -298,43 +188,30 @@ export function PosBoard({
       kind: 'freitext',
     })
     onChange([...positionen, np])
-    setEditId(draft?.name?.trim() || draft?.beschreibung?.trim() ? null : id)
+    setEditId(id)
   }
 
-  const addNachlass = (draft?: {
-    name?: string
-    nachlassModus?: 'prozent' | 'betrag'
-    preis?: number
-  }) => {
+  const addNachlass = () => {
     if (!onChange) return
     const existing = positionen.find((p) => p.kind === 'nachlass')
     if (existing) {
-      if (draft) {
-        update(existing.id, {
-          name: draft.name?.trim() || existing.name,
-          nachlassModus: draft.nachlassModus ?? existing.nachlassModus ?? 'prozent',
-          preis: draft.preis ?? existing.preis,
-          einheit: (draft.nachlassModus ?? existing.nachlassModus) === 'betrag' ? '€' : '%',
-        })
-      }
       setEditId(existing.id)
       return
     }
-    const modus = draft?.nachlassModus ?? 'prozent'
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
       gewerk: 'Allgemein',
-      name: draft?.name?.trim() || 'Nachlass',
+      name: 'Nachlass',
       menge: 1,
-      einheit: modus === 'betrag' ? '€' : '%',
-      preis: draft?.preis ?? 0,
+      einheit: '%',
+      preis: 0,
       ust: 0,
       kind: 'nachlass',
-      nachlassModus: modus,
+      nachlassModus: 'prozent',
     })
     onChange([...positionen, np])
-    setEditId(draft ? null : id)
+    setEditId(id)
   }
 
   const addFromPreisliste = (pl: Preisliste) => {
@@ -353,8 +230,6 @@ export function PosBoard({
       ust: 19,
       kind: 'position',
       preisliste_id: pl.id,
-      variante_id: pl.id,
-      position_quelle: 'katalog',
     })
     onChange([...positionen, np])
     setPreislisteOpen(false)
@@ -363,46 +238,16 @@ export function PosBoard({
     setEditId(id)
   }
 
-  const addFromKatalog = (r: {
-    position: { titel: string; gewerk_name?: string | null }
-    variante: {
-      id: string
-      beschreibung: string
-      einheit: string
-      preis: number
-    }
-    menge: number
-    beschreibung: string
-  }) => {
-    if (!onChange) return
-    const id = neuePosBoardLine().id
-    const gewerkName =
-      preislisteTargetGewerk?.trim() ||
-      r.position.gewerk_name?.trim() ||
-      defaultGewerk()
-    const np = neuePosBoardLine({
-      id,
-      gewerk: gewerkName,
-      name: r.position.titel,
-      beschreibung: r.beschreibung,
-      menge: r.menge,
-      einheit: r.variante.einheit || 'Stück',
-      preis: Number(r.variante.preis) || 0,
-      ust: 19,
-      kind: 'position',
-      preisliste_id: r.variante.id,
-      variante_id: r.variante.id,
-      position_quelle: 'katalog',
-    })
-    onChange([...positionen, np])
-  }
-
   const onAddKind = (kind: PosAddKind, gewerk?: string) => {
     const target = gewerk?.trim() || defaultGewerk()
-    if (kind === 'position' || kind === 'preisliste') {
-      openAddSheet(target, 'preisliste')
-    } else if (kind === 'freitext') addFreitext(target)
+    if (kind === 'position') addPosition(target)
+    else if (kind === 'freitext') addFreitext(target)
     else if (kind === 'nachlass') addNachlass()
+    else if (kind === 'preisliste') {
+      if (preislisten.filter((p) => p.aktiv !== false).length === 0) return
+      setPreislisteTargetGewerk(target)
+      setPreislisteOpen(true)
+    }
   }
 
   const addGewerk = () => {
@@ -411,11 +256,11 @@ export function PosBoard({
     setGewerkAddOpen(true)
   }
 
-  const confirmAddGewerk = (forcedName?: string) => {
+  const confirmAddGewerk = () => {
     const used = new Set(positionen.map(gewerkOf))
     const fromSelect = gewerkAddPick.trim()
     const fromCustom = gewerkAddCustom.trim()
-    let name = (forcedName?.trim() || fromCustom || fromSelect).trim()
+    let name = fromCustom || fromSelect
     if (!name) return
     if (used.has(name)) {
       let n = 2
@@ -426,9 +271,7 @@ export function PosBoard({
     setGewerkAddOpen(false)
     setGewerkAddPick('')
     setGewerkAddCustom('')
-    setPreislisteTargetGewerk(name)
-    setAddSheetMode('preisliste')
-    setAddSheetOpen(true)
+    addPosition(name)
   }
 
   const renameGewerk = (from: string, to: string) => {
@@ -527,8 +370,6 @@ export function PosBoard({
           name: namePlain || beschPlain || '(ohne Bezeichnung)',
           beschreibung: namePlain ? beschPlain : '',
           mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
-          menge: typeof p.menge === 'number' ? p.menge : Number(p.menge) || undefined,
-          einheit: p.einheit || undefined,
           preisLabel: preisLabelOf ? preisLabelOf(p) : defaultPreisLabel(p, lineNetto),
           badge: badgeOf ? badgeOf(p) : defaultBadge(p),
         }
@@ -610,10 +451,7 @@ export function PosBoard({
   const helpers = editP
     ? {
         onChange: (patch: Partial<PosBoardLine>) => update(editP.id, patch),
-        onClose: () => {
-          guardSheetPointerFallthrough()
-          setEditId(null)
-        },
+        onClose: () => setEditId(null),
         onRemove: () => remove(editP.id),
       }
     : null
@@ -635,27 +473,20 @@ export function PosBoard({
 
   return (
     <div className={className}>
-      {title || headerAction ? (
+      {title ? (
         <div
-          className="section-h posboard-sec-h"
+          className="section-h"
           style={{
             margin: '2px 2px 10px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10,
-            /* Dokumenttitel (Angebot/Rechnung), kein Section-Label „Positionen“ */
-            textTransform: 'none',
-            letterSpacing: 0,
-            fontSize: 14,
-            fontWeight: 600,
-            color: 'var(--text)',
+            alignItems: 'baseline',
           }}
         >
-          <span className="posboard-sec-h__title">{title || null}</span>
-          <div className="posboard-sec-h__actions">
+          <span>{title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {headerAction}
-            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12.5 }}>
               {positionen.length} {positionen.length === 1 ? 'Position' : 'Positionen'}
             </span>
           </div>
@@ -672,14 +503,14 @@ export function PosBoard({
             gap: 10,
             padding: '10px 14px',
             marginBottom: 10,
-            background: '#5a615d',
+            background: 'var(--green-dark)',
             color: '#fff',
             borderRadius: 10,
             boxShadow: 'var(--shadow-pop)',
           }}
         >
           <MockIcon ctx="default" n="checks" size={16} />
-          <span style={{ fontWeight: 600, fontSize: 'var(--fs-text)' }}>{selectedIds.length} ausgewählt</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{selectedIds.length} ausgewählt</span>
           <div style={{ flex: 1 }} />
           {(bulkActions ? bulkActions(selectedPositions, clearSel) : []).map((a, i) => (
             <button
@@ -695,7 +526,7 @@ export function PosBoard({
                 border: 'none',
                 background: 'rgba(255,255,255,0.16)',
                 color: '#fff',
-                fontSize: 'var(--fs-text)',
+                fontSize: 13,
                 fontWeight: 500,
                 cursor: 'pointer',
               }}
@@ -722,61 +553,28 @@ export function PosBoard({
           </button>
         </div>
       ) : null}
-      {editable ? (
-        <PosBoardKiSuggestions context={suggestContext} />
-      ) : null}
       <PosTable
         groups={groups}
-        onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
-        onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
+        onAddKind={editable ? onAddKind : undefined}
+        onAddGroup={editable && !hideAddGewerk ? addGewerk : undefined}
         groupActions={groupActions}
-        itemActions={unifiedAdd ? undefined : itemActions}
+        itemActions={itemActions}
         selectable={selectable}
         selected={sel}
         onToggleItem={toggleItem}
         onToggleGroup={toggleGroup}
-        dnd={editable && !unifiedAdd}
+        dnd={editable}
         onReorder={reorder}
         onDropToGroup={dropToGroup}
         onReorderGroup={reorderGroups}
-        onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
-        onMengeChange={
-          editable && !unifiedAdd
-            ? (id, menge) => update(id, { menge })
-            : undefined
-        }
-        showTotals={showTotals ?? showUst !== false}
+        showTotals={showUst !== false}
         netto={netto}
         ust={ust}
         brutto={brutto}
-        unifiedAdd={unifiedAdd}
         disabledAddKinds={{
-          preisliste: false,
+          preisliste: aktivePreislisten.length === 0,
         }}
       />
-      {unifiedAdd ? (
-        <>
-          {groups.length === 0 ? (
-            <p className="posboard-empty-hint">Noch keine Positionen.</p>
-          ) : null}
-          <div className="posboard-add-fabs">
-            <button
-              type="button"
-              className="posboard-add-fab"
-              onClick={() => openAddSheet(defaultGewerk(), 'preisliste')}
-            >
-              <MockIcon ctx="btn" n="plus" size={18} />
-              Position hinzufügen
-            </button>
-            {!hideAddGewerk ? (
-              <button type="button" className="posboard-add-fab posboard-add-fab--secondary" onClick={addGewerk}>
-                <MockIcon ctx="btn" n="folder-open" size={18} />
-                Gewerk hinzufügen
-              </button>
-            ) : null}
-          </div>
-        </>
-      ) : null}
       {editP && helpers
         ? renderEditor
           ? renderEditor(editP, helpers)
@@ -825,20 +623,36 @@ export function PosBoard({
               autoFocus
             />
           </div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
+            Benennt das Gewerk für alle Positionen dieser Gruppe um.
+          </div>
         </MockModal>
       ) : null}
       {gewerkAddOpen ? (
-        <EditorSheet
+        <MockModal
           open
-          context="canvas"
-          title="Gewerk hinzufügen"
           onClose={() => {
             setGewerkAddOpen(false)
             setGewerkAddPick('')
             setGewerkAddCustom('')
           }}
-          onConfirm={() => confirmAddGewerk()}
-          confirmDisabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
+          icon="folder-open"
+          title="Gewerk hinzufügen"
+          sub="Abschnitt aus Stammdaten oder freier Bezeichnung"
+          footer={
+            <>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                sm
+                kind="primary"
+                icon="check"
+                disabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
+                onClick={confirmAddGewerk}
+              >
+                Hinzufügen
+              </MockBtn>
+            </>
+          }
         >
           {gewerkeZumHinzufuegen.length > 0 ? (
             <div className="field">
@@ -861,11 +675,11 @@ export function PosBoard({
               </select>
             </div>
           ) : (
-            <p className="m-0 mb-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
               {gewerke.length === 0
                 ? 'Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.'
                 : 'Alle Stammdaten-Gewerke sind bereits als Abschnitt vorhanden.'}
-            </p>
+            </div>
           )}
           <div className="field" style={{ marginTop: gewerkeZumHinzufuegen.length ? 12 : 0 }}>
             <div className="field-label">Oder freie Bezeichnung</div>
@@ -879,66 +693,7 @@ export function PosBoard({
               placeholder="z.B. Trockenbau · 1. OG"
             />
           </div>
-        </EditorSheet>
-      ) : null}
-      {addSheetOpen ? (
-        <PositionAddSheet
-          open
-          initialMode={addSheetMode}
-          preferredGewerkName={preislisteTargetGewerk}
-          gewerke={gewerkOptions}
-          showUst={showUst}
-          allowGewerk={!hideAddGewerk}
-          allowNachlass
-          onClose={() => {
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onPickKatalog={(r) => {
-            addFromKatalog(r)
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddFrei={(draft) => {
-            addPosition(draft.gewerk, {
-              name: draft.name,
-              beschreibung: draft.beschreibung,
-              menge: draft.menge,
-              einheit: draft.einheit,
-              preis: draft.preis,
-              ust: draft.ust,
-              regieSchein: Boolean(draft.regie),
-            })
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddFreitext={(draft) => {
-            addFreitext(draft.gewerk, {
-              name: draft.name,
-              beschreibung: draft.beschreibung,
-            })
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddNachlass={(draft) => {
-            addNachlass(draft)
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddGewerk={(name) => {
-            const used = new Set(positionen.map(gewerkOf))
-            let n = name.trim()
-            if (!n) return
-            if (used.has(n)) {
-              let i = 2
-              const base = n
-              while (used.has(`${base} ${i}`)) i += 1
-              n = `${base} ${i}`
-            }
-            setPreislisteTargetGewerk(n)
-            setAddSheetMode('preisliste')
-          }}
-        />
+        </MockModal>
       ) : null}
       {preislisteOpen ? (
         <MockModal
@@ -949,8 +704,8 @@ export function PosBoard({
             setPreislisteTargetGewerk(null)
           }}
           icon="list-filter"
-          title="Aus Preisliste (Legacy)"
-          sub="Fallback bis Katalog importiert ist"
+          title="Aus Preisliste"
+          sub="Vorlage wählen und als Position übernehmen"
           footer={
             <>
               <div style={{ flex: 1 }} />

@@ -7,7 +7,6 @@ import { summenAusPositionen, normalizeAngebotPositionen } from '@/lib/angebot-p
 import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
 import { defaultAngebotZahlungsbedingungen } from '@/lib/angebote/angebot-wizard-types'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
-import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { copilotAlertAlreadySent, recordCopilotAlert } from '@/lib/copilot/alerts'
 import { sendTelegram } from '@/lib/copilot/telegram'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -118,7 +117,7 @@ export async function getTermine(von: string, bis: string) {
 // ── Suche ──
 
 export type CrmSearchHit = {
-  typ: 'lead' | 'kunde' | 'angebot' | 'termin' | 'rechnung' | 'auftrag' | 'todo'
+  typ: 'lead' | 'kunde' | 'angebot' | 'termin' | 'rechnung'
   id: string
   titel: string
   untertitel?: string | null
@@ -130,10 +129,9 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (q.length < 2) return []
   const pattern = `%${escapeIlike(q)}%`
   const allowed = new Set(
-    (types?.length
-      ? types
-      : ['lead', 'kunde', 'angebot', 'termin', 'rechnung', 'auftrag', 'todo']
-    ).map((t) => t.toLowerCase())
+    (types?.length ? types : ['lead', 'kunde', 'angebot', 'termin', 'rechnung']).map((t) =>
+      t.toLowerCase()
+    )
   )
   const hits: CrmSearchHit[] = []
 
@@ -262,51 +260,6 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
     )
   }
 
-  if (allowed.has('auftrag')) {
-    tasks.push(
-      (async () => {
-        const { data } = await supabaseAdmin
-          .from('auftraege')
-          .select('id, titel, status, kunden(name)')
-          .or(`titel.ilike.${pattern}`)
-          .order('created_at', { ascending: false })
-          .limit(8)
-        for (const row of data ?? []) {
-          const kunde = Array.isArray(row.kunden) ? row.kunden[0] : row.kunden
-          hits.push({
-            typ: 'auftrag',
-            id: row.id,
-            titel: row.titel?.trim() || 'Auftrag',
-            untertitel: kunde?.name ?? null,
-            status: row.status,
-          })
-        }
-      })()
-    )
-  }
-
-  if (allowed.has('todo')) {
-    tasks.push(
-      (async () => {
-        const { data } = await supabaseAdmin
-          .from('todos')
-          .select('id, titel, prioritaet, faellig_am, erledigt')
-          .ilike('titel', pattern)
-          .order('created_at', { ascending: false })
-          .limit(8)
-        for (const row of data ?? []) {
-          hits.push({
-            typ: 'todo',
-            id: row.id,
-            titel: row.titel,
-            untertitel: [row.prioritaet, row.faellig_am?.slice(0, 10)].filter(Boolean).join(' · '),
-            status: row.erledigt ? 'erledigt' : 'offen',
-          })
-        }
-      })()
-    )
-  }
-
   await Promise.all(tasks)
   return hits.slice(0, 20)
 }
@@ -353,7 +306,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
           `
           id, angebotsnr, status, status_einfach, leistungsumfang,
           gesamt_fix, gesamt_min, gesamt_max, gueltig_bis, gesendet_kunde_at,
-          lead_id, kunde_id, pdf_url, positionen, einleitung, hinweise,
+          lead_id, kunde_id,
           leads(kontakt_name, kontakt_email),
           kunden(name, email)
         `
@@ -361,14 +314,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         .eq('id', id)
         .maybeSingle()
       if (error) throw error
-      if (!data) return { error: 'Angebot nicht gefunden' }
-      const pos = Array.isArray(data.positionen) ? data.positionen : []
-      return {
-        ...data,
-        positionen_count: pos.length,
-        positionen_vorschau: pos.slice(0, 25),
-        link: `/angebote/${data.id}`,
-      }
+      return data ?? { error: 'Angebot nicht gefunden' }
     }
     case 'termin': {
       const { data, error } = await supabaseAdmin
@@ -392,69 +338,16 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         .select(
           `
           id, rechnungsnummer, brutto, netto, status, faellig_am, rechnungsdatum,
-          pdf_url, positionen, einleitung, hinweise, auftrag_id,
           kunden(name, email)
         `
         )
         .eq('id', id)
         .maybeSingle()
       if (error) throw error
-      if (!data) return { error: 'Rechnung nicht gefunden' }
-      return {
-        ...data,
-        positionen_count: Array.isArray(data.positionen) ? data.positionen.length : 0,
-        link: `/rechnungen/${data.id}`,
-      }
-    }
-    case 'auftrag': {
-      const { data, error } = await supabaseAdmin
-        .from('auftraege')
-        .select(
-          `
-          id, titel, status, fortschritt, created_at, start_datum, end_datum,
-          kunde_id, lead_id, angebot_id, abnahme_protokoll_url,
-          kunden(name, email, telefon),
-          auftrag_positionen(
-            id, leistung_name, beschreibung, menge, einheit, preis_kunde,
-            gewerk_name, gewerk_slug, handwerker_id, leistung_status, sort_order
-          ),
-          auftrag_handwerker(
-            id, status, gewerk_id, handwerker_id,
-            handwerker(name, firma),
-            gewerke(name, slug)
-          )
-        `
-        )
-        .eq('id', id)
-        .maybeSingle()
-      if (error) throw error
-      if (!data) return { error: 'Auftrag nicht gefunden' }
-      return {
-        ...data,
-        link: `/auftraege/${data.id}`,
-        hinweis:
-          'Positionen in auftrag_positionen. Für PDF: read_document typ=abnahme. HW-Zuordnung: vorschlage_handwerker_zuordnung / assign_auftrag_handwerker_gewerk.',
-      }
-    }
-    case 'todo': {
-      const { data, error } = await supabaseAdmin
-        .from('todos')
-        .select(
-          `
-          id, titel, beschreibung, erledigt, faellig_am, prioritaet,
-          kunde_id, lead_id, auftrag_id, handwerker_id,
-          kunden(id, name), leads(id, kontakt_name), auftraege(id, titel)
-        `
-        )
-        .eq('id', id)
-        .maybeSingle()
-      if (error) throw error
-      return data ?? { error: 'To-do nicht gefunden' }
+      return data ?? { error: 'Rechnung nicht gefunden' }
     }
     default:
-      return {
-        error: `Unbekannter Typ: ${typ}. Erlaubt: lead, kunde, angebot, termin, rechnung, auftrag, todo`,
-      }
+      return { error: `Unbekannter Typ: ${typ}. Erlaubt: lead, kunde, angebot, termin, rechnung` }
   }
 }
 
@@ -526,11 +419,11 @@ export async function createAngebotEntwurfCopilot(input: {
   if (!kundeId && leadId) {
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('kunde_id, auftraggeber_kunde_id, kontakt_name, kontakt_email, kontakt_telefon, kundentyp')
+      .select('kunde_id, kontakt_name, kontakt_email, kontakt_telefon, kundentyp')
       .eq('id', leadId)
       .maybeSingle()
     if (!lead) throw new Error('Lead nicht gefunden')
-    kundeId = leadVertragsKundeId(lead) ?? lead.kunde_id
+    kundeId = lead.kunde_id
     if (!kundeId) {
       const kunde = await createKundeCopilot({
         name: lead.kontakt_name ?? 'Kunde',

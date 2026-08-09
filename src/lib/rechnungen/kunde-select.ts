@@ -4,10 +4,10 @@ import { isRechnungComplianceSchemaError } from '@/lib/rechnungen/rechnung-speic
 import type { Kunde } from '@/lib/types'
 
 const KUNDE_SELECT =
-  'id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, ust_id, kundennummer, ansprechpartner, webseite'
+  'id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, ust_id, kundennummer'
 
 const KUNDE_SELECT_LEGACY =
-  'id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, kundennummer, ansprechpartner, webseite'
+  'id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, kundennummer'
 
 export async function loadKundeFuerRechnung(
   _supabase: SupabaseClient,

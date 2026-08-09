@@ -57,7 +57,7 @@ export function FilterChips({
             className={cn(
               'chip shrink-0',
               variant === 'grid' && 'chip-grid min-h-[44px] justify-center px-3 py-2.5 text-[13px]',
-              isOn && 'active'
+              isOn && 'chip-active'
             )}
           >
             {opt.label}

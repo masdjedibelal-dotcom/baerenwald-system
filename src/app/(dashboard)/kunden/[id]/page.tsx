@@ -5,7 +5,6 @@ import { KundeDetailClient } from '@/components/kunden/KundeDetailClient'
 import { loadKundeDetail } from '@/lib/kunden/load-kunde-detail'
 import { getCustomFields, getCustomValues } from '@/lib/custom-fields'
 import { istKundeGewerbeTyp } from '@/lib/kunde-stammdaten'
-import { createClient } from '@/lib/supabase-server'
 import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
 
 export async function generateMetadata({
@@ -14,17 +13,8 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const supabase = createClient()
-  const { data } = await supabase
-    .from('kunden')
-    .select('name, vorname, nachname')
-    .eq('id', id)
-    .maybeSingle()
-  const title =
-    data?.name?.trim() ||
-    [data?.vorname?.trim(), data?.nachname?.trim()].filter(Boolean).join(' ') ||
-    'Kunde'
-  return { title }
+  const kunde = await loadKundeDetail(id)
+  return { title: kunde?.name?.trim() ? kunde.name : 'Kunde' }
 }
 
 export default async function KundeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,13 +26,12 @@ export default async function KundeDetailPage({ params }: { params: Promise<{ id
     getCustomFields('kunde'),
     getCustomValues(id),
     istKundeGewerbeTyp(kunde.typ) ? fetchKundenObjekte(id) : Promise.resolve([]),
-    loadVorgaengeListe({ kundeId: id }),
+    loadVorgaengeListe(),
   ])
 
   return (
     <div>
       <KundeDetailClient
-        key={id}
         kunde={kunde}
         customFieldDefs={customFieldDefs}
         customValues={customValues}

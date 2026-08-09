@@ -1,11 +1,10 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 /**
  * @deprecated Gegenvorschlag-Prüfung — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
  */
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
@@ -79,7 +78,7 @@ export function HandwerkerEinreichungPruefung({
 }) {
   if (auftragId) {
     return (
-      <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+      <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-xs text-bw-text-muted">
         <p className="font-medium text-bw-text">Vorgänge-Flow (Auftrag aktiv)</p>
         <p className="mt-1">
           Preise und Leistungen pflegt ihr im Auftrag unter Tab{' '}
@@ -88,7 +87,7 @@ export function HandwerkerEinreichungPruefung({
         </p>
         <Link
           href={`/auftraege/${auftragId}?tab=leistung`}
-          className="mt-2 inline-block text-[length:var(--fs-text)] font-medium text-bw-primary hover:underline"
+          className="mt-2 inline-block text-sm font-medium text-bw-primary hover:underline"
         >
           Zum Auftrag → Positionen
         </Link>
@@ -96,7 +95,7 @@ export function HandwerkerEinreichungPruefung({
     )
   }
 
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
   const [crmNotiz, setCrmNotiz] = useState('')
   const [mailModal, setMailModal] = useState<AntwortModal | null>(null)
@@ -259,12 +258,12 @@ export function HandwerkerEinreichungPruefung({
     <>
       <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg-soft/80 p-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-muted">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
             Eingereichtes Angebot
           </span>
           <span
             className={cn(
-              'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+              'rounded-full px-2 py-0.5 text-xs font-medium',
               hwStatusBadgeClass(z.hw_status)
             )}
           >
@@ -272,7 +271,7 @@ export function HandwerkerEinreichungPruefung({
           </span>
         </div>
 
-        <p className="text-[length:var(--fs-text)] text-bw-text">
+        <p className="text-sm text-bw-text">
           <span className="text-bw-text-muted">Netto:</span>{' '}
           {z.hw_preis_netto != null ? betragAnzeige(z.hw_preis_netto, null, null) : '—'}
           {' · '}
@@ -293,19 +292,19 @@ export function HandwerkerEinreichungPruefung({
         ) : null}
 
         {z.hw_eingereicht_at ? (
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="text-xs text-bw-text-muted">
             Eingereicht: {formatDatumZeit(z.hw_eingereicht_at)}
           </p>
         ) : null}
 
         {z.hw_notiz?.trim() ? (
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap">
+          <p className="text-xs text-bw-text-muted whitespace-pre-wrap">
             <span className="font-medium text-bw-text">Partner-Notiz:</span> {z.hw_notiz.trim()}
           </p>
         ) : null}
 
         {z.hw_crm_notiz?.trim() && !kannPruefen ? (
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+          <p className="text-xs text-bw-text-muted whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
             <span className="font-medium text-amber-950">Deine letzte Nachricht:</span>{' '}
             {z.hw_crm_notiz.trim()}
           </p>
@@ -360,13 +359,13 @@ export function HandwerkerEinreichungPruefung({
           ) : null}
 
           {uebernommen ? (
-            <span className="text-[length:var(--fs-meta)] font-medium text-bw-primary self-center">
+            <span className="text-xs font-medium text-bw-primary self-center">
               Übernommen — Partner hat bestätigt
             </span>
           ) : null}
 
           {bestaetigt ? (
-            <p className="w-full rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-[length:var(--fs-meta)] text-violet-950">
+            <p className="w-full rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs text-violet-950">
               Konditionen im CRM übernommen — <span className="font-medium">Partner muss im Portal noch bestätigen</span>{' '}
               (Tab Anfragen). Danach wechselt der Vorgang zu Angebote.
             </p>
@@ -389,7 +388,7 @@ export function HandwerkerEinreichungPruefung({
           </div>
         }
       >
-        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="mb-3 text-sm text-bw-text-muted">
           Dieser Text wird im Partner-Portal angezeigt und in der E-Mail an{' '}
           <span className="font-medium text-bw-text">{handwerkerName}</span> mitgeschickt.
         </p>
@@ -425,7 +424,7 @@ export function HandwerkerEinreichungPruefung({
       >
         {mailModal ? (
           <div className="space-y-3">
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+            <p className="text-sm text-bw-text-muted">
               Gewerk: <span className="font-medium text-bw-text">{gewerkName}</span>
             </p>
             <Input
@@ -453,7 +452,7 @@ export function HandwerkerEinreichungPruefung({
               placeholder="weitere@beispiel.de"
               hint="Optional."
             />
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            <p className="text-xs text-bw-text-muted">
               Versand über die Website (Partner-Portal), nicht über CRM-Resend.
             </p>
             <iframe

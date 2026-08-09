@@ -38,12 +38,12 @@ export function AngebotWizardPdfPreview({
           gap: 12,
           textTransform: 'none',
           letterSpacing: 0,
-          fontSize: 'var(--fs-text)',
+          fontSize: 14,
           fontWeight: 600,
         }}
       >
         <span>Angebots-PDF</span>
-        <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
+        <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12 }}>
           {kundeName
             ? `So erhält ${kundeName} das Angebot`
             : 'Vorschau wie beim Kundenversand'}
@@ -57,7 +57,7 @@ export function AngebotWizardPdfPreview({
             padding: 48,
             textAlign: 'center',
             color: 'var(--text-3)',
-            fontSize: 'var(--fs-text)',
+            fontSize: 13,
           }}
         >
           <MockIcon ctx="default" n="hourglass" size={22} />
@@ -75,7 +75,7 @@ export function AngebotWizardPdfPreview({
             gap: 12,
           }}
         >
-          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
             Vorschau konnte nicht geladen werden.
           </div>
           {pdfHref ? (

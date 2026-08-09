@@ -28,7 +28,7 @@ Abhängig davon: Keine Gruppierung der Vorgangsliste nach Aktionsbedarf.
 ### Sidebar
 
 **(1) Element**
-- Brand: Logo-Mark „B“, Label, Toggle rechts (`layout-sidebar-left-collapse` / `layout-sidebar-left-expand`)
+- Brand: Logo-Mark „B“, Label, Toggle (`chevron-left` / `chevron-right`)
 - Sektionen + Einträge mit Icon:
   - **Arbeit:** Dashboard (`layout-dashboard`), Vorgänge (`folders`)
   - **Stammdaten:** Kunden (`users`), Handwerker (`tool`), Partner (`building`)

@@ -3,7 +3,6 @@ import {
   angebotGewerkNameAnzeige,
   GEWERK_BESCHREIBUNG_TITEL,
   istFreitextPosition,
-  istGesamtrabattPosition,
   istGewerkBeschreibungLeistungName,
   istGewerkBeschreibungPosition,
 } from '@/lib/dokument-zeilen'
@@ -78,9 +77,6 @@ export function groupAngebotPositionenByBlock(
   }
 
   for (const p of pos) {
-    // Nachlass gehört nicht in einen Gewerk-Block — Abzug läuft über die Dokumentsummen.
-    if (istGesamtrabattPosition(p)) continue
-
     if (istGewerkBeschreibungPosition(p)) {
       const key = p.gewerk_block_key?.trim() || lastKey
       lastKey = key

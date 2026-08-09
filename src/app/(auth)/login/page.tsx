@@ -13,7 +13,6 @@ import {
   CRM_LOGIN_INVALID_MESSAGE,
   CRM_LOGIN_PORTAL_ONLY_MESSAGE,
 } from '@/lib/auth/crm-access'
-import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { cn } from '@/lib/utils'
 
 const BENEFITS: { icon: string; text: string }[] = [
@@ -42,16 +41,8 @@ function LoginPageContent() {
     void (async () => {
       try {
         if (urlError === 'portal_only') {
-          await supabase.auth.signOut({ scope: 'local' })
+          await supabase.auth.signOut()
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
-          return
-        }
-        if (urlError === 'session') {
-          setError('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.')
-          return
-        }
-        if (urlError === 'idle') {
-          setError('Du wurdest wegen Inaktivität abgemeldet. Bitte melde dich erneut an.')
           return
         }
         const { data, error: userErr } = await supabase.auth.getUser()
@@ -59,7 +50,7 @@ function LoginPageContent() {
         if (userErr || !data.user) return
         const crm = await verifyCrmStaffSession()
         if (!crm.ok) {
-          await supabase.auth.signOut({ scope: 'local' })
+          await supabase.auth.signOut()
           setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
@@ -74,7 +65,6 @@ function LoginPageContent() {
   }, [router, supabase, urlError])
 
   async function handleLogin() {
-    dismissSoftKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -93,7 +83,7 @@ function LoginPageContent() {
 
     const crm = await verifyCrmStaffSession()
     if (!crm.ok) {
-      await supabase.auth.signOut({ scope: 'local' })
+      await supabase.auth.signOut()
       setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
       setLoading(false)
       return
@@ -105,7 +95,6 @@ function LoginPageContent() {
   }
 
   async function handleForgot() {
-    dismissSoftKeyboard()
     setLoading(true)
     setError(null)
     setInfo(null)
@@ -126,27 +115,8 @@ function LoginPageContent() {
     setInfo(null)
   }
 
-  const loginBusy = loading && mode === 'login'
-
   return (
-    <div className={cn('crm-login', loginBusy && 'crm-login--busy')}>
-      {loginBusy ? (
-        <div
-          className="crm-login__busy"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-          aria-label="Anmeldung läuft"
-        >
-          <div className="crm-login__busy-card">
-            <div className="crm-login__brand-mark" aria-hidden>
-              <BrandLogo variant="green" height={22} priority />
-            </div>
-            <span className="crm-login__busy-spinner" aria-hidden />
-            <span className="crm-login__busy-label">Anmeldung läuft…</span>
-          </div>
-        </div>
-      ) : null}
+    <div className="crm-login">
       <aside className="crm-login__brand">
         <div className="crm-login__brand-head">
           <div className="crm-login__brand-mark" aria-hidden>
@@ -196,7 +166,7 @@ function LoginPageContent() {
           {mode === 'login' ? (
             <>
               <h2 className="crm-login__welcome">Willkommen zurück</h2>
-              <p className="crm-login__welcome-sub">Melde dich mit deinem Konto an.</p>
+              <p className="crm-login__welcome-sub">Melden Sie sich mit Ihrem Konto an.</p>
 
               <div className="crm-login__fields">
                 <div className="crm-login__field">
@@ -281,12 +251,19 @@ function LoginPageContent() {
                   {loading ? 'Bitte warten…' : 'Anmelden'}
                 </button>
               </div>
+
+              <p className="crm-login__foot">
+                Probleme bei der Anmeldung?{' '}
+                <button type="button" className="crm-login__link" onClick={openForgot}>
+                  Passwort zurücksetzen
+                </button>
+              </p>
             </>
           ) : (
             <>
               <h2 className="crm-login__welcome">Passwort zurücksetzen</h2>
               <p className="crm-login__welcome-sub">
-                Wir senden einen Link an deine CRM-E-Mail.
+                Wir senden einen Link an Ihre CRM-E-Mail.
               </p>
 
               <div className="crm-login__fields">
@@ -348,13 +325,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="crm-login crm-login--loading" role="status" aria-busy="true">
-          <div className="crm-login__busy-card">
-            <div className="crm-login__brand-mark" aria-hidden>
-              <BrandLogo variant="green" height={22} priority />
-            </div>
-            <span className="crm-login__busy-spinner" aria-hidden />
-            <span className="crm-login__busy-label">Wird geladen…</span>
+        <div className="crm-login crm-login--loading">
+          <div className="crm-login__brand-mark" aria-hidden>
+            <BrandLogo variant="green" height={22} priority />
           </div>
         </div>
       }

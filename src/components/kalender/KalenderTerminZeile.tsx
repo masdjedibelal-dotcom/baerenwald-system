@@ -2,7 +2,7 @@
 
 import { AppEntityListRow } from '@/components/layout/app'
 import { TerminMarker } from '@/components/kalender/TerminMarker'
-import { kalenderTypLabel } from '@/lib/kalender-styles'
+import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
 import type { KalenderTermin } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 
@@ -42,7 +42,7 @@ export function KalenderTerminZeile({
   showTyp?: boolean
   showFaelligkeit?: boolean
 }) {
-  const line2Parts = [showTyp ? kalenderTypLabel(termin.typ) : null]
+  const line2Parts = [showTyp ? KALENDER_TYP_LABEL[termin.typ] : null]
   if (termin.adresse?.trim()) line2Parts.push(termin.adresse.trim())
   else if (!showTyp) line2Parts.push(formatUhrzeit(termin.uhrzeit_von, termin.uhrzeit_bis))
 

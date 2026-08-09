@@ -28,7 +28,7 @@ export async function createPartner(input: {
     .single()
 
   if (error || !data?.id) {
-    return { ok: false, message: error?.message ?? 'Netzwerk-Eintrag konnte nicht angelegt werden.' }
+    return { ok: false, message: error?.message ?? 'Partner konnte nicht angelegt werden.' }
   }
 
   revalidatePath('/partner')

@@ -190,11 +190,11 @@ export function PreislistenCsvImportModal({ open, onClose, onDone }: Props) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" onClick={handleClose} disabled={busy}>
-          Abbrechen
-        </Button>
         <Button type="button" variant="primary" onClick={() => void runImport()} disabled={busy || !file}>
           {busy ? 'Importiere…' : 'Importieren'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={handleClose} disabled={busy}>
+          Abbrechen
         </Button>
       </div>
     </Modal>

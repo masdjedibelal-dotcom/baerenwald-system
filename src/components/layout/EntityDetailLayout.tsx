@@ -1,114 +1,61 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
-import {
-  VorgangResolverBanner,
-  vorgangResolverBannerVisible,
-} from '@/components/vorgang/VorgangResolverBanner'
-import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
-import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
-import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorlage-actions'
+import { VorgangPhasenDiagramm } from '@/components/crm/VorgangPhasenDiagramm'
+import { VorgangResolverBanner } from '@/components/vorgang/VorgangResolverBanner'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
-import { parseAkteFromParam } from '@/lib/vorgang/akte-from'
-import { useIsMobile } from '@/hooks/useIsMobile'
-import { cn } from '@/lib/utils'
+import { getDetailRouteMeta } from '@/lib/detail-route-meta'
 
 export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
-  /** @deprecated Display-Phase — Prop bleibt für Aufrufer */
   phase?: VorgangPhase | null
-  /** @deprecated Phasen-Strip — nicht mehr im Header */
   projektKontext?: ProjektKontext | null
   head: DetailHeadProps
-  /**
-   * @deprecated Next-Step-Card ist entfernt (Mobil + Desktop) und wird nicht wieder gerendert.
-   * Props bleiben nur, damit bestehende Aufrufer typechecken — Werte werden ignoriert.
-   */
-  nextStep?: unknown
-  /** @deprecated ignoriert — Next-Step entfernt */
-  nextStepMetrics?: unknown
-  /** @deprecated ignoriert — Next-Step entfernt */
-  onNextStepClick?: () => void
-  /** @deprecated WV-Pill entfernt — Props bleiben für Aufrufer-Kompatibilität */
-  wiedervorlageDatum?: string | null
-  wiedervorlageNotiz?: string | null
-  wiedervorlageEntity?: WiedervorlageEntity
-  wiedervorlageEntityId?: string | null
-  onWiedervorlageSaved?: () => void
-  wiedervorlageOpen?: boolean
-  onWiedervorlageOpenChange?: (open: boolean) => void
-  quickBar?: QuickBarAction[]
-  /** @deprecated Breadcrumb entfernt */
-  breadcrumbTitle?: ReactNode
+  /** @deprecated nur noch für Fallback-Titel; Crumb-Pfad entfernt */
+  breadcrumbTitle?: string
   crumbBackHref?: string
   crumbBackLabel?: string
+  /** @deprecated ignoriert — kein Section-Crumb mehr */
   crumbSectionLabel?: string
-  /** Kontext-Band (z. B. Notfall) */
-  banner?: ReactNode
   children: ReactNode
   className?: string
 }
 
-/**
- * Vorgangs-Detail: Hero (nicht sticky) · QuickBar scrollt mit · Tabs sticky · Cards darunter.
- */
+/** Vorgangs-Detail: Zurück-Link · Kopf (Titel/Status/Kunde) · Phasen-Diagramm · Inhalt. */
 export function EntityDetailLayout({
   resolvedVorgang,
+  phase,
+  projektKontext,
   head,
-  quickBar,
   crumbBackHref,
-  crumbBackLabel = 'Zurück zu den Suchergebnissen',
-  banner,
+  crumbBackLabel,
   children,
   className,
 }: EntityDetailLayoutProps) {
-  const isMobile = useIsMobile()
-  const searchParams = useSearchParams()
-  const fromRef = useMemo(
-    () => parseAkteFromParam(searchParams.get('from')),
-    [searchParams]
-  )
+  const pathname = usePathname() ?? '/'
+  const routeMeta = getDetailRouteMeta(pathname)
 
-  const showResolver =
-    resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
+  const backHref = crumbBackHref ?? routeMeta.backHref ?? '/vorgaenge'
+  const backLabel = crumbBackLabel ?? 'Zurück zu den Suchergebnissen'
 
   return (
-    <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
-      <div className="detail-entity-hero">
-        <div className="detail-entity-toprow">
-          {fromRef ? (
-            <AkteRueckwegChip />
-          ) : crumbBackHref ? (
-            <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
-          ) : (
-            <span className="detail-entity-toprow__spacer" aria-hidden />
-          )}
-          <div className="detail-entity-toprow__actions">
-            <span id="detail-entity-top-overflow" className="detail-entity-top-overflow" />
-          </div>
-        </div>
-        {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
-        <DetailHead
-          title={head.title}
-          badges={head.badges}
-          titleBadges={head.titleBadges}
-          titleTrailing={isMobile ? undefined : head.titleTrailing}
-          meta={undefined}
-          sub={undefined}
-          actions={head.actions}
-          variant={head.variant}
-          className={head.className}
+    <div className={className ?? 'pb-6'}>
+      <MockDetailBackLink href={backHref} label={backLabel} />
+      {resolvedVorgang ? <VorgangResolverBanner resolved={resolvedVorgang} /> : null}
+      <DetailHead {...head} />
+      {phase ? (
+        <VorgangPhasenDiagramm
+          className="hidden md:block"
+          activePhase={phase}
+          projektKontext={projektKontext}
         />
-        {banner ? <div className="detail-entity-banner">{banner}</div> : null}
-        {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
-      </div>
-      <div className="detail-entity-body">{children}</div>
+      ) : null}
+      {children}
     </div>
   )
 }

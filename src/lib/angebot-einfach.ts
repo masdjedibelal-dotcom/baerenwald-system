@@ -151,25 +151,6 @@ export function betragAnzeige(
   return `${total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
-/** CRM-Listen/Karten: Beträge einheitlich brutto (Netto-DB-Feld × MwSt). */
-export function nettoZuBrutto(netto: number, mwstSatz = 19): number {
-  const n = Number(netto) || 0
-  if (n <= 0) return 0
-  return Math.round(n * (1 + mwstSatz / 100) * 100) / 100
-}
-
-export function betragAnzeigeBrutto(
-  gesamt_fix: number | null | undefined,
-  gesamt_min: number | null | undefined,
-  gesamt_max: number | null | undefined,
-  mwstSatz = 19
-): string {
-  const total = resolveAngebotGesamtbetrag(gesamt_fix, gesamt_min, gesamt_max)
-  if (total == null) return '—'
-  const brutto = nettoZuBrutto(total, mwstSatz)
-  return `${brutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
-}
-
 export function angebotSummenBrutto(positionen: AngebotPosition[], mwstSatz = 19) {
   const s = summenAusPositionen(positionen, mwstSatz)
   const netto =

@@ -52,7 +52,7 @@ export default async function LeadStatusPublicPage({ params }: { params: { id: s
       </header>
       <main className="mx-auto max-w-xl px-4 py-10">
         <h1 className="text-xl font-semibold text-[#1A3D2B]">Hallo {name}</h1>
-        <p className="mt-4 text-sm leading-relaxed text-[var(--text-2,#404a45)]">
+        <p className="mt-4 text-sm leading-relaxed text-[#374151]">
           Vielen Dank für Ihre Anfrage. Aktueller Stand: <strong>{st}</strong>. Wir melden uns bei Ihnen.
         </p>
         <a

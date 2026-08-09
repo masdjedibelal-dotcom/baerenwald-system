@@ -65,6 +65,17 @@ export function rechnungenFullBleedSubRoute(pathname: string): boolean {
   return pathname === '/rechnungen/neu'
 }
 
+export function partnerIdFromPath(pathname: string): string | null {
+  const m = pathname.match(/^\/partner\/([^/]+)/)
+  if (!m) return null
+  return m[1]
+}
+
+export function partnerFullBleedSubRoute(pathname: string): boolean {
+  void pathname
+  return false
+}
+
 export function handwerkerIdFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/handwerker\/([^/]+)/)
   if (!m) return null

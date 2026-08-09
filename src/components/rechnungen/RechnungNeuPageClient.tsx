@@ -24,18 +24,6 @@ export function RechnungNeuPageClient({
   const zahlungszielTage =
     Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || defaultZahlungszielTage(bootstrap.kunde?.typ))
 
-  function leave(rechnungId?: string) {
-    if (rechnungId) {
-      router.replace(`/rechnungen/${rechnungId}`)
-      return
-    }
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back()
-      return
-    }
-    router.replace('/vorgaenge?tab=rechnung')
-  }
-
   return (
     <RechnungWizard
       bootstrap={bootstrap}
@@ -43,8 +31,8 @@ export function RechnungNeuPageClient({
       preislisten={preislisten}
       firm={firm}
       zahlungszielTage={zahlungszielTage}
-      onClose={() => leave()}
-      onDone={(rechnungId) => leave(rechnungId)}
+      onClose={() => router.push('/rechnungen')}
+      onDone={(rechnungId) => router.push(`/rechnungen/${rechnungId}`)}
     />
   )
 }

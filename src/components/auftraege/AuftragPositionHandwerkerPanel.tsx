@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { ChevronDown, FileUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
@@ -43,7 +42,7 @@ export function AuftragPositionHandwerkerBadge({
   return (
     <span
       className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+        'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium',
         auftragHwStatusBadgeClass(st),
         className
       )}
@@ -66,7 +65,7 @@ function KonditionenWarteHinweis({
 
   if (partnerAkzeptiert) {
     return (
-      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
         <span className="font-semibold">Zuweisung angenommen — Konditionen fehlen noch.</span>{' '}
         Der Partner muss im Portal „Gegenangebot senden“ oder Preise bestätigen. Alternativ können
         Sie das Angebot manuell erfassen.
@@ -76,14 +75,14 @@ function KonditionenWarteHinweis({
 
   if (zuweisungStatus === 'angefragt' || zuweisungStatus === 'warten') {
     return (
-      <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[length:var(--fs-meta)] text-blue-950">
+      <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-950">
         Warte auf Antwort des Partners (Annahme oder Gegenangebot im Partner-Portal).
       </p>
     )
   }
 
   return (
-    <p className="rounded-md border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+    <p className="rounded-md border border-bw-border bg-bw-bg px-3 py-2 text-xs text-bw-text-muted">
       Noch keine Konditionen vom Partner — nach Zuweisung und Annahme erscheint hier das
       Gegenangebot zur Prüfung.
     </p>
@@ -102,26 +101,26 @@ function PositionKonditionVorschau({
   return (
     <div className="rounded-md border border-bw-border bg-surface p-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+        <span className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
           Partner-Vorschlag diese Leistung
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+            'rounded-full px-2 py-0.5 text-xs font-medium',
             hwKonditionenArtBadgeClass(art)
           )}
         >
           {hwKonditionenArtLabel(art)}
         </span>
         {kondition.geaendert ? (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-amber-950">
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-950">
             Geändert
           </span>
         ) : null}
       </div>
-      <div className="grid gap-2 text-[length:var(--fs-text)] sm:grid-cols-3">
+      <div className="grid gap-2 text-sm sm:grid-cols-3">
         <div>
-          <p className="text-[length:var(--fs-meta)] font-medium uppercase text-bw-text-muted">Vorschlag netto</p>
+          <p className="text-[10px] font-medium uppercase text-bw-text-muted">Vorschlag netto</p>
           <p className="tabular-nums font-medium text-bw-text">
             {kondition.ek_netto != null && kondition.ek_netto > 0
               ? betragAnzeige(kondition.ek_netto, null, null)
@@ -129,13 +128,13 @@ function PositionKonditionVorschau({
           </p>
         </div>
         <div>
-          <p className="text-[length:var(--fs-meta)] font-medium uppercase text-bw-text-muted">Vergütung netto</p>
+          <p className="text-[10px] font-medium uppercase text-bw-text-muted">Vergütung netto</p>
           <p className="tabular-nums font-semibold text-bw-text">
             {betragAnzeige(kondition.hw_netto, null, null)}
           </p>
         </div>
         <div>
-          <p className="text-[length:var(--fs-meta)] font-medium uppercase text-bw-text-muted">Differenz</p>
+          <p className="text-[10px] font-medium uppercase text-bw-text-muted">Differenz</p>
           <p
             className={cn(
               'tabular-nums font-medium',
@@ -238,7 +237,7 @@ export function AuftragPositionHandwerkerPanel({
     partnerRow &&
     (partnerRow.status ?? '').toLowerCase() === 'abgelehnt' &&
     partnerRow.ablehnung_grund ? (
-      <p className="rounded-md border border-danger/30 bg-danger/5 px-2 py-1.5 text-[length:var(--fs-meta)] text-danger">
+      <p className="rounded-md border border-danger/30 bg-danger/5 px-2 py-1.5 text-xs text-danger">
         Ablehnung: {labelHandwerkerAblehnung(partnerRow.ablehnung_grund)}
         {partnerRow.antwort_notiz?.trim() ? ` — ${partnerRow.antwort_notiz.trim()}` : ''}
       </p>
@@ -249,7 +248,7 @@ export function AuftragPositionHandwerkerPanel({
       {!embedded ? (
         <button
           type="button"
-          className="mt-2 flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-text-muted hover:text-bw-text"
+          className="mt-2 flex items-center gap-1 text-[11px] text-bw-text-muted hover:text-bw-text"
           onClick={toggleCrmStatus}
         >
           <ChevronDown
@@ -281,7 +280,7 @@ export function AuftragPositionHandwerkerPanel({
             disabled={pending}
             onChange={(e) => changeStatus(e.target.value as AuftragHandwerkerZuweisungStatus)}
             options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            className="text-[length:var(--fs-text)]"
+            className="text-sm"
           />
         </div>
       ) : null}
@@ -292,28 +291,28 @@ export function AuftragPositionHandwerkerPanel({
     <div className="space-y-3">
       {!embedded ? (
         <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
-          <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
             Zuweisung
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {pos.handwerker?.name ? (
-              <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{pos.handwerker.name}</span>
+              <span className="text-sm font-medium text-bw-text">{pos.handwerker.name}</span>
             ) : null}
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                'rounded-full px-2 py-0.5 text-xs font-medium',
                 auftragHwStatusBadgeClass(zuweisungStatus)
               )}
             >
               {auftragHwStatusLabel(zuweisungStatus)}
             </span>
             {partnerRow?.antwort_at ? (
-              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              <span className="text-xs text-bw-text-muted">
                 {formatDatumZeit(partnerRow.antwort_at)}
               </span>
             ) : null}
           </div>
-          <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="mt-2 text-xs text-bw-text-muted">
             „Akzeptiert“ bedeutet: Partner hat die Anfrage angenommen — nicht automatisch, dass Preise
             vereinbart sind.
           </p>
@@ -329,16 +328,16 @@ export function AuftragPositionHandwerkerPanel({
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {!embedded ? (
-            <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-bw-text-muted">
               Konditionen & Verhandlung
             </p>
           ) : (
-            <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">Gegenvorschlag & Aktionen</p>
+            <p className="text-sm font-semibold text-bw-text">Gegenvorschlag & Aktionen</p>
           )}
           {eingereicht ? (
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                'rounded-full px-2 py-0.5 text-xs font-medium',
                 hwStatusBadgeClass(partnerRow?.hw_status)
               )}
             >
@@ -348,7 +347,7 @@ export function AuftragPositionHandwerkerPanel({
         </div>
 
         {!partnerRow ? (
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="text-xs text-bw-text-muted">
             Keine Angebots-Zuweisung verknüpft — Handwerker wurde ggf. nur direkt auf dem Auftrag
             gesetzt.
           </p>
@@ -369,14 +368,14 @@ export function AuftragPositionHandwerkerPanel({
             ) : null}
 
             {partnerRow.hw_notiz?.trim() ? (
-              <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap">
+              <p className="mt-2 text-xs text-bw-text-muted whitespace-pre-wrap">
                 <span className="font-medium text-bw-text">Partner-Notiz:</span>{' '}
                 {partnerRow.hw_notiz.trim()}
               </p>
             ) : null}
 
             {konditionenWartenAufHw ? (
-              <p className="mt-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-[length:var(--fs-meta)] text-violet-950">
+              <p className="mt-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-950">
                 <span className="font-semibold">CRM hat übernommen.</span> Der Partner muss die vereinbarten
                 Konditionen im Portal noch bestätigen — danach Status „übernommen“ und optional Angebots-PDF.
               </p>
@@ -387,7 +386,7 @@ export function AuftragPositionHandwerkerPanel({
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="mt-3 h-7 gap-1 text-[length:var(--fs-meta)]"
+                className="mt-3 h-7 gap-1 text-xs"
                 onClick={() => setManuellOpen(true)}
               >
                 <FileUp className="h-3.5 w-3.5" aria-hidden />

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
-import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
 import type { FreigabeModus, PortalModus } from '@/lib/types'
 
@@ -14,7 +13,6 @@ export type SaveKundeOrganisationInput = {
   freigabe_modus: FreigabeModus
   freigabe_schwelle_eur?: number | null
   notfall_direkt: boolean
-  kleinreparaturen_ohne_angebot?: boolean
 }
 
 function parseSchwelle(raw: number | null | undefined): number | null {
@@ -55,91 +53,57 @@ export async function saveKundeOrganisation(
     db.from('kunden').select('typ').eq('id', id).maybeSingle()
   )
   if (kundeErr) return { ok: false, message: kundeErr.message }
-  const typ = (kundeRow as { typ?: string } | null)?.typ
-  const istHausverwaltung = istKundeHausverwaltungTyp(typ)
+  const istHausverwaltung = (kundeRow as { typ?: string } | null)?.typ === 'hausverwaltung'
 
-  if (!istHausverwaltung) {
-    return { ok: false, message: 'Organisation & Portal ist nur für Hausverwaltungskunden verfügbar.' }
-  }
-
-  const slug = normalizeOrgSlug(input.org_kennung ?? '')
-  if (!isValidMeldeSlug(slug)) {
-    return {
-      ok: false,
-      message: 'Für Hausverwaltung ist eine gültige Org-Kennung Pflicht (2–48 Zeichen, a-z, 0-9, -).',
+  if (istHausverwaltung) {
+    const hvPayload: Record<string, unknown> = {
+      portal_modus: 'organisation',
+      freigabe_modus: 'freigabe',
+      freigabe_schwelle_eur: null,
+      notfall_direkt: false,
+      org_anzeigename: input.org_anzeigename?.trim() || null,
+      org_logo_url: input.org_logo_url?.trim() || null,
     }
+    const slug = normalizeOrgSlug(input.org_kennung ?? '')
+    if (!isValidMeldeSlug(slug)) {
+      return {
+        ok: false,
+        message: 'Für Hausverwaltung ist eine gültige Org-Kennung Pflicht (2–48 Zeichen, a-z, 0-9, -).',
+      }
+    }
+    const unique = await checkOrgKennungUnique(slug, id)
+    if (!unique.ok) return unique
+    hvPayload.org_kennung = slug
+    const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(hvPayload).eq('id', id))
+    if (error) return { ok: false, message: error.message }
+    revalidatePath('/kunden')
+    revalidatePath(`/kunden/${id}`)
+    return { ok: true }
   }
-  const unique = await checkOrgKennungUnique(slug, id)
-  if (!unique.ok) return unique
 
-  const freigabeModus: FreigabeModus = input.freigabe_modus === 'direkt' ? 'direkt' : 'freigabe'
+  const portalModus = input.portal_modus
   const payload: Record<string, unknown> = {
-    portal_modus: 'organisation',
-    org_kennung: slug,
+    portal_modus: portalModus,
+    freigabe_modus: input.freigabe_modus,
+    freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
+    notfall_direkt: input.notfall_direkt,
     org_anzeigename: input.org_anzeigename?.trim() || null,
     org_logo_url: input.org_logo_url?.trim() || null,
-    freigabe_modus: freigabeModus,
-    freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
-    notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
-    kleinreparaturen_ohne_angebot: Boolean(input.kleinreparaturen_ohne_angebot),
   }
 
-  const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
-  if (error) {
-    // Migration ggf. noch nicht angewendet — ohne neues Flag erneut speichern
-    const msg = error.message ?? ''
-    if (
-      input.kleinreparaturen_ohne_angebot != null &&
-      (msg.includes('kleinreparaturen_ohne_angebot') || msg.includes('PGRST204'))
-    ) {
-      const { kleinreparaturen_ohne_angebot: _drop, ...ohneFlag } = payload
-      void _drop
-      const retry = await withCrmReadFallback(async (db) =>
-        db.from('kunden').update(ohneFlag).eq('id', id)
-      )
-      if (retry.error) return { ok: false, message: retry.error.message }
-    } else {
-      return { ok: false, message: error.message }
+  if (portalModus === 'organisation') {
+    const slug = normalizeOrgSlug(input.org_kennung ?? '')
+    if (!isValidMeldeSlug(slug)) {
+      return {
+        ok: false,
+        message: 'Bei Auftraggeber-Modus ist eine gültige Org-Kennung Pflicht (2–48 Zeichen, a-z, 0-9, -).',
+      }
     }
-  }
-
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
-  return { ok: true }
-}
-
-/** Nur Freigabe-Regeln (HV-Übersicht) — ohne Org-Kennung/Logo. */
-export async function saveKundeFreigabeRegeln(
-  kundeId: string,
-  input: {
-    freigabe_schwelle_eur?: number | null
-    notfall_direkt: boolean
-    freigabe_modus?: FreigabeModus
-  }
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const id = kundeId?.trim()
-  if (!id) return { ok: false, message: 'Kunde fehlt.' }
-
-  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('typ, freigabe_modus').eq('id', id).maybeSingle()
-  )
-  if (kundeErr) return { ok: false, message: kundeErr.message }
-  const row = kundeRow as { typ?: string; freigabe_modus?: FreigabeModus | null } | null
-  if (!istKundeHausverwaltungTyp(row?.typ)) {
-    return { ok: false, message: 'Freigabe-Regeln nur für Hausverwaltung.' }
-  }
-
-  const freigabeModus: FreigabeModus =
-    input.freigabe_modus === 'direkt' || input.freigabe_modus === 'freigabe'
-      ? input.freigabe_modus
-      : row?.freigabe_modus === 'direkt'
-        ? 'direkt'
-        : 'freigabe'
-
-  const payload = {
-    freigabe_modus: freigabeModus,
-    freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
-    notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
+    const unique = await checkOrgKennungUnique(slug, id)
+    if (!unique.ok) return unique
+    payload.org_kennung = slug
+  } else {
+    payload.org_kennung = null
   }
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))

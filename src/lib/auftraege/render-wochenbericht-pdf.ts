@@ -3,7 +3,7 @@ import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import { aggregiereBaustellenPersonal } from '@/lib/auftraege/baustelle-helpers'
 import type { AuftragBaustelleTeam, AuftragRegiearbeit, AuftragWochenbericht } from '@/lib/auftraege/baustelle-types'
-import { firmZeileAdresse, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   buildWochenberichtHtml,
   buildWochenberichtPdfFooterTemplate,
@@ -12,6 +12,9 @@ import {
 } from '@/lib/templates/wochenbericht-template'
 import type { Kunde } from '@/lib/types'
 
+function firmZeileAdresse(f: FirmenEinstellungen): string {
+  return [[f.strasse, [f.plz, f.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')].join('\n')
+}
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
   return [f.telefon ? `Tel. ${f.telefon}` : '', f.email ?? '', f.website ?? ''].filter(Boolean).join(' · ')

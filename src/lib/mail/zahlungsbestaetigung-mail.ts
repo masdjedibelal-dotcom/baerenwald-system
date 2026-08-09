@@ -1,5 +1,4 @@
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -28,7 +27,6 @@ export type ZahlungsbestaetigungMailInput = {
   brutto: number
   bezahltAm: string
   projektTitel?: string | null
-  reverseCharge?: boolean
 }
 
 export function zahlungsbestaetigungMailBetreff(
@@ -64,7 +62,7 @@ export function buildZahlungsbestaetigungMail(
   const summaryHtml = mailSummaryBlock({
     label: anrede === 'du' ? `ZAHLUNG ERHALTEN · ${nr}` : `ZAHLUNG ERHALTEN · ${nr}`,
     title: titel,
-    priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
+    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(data.brutto)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`,
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Bezahlt am:</strong> ${bezahltAm}</p>`,
   })
 

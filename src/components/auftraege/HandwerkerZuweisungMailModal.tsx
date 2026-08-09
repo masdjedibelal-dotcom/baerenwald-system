@@ -1,12 +1,12 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Link2 } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
+import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
@@ -19,41 +19,6 @@ export type HandwerkerZuweisungMailTarget = {
   positionIds?: string[]
 }
 
-function MailFooter({
-  pending,
-  loading,
-  canSend,
-  portalLink,
-  onSend,
-  onCopyLink,
-}: {
-  pending: boolean
-  loading: boolean
-  canSend: boolean
-  portalLink?: string
-  onSend: () => void
-  onCopyLink: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Später
-      </Button>
-      {portalLink ? (
-        <Button type="button" variant="secondary" onClick={() => void onCopyLink()}>
-          <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
-          Link kopieren
-        </Button>
-      ) : null}
-      <Button type="button" variant="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
-        Jetzt senden
-      </Button>
-    </div>
-  )
-}
-
-/** Partner-Mail — EditorSheet Split-over (Mock Surface B). */
 export function HandwerkerZuweisungMailModal({
   open,
   onClose,
@@ -72,7 +37,6 @@ export function HandwerkerZuweisungMailModal({
   onCloseRef.current = onClose
   const [pending, startTransition] = useTransition()
   const [loading, setLoading] = useState(false)
-  const [dirty, setDirty] = useState(false)
   const [mail, setMail] = useState<{
     betreff: string
     html: string
@@ -84,13 +48,11 @@ export function HandwerkerZuweisungMailModal({
   useEffect(() => {
     if (!open || !target?.handwerkerId) {
       setMail(null)
-      setDirty(false)
       return
     }
     let cancelled = false
     setLoading(true)
     setMail(null)
-    setDirty(false)
     void (async () => {
       const res = await fetch(`/api/auftraege/${auftragId}/partner-mail`, {
         method: 'POST',
@@ -157,7 +119,6 @@ export function HandwerkerZuweisungMailModal({
         return
       }
       toast.success(`Partner-Mail an ${target.handwerkerName} gesendet`)
-      setDirty(false)
       onSent?.()
       router.refresh()
       onClose()
@@ -175,39 +136,39 @@ export function HandwerkerZuweisungMailModal({
   }
 
   return (
-    <EditorSheet
+    <Modal
       open={open}
       onClose={onClose}
-      title="Partner-Mail"
-      crumb={target ? `${target.handwerkerName} >` : null}
-      context="detail"
-      dirty={dirty}
+      title={target ? `Partner-Mail — ${target.handwerkerName}` : 'Partner-Mail'}
       size="lg"
-      compose
-      composeLabel="Senden"
-      onConfirm={sendNow}
-      confirmBusy={pending || loading}
-      confirmDisabled={!mail}
       footer={
-        <MailFooter
-          pending={pending}
-          loading={loading}
-          canSend={!!mail}
-          portalLink={mail?.portalLink}
-          onSend={sendNow}
-          onCopyLink={copyPortalLink}
+        <ModalFormFooter
+          onCancel={onClose}
+          onSubmit={sendNow}
+          submitLabel="Jetzt senden"
+          cancelLabel="Später"
+          loading={pending || loading}
+          submitDisabled={!mail}
+          extra={
+            mail?.portalLink ? (
+              <Button type="button" variant="secondary" className="w-full md:w-auto" onClick={() => void copyPortalLink()}>
+                <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
+                Link kopieren
+              </Button>
+            ) : null
+          }
         />
       }
     >
       {loading ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
+        <p className="text-sm text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
       ) : mail && target ? (
         <div className="space-y-3">
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             Leistungsanfrage an den Partner. Bitte Text und Portal-Link prüfen und versenden (An / CC wie
             gewohnt).
           </p>
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+          <p className="text-sm text-bw-text-muted">
             Gewerk: <span className="font-medium text-bw-text">{target.gewerkName}</span>
             {target.positionIds && target.positionIds.length > 1 ? (
               <span className="text-bw-text-muted">
@@ -219,37 +180,26 @@ export function HandwerkerZuweisungMailModal({
           <Input
             label="Betreff"
             value={mail.betreff}
-            onChange={(e) => {
-              setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
-              setDirty(true)
-            }}
+            onChange={(e) => setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))}
           />
           <EmailPillsField
             label="An"
             required
             emails={mail.to}
-            onChange={(emails) => {
-              setMail((prev) => (prev ? { ...prev, to: emails } : prev))
-              setDirty(true)
-            }}
+            onChange={(emails) => setMail((prev) => (prev ? { ...prev, to: emails } : prev))}
             placeholder="handwerker@beispiel.de"
           />
           <EmailPillsField
             label="CC"
             emails={mail.cc}
-            onChange={(emails) => {
-              setMail((prev) => (prev ? { ...prev, cc: emails } : prev))
-              setDirty(true)
-            }}
+            onChange={(emails) => setMail((prev) => (prev ? { ...prev, cc: emails } : prev))}
             placeholder="weitere@beispiel.de"
             hint="Optional."
           />
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Versand über CRM (Resend) — inkl. Button zum Partner-Portal.
-          </p>
+          <p className="text-xs text-bw-text-muted">Versand über CRM (Resend) — inkl. Button zum Partner-Portal.</p>
           <CollapsibleMailPreview previewHtml={mail.html} />
         </div>
       ) : null}
-    </EditorSheet>
+    </Modal>
   )
 }

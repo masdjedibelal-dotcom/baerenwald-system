@@ -5,8 +5,8 @@ export type PageHeaderCrumb = { label: string; href?: string }
 
 /**
  * Optionale Page-Meta unterhalb der TopBar.
- * Der Seitentitel kommt aus der TopBar (Desktop) bzw. der Mobile-Screen-Titelzeile
- * und wird hier NICHT dupliziert.
+ * Der Seitentitel kommt grundsätzlich aus der TopBar (siehe Sidebar/TopBar) und
+ * wird hier NICHT mehr dupliziert.
  *
  * Slots:
  *  - description: kurze Erläuterung
@@ -38,7 +38,7 @@ export function PageHeader({
         >
           {description ? (
             <div className="min-w-0">
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">{description}</p>
+              <p className="text-sm text-bw-text-muted">{description}</p>
             </div>
           ) : null}
           {action ? (

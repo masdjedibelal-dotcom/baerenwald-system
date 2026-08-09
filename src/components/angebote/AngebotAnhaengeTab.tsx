@@ -1,15 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
-import { useIsMobile } from '@/hooks/useIsMobile'
 
-const COLS = 'minmax(0, 1fr) auto auto'
+const COLS = '28px 1.6fr 1fr 120px 110px 70px'
 
 type DocRow = {
   id: string
@@ -17,6 +17,7 @@ type DocRow = {
   href: string
   created_at: string
   beschreibung: string
+  isImage: boolean
 }
 
 function formatDatum(iso: string): string {
@@ -36,60 +37,38 @@ function angebotPdfDateiname(detail: AngebotDetail): string {
   return `Angebot_${nr.replace(/\s+/g, '_')}_Baerenwald.pdf`
 }
 
-function openDokumentDatei(url: string) {
-  const href = url.trim()
-  if (!href) return
-  window.open(href, '_blank', 'noopener,noreferrer')
+function isImageDoc(name: string, url: string): boolean {
+  return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(`${name} ${url}`)
 }
 
-type RechnungKurz = {
-  id: string
-  created_at?: string | null
-  rechnungsnummer?: string | null
-  status?: string | null
-  rechnungsdatum?: string | null
-  gesendet_at?: string | null
-  pdf_url?: string | null
-  rechnung_art?: string | null
-  abschlag_index?: number | null
-  beleg_typ?: string | null
-}
-
-/**
- * Badge-Zähler für den Dokumente-Tab (Upload + Angebot-PDF + optional Fotos/Rechnungen).
- */
+/** Badge-Zähler: Lead-Uploads + Angebot-PDF (+ Projektfotos nur ohne Lead-Upload-UI). */
 export function anzahlAngebotAnhaenge(
   detail: AngebotDetail,
-  dokumente: LeadDokumentRow[],
-  opts?: { includeFotos?: boolean; rechnungenCount?: number }
+  leadDokumente?: LeadDokumentRow[] | null,
+  opts?: { includeFotos?: boolean }
 ): number {
-  const rechnungenCount = opts?.rechnungenCount ?? 0
-  if (opts?.includeFotos) {
-    return 1 + parseProjektFotos(detail.fotos_urls).length + rechnungenCount
-  }
-  return dokumente.length + 1 + rechnungenCount
+  const uploads = Array.isArray(leadDokumente) ? leadDokumente.length : 0
+  const fotos =
+    opts?.includeFotos === false ? 0 : parseProjektFotos(detail.fotos_urls).length
+  return uploads + 1 + fotos
 }
 
 /**
- * Angebot → Dokumente: gleiche Liste wie Anfrage (Lead-Uploads + Angebote + Rechnungen).
- * Fallback ohne Lead: PDF + Projektfotos.
+ * Dokumente-Tab wie Anfrage: bei Lead → AnfrageDokumenteTab (Upload + PDF),
+ * sonst MockDokumenteCard mit PDF + Projektfotos.
  */
 export function AngebotAnhaengeTab({
   detail,
-  leadId: leadIdProp = null,
+  leadId,
   dokumente = [],
-  rechnungen = [],
   onReload,
 }: {
   detail: AngebotDetail
   leadId?: string | null
   dokumente?: LeadDokumentRow[]
-  rechnungen?: RechnungKurz[]
-  onReload: () => void
+  onReload?: () => void
 }) {
-  const leadId = leadIdProp?.trim() || detail.lead_id?.trim() || null
-
-  if (leadId) {
+  if (leadId?.trim() && onReload) {
     return (
       <AnfrageDokumenteTab
         leadId={leadId}
@@ -102,7 +81,6 @@ export function AngebotAnhaengeTab({
             pdf_url: detail.pdf_url,
           },
         ]}
-        rechnungen={rechnungen}
         onReload={onReload}
       />
     )
@@ -112,7 +90,7 @@ export function AngebotAnhaengeTab({
 }
 
 function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
-  const isMobile = useIsMobile()
+  const [view, setView] = useState<DocRow | null>(null)
   const erstellt = detail.updated_at || detail.created_at
   const pdfHref = detail.pdf_url?.trim() || `/api/angebote/${detail.id}/pdf`
 
@@ -124,6 +102,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
         href: pdfHref,
         created_at: erstellt,
         beschreibung: 'Angebot PDF',
+        isImage: false,
       },
     ]
     parseProjektFotos(detail.fotos_urls).forEach((foto, i) => {
@@ -134,74 +113,122 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
         href: foto.url,
         created_at: erstellt,
         beschreibung: foto.beschreibung?.trim() || '',
+        isImage: isImageDoc(name, foto.url),
       })
     })
     return rows
   }, [detail, erstellt, pdfHref])
 
   return (
-    <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
-      {docs.length === 0 ? null : isMobile ? (
-        <div className="dok-cards">
-          {docs.map((d) => {
-            const meta = [d.beschreibung || null, formatDatum(d.created_at)]
-              .filter(Boolean)
-              .join(' · ')
-            return (
-              <DokMobileCard
-                key={d.id}
-                title={d.name}
-                meta={meta}
-                onClick={() => openDokumentDatei(d.href)}
-                badge={<span className="dok-card__tag">intern</span>}
-              />
-            )
-          })}
-        </div>
-      ) : (
-        <div className="dok-list">
-          {docs.map((d) => {
-            const meta = [d.beschreibung || null, formatDatum(d.created_at)]
-              .filter(Boolean)
-              .join(' · ')
-            return (
+    <>
+      <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
+        {docs.length === 0 ? null : (
+          <div className="dok-list">
+            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
+              <div />
+              <div>Name</div>
+              <div>Beschreibung</div>
+              <div>Datum</div>
+              <div>Freigabe</div>
+              <div />
+            </div>
+            {docs.map((d) => (
               <div
                 key={d.id}
-                className="list-row dok-list__row--openable"
-                style={{ gridTemplateColumns: COLS, cursor: 'pointer', alignItems: 'center' }}
-                role="button"
-                tabIndex={0}
-                onClick={() => openDokumentDatei(d.href)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openDokumentDatei(d.href)
-                  }
-                }}
+                className="list-row"
+                style={{ gridTemplateColumns: COLS, cursor: 'default', alignItems: 'center' }}
               >
-                <div className="dok-list__main min-w-0">
-                  <div className="dok-list__name">
-                    {d.name}
-                    {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
-                  </div>
+                <MockIcon
+                  ctx="row"
+                  n={d.isImage ? 'photo' : 'file-text'}
+                  size={18}
+                  style={{ color: 'var(--text-3)' }}
+                />
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {d.name}
                 </div>
-                <span className="dok-list__freigabe">
-                  <span>intern</span>
-                </span>
-                <div className="dok-list__actions" onClick={(e) => e.stopPropagation()}>
-                  <MockBtn
-                    sm
-                    kind="ghost"
-                    icon="eye"
-                    title="Ansehen"
-                    onClick={() => openDokumentDatei(d.href)}
-                  />
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: 'var(--text-3)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {d.beschreibung || <span style={{ color: 'var(--text-4)' }}>—</span>}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {formatDatum(d.created_at)}
+                </div>
+                <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>intern</span>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <MockBtn sm kind="ghost" icon="eye" title="Ansehen" onClick={() => setView(d)} />
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
-    </MockDokumenteCard>
+            ))}
+          </div>
+        )}
+      </MockDokumenteCard>
+
+      <MockModal
+        open={!!view}
+        onClose={() => setView(null)}
+        icon={view?.isImage ? 'photo' : 'file-text'}
+        title={view?.name ?? 'Dokument'}
+        sub={view ? formatDatum(view.created_at) : undefined}
+        footer={
+          <MockBtn sm kind="primary" icon="x" onClick={() => setView(null)}>
+            Schließen
+          </MockBtn>
+        }
+      >
+        {view ? (
+          view.isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={view.href}
+              alt={view.name}
+              style={{ width: '100%', borderRadius: 8, display: 'block' }}
+            />
+          ) : (
+            <div
+              style={{
+                padding: 40,
+                textAlign: 'center',
+                background: 'var(--bg-soft)',
+                borderRadius: 10,
+                border: '0.5px solid var(--border)',
+              }}
+            >
+              <MockIcon
+                ctx="empty"
+                n="file-text"
+                size={44}
+                style={{ color: 'var(--text-4)' }}
+              />
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 10 }}>{view.name}</div>
+              <a
+                href={view.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn ghost sm"
+                style={{ marginTop: 12, display: 'inline-flex' }}
+              >
+                Datei öffnen
+              </a>
+            </div>
+          )
+        ) : null}
+      </MockModal>
+    </>
   )
 }

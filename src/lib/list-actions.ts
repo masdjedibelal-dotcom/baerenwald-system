@@ -3,43 +3,28 @@
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { toast } from '@/components/ui/app-toast'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
-import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
   duplicateAnfrage,
   duplicateAngebotHref,
   duplicateAuftragHref,
   duplicateRechnung,
+  duplicatePartner,
 } from '@/app/(dashboard)/crm/list-copy-actions'
 import { duplicateKunde } from '@/app/actions/kunden'
 import { duplicateHandwerker } from '@/app/(dashboard)/handwerker/actions'
 
-export async function runDeleteVorgang(
+export function runDeleteVorgang(
   leadId: string,
   router: AppRouterInstance,
   label = 'Vorgang'
-): Promise<void> {
-  const r = await deleteVorgang(leadId)
-  if (!r.ok) {
-    toast.error(r.message)
-    throw new Error(r.message)
-  }
-  toast.success(`${label} gelöscht`)
-  router.refresh()
-}
-
-/** Standalone-Rechnung (ohne Lead) aus der Vorgänge-Liste löschen. */
-export async function runDeleteStandaloneRechnung(
-  rechnungId: string,
-  router: AppRouterInstance,
-  label = 'Rechnung'
-): Promise<void> {
-  const r = await deleteRechnungEntwurf(rechnungId)
-  if (!r.ok) {
-    toast.error(r.message)
-    throw new Error(r.message)
-  }
-  toast.success(`${label} gelöscht`)
-  router.refresh()
+) {
+  void deleteVorgang(leadId).then((r) => {
+    if (!r.ok) toast.error(r.message)
+    else {
+      toast.success(`${label} gelöscht`)
+      router.refresh()
+    }
+  })
 }
 
 export function runDuplicateAnfrage(leadId: string, router: AppRouterInstance) {
@@ -99,3 +84,12 @@ export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterIn
   })
 }
 
+export function runDuplicatePartner(partnerId: string, router: AppRouterInstance) {
+  void duplicatePartner(partnerId).then((r) => {
+    if (!r.ok) toast.error(r.message)
+    else {
+      toast.success('Partner kopiert')
+      router.push(`/partner/${r.id}`)
+    }
+  })
+}

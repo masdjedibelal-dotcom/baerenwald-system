@@ -17,10 +17,10 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-status-order-bg text-status-order-text">
         <CheckCircle2 className="h-9 w-9" aria-hidden />
       </div>
-      <h2 className="text-[length:var(--fs-head)] font-semibold text-bw-text">
+      <h2 className="text-xl font-semibold text-bw-text">
         {versendet ? 'Angebot versendet' : 'Angebot erstellt'}
       </h2>
-      <p className="mx-auto mt-2 max-w-md text-[length:var(--fs-text)] text-bw-text-muted">
+      <p className="mx-auto mt-2 max-w-md text-sm text-bw-text-muted">
         {versendet ? (
           <>
             Das Angebot für <strong className="font-medium text-bw-text">{kundeName}</strong> wurde

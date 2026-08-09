@@ -17,7 +17,7 @@ export function AngebotVisualisierungenTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="text-sm text-bw-text-muted">
           KI-Visualisierungen für dieses Angebot — Vorher/Nachher für Kunden-PDF und Mail.
         </p>
         <Link href={`/angebote/${angebotId}/visualisierung`}>
@@ -30,7 +30,7 @@ export function AngebotVisualisierungenTab({
 
       {!sessions.length ? (
         <Card>
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Visualisierungen. Erstelle die erste mit Ist-Fotos und einem Prompt.</p>
+          <p className="text-sm text-bw-text-muted">Noch keine Visualisierungen. Erstelle die erste mit Ist-Fotos und einem Prompt.</p>
         </Card>
       ) : (
         <ul className="divide-y divide-bw-border rounded-xl border border-bw-border bg-white">
@@ -46,23 +46,23 @@ export function AngebotVisualisierungenTab({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumb} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[length:var(--fs-meta)] text-bw-text-muted">—</div>
+                    <div className="flex h-full items-center justify-center text-xs text-bw-text-muted">—</div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
+                  <p className="text-sm font-medium text-bw-text">
                     {formatDatumZeit(s.created_at)}
-                    <span className="ml-2 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
+                    <span className="ml-2 text-xs font-normal text-bw-text-muted">
                       {s.prompt_history.length} Version{s.prompt_history.length === 1 ? '' : 'en'}
                     </span>
                   </p>
-                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                  <p className="text-xs text-bw-text-muted">
                     Status: {s.status} · Im Angebot: {s.ins_angebot ? 'Ja' : 'Nein'}
                   </p>
                 </div>
                 <Link
                   href={`/angebote/${angebotId}/visualisierung?session=${encodeURIComponent(s.id)}`}
-                  className="text-[length:var(--fs-text)] text-bw-link hover:underline"
+                  className="text-sm text-bw-link hover:underline"
                 >
                   Öffnen →
                 </Link>

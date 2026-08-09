@@ -1,47 +1,33 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import type { LeadDokumentRow, Rechnung } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 
-const COLS = 'minmax(0, 1fr) auto auto'
+const COLS = '28px 1.6fr 1fr 120px 110px 70px'
 
 function pdfName(detail: Rechnung): string {
   const nr = detail.rechnungsnummer?.trim() || `RE-${detail.id.slice(0, 8).toUpperCase()}`
   return `Rechnung_${nr.replace(/\s+/g, '_')}_Baerenwald.pdf`
 }
 
-type RechnungKurz = {
-  id: string
-  created_at?: string | null
-  rechnungsnummer?: string | null
-  status?: string | null
-  rechnungsdatum?: string | null
-  gesendet_at?: string | null
-  pdf_url?: string | null
-  rechnung_art?: string | null
-  abschlag_index?: number | null
-  beleg_typ?: string | null
-}
-
-/** Eine Dokumente-Liste: aktuelle RE + Geschwister + Uploads (kein zweiter „Dokumente“-Block). */
 export function RechnungDokumenteTab({
   detail,
   leadId,
   dokumente = [],
-  rechnungen = [],
   onReload,
 }: {
   detail: Rechnung
   leadId?: string | null
   dokumente?: LeadDokumentRow[]
-  rechnungen?: RechnungKurz[]
   onReload: () => void
 }) {
+  const [preview, setPreview] = useState(false)
   const pdfHref = detail.pdf_url?.trim() || `/api/rechnungen/${detail.id}/pdf`
   const name = pdfName(detail)
   const datum = detail.rechnungsdatum
@@ -50,73 +36,67 @@ export function RechnungDokumenteTab({
       ? formatDatum(detail.created_at.slice(0, 10))
       : '—'
 
-  const alleRechnungen = useMemo((): RechnungKurz[] => {
-    const extra = detail as Rechnung & {
-      rechnung_art?: string | null
-      abschlag_index?: number | null
-    }
-    const byId = new Map<string, RechnungKurz>()
-    for (const r of rechnungen) byId.set(r.id, r)
-    byId.set(detail.id, {
-      id: detail.id,
-      created_at: detail.created_at,
-      rechnungsnummer: detail.rechnungsnummer,
-      status: detail.status,
-      rechnungsdatum: detail.rechnungsdatum,
-      gesendet_at: detail.gesendet_at,
-      pdf_url: detail.pdf_url,
-      rechnung_art: extra.rechnung_art ?? null,
-      abschlag_index: extra.abschlag_index ?? null,
-      beleg_typ: detail.beleg_typ,
-    })
-    return Array.from(byId.values())
-  }, [rechnungen, detail])
-
-  if (leadId) {
-    return (
-      <AnfrageDokumenteTab
-        leadId={leadId}
-        dokumente={dokumente}
-        angebote={[]}
-        rechnungen={alleRechnungen}
-        immerRechnungIds={[detail.id]}
-        onReload={onReload}
-      />
-    )
-  }
-
   return (
-    <MockDokumenteCard>
-      <div className="dok-list">
-        <div className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
-          <div className="dok-list__main min-w-0">
-            <div className="dok-list__name">
+    <>
+      <MockDokumenteCard>
+        <div className="dok-list">
+          <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
+            <div />
+            <div>Name</div>
+            <div>Beschreibung</div>
+            <div>Datum</div>
+            <div>Freigabe</div>
+            <div />
+          </div>
+          <div className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
+            <MockIcon ctx="row" n="file-text" size={18} />
+            <div className="min-w-0 truncate text-[13px] font-medium text-bw-text">
               <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="hover:text-bw-link">
                 {name}
               </a>
-              <span className="dok-list__name-size">
-                {' '}
-                · Rechnungs-PDF{datum ? ` · ${datum}` : ''}
-              </span>
+            </div>
+            <div className="min-w-0 truncate text-[12.5px] text-bw-text-muted">Rechnungs-PDF</div>
+            <div className="whitespace-nowrap text-[12px] tabular-nums text-bw-text-muted">{datum}</div>
+            <div className="text-[12px] text-bw-text-muted">—</div>
+            <div className="flex justify-end gap-1">
+              <MockBtn
+                sm
+                kind="ghost"
+                icon="eye"
+                title="Vorschau"
+                onClick={() => setPreview(true)}
+              />
+              <a href={pdfHref} download className="btn ghost sm icon" title="Download">
+                <MockIcon ctx="btn" n="download" size={14} />
+              </a>
             </div>
           </div>
-          <span className="dok-list__freigabe">
-            <span>—</span>
-          </span>
-          <div className="dok-list__actions">
-            <MockBtn
-              sm
-              kind="ghost"
-              icon="eye"
-              title="Vorschau"
-              onClick={() => window.open(pdfHref, '_blank')}
-            />
-            <a href={pdfHref} download className="btn ghost sm icon" title="Download">
-              <MockIcon ctx="btn" n="download" size={14} />
-            </a>
-          </div>
         </div>
-      </div>
-    </MockDokumenteCard>
+      </MockDokumenteCard>
+
+      {leadId ? (
+        <AnfrageDokumenteTab
+          leadId={leadId}
+          dokumente={dokumente}
+          angebote={[]}
+          onReload={onReload}
+        />
+      ) : null}
+
+      <MockModal
+        open={preview}
+        onClose={() => setPreview(false)}
+        icon="file-text"
+        title={name}
+        sub="Rechnungs-PDF"
+        footer={
+          <MockBtn kind="primary" icon="external-link" onClick={() => window.open(pdfHref, '_blank')}>
+            In neuem Tab öffnen
+          </MockBtn>
+        }
+      >
+        <iframe title={name} src={pdfHref} style={{ width: '100%', height: 420, border: 0, borderRadius: 8 }} />
+      </MockModal>
+    </>
   )
 }

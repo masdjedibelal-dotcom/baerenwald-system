@@ -1,25 +1,21 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
-import { Check, Link2, Mail, Trash2 } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { Link2, Mail } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
-  handwerkerZuweisungAktiv,
 } from '@/lib/angebote/angebot-handwerker-flow'
-import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import {
   normalizeAngebotPositionen,
@@ -31,10 +27,6 @@ import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
 import { mailAngebot } from '@/lib/mail-templates'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { kundeBegruessungsVorname } from '@/lib/kunde-rechnungsempfaenger'
-import {
-  crmBestaetigeHandwerkerAnfrage,
-  loescheHandwerkerAnfrage,
-} from '@/app/(dashboard)/angebote/actions'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
@@ -42,7 +34,6 @@ function hwStatusLabel(s: string | null | undefined): string {
   if (v === 'akzeptiert') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'zugewiesen') return 'Zugewiesen'
-  if (v === 'ersetzt') return 'Ersetzt'
   return 'Ausstehend'
 }
 
@@ -96,7 +87,6 @@ export function AngebotVersandSection({
     else setKundeModalInternal(open)
   }
   const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
-
   const [hwModal, setHwModal] = useState<{
     id: string
     name: string
@@ -106,7 +96,7 @@ export function AngebotVersandSection({
     to: string[]
     cc: string[]
   } | null>(null)
-  const [pending, startTransition] = useLocalTransition('Wird gesendet…')
+  const [pending, startTransition] = useTransition()
 
   const kunde = detail.kunden
   const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, detail.leads?.kundentyp)
@@ -121,10 +111,7 @@ export function AngebotVersandSection({
       typ: kunde?.typ,
     }) ?? (kundeName.split(/\s+/)[0] || kundeName)
 
-  const rows = useMemo(
-    () => (detail.angebot_handwerker ?? []).filter(handwerkerZuweisungAktiv),
-    [detail.angebot_handwerker]
-  )
+  const rows = useMemo(() => detail.angebot_handwerker ?? [], [detail.angebot_handwerker])
   const orgFreigabeStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
     ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
   const titel =
@@ -287,29 +274,24 @@ export function AngebotVersandSection({
   return (
     <section className={showKundeModalOnly ? undefined : 'mb-6'}>
       {!showKundeModalOnly ? (
-        <div className="mb-3">
-          <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Versand</h2>
-          <p className="m-0 text-[length:var(--fs-text)] text-muted">
-            Zuerst Partner anfragen (falls nötig), danach Angebot an den Kunden senden.
-          </p>
-        </div>
+        <h2 className="mb-3 text-lg font-semibold text-ink">Versand</h2>
       ) : null}
 
       {allHandwerkerAngefragt && rows.length > 0 && showHandwerkerBlock ? (
-        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-text)] text-emerald-950">
-          Alle Partner wurden angefragt.
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+          Alle Handwerker wurden angefragt.
         </div>
       ) : null}
 
       {showKundeBlock && !showKundeModalOnly ? (
-      <Card id="angebot-versand-kunde" className="mb-4 space-y-4 p-4">
-        <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">An Kunden</h3>
+      <Card id="angebot-versand-kunde" className="mb-6 space-y-4 p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Kunden senden</h3>
         {kannAnKunde ? (
           <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
             Angebot an Kunden senden
           </Button>
         ) : (
-          <p className="text-[length:var(--fs-text)] text-muted">
+          <p className="text-sm text-muted">
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
               : !darfAngebotAnKundeSenden(rows, detail.status)
@@ -322,32 +304,15 @@ export function AngebotVersandSection({
 
       {showHandwerkerBlock ? (
       <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
-        <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Partner anfragen</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">An Handwerker senden</h3>
         {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-muted">Keine Partner zugewiesen.</p>
+          <p className="text-sm text-muted">Keine Handwerker zugewiesen.</p>
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((z) => {
               const hwEmail = z.handwerker?.email?.trim()
               const name = z.handwerker?.name ?? '—'
               const gw = z.gewerke?.name ?? 'Gewerk'
-              const statusLc = (z.status ?? 'ausstehend').toLowerCase()
-              const eingereicht = hasHwEinreichung(z)
-              const hwSt = (z.hw_status ?? '').toLowerCase()
-              const kannBestaetigen =
-                statusLc !== 'akzeptiert' &&
-                statusLc !== 'abgelehnt' &&
-                statusLc !== 'ersetzt' &&
-                !z.antwort_at &&
-                !eingereicht &&
-                hwSt !== 'uebernommen'
-              const kannLoeschen =
-                !eingereicht &&
-                hwSt !== 'bestaetigt' &&
-                hwSt !== 'uebernommen' &&
-                !(statusLc === 'akzeptiert' && hwSt && hwSt !== 'offen')
-              const schonAngefragt =
-                statusLc === 'angefragt' || statusLc === 'akzeptiert' || statusLc === 'zugewiesen'
               return (
                 <li key={z.id} className="flex flex-col gap-3 py-4 first:pt-0">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -357,7 +322,7 @@ export function AngebotVersandSection({
                       </p>
                       <span
                         className={cn(
-                          'mt-1 inline-block rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                          'mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium',
                           hwBadgeClass(z.status as string)
                         )}
                       >
@@ -367,14 +332,14 @@ export function AngebotVersandSection({
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        variant="primary"
+                        variant="secondary"
                         size="sm"
                         disabled={pending}
                         title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
                         onClick={() => openHandwerkerModal(z)}
                       >
                         <Mail className="mr-1 inline h-4 w-4" aria-hidden />
-                        {schonAngefragt ? 'Erneut anfragen' : 'Partner anfragen'}
+                        Partner-Mail
                       </Button>
                       <Button
                         type="button"
@@ -387,69 +352,6 @@ export function AngebotVersandSection({
                         <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
                         WhatsApp-Link
                       </Button>
-                      {kannBestaetigen ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Anfrage von ${name} im CRM als akzeptiert markieren?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await crmBestaetigeHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
-                                toast.success('Anfrage bestätigt')
-                                router.refresh()
-                              }
-                            })
-                          }}
-                        >
-                          <Check className="mr-1 inline h-4 w-4" aria-hidden />
-                          Bestätigen
-                        </Button>
-                      ) : null}
-                      {kannLoeschen ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending}
-                          className="text-danger"
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Partner-Anfrage an ${name} wirklich löschen?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await loescheHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
-                                toast.success('Anfrage gelöscht')
-                                router.refresh()
-                              }
-                            })
-                          }}
-                        >
-                          <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />
-                          Löschen
-                        </Button>
-                      ) : null}
                     </div>
                   </div>
                   <HandwerkerEinreichungPruefung
@@ -475,38 +377,31 @@ export function AngebotVersandSection({
         size="lg"
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
-              Abbrechen
-            </Button>
             <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
               Jetzt senden
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
+              Abbrechen
             </Button>
           </div>
         }
       >
-        <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="mb-2 text-sm text-bw-text-muted">
           Empfänger: <span className="font-medium text-bw-text">{kundeEmail}</span>
         </p>
-        <KiAssistFieldLabel
-          label="Betreff"
-          value={subject}
-          onApply={setSubject}
-          extraHint="Angebotsversand — Betreff an den Kunden."
-          multiline={false}
-        >
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
-        </KiAssistFieldLabel>
-        <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
+        <Input label="Betreff" value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
+        <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
         <iframe
           title="Vorschau"
           sandbox="allow-same-origin"
           className="mb-3 h-[280px] w-full rounded-lg border border-bw-border bg-white"
           srcDoc={previewHtml}
         />
-        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text">
+        <p className="mb-3 text-sm text-bw-text">
           Gesamtbetrag (Brutto):{' '}
           <strong>{betragAnzeige(null, bruttoMin, bruttoMax)}</strong>
         </p>
+        <p className="text-xs text-bw-text-muted">PDF wird angehängt.</p>
       </Modal>
 
       <Modal
@@ -527,7 +422,7 @@ export function AngebotVersandSection({
       >
         {hwModal ? (
           <div className="space-y-3">
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+            <p className="text-sm text-bw-text-muted">
               Gewerk: <span className="font-medium text-bw-text">{hwModal.gewerk}</span>
             </p>
             <Input
@@ -547,10 +442,11 @@ export function AngebotVersandSection({
               emails={hwModal.cc}
               onChange={(emails) => setHwModal((prev) => (prev ? { ...prev, cc: emails } : prev))}
               placeholder="weitere@beispiel.de"
+              hint="Optional — nur für zusätzliche Empfänger sichtbar."
             />
-            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-              Versand über Partner-Portal (Website); bei Fehler automatisch per CRM-Resend.
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Vorschau</p>
+            <p className="text-xs text-bw-text-muted">
+              Versand über die Website (Partner-Portal), nicht über CRM-Resend.
             </p>
             <iframe
               title="Partner-Mail Vorschau"

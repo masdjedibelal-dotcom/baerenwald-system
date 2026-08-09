@@ -39,7 +39,7 @@ export function ListFilterSection({ chipGroups, chips, children, className }: Li
         {chipGroups.map((group, index) => (
           <div key={group.label ?? `chip-group-${index}`} className="min-w-0">
             {group.label ? (
-              <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
                 {group.label}
               </p>
             ) : null}
@@ -100,7 +100,7 @@ export function ListTableShell({
 }) {
   return (
     <div className={cn('list-table-shell', className)}>
-      <table className="w-full border-collapse text-left text-[length:var(--fs-text)]" style={{ minWidth }}>
+      <table className="w-full border-collapse text-left text-sm" style={{ minWidth }}>
         {children}
       </table>
     </div>

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
 import { createClient } from '@/lib/supabase-server'
-import type { KalenderTermin, LeadDetail, LeadKanal, LeadStatus } from '@/lib/types'
+import type { KalenderTermin, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
@@ -143,7 +143,6 @@ export async function updateLeadBeschreibung(
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
@@ -247,14 +246,6 @@ export async function insertKalenderTermin(input: {
 export type NeueAnfragePayload = {
   /** Wenn gesetzt, wird dieser Kunde verknüpft (kein neuer Kunde aus E-Mail-Logik). */
   kunde_id?: string | null
-  /** HV: Auftraggeber-Organisation (Pipeline hv_meldung) */
-  auftraggeber_kunde_id?: string | null
-  /** HV: Gebäude/Objekt der Meldung */
-  kunde_objekt_id?: string | null
-  /** HV: Mieter-/Meldername (Vor- + Nachname) */
-  melder_name?: string | null
-  /** projekt | meldung — HV-Meldung braucht anlass meldung */
-  anlass?: 'projekt' | 'meldung' | null
   /** Anzeigename / Fallback (z. B. „Vorname Nachname“ oder Firma). */
   name: string
   vorname?: string | null
@@ -282,16 +273,8 @@ export type NeueAnfragePayload = {
   ort?: string | null
   /** Bauprojekt — Bautagesbericht & Leistungs-Compliance */
   ist_bauprojekt?: boolean
-  /** Bestand: wiederkehrende Leistung */
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
   /** Manuell im CRM: Bestätigungsmail an Kund:in (Standard: aus) */
   bestaetigungsmail_senden?: boolean
-  /**
-   * CRM: Als Akut/Notfall anlegen → Direktbeauftragung ohne Angebot
-   * (situation=notfall + freigabe_bypass_grund=akut).
-   */
-  als_akut?: boolean
 }
 
 export async function createAnfrage(
@@ -349,21 +332,7 @@ export async function createAnfrage(
 
   const bereicheMerged = bereicheMergedEarly
   const bereicheFinal = bereicheMerged.length ? bereicheMerged : null
-  let situationFinal = situationOhneGewerbe(payload.situation)
-  const funnelDaten: Record<string, unknown> =
-    payload.funnel_daten && typeof payload.funnel_daten === 'object' && !Array.isArray(payload.funnel_daten)
-      ? { ...(payload.funnel_daten as Record<string, unknown>) }
-      : {}
-  let freigabeBypassGrund: string | null = null
-  if (payload.als_akut) {
-    if (situationFinal && situationFinal !== 'notfall') {
-      funnelDaten._akut_prev_situation = situationFinal
-    }
-    funnelDaten.melde_kategorie = 'notfall'
-    funnelDaten.notfall = true
-    situationFinal = 'notfall'
-    freigabeBypassGrund = 'akut'
-  }
+  const situationFinal = situationOhneGewerbe(payload.situation)
   const istGewerbe = leadHatGewerbeKontext(bereicheMerged, payload.situation)
   const kundentyp =
     payload.kundentyp?.trim() ||
@@ -373,7 +342,7 @@ export async function createAnfrage(
     name: istKundeHausverwaltungTyp(kundentyp) || istKundeNurGewerbeTyp(kundentyp) ? name : undefined,
     vorname: payload.vorname,
     nachname: payload.nachname,
-    funnelDaten: funnelDaten,
+    funnelDaten: payload.funnel_daten,
     kontaktName: name,
   })
 
@@ -382,7 +351,7 @@ export async function createAnfrage(
     strasse: payload.strasse,
     hausnummer: payload.hausnummer,
     ort: payload.ort,
-    funnel_daten: funnelDaten,
+    funnel_daten: payload.funnel_daten,
   })
   const adresseDb = kundeAdresseDbFelder(adresseFelder)
   const plzFinal = plz || adresseDb.plz || null
@@ -427,10 +396,6 @@ export async function createAnfrage(
     .from('leads')
     .insert({
       kunde_id: kundeId,
-      auftraggeber_kunde_id: payload.auftraggeber_kunde_id?.trim() || null,
-      kunde_objekt_id: payload.kunde_objekt_id?.trim() || null,
-      melder_name: payload.melder_name?.trim() || null,
-      anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
       kanal: payload.kanal,
       status: 'neu',
       situation: situationFinal,
@@ -450,14 +415,8 @@ export async function createAnfrage(
       kontakt_telefon: telefon || null,
       kontakt_nachricht: payload.kontakt_nachricht?.trim() || null,
       notizen: payload.notizen.trim() || null,
-      funnel_daten: funnelDaten,
-      freigabe_bypass_grund: freigabeBypassGrund,
+      funnel_daten: payload.funnel_daten && typeof payload.funnel_daten === 'object' ? payload.funnel_daten : {},
       ist_bauprojekt: payload.ist_bauprojekt === true,
-      ist_wiederkehrend: payload.ist_wiederkehrend === true,
-      wiederkehr_turnus:
-        payload.ist_wiederkehrend === true
-          ? payload.wiederkehr_turnus?.trim() || null
-          : null,
     })
     .select('id')
     .single()
@@ -623,13 +582,6 @@ export async function updateAnfrageAusNeuForm(
   }
 
   if (payload.ist_bauprojekt !== undefined) patch.ist_bauprojekt = payload.ist_bauprojekt === true
-  if (payload.ist_wiederkehrend !== undefined) {
-    patch.ist_wiederkehrend = payload.ist_wiederkehrend === true
-    patch.wiederkehr_turnus =
-      payload.ist_wiederkehrend === true
-        ? payload.wiederkehr_turnus?.trim() || null
-        : null
-  }
 
   if (payload.budget_ca !== undefined) patch.budget_ca = payload.budget_ca
   if (payload.zeitraum_von !== undefined) patch.zeitraum_von = payload.zeitraum_von?.trim() || null
@@ -679,90 +631,6 @@ export async function updateLeadPreisindikation(
   return { ok: true }
 }
 
-/**
- * Manuell „Als akut markieren“ / aufheben — für Direktbeauftragung ohne Angebot
- * (situation=notfall + freigabe_bypass_grund=akut).
- */
-export async function setLeadAlsAkut(
-  leadId: string,
-  akut: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const id = leadId?.trim()
-  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
-
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
-
-  const { data: lead, error: fetchErr } = await supabase
-    .from('leads')
-    .select('id, situation, funnel_daten, freigabe_bypass_grund')
-    .eq('id', id)
-    .maybeSingle()
-  if (fetchErr || !lead) return { ok: false, message: fetchErr?.message ?? 'Anfrage nicht gefunden.' }
-
-  const fdRaw =
-    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
-      ? { ...(lead.funnel_daten as Record<string, unknown>) }
-      : {}
-
-  if (akut) {
-    if (!fdRaw._akut_prev_situation && lead.situation && lead.situation !== 'notfall') {
-      fdRaw._akut_prev_situation = lead.situation
-    }
-    fdRaw.melde_kategorie = 'notfall'
-    const { error } = await supabase
-      .from('leads')
-      .update({
-        situation: 'notfall',
-        freigabe_bypass_grund: 'akut',
-        funnel_daten: fdRaw,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-    if (error) return { ok: false, message: error.message }
-  } else {
-    const prevSit =
-      typeof fdRaw._akut_prev_situation === 'string' && fdRaw._akut_prev_situation.trim()
-        ? String(fdRaw._akut_prev_situation).trim()
-        : 'kaputt'
-    delete fdRaw._akut_prev_situation
-    if (fdRaw.melde_kategorie === 'notfall') delete fdRaw.melde_kategorie
-    const patch: Record<string, unknown> = {
-      funnel_daten: fdRaw,
-      updated_at: new Date().toISOString(),
-    }
-    if (lead.situation === 'notfall' || (lead.freigabe_bypass_grund ?? '') === 'akut') {
-      patch.situation = prevSit
-    }
-    if ((lead.freigabe_bypass_grund ?? '') === 'akut') {
-      patch.freigabe_bypass_grund = null
-    }
-    const { error } = await supabase.from('leads').update(patch).eq('id', id)
-    if (error) return { ok: false, message: error.message }
-  }
-
-  revalidatePath(`/anfragen/${id}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
-  return { ok: true }
-}
-
-/** Leichtgewicht für Listen-⋯ / Split-over „Anfrage bearbeiten“. */
-export async function getAnfragePhaseEditLead(
-  leadId: string
-): Promise<{ ok: true; lead: LeadDetail } | { ok: false; message: string }> {
-  const id = leadId?.trim()
-  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
-  const supabase = createClient()
-  const { loadAnfrageDetail } = await import('@/lib/anfragen/load-anfrage-detail')
-  const lead = await loadAnfrageDetail(supabase, id)
-  if (!lead) return { ok: false, message: 'Anfrage nicht gefunden oder keine Berechtigung.' }
-  return { ok: true, lead }
-}
-
 export async function updateLeadKontakt(
   leadId: string,
   data: {
@@ -790,7 +658,6 @@ export async function updateLeadKontakt(
   if (error) return { ok: false, message: error.message }
   revalidatePath('/anfragen')
   revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/vorgaenge')
   return { ok: true }
 }
 
@@ -1277,139 +1144,25 @@ export async function saveLeadRueckfrage(input: {
 export async function saveLeadNichtErreichbar(input: {
   leadId: string
   kontaktName: string
-  notiz?: string | null
-  /** @deprecated Spec: kein WV-Feld mehr — Zähler über Timeline */
-  wiedervorlage?: string
-}): Promise<
-  | { ok: true; versuche: number; vorschlagVerloren: boolean }
-  | { ok: false; message: string }
-> {
-  const supabase = createClient()
-  const stamp = new Date().toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-  const name = input.kontaktName.trim() || 'Kunde'
-  const extra = [name ? `Kontakt: ${name}` : null, input.notiz?.trim() || null]
-    .filter(Boolean)
-    .join(' — ')
-
+  wiedervorlage: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
   await insertLeadTimelineEntry(
     input.leadId,
     'kontakt',
-    `Nicht erreichbar — Versuch · ${stamp}`,
-    extra || null
+    `Nicht erreichbar — Wiedervorlage: ${input.wiedervorlage}`,
+    null
   )
 
-  const { count, error } = await supabase
-    .from('lead_timeline')
-    .select('id', { count: 'exact', head: true })
-    .eq('lead_id', input.leadId)
-    .eq('typ', 'kontakt')
-    .ilike('titel', 'Nicht erreichbar%')
-
-  if (error) {
-    console.warn('kontaktversuche count:', error.message)
+  const supabase = createClient()
+  const { data: lead } = await supabase.from('leads').select('status').eq('id', input.leadId).maybeSingle()
+  if (lead?.status === 'neu') {
+    return updateLeadStatus(input.leadId, 'kontaktiert')
   }
-
-  const versuche = typeof count === 'number' ? count : 1
-  const vorschlagVerloren = versuche >= 3
 
   revalidatePath(`/anfragen/${input.leadId}`)
   revalidatePath('/anfragen')
   revalidatePath('/kalender')
-  return { ok: true, versuche, vorschlagVerloren }
-}
-
-/** Soft-delete: geloescht_am setzen (kein Hard-Delete). */
-export async function softDeleteAnfrage(
-  leadId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ geloescht_am: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  await insertLeadTimelineEntry(leadId, 'system', 'Anfrage als gelöscht markiert', null)
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
   return { ok: true }
-}
-
-export async function restoreAnfrage(
-  leadId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ geloescht_am: null, updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  await insertLeadTimelineEntry(leadId, 'system', 'Löschen rückgängig', null)
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
-  return { ok: true }
-}
-
-/** Termin-Status rückgängig (Undo-Toast). */
-export async function undoLeadTerminVereinbart(
-  leadId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: hist } = await supabase
-    .from('leads_status_history')
-    .select('status_alt')
-    .eq('lead_id', leadId)
-    .eq('status_neu', 'termin')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const prev = (hist?.status_alt as LeadStatus | null) || 'kontaktiert'
-  const statusRes = await updateLeadStatus(leadId, prev, 'Termin rückgängig')
-  if (!statusRes.ok) return statusRes
-
-  await supabase
-    .from('kalender_termine')
-    .update({ erledigt: true })
-    .eq('lead_id', leadId)
-    .eq('typ', 'besichtigung')
-    .eq('erledigt', false)
-
-  revalidatePath('/kalender')
-  return { ok: true }
-}
-
-export async function dismissDuplikatBand(
-  leadId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ duplikat_band_dismissed: true, updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
-  return { ok: true }
-}
-
-export async function countNichtErreichbarVersuche(
-  leadId: string
-): Promise<number> {
-  const supabase = createClient()
-  const { count } = await supabase
-    .from('lead_timeline')
-    .select('id', { count: 'exact', head: true })
-    .eq('lead_id', leadId)
-    .eq('typ', 'kontakt')
-    .ilike('titel', 'Nicht erreichbar%')
-  return typeof count === 'number' ? count : 0
 }
 
 export async function saveLeadAlsVerloren(input: {

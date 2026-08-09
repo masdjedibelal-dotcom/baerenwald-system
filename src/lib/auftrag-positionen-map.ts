@@ -22,10 +22,6 @@ export type AuftragPositionInsert = {
   start_datum?: string | null
   end_datum?: string | null
   preis_partner?: number | null
-  typ?: string | null
-  verguetung?: string | null
-  geschaetzt_std?: number | null
-  stundensatz?: number | null
 }
 
 function preisZeileNetto(p: AngebotPosition): number {
@@ -76,17 +72,6 @@ export function angebotPositionenToAuftragRows(
             : gewerkEk != null && gewerkEk > 0
               ? gewerkEk
               : null
-    const isRegie = String(p.verguetung ?? '').toLowerCase() === 'aufwand'
-    const stundensatz =
-      isRegie && Number(p.stundensatz) > 0
-        ? Number(p.stundensatz)
-        : isRegie && Number(p.vk_netto) > 0
-          ? Number(p.vk_netto)
-          : isRegie
-            ? Math.round((preis / m) * 100) / 100
-            : null
-    const geschaetztStd =
-      isRegie && Number(p.geschaetzt_std) > 0 ? Number(p.geschaetzt_std) : isRegie ? m : null
     return {
       auftrag_id: auftragId,
       gewerk_slug: p.gewerk_slug?.trim() || null,
@@ -97,7 +82,7 @@ export function angebotPositionenToAuftragRows(
       unterkategorie: null,
       leistung_name,
       beschreibung: beschreibung ? beschreibung.slice(0, 4000) : null,
-      einheit: (p.einheit || (isRegie ? 'h' : 'pauschal')).toString().slice(0, 80),
+      einheit: (p.einheit || 'pauschal').toString().slice(0, 80),
       menge: m,
       preis_fix: preis > 0 ? preis : null,
       lohn_fix: lohnZeile > 0 ? lohnZeile : null,
@@ -105,10 +90,6 @@ export function angebotPositionenToAuftragRows(
       preis_partner: partnerPreis,
       handwerker_id: p.handwerker_id?.trim() || null,
       sort_order: i * 10,
-      typ: isRegie ? 'regie' : 'lv',
-      verguetung: isRegie ? 'aufwand' : 'festpreis',
-      geschaetzt_std: geschaetztStd,
-      stundensatz,
     }
   })
 }

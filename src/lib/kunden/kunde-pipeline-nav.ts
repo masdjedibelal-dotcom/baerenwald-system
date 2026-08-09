@@ -36,8 +36,3 @@ export function kundeNeuerAuftragHref(kunde: KundeDetailPayload): string {
   if (leadId) return `/anfragen/${leadId}?angebot_wizard=1`
   return `/anfragen/neu?kunde_id=${encodeURIComponent(kunde.id)}&ziel=angebot`
 }
-
-/** Direktrechnung für diesen Kunden (optional später Auftrag wählen im Wizard). */
-export function kundeNeueRechnungHref(kundeId: string): string {
-  return `/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`
-}

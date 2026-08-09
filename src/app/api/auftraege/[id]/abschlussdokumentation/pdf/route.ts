@@ -17,7 +17,7 @@ export async function GET(
   const pdf = await downloadAbschlussdokumentationPdf(params.id, {
     mitBautagebuch: true,
     mitFotos: true,
-    mitPreisen: false,
+    mitPreisen: true,
   })
 
   if (!pdf.ok) {

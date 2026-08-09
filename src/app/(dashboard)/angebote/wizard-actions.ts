@@ -37,7 +37,6 @@ import { rebindLooseAnfahrtPositionen } from '@/lib/anfahrt-angebot'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncAuftragAusAngebotKorrektur } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
-import { upsertNachtragEntwurfFromAngebotWizard } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import {
   syncInputsFromAngebotPositionen,
   syncInputsFromDokumentArtikel,
@@ -69,18 +68,17 @@ export type SaveAngebotWizardDraftPayload = {
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
   /** Nach Speichern: Auftragspositionen aus Angebot übernehmen */
   auftragKorrekturId?: string | null
-  /** Phase 10/N3: Nachtrags-Angebot → nachtraege[] am Auftrag schreiben */
-  nachtragZuAuftragId?: string | null
-  ist_wiederkehrend?: boolean
-  wiederkehr_turnus?: string | null
 }
 
 async function persistAngebotPdfNachEntwurfSpeichern(
   angebotId: string,
   leadId: string | null,
   opts?: { asSystem?: boolean }
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<void> {
   const pdf = await persistPdfForAngebot(angebotId, { skipRevalidate: true })
+  if (!pdf.ok) {
+    console.warn('[saveAngebotWizardDraft] PDF:', pdf.message)
+  }
   if (!opts?.asSystem) {
     revalidatePath('/angebote')
     revalidatePath(`/angebote/${angebotId}`)
@@ -88,38 +86,6 @@ async function persistAngebotPdfNachEntwurfSpeichern(
       revalidatePath(`/anfragen/${leadId}`)
       revalidatePath('/anfragen')
     }
-  }
-  if (!pdf.ok) {
-    console.warn('[saveAngebotWizardDraft] PDF:', pdf.message)
-    return { ok: false, message: pdf.message }
-  }
-  return { ok: true }
-}
-
-/** PDF erzeugen und speichern — ohne E-Mail (wie Rechnung „Erstellen“). */
-export async function finalizeAngebotWizardWithoutMail(
-  angebotId: string
-): Promise<{ ok: true; angebotsnr: string | null } | { ok: false; message: string }> {
-  const pdf = await persistPdfForAngebot(angebotId)
-  if (!pdf.ok) return pdf
-
-  const { data: row } = await supabaseAdmin
-    .from('angebote')
-    .select('angebotsnr, lead_id')
-    .eq('id', angebotId)
-    .maybeSingle()
-
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
-  const leadId = (row as { lead_id?: string | null } | null)?.lead_id
-  if (leadId) {
-    revalidatePath(`/anfragen/${leadId}`)
-    revalidatePath('/anfragen')
-  }
-
-  return {
-    ok: true,
-    angebotsnr: (row as { angebotsnr?: string | null } | null)?.angebotsnr ?? null,
   }
 }
 
@@ -147,29 +113,7 @@ export async function saveAngebotWizardDraft(
   if (Array.isArray(variantenB) && variantenB.length) {
     preislisteSync.push(...syncInputsFromAngebotPositionen(normalizeAngebotPositionen(variantenB)))
   }
-  // No-Op für Katalog — freie Positionen → Lernsignale (KI)
   await syncNeueLeistungenToPreisliste(preislisteSync)
-  const freie = positionen.filter(
-    (p) =>
-      p.position_quelle === 'frei' ||
-      (!p.variante_id && !p.leistung_id && p.leistung?.trim())
-  )
-  if (freie.length) {
-    const { recordKatalogLernsignale } = await import('@/app/(dashboard)/katalog/actions')
-    await recordKatalogLernsignale(
-      freie.map((p) => ({
-        angebotId: input.angebotId,
-        leadId: input.lead_id,
-        gewerkId: p.gewerk_id || null,
-        titel: p.leistung || p.leistung_name || '',
-        beschreibung: p.beschreibung,
-        einheit: p.einheit,
-        preisNetto: Number(p.vk_netto ?? p.lohn_netto) || 0,
-        menge: p.menge,
-        quelle: 'frei' as const,
-      }))
-    )
-  }
 
   const variantenNormalized: AngebotVariantenPersistJson | null =
     dokumentTyp === 'projekt' && input.varianten
@@ -240,8 +184,6 @@ export async function saveAngebotWizardDraft(
       wichtige_hinweise: projektFelder.wichtige_hinweise,
       varianten: projektFelder.varianten,
       handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-      ist_wiederkehrend: input.ist_wiederkehrend,
-      wiederkehr_turnus: input.wiederkehr_turnus,
     }, { asSystem: opts?.asSystem })
     if (!upd.ok) return upd
     const db = opts?.asSystem ? supabaseAdmin : createClient()
@@ -255,20 +197,8 @@ export async function saveAngebotWizardDraft(
       const sync = await syncAuftragAusAngebotKorrektur({
         auftragId: input.auftragKorrekturId.trim(),
         angebotId: input.angebotId,
-        leistungszeitraum_von: input.meta.leistungszeitraum_von ?? null,
-        leistungszeitraum_bis: input.meta.leistungszeitraum_bis ?? null,
       })
       if (!sync.ok) return sync
-    }
-    if (input.nachtragZuAuftragId?.trim()) {
-      const n = await upsertNachtragEntwurfFromAngebotWizard({
-        auftragId: input.nachtragZuAuftragId.trim(),
-        angebotId: input.angebotId,
-        grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
-        beschreibung: input.meta.leistungsumfang?.trim() || null,
-        positionen,
-      })
-      if (!n.ok) return n
     }
     return { ok: true, angebotId: input.angebotId, angebotsnr: nrRow?.angebotsnr ?? null }
   }
@@ -298,8 +228,6 @@ export async function saveAngebotWizardDraft(
     wichtige_hinweise: projektFelder.wichtige_hinweise,
     varianten: projektFelder.varianten,
     handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-    ist_wiederkehrend: input.ist_wiederkehrend,
-    wiederkehr_turnus: input.wiederkehr_turnus,
   }, { asSystem: opts?.asSystem })
   if (!created.ok) return created
   const db = opts?.asSystem ? supabaseAdmin : createClient()
@@ -309,16 +237,6 @@ export async function saveAngebotWizardDraft(
     .eq('id', created.id)
     .maybeSingle()
   await persistAngebotPdfNachEntwurfSpeichern(created.id, input.lead_id, opts)
-  if (input.nachtragZuAuftragId?.trim()) {
-    const n = await upsertNachtragEntwurfFromAngebotWizard({
-      auftragId: input.nachtragZuAuftragId.trim(),
-      angebotId: created.id,
-      grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
-      beschreibung: input.meta.leistungsumfang?.trim() || null,
-      positionen,
-    })
-    if (!n.ok) return n
-  }
   return { ok: true, angebotId: created.id, angebotsnr: nrRow?.angebotsnr ?? null }
 }
 
@@ -397,8 +315,6 @@ export async function loadAngebotWizardBootstrap(
       varianten,
       kunde_objekt_id,
       gesendet_kunde_at,
-      ist_wiederkehrend,
-      wiederkehr_turnus,
       leads(plz, bereiche, situation, kundentyp,       kunden!kunde_id(typ)),
       angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
@@ -430,8 +346,6 @@ export async function loadAngebotWizardBootstrap(
     hinweise: string | null
     varianten?: unknown
     gesendet_kunde_at?: string | null
-    ist_wiederkehrend?: boolean | null
-    wiederkehr_turnus?: string | null
     leads?: {
       plz?: string | null
       bereiche?: unknown
@@ -513,8 +427,6 @@ export async function loadAngebotWizardBootstrap(
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
     bereitsGesendet: Boolean(ang.gesendet_kunde_at),
     zahlungsplan,
-    ist_wiederkehrend: ang.ist_wiederkehrend === true,
-    wiederkehr_turnus: ang.wiederkehr_turnus ?? null,
   }
 
   return { ok: true, bootstrap }
@@ -548,8 +460,6 @@ export async function loadAngebotWizardBootstrapKopie(
       hinweise,
       varianten,
       kunde_objekt_id,
-      ist_wiederkehrend,
-      wiederkehr_turnus,
       leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ)),
       angebot_handwerker(gewerk_id, handwerker_id, status, aufgabe_notiz)
     `
@@ -578,8 +488,6 @@ export async function loadAngebotWizardBootstrapKopie(
     zahlungsplan?: unknown
     hinweise: string | null
     varianten?: unknown
-    ist_wiederkehrend?: boolean | null
-    wiederkehr_turnus?: string | null
     leads?: {
       plz?: string | null
       bereiche?: unknown
@@ -655,8 +563,6 @@ export async function loadAngebotWizardBootstrapKopie(
     varianten: variantenPersist,
     wichtige_hinweise: ang.wichtige_hinweise?.trim() || null,
     zahlungsplan,
-    ist_wiederkehrend: ang.ist_wiederkehrend === true,
-    wiederkehr_turnus: ang.wiederkehr_turnus ?? null,
   }
 
   return { ok: true, bootstrap }

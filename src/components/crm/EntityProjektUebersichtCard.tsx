@@ -1,10 +1,9 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
 import { formatDatum, cn } from '@/lib/utils'
 
@@ -29,7 +28,6 @@ type EditableKeys = keyof ProjektInlineDraft
 export function EntityProjektUebersichtCard({
   title = 'Projekt-Übersicht',
   icon = 'clipboard-list',
-  titelLabel = 'Projekt',
   initial,
   editableFields = [],
   onSave,
@@ -38,17 +36,13 @@ export function EntityProjektUebersichtCard({
   preisMin,
   preisMax,
   preisrahmenLabel,
-  preisLabel = 'Preisrahmen',
   quelle,
   fortschritt,
   extraRows,
   footerRows,
-  belowContent,
 }: {
   title?: string
   icon?: string
-  /** Label für das Titel-Feld (Anfrage: Vorhaben). */
-  titelLabel?: string
   initial: ProjektInlineDraft
   /** Welche Felder im Bearbeitungsmodus editierbar sind */
   editableFields?: EditableKeys[]
@@ -58,19 +52,15 @@ export function EntityProjektUebersichtCard({
   preisMin?: number | null
   preisMax?: number | null
   preisrahmenLabel?: string | null
-  /** Label über dem Preis (z. B. Preiseinschätzung bei Staff-Anfragen). */
-  preisLabel?: string
   quelle?: string | null
   fortschritt?: number | null
   extraRows?: ProjektUebersichtExtraRow[]
   footerRows?: ProjektUebersichtExtraRow[]
-  /** Inhalt unter den Props (z. B. KI-Auskunft inline in Bedarf). */
-  belowContent?: ReactNode
 }) {
   const canEdit = Boolean(onSave) && editableFields.length > 0 && !disabled
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initial)
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
 
   useEffect(() => {
     if (!editing) setDraft(initial)
@@ -124,9 +114,15 @@ export function EntityProjektUebersichtCard({
       saving={pending}
       disabled={!canEdit}
     >
+      {editing ? (
+        <p className="inline-edit-hint">
+          <MockIcon ctx="default" n="info-circle" size={14} />
+          Hervorgehobene Felder sind bearbeitbar.
+        </p>
+      ) : null}
       <div className="props">
         <InlineEditField
-          label={titelLabel}
+          label="Projekt"
           editing={can('titel')}
           value={draft.titel.trim() || '—'}
         >
@@ -139,27 +135,18 @@ export function EntityProjektUebersichtCard({
         </InlineEditField>
 
         {(editing && editableFields.includes('beschreibung')) || draft.beschreibung.trim() ? (
-          can('beschreibung') ? (
-            <KiAssistFieldLabel
-              label="Beschreibung"
+          <InlineEditField
+            label="Beschreibung"
+            editing={can('beschreibung')}
+            value={draft.beschreibung.trim() || '—'}
+          >
+            <textarea
+              className="input"
+              rows={3}
               value={draft.beschreibung}
-              onApply={(text) => patch({ beschreibung: text })}
-              extraHint="Projektbeschreibung (kundensichtbar)."
-            >
-              <textarea
-                className="input"
-                rows={3}
-                value={draft.beschreibung}
-                onChange={(e) => patch({ beschreibung: e.target.value })}
-              />
-            </KiAssistFieldLabel>
-          ) : (
-            <InlineEditField
-              label="Beschreibung"
-              editing={false}
-              value={draft.beschreibung.trim() || '—'}
+              onChange={(e) => patch({ beschreibung: e.target.value })}
             />
-          )
+          </InlineEditField>
         ) : null}
 
         {(extraRows ?? []).map((row, i) => (
@@ -171,6 +158,14 @@ export function EntityProjektUebersichtCard({
 
         {region && region !== '—' ? (
           <InlineEditField label="Region" editing={false} value={region} />
+        ) : null}
+
+        {preisrahmen ? (
+          <InlineEditField
+            label="Preisrahmen"
+            editing={false}
+            value={<span style={{ color: 'var(--green)', fontWeight: 600 }}>{preisrahmen}</span>}
+          />
         ) : null}
 
         {quelle ? <InlineEditField label="Quelle" editing={false} value={quelle} /> : null}
@@ -216,14 +211,19 @@ export function EntityProjektUebersichtCard({
             editing={can('istBauprojekt')}
             value={draft.istBauprojekt ? 'Ja' : 'Nein'}
           >
-            <label className={cn('flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]')}>
+            <label className={cn('flex cursor-pointer items-start gap-2 text-sm')}>
               <input
                 type="checkbox"
                 className="mt-0.5 h-4 w-4 rounded border-bw-border"
                 checked={draft.istBauprojekt}
                 onChange={(e) => patch({ istBauprojekt: e.target.checked })}
               />
-              <span>Bauprojekt / Bauauftrag</span>
+              <span>
+                Bauprojekt / Bauauftrag
+                <span className="mt-0.5 block text-xs text-bw-text-muted">
+                  Aktiviert Bautagebuch, Baustellen-Tab und Compliance.
+                </span>
+              </span>
             </label>
           </InlineEditField>
         ) : null}
@@ -234,16 +234,7 @@ export function EntityProjektUebersichtCard({
             <div className="v">{row.children}</div>
           </div>
         ))}
-
-        {preisrahmen ? (
-          <InlineEditField
-            label={preisLabel}
-            editing={false}
-            value={<span style={{ color: 'var(--green)', fontWeight: 600 }}>{preisrahmen}</span>}
-          />
-        ) : null}
       </div>
-      {belowContent ? <div className="mt-4">{belowContent}</div> : null}
     </InlineEditSection>
   )
 }

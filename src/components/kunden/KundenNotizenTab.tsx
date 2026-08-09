@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { addKundenNotiz, deleteKundenNotiz } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenNotizRow } from '@/lib/types'
@@ -9,7 +8,6 @@ import { formatTimelineStamp } from '@/lib/utils'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { useIsMobile } from '@/hooks/useIsMobile'
 
 function notizAutor(n: KundenNotizRow): string {
   const name = n.user_profiles?.name?.trim()
@@ -38,7 +36,6 @@ export function KundenNotizenTab({
   legacyNotiz?: string | null
   onReload: () => void
 }) {
-  const isMobile = useIsMobile()
   const [val, setVal] = useState('')
   const [pending, startTransition] = useTransition()
 
@@ -108,26 +105,17 @@ export function KundenNotizenTab({
         }}
       >
         {notes.length === 0 ? (
-          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
-            {isMobile
-              ? 'Noch keine Notizen. Über „Notiz“ oben hinzufügen.'
-              : 'Noch keine Notizen — schreibe die erste unten.'}
+          <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '4px 0' }}>
+            Noch keine Notizen — schreibe die erste unten.
           </div>
         ) : (
           notes.map((n) => (
-            <div
-              key={n.id}
-              className="note"
-              style={{
-                position: 'relative',
-                paddingRight: !isMobile && n.deletable ? 36 : undefined,
-              }}
-            >
+            <div key={n.id} className="note" style={{ position: 'relative', paddingRight: n.deletable ? 36 : undefined }}>
               <div className="meta">
                 {n.autor}
                 {n.time ? ` · ${n.time}` : ''}
               </div>
-              {!isMobile && n.deletable ? (
+              {n.deletable ? (
                 <div style={{ position: 'absolute', top: 4, right: 4 }}>
                   <MockBtn
                     sm
@@ -145,15 +133,13 @@ export function KundenNotizenTab({
         )}
       </div>
 
-      {!isMobile ? (
-        <MockNotizComposer
-          value={val}
-          onChange={setVal}
-          onSubmit={speichern}
-          disabled={pending}
-          placeholder="Notiz schreiben"
-        />
-      ) : null}
+      <MockNotizComposer
+        value={val}
+        onChange={setVal}
+        onSubmit={speichern}
+        disabled={pending}
+        placeholder="Notiz schreiben…  (Enter senden · Shift+Enter neue Zeile)"
+      />
     </MockCard>
   )
 }

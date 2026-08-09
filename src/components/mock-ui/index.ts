@@ -1,13 +1,3 @@
-/**
- * Mock-UI = Source of Truth für CRM-Primitives.
- *
- * Kanonisch:
- * - Modal: `@/components/ui/Modal` (Mock-CSS); Listen-API = `MockModal` (Adapter)
- * - Empty: `MockEmpty`; Legacy `EmptyState` = Adapter
- * - Detail-Tabs: `DetailShell`; `MockDetailShell` = uncontrolled Adapter
- *
- * Neue Screens: diese Exports nutzen, nicht parallele ui/layout-Varianten bauen.
- */
 export { MockIcon, mockMenuIcon, type MockIconProps } from './MockIcon'
 export { LeadStatusMockBadge } from './LeadStatusMockBadge'
 export { DetailShell, type DetailShellGroup, type DetailShellProps } from './DetailShell'

@@ -1,11 +1,5 @@
 import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
-import {
-  gesamtrabattAbzugAusAngebotPositionen,
-  istGesamtrabattPosition,
-  istPreisPosition,
-  parseGesamtrabattMetaFromPosition,
-  ZEILE_SLUG_GESAMTRABATT,
-} from '@/lib/dokument-zeilen'
+import { istPreisPosition } from '@/lib/dokument-zeilen'
 import type {
   AngebotHandwerkerZuweisungInput,
   AngebotPosition,
@@ -112,61 +106,6 @@ export function normalizeAngebotPosition(
 
   if (!gewerk_id && !gewerk_slug && !leistung) return null
 
-  const slugLower = (gewerk_slug ?? '').toLowerCase()
-  const leistungLower = leistung.toLowerCase()
-  /** Negativzeilen: Nachlass / Abschlag in Schlussrechnung */
-  const erlaubtNegativ =
-    slugLower === ZEILE_SLUG_GESAMTRABATT ||
-    slugLower === 'abschlag_abzug' ||
-    leistungLower.startsWith('abzüglich')
-
-  if (slugLower === ZEILE_SLUG_GESAMTRABATT) {
-    const beschRaw = r.beschreibung != null ? String(r.beschreibung).trim() : ''
-    const meta = parseGesamtrabattMetaFromPosition({
-      id,
-      gewerk_id: '',
-      gewerk_name: gewerk_name || 'Gesamtrabatt',
-      gewerk_slug: ZEILE_SLUG_GESAMTRABATT,
-      leistung: leistung || 'Nachlass',
-      beschreibung: beschRaw,
-      lohn_netto: num(r.lohn_netto),
-      material_netto: 0,
-      gesamt_min: num(r.gesamt_min),
-      gesamt_max: num(r.gesamt_max),
-      menge: 1,
-      einheit: 'Stk.',
-      vk_netto: num(r.vk_netto),
-    })
-    const signed =
-      meta.wert > 0 ? -Math.abs(meta.wert) : num(r.gesamt_min) < 0 ? num(r.gesamt_min) : 0
-    const bezeichnung = (leistung || 'Nachlass').trim() || 'Nachlass'
-    const beschreibung =
-      beschRaw ||
-      (meta.wert > 0 ? `${meta.modus}:${meta.wert}` : '')
-    const outRabatt: AngebotPosition = {
-      id,
-      gewerk_id: '',
-      gewerk_slug: ZEILE_SLUG_GESAMTRABATT,
-      gewerk_name: gewerk_name || 'Gesamtrabatt',
-      leistung: bezeichnung,
-      beschreibung,
-      lohn_netto: signed,
-      material_netto: 0,
-      vk_netto: signed,
-      gesamt_min: signed,
-      gesamt_max: signed,
-      menge: 1,
-      einheit: 'Stk.',
-      preis_typ: 'fix',
-    }
-    const gewerk_block_key =
-      r.gewerk_block_key != null && String(r.gewerk_block_key).trim()
-        ? String(r.gewerk_block_key).trim()
-        : undefined
-    if (gewerk_block_key) outRabatt.gewerk_block_key = gewerk_block_key
-    return outRabatt
-  }
-
   let lohn_netto = num(r.lohn_netto)
   if (lohn_netto <= 0 && (r.lohn_netto == null || r.lohn_netto === '')) {
     const lmin = num(r.lohn_min)
@@ -196,7 +135,7 @@ export function normalizeAngebotPosition(
       }
     }
   }
-  if (lohn_netto < 0 && !erlaubtNegativ) lohn_netto = 0
+  if (lohn_netto < 0) lohn_netto = 0
 
   let material_netto = num(r.material_netto)
   if (material_netto <= 0 && (r.material_netto == null || r.material_netto === '')) {
@@ -213,7 +152,7 @@ export function normalizeAngebotPosition(
       else material_netto = 0
     }
   }
-  if (material_netto < 0 && !erlaubtNegativ) material_netto = 0
+  if (material_netto < 0) material_netto = 0
 
   let einkaufspreis: number | undefined
   const ekSingle = r.einkaufspreis
@@ -302,45 +241,15 @@ export function normalizeAngebotPosition(
   if (gewerk_block_key) out.gewerk_block_key = gewerk_block_key
   if (leistung_id) out.leistung_id = leistung_id
   if (leistung_name) out.leistung_name = leistung_name
-  const variante_id =
-    r.variante_id != null && String(r.variante_id).trim()
-      ? String(r.variante_id).trim()
-      : leistung_id
-  if (variante_id) out.variante_id = variante_id
-  if (r.position_quelle === 'katalog' || r.position_quelle === 'frei') {
-    out.position_quelle = r.position_quelle
-  } else if (variante_id) {
-    out.position_quelle = 'katalog'
-  } else {
-    out.position_quelle = 'frei'
-  }
-  const mwstRaw =
-    r.mwst_satz != null && r.mwst_satz !== '' ? num(r.mwst_satz) : NaN
+  const mwstRaw = num(r.mwst_satz)
   if (mwstRaw === 0 || mwstRaw === 7 || mwstRaw === 19) out.mwst_satz = mwstRaw
   const kostenverteilung = parseKostenverteilung(r.kostenverteilung)
   if (kostenverteilung) out.kostenverteilung = kostenverteilung
-  if (vkRaw > 0 || (erlaubtNegativ && vkRaw < 0)) out.vk_netto = vkRaw
+  if (vkRaw > 0) out.vk_netto = vkRaw
   if (r.kostenart === 'anfahrt' || gewerk_slug === GEWERK_SLUG_ANFAHRT) out.kostenart = 'anfahrt'
   if (einkaufspreis != null && einkaufspreis > 0) out.einkaufspreis = einkaufspreis
   if (handwerker_id) out.handwerker_id = handwerker_id
   if (handwerker_name) out.handwerker_name = handwerker_name
-
-  const verguetungRaw = String(r.verguetung ?? '').toLowerCase().trim()
-  const isRegie =
-    verguetungRaw === 'aufwand' ||
-    r.regieSchein === true ||
-    (notiz_extern != null &&
-      (/regieschein/i.test(notiz_extern) || /nach aufwand/i.test(notiz_extern)))
-  if (isRegie) {
-    out.verguetung = 'aufwand'
-    const gesch = num(r.geschaetzt_std)
-    out.geschaetzt_std = gesch > 0 ? gesch : menge
-    const satz = num(r.stundensatz)
-    out.stundensatz = satz > 0 ? satz : gesamtStueck > 0 ? gesamtStueck : null
-  } else if (verguetungRaw === 'festpreis') {
-    out.verguetung = 'festpreis'
-  }
-
   return out
 }
 
@@ -417,11 +326,6 @@ export type AngebotSummen = {
   einkaufZeileMax: number
   margeMin: number
   margeMax: number
-  /** Nachlass-Abzug (positiv), 0 wenn keiner */
-  nachlassNetto: number
-  nachlassLabel?: string
-  /** Netto der Preispositionen vor Nachlass */
-  nettoVorNachlass: number
 }
 
 function zeileEinkauf(p: AngebotPosition): { min: number; max: number } {
@@ -468,7 +372,7 @@ export function summenAusPositionen(
   let einkaufZeileMin = 0
   let einkaufZeileMax = 0
 
-  const list = Array.isArray(positionen) ? normalizeAngebotPositionen(positionen) : []
+  const list = Array.isArray(positionen) ? positionen : []
   for (const p of list) {
     if (!istPreisPosition(p)) continue
     const m = p.menge || 1
@@ -483,17 +387,13 @@ export function summenAusPositionen(
     einkaufZeileMax += ek.max
   }
 
-  const artikelNettoMin = lohnZeileMin + materialZeileMin
-  const artikelNettoMax = lohnZeileMax + materialZeileMax
-  const nachlass = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMin)
-  const nachlassMax = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMax)
-  const nettoMin = Math.max(0, Math.round((artikelNettoMin - nachlass) * 100) / 100)
-  const nettoMax = Math.max(0, Math.round((artikelNettoMax - nachlassMax) * 100) / 100)
+  const nettoMin = lohnZeileMin + materialZeileMin
+  const nettoMax = lohnZeileMax + materialZeileMax
   const f = mwstSatz / 100
-  const mwstBetragMin = Math.round(nettoMin * f * 100) / 100
-  const mwstBetragMax = Math.round(nettoMax * f * 100) / 100
-  const bruttoMin = Math.round((nettoMin + mwstBetragMin) * 100) / 100
-  const bruttoMax = Math.round((nettoMax + mwstBetragMax) * 100) / 100
+  const mwstBetragMin = nettoMin * f
+  const mwstBetragMax = nettoMax * f
+  const bruttoMin = nettoMin + mwstBetragMin
+  const bruttoMax = nettoMax + mwstBetragMax
 
   const margeMin = nettoMin - einkaufZeileMax
   const margeMax = nettoMax - einkaufZeileMin
@@ -514,12 +414,6 @@ export function summenAusPositionen(
     einkaufZeileMax,
     margeMin,
     margeMax,
-    nachlassNetto: nachlass,
-    nachlassLabel: (() => {
-      const r = list.find(istGesamtrabattPosition)
-      return r ? parseGesamtrabattMetaFromPosition(r).bezeichnung : undefined
-    })(),
-    nettoVorNachlass: artikelNettoMin,
   }
 }
 
@@ -581,10 +475,7 @@ export function positionVkNettoStueck(p: AngebotPosition): number {
 /** Korrigiert vk_netto, Zeilensumme und ggf. Lohn/Material nach dem Laden oder vor dem Speichern. */
 export function repairAngebotPositionPreise(p: AngebotPosition): AngebotPosition {
   const slug = p.gewerk_slug ?? ''
-  if (slug === '__freitext__' || slug === '__gesamtrabatt__' || slug === 'abschlag_abzug') {
-    return p
-  }
-  if ((p.leistung ?? '').toLowerCase().startsWith('abzüglich')) return p
+  if (slug === '__freitext__' || slug === '__gesamtrabatt__') return p
 
   const m = Math.max(p.menge || 1, 0.0001)
   const vk = positionVkNettoStueck(p)

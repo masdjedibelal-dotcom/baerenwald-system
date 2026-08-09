@@ -1,8 +1,7 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -101,7 +100,7 @@ export function AuftragFinanzenClient({
     summeEinbehaltBrutto: number
   }
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [erModal, setErModal] = useState(false)
   const [ebModal, setEbModal] = useState(false)
   const [buModal, setBuModal] = useState<Einbehalt | null>(null)
@@ -178,34 +177,34 @@ export function AuftragFinanzenClient({
       ) : null}
 
       <section>
-        <h2 className="mb-3 text-[length:var(--fs-head)] font-semibold text-ink">Projektmarge</h2>
+        <h2 className="mb-3 text-lg font-semibold text-ink">Projektmarge</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Card className="p-3 text-[length:var(--fs-text)]">
+          <Card className="p-3 text-sm">
             <p className="text-muted">Kundenrechnung</p>
-            <p className="mt-1 text-[length:var(--fs-head)] font-semibold text-ink">
+            <p className="mt-1 text-lg font-semibold text-ink">
               {metrics.kundenBrutto != null ? `${fmtEuro(metrics.kundenBrutto)} €` : 'Noch keine Rechnung'}
             </p>
           </Card>
-          <Card className="p-3 text-[length:var(--fs-text)]">
+          <Card className="p-3 text-sm">
             <p className="text-muted">Kosten gesamt</p>
-            <p className="mt-1 text-[length:var(--fs-head)] font-semibold text-ink">{fmtEuro(metrics.kostenGesamt)} €</p>
+            <p className="mt-1 text-lg font-semibold text-ink">{fmtEuro(metrics.kostenGesamt)} €</p>
           </Card>
-          <Card className="p-3 text-[length:var(--fs-text)]">
+          <Card className="p-3 text-sm">
             <p className="text-muted">Echte Marge €</p>
             <p
               className={cn(
-                'mt-1 text-[length:var(--fs-head)] font-semibold',
+                'mt-1 text-lg font-semibold',
                 metrics.margeEuro == null ? 'text-muted' : metrics.margeEuro >= 0 ? 'text-emerald-700' : 'text-red-700'
               )}
             >
               {metrics.margeEuro != null ? `${fmtEuro(metrics.margeEuro)} €` : '—'}
             </p>
           </Card>
-          <Card className="p-3 text-[length:var(--fs-text)]">
+          <Card className="p-3 text-sm">
             <p className="text-muted">Echte Marge %</p>
             <p
               className={cn(
-                'mt-1 text-[length:var(--fs-head)] font-semibold',
+                'mt-1 text-lg font-semibold',
                 metrics.margePct == null
                   ? 'text-muted'
                   : metrics.margePct >= 15
@@ -221,7 +220,7 @@ export function AuftragFinanzenClient({
         </div>
 
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[480px] text-left text-[length:var(--fs-text)]">
+          <table className="w-full min-w-[480px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-canvas text-muted">
                 <th className="px-3 py-2">Kategorie</th>
@@ -247,7 +246,7 @@ export function AuftragFinanzenClient({
         </div>
 
         {metrics.hatEingang ? (
-          <Card className="mt-4 p-3 text-[length:var(--fs-text)]">
+          <Card className="mt-4 p-3 text-sm">
             <p className="font-medium text-ink">Kalkuliert vs. echte Marge</p>
             <p className="mt-1 text-muted">
               Kalkuliert (Angebot): <strong>{fmtEuro(metrics.kalkMargeMitte)} €</strong>
@@ -271,14 +270,14 @@ export function AuftragFinanzenClient({
 
       <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Eingangsrechnungen</h2>
+          <h2 className="text-lg font-semibold text-ink">Eingangsrechnungen</h2>
           <Button type="button" variant="primary" onClick={() => setErModal(true)}>
             + Eingangsrechnung
           </Button>
         </div>
 
         <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-          <table className="w-full min-w-[720px] text-left text-[length:var(--fs-text)]">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-canvas text-muted">
                 <th className="px-3 py-2">Lieferant</th>
@@ -296,7 +295,7 @@ export function AuftragFinanzenClient({
                 <tr key={e.id} className="border-b border-border">
                   <td className="px-3 py-2 font-medium">{e.lieferant}</td>
                   <td className="px-3 py-2">
-                    <span className={cn('rounded px-2 py-0.5 text-[length:var(--fs-meta)]', katBadgeClass(e.kategorie))}>
+                    <span className={cn('rounded px-2 py-0.5 text-xs', katBadgeClass(e.kategorie))}>
                       {katLabel(e.kategorie)}
                     </span>
                   </td>
@@ -346,15 +345,15 @@ export function AuftragFinanzenClient({
 
         <div className="space-y-2 md:hidden">
           {eingangsrechnungen.map((e) => (
-            <Card key={e.id} className="p-3 text-[length:var(--fs-text)]">
+            <Card key={e.id} className="p-3 text-sm">
               <p className="font-semibold text-ink">{e.lieferant}</p>
               {e.beschreibung ? <p className="text-muted">{e.beschreibung}</p> : null}
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className={cn('rounded px-2 py-0.5 text-[length:var(--fs-meta)]', katBadgeClass(e.kategorie))}>{katLabel(e.kategorie)}</span>
+                <span className={cn('rounded px-2 py-0.5 text-xs', katBadgeClass(e.kategorie))}>{katLabel(e.kategorie)}</span>
                 <span className="font-medium">{fmtEuro(e.betrag_brutto)} € brutto</span>
-                {e.rechnungsdatum ? <span className="text-[length:var(--fs-meta)] text-muted">{formatDatum(e.rechnungsdatum)}</span> : null}
+                {e.rechnungsdatum ? <span className="text-xs text-muted">{formatDatum(e.rechnungsdatum)}</span> : null}
               </div>
-              <label className="mt-2 flex items-center gap-2 text-[length:var(--fs-meta)]">
+              <label className="mt-2 flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
                   checked={e.bezahlt}
@@ -369,7 +368,7 @@ export function AuftragFinanzenClient({
                 Bezahlt
               </label>
               {e.beleg_url ? (
-                <Link href={e.beleg_url} target="_blank" className="mt-1 inline-block text-[length:var(--fs-meta)] text-primary underline">
+                <Link href={e.beleg_url} target="_blank" className="mt-1 inline-block text-xs text-primary underline">
                   Beleg anzeigen
                 </Link>
               ) : null}
@@ -380,12 +379,12 @@ export function AuftragFinanzenClient({
 
       <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Sicherheitseinbehalte</h2>
+          <h2 className="text-lg font-semibold text-ink">Sicherheitseinbehalte</h2>
           <Button type="button" variant="secondary" onClick={() => setEbModal(true)}>
             + Einbehalt erfassen
           </Button>
         </div>
-        <Card className="mb-4 border-amber-200 bg-amber-50/80 p-3 text-[length:var(--fs-text)] text-amber-950">
+        <Card className="mb-4 border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950">
           Sicherheitseinbehalte schützen Sie während der Gewährleistungsfrist von 5 Jahren. Standard: 5 % der
           Bruttosumme.
         </Card>
@@ -397,14 +396,14 @@ export function AuftragFinanzenClient({
             let buerTage = 999
             if (b?.gueltig_bis) buerTage = tageBis(b.gueltig_bis)
             return (
-              <Card key={e.id} className={cn('p-4 text-[length:var(--fs-text)]', e.status === 'freigegeben' && 'opacity-70')}>
+              <Card key={e.id} className={cn('p-4 text-sm', e.status === 'freigegeben' && 'opacity-70')}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-ink">
                       {e.handwerker?.name ?? '—'}
                       {e.handwerker?.firma ? <span className="text-muted"> · {e.handwerker.firma}</span> : null}
                     </p>
-                    <span className={cn('mt-1 inline-block rounded px-2 py-0.5 text-[length:var(--fs-meta)]', einbehaltStatusBadge(e.status))}>
+                    <span className={cn('mt-1 inline-block rounded px-2 py-0.5 text-xs', einbehaltStatusBadge(e.status))}>
                       {e.status === 'einbehalten' ? 'Einbehalten' : e.status === 'buergschaft' ? 'Bürgschaft' : 'Freigegeben'}
                     </span>
                   </div>
@@ -444,7 +443,7 @@ export function AuftragFinanzenClient({
                 ) : null}
 
                 {e.status === 'buergschaft' && b ? (
-                  <div className="mt-3 rounded border border-border bg-canvas p-2 text-[length:var(--fs-meta)]">
+                  <div className="mt-3 rounded border border-border bg-canvas p-2 text-xs">
                     <p>Urkunden-Nr.: {b.urkunden_nummer}</p>
                     <p>Bank: {b.bank ?? '—'}</p>
                     <p>Gültig bis: {formatDatum(b.gueltig_bis)}</p>
@@ -465,14 +464,14 @@ export function AuftragFinanzenClient({
                 ) : null}
 
                 {e.status === 'freigegeben' && e.freigegeben_at ? (
-                  <p className="mt-2 text-[length:var(--fs-meta)] text-muted">Freigegeben am {formatDatum(e.freigegeben_at.slice(0, 10))}</p>
+                  <p className="mt-2 text-xs text-muted">Freigegeben am {formatDatum(e.freigegeben_at.slice(0, 10))}</p>
                 ) : null}
               </Card>
             )
           })}
         </div>
 
-        <Card className="mt-4 p-3 text-[length:var(--fs-text)]">
+        <Card className="mt-4 p-3 text-sm">
           <p>Einbehalten gesamt: {fmtEuro(summenEin.ein)} €</p>
           <p>Mit Bürgschaft: {fmtEuro(summenEin.buer)} €</p>
           <p>Freigegeben: {fmtEuro(summenEin.frei)} €</p>
@@ -480,7 +479,7 @@ export function AuftragFinanzenClient({
       </section>
 
       <Modal open={erModal} onClose={() => setErModal(false)} title="Eingangsrechnung" size="md">
-            <div className="space-y-3 text-[length:var(--fs-text)] max-h-[60vh] overflow-y-auto">
+            <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
               <label className="block">
                 Lieferant *
                 <input list="lief" value={lieferant} onChange={(e) => setLieferant(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2" />
@@ -546,7 +545,7 @@ export function AuftragFinanzenClient({
                       }
                     })
                   }}
-                  className="mt-1 w-full text-[length:var(--fs-meta)]"
+                  className="mt-1 w-full text-xs"
                 />
               </label>
               <label className="block">
@@ -604,7 +603,7 @@ export function AuftragFinanzenClient({
       </Modal>
 
       <Modal open={ebModal} onClose={() => setEbModal(false)} title="Einbehalt" size="md">
-            <div className="space-y-3 text-[length:var(--fs-text)]">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 Handwerker
                 <select value={ebHw} onChange={(e) => setEbHw(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2">
@@ -679,14 +678,14 @@ export function AuftragFinanzenClient({
       >
         {buModal ? (
           <>
-            <p className="-mt-1 mb-3 text-[length:var(--fs-text)] text-muted">
+            <p className="-mt-1 mb-3 text-sm text-muted">
               Handwerker: {buModal.handwerker?.name ?? '—'} · Einbehalt: {fmtEuro(buModal.einbehalt_betrag)} €
             </p>
-            <div className="space-y-3 text-[length:var(--fs-text)]">
+            <div className="space-y-3 text-sm">
               <label className="block">
                 Urkunden-Nummer *
                 <input value={buNr} onChange={(e) => setBuNr(e.target.value)} className="mt-1 w-full rounded border border-border px-3 py-2" />
-                <span className="text-[length:var(--fs-meta)] text-muted">Von der Bank ausgestellt</span>
+                <span className="text-xs text-muted">Von der Bank ausgestellt</span>
               </label>
               <label className="block">
                 Bank
@@ -724,7 +723,7 @@ export function AuftragFinanzenClient({
                       }
                     })
                   }}
-                  className="mt-1 w-full text-[length:var(--fs-meta)]"
+                  className="mt-1 w-full text-xs"
                 />
               </label>
             </div>

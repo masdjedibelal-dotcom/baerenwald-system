@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
+import { FormSheet } from '@/components/ui/FormSheet'
 import { Button } from '@/components/ui/Button'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Textarea } from '@/components/ui/Textarea'
 import {
   insertKalenderTermin,
@@ -11,9 +13,6 @@ import {
 } from '@/app/(dashboard)/anfragen/actions'
 import { TerminMitarbeiterSelect } from '@/components/anfragen/TerminMitarbeiterSelect'
 import { toast } from '@/components/ui/app-toast'
-import { DateInput } from '@/components/ui/DateInput'
-import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
-import { TimeInput } from '@/components/ui/TimeInput'
 import {
   TerminBestaetigungMailEditor,
   type TerminMailDraft,
@@ -171,6 +170,7 @@ export function TerminModal({
   }
 
   const kontaktNameAnzeige = kontaktName?.trim() || 'Kundin/Kunde'
+  const isMobile = useIsMobile()
 
   const formBody = (
     <>
@@ -187,22 +187,18 @@ export function TerminModal({
             </select>
           </label>
         )}
-        <label className="md:col-span-2">
+        <label>
           <span className="input-label">Datum</span>
-          <DateInput size="sm" value={datum} onChange={(e) => setDatum(e.target.value)} required />
+          <input type="date" className="input" value={datum} onChange={(e) => setDatum(e.target.value)} required />
         </label>
-        <div className="md:col-span-2">
-          <FilterRangeRow
-            title="Uhrzeit"
-            className="!mb-0"
-            von={
-              <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
-            }
-            bis={
-              <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
-            }
-          />
-        </div>
+        <label>
+          <span className="input-label">Uhrzeit von</span>
+          <input type="time" className="input" value={von} onChange={(e) => setVon(e.target.value)} />
+        </label>
+        <label>
+          <span className="input-label">Uhrzeit bis</span>
+          <input type="time" className="input" value={bis} onChange={(e) => setBis(e.target.value)} />
+        </label>
         <label className="md:col-span-2">
           <span className="input-label">Adresse</span>
           <input type="text" className="input" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
@@ -224,7 +220,7 @@ export function TerminModal({
 
       {istBesichtigung ? (
         <div className="mt-4 space-y-3">
-          <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input type="checkbox" checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
             Bestätigungs-Mail an Kunden ({kontaktEmail ?? 'keine E-Mail'})
           </label>
@@ -249,8 +245,11 @@ export function TerminModal({
 
   const formFooter = (
     <div className="flex flex-wrap justify-end gap-2">
+      <Button type="button" variant="secondary" onClick={onClose}>
+        Abbrechen
+      </Button>
       <Button type="button" variant="secondary" loading={saving} onClick={() => void save(false)}>
-        Ohne Mail
+        Speichern ohne Mail
       </Button>
       {istBesichtigung && kontaktEmail?.trim() ? (
         <Button type="button" variant="primary" loading={saving} onClick={() => void save(true)}>
@@ -264,10 +263,25 @@ export function TerminModal({
     </div>
   )
 
+  if (isMobile) {
+    return (
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        breadcrumb="Anfragen"
+        title="Termin vereinbaren"
+        footer={formFooter}
+        width="lg"
+      >
+        {formBody}
+      </FormSheet>
+    )
+  }
+
   return (
-    <EditorSheet open={open} onClose={onClose} title="Termin" context="detail" size="lg">
+    <Modal open={open} onClose={onClose} title="Termin vereinbaren" size="lg">
       {formBody}
-      <div className="mt-4 border-t border-[var(--app-separator)] pt-3">{formFooter}</div>
-    </EditorSheet>
+      <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-bw-border pt-4">{formFooter}</div>
+    </Modal>
   )
 }

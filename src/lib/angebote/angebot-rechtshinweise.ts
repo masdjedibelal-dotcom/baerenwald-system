@@ -35,25 +35,14 @@ export function parseRechtshinweiseFromWizardMeta(
   firm: FirmenEinstellungen
 ): AngebotRechtshinweise {
   const defaults = defaultAngebotRechtshinweise(kundeTyp, firm)
-  const klein = parseKleinunternehmerSetting(firm.kleinunternehmer)
-  const erlaubt35a = kundeZeigt35a(kundeTyp) && !klein
-  const erlaubt13b = kundeKannReverseCharge13b(kundeTyp) && !klein
-  if (!raw || typeof raw !== 'object') {
-    return {
-      ...defaults,
-      hinweis_35a: defaults.hinweis_35a && erlaubt35a,
-      hinweis_13b: defaults.hinweis_13b && erlaubt13b,
-    }
-  }
+  if (!raw || typeof raw !== 'object') return defaults
   const wm = raw as Record<string, unknown>
-  const raw35a =
-    typeof wm.hinweis_35a === 'boolean' ? wm.hinweis_35a : defaults.hinweis_35a
-  const raw13b =
-    typeof wm.hinweis_13b === 'boolean' ? wm.hinweis_13b : defaults.hinweis_13b
   return {
-    hinweis_35a: Boolean(raw35a && erlaubt35a),
+    hinweis_35a:
+      typeof wm.hinweis_35a === 'boolean' ? wm.hinweis_35a : defaults.hinweis_35a,
     hinweis_19: false,
-    hinweis_13b: Boolean(raw13b && erlaubt13b),
+    hinweis_13b:
+      typeof wm.hinweis_13b === 'boolean' ? wm.hinweis_13b : defaults.hinweis_13b,
   }
 }
 

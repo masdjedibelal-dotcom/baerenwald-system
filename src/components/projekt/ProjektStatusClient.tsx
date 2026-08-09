@@ -237,7 +237,7 @@ export function ProjektStatusClient({
         {naechsterFreitext && auftrag.status !== 'abgeschlossen' && auftrag.status !== 'storniert' ? (
           <section className="mt-6 rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-[#1A3D2B]">Nächster Schritt</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-bw-text-mid">{naechsterFreitext}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-[#374151]">{naechsterFreitext}</p>
           </section>
         ) : null}
 

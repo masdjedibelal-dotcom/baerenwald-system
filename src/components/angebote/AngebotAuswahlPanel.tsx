@@ -1,7 +1,6 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Copy, Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
@@ -142,7 +141,7 @@ export function AngebotAuswahlPanel({
     const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
     const items: ActionsMenuItem[] = [
       {
-        label: 'Öffnen',
+        label: 'Ansehen',
         icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => {
           onClose?.()
@@ -230,18 +229,18 @@ export function AngebotAuswahlPanel({
       {variant === 'page' ? (
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Anfrage</p>
-            <h1 className="text-[length:var(--fs-head)] font-semibold text-bw-text">Angebote</h1>
+            <p className="text-xs text-bw-text-muted">Anfrage</p>
+            <h1 className="text-lg font-semibold text-bw-text">Angebote</h1>
           </div>
         </div>
       ) : null}
 
-      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+      <p className="text-sm text-bw-text-muted">
         Bestehende Angebote auswählen und bearbeiten — oder unten ein neues anlegen.
       </p>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-sm text-bw-text-muted">
           Noch keine Angebote zu dieser Anfrage.
         </p>
       ) : variant === 'page' ? (
@@ -329,15 +328,15 @@ export function AngebotAuswahlPanel({
                           <span className="block h-1.5 w-1.5 rounded-full bg-white" />
                         ) : null}
                       </span>
-                      <span className="font-mono text-[length:var(--fs-meta)] text-bw-text-muted">{nr}</span>
+                      <span className="font-mono text-xs text-bw-text-muted">{nr}</span>
                       <AngebotStatusBadge status={a.status} />
                     </div>
-                    <p className="mt-0.5 pl-6 text-[length:var(--fs-text)] text-bw-text-muted">
+                    <p className="mt-0.5 pl-6 text-[13px] text-bw-text-muted">
                       {a.created_at ? formatRelativeDate(a.created_at) : '—'}
                       {label ? ` · ${label}` : ''}
                     </p>
                   </button>
-                  <span className="text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
+                  <span className="text-[13px] font-medium tabular-nums text-bw-text">
                     {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                   </span>
                   <div className="flex shrink-0 items-center">

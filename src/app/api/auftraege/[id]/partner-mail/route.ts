@@ -2,7 +2,6 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendAuftragHandwerkerZuweisungMail } from '@/lib/auftraege/send-auftrag-handwerker-zuweisung-mail'
-import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 
 type Body = {
   handwerker_id: string
@@ -65,18 +64,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       betreff: sent.betreff,
       defaultTo: sent.defaultTo,
       defaultCc: sent.defaultCc,
-    })
-  }
-
-  if (sent.gesendet) {
-    await insertAuftragTimelineEvent({
-      auftrag_id: auftragId,
-      typ: 'mail_handwerker',
-      titel: 'Zuweisung an Handwerker gesendet',
-      beschreibung: sent.betreff ?? 'Partner-Mail',
-      handwerker_id: handwerkerId,
-      erstellt_von: user.id,
-      email_log_id: sent.emailLogId ?? null,
     })
   }
 

@@ -91,7 +91,7 @@ export function AngebotWizardAngebotDetailsCard({
       gesamtNetto != null &&
       gesamtNetto > 0 ? (
         <div className="rounded-lg border border-bw-border p-3">
-          <p className="mb-2 text-[length:var(--fs-text)] font-medium text-bw-text">Abschlagsplan</p>
+          <p className="mb-2 text-sm font-medium text-bw-text">Abschlagsplan</p>
           <ZahlungsplanEditor
             plan={zahlungsplan}
             onChange={onZahlungsplanChange}

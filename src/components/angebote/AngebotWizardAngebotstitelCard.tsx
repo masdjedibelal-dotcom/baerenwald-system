@@ -42,6 +42,9 @@ export function AngebotWizardAngebotstitelCard({
         disabled={disabled}
         placeholder="z. B. Angebot Badsanierung — Max Mustermann"
       />
+      <p className="mt-2 text-[11px] text-bw-text-muted">
+        Interner Titel für Versand und Übersicht — erscheint im Betreff der Kunden-Mail.
+      </p>
     </label>
   )
 
@@ -66,6 +69,9 @@ export function AngebotWizardAngebotstitelCard({
       <MobileEditableBlock sheetTitle="Angebotstitel" overview={overview} disabled={disabled}>
         {editForm}
       </MobileEditableBlock>
+      <p className="mt-2 hidden text-[11px] text-bw-text-muted md:block">
+        Interner Titel für Versand und Übersicht — erscheint im Betreff der Kunden-Mail.
+      </p>
     </Card>
   )
 }

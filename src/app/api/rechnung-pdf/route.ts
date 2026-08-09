@@ -44,10 +44,7 @@ export async function GET(request: Request) {
   const gewerke = await loadGewerkeAusfuehrung(supabaseAdmin)
 
   if (wantPreview) {
-    const html = await buildRechnungHtmlAusDetail(detail, firm, gewerke, {
-      previewFooter: true,
-      supabase: supabaseAdmin,
-    })
+    const html = buildRechnungHtmlAusDetail(detail, firm, gewerke, { previewFooter: true })
     return new NextResponse(html, {
       status: 200,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -55,9 +52,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const buffer = await renderRechnungPdfForDetail(detail, firm, gewerke, {
-      supabase: supabaseAdmin,
-    })
+    const buffer = await renderRechnungPdfForDetail(detail, firm, gewerke)
     const nr = detail.rechnungsnummer?.trim()?.replace(/\s+/g, '_') ?? rechnungId.slice(0, 8)
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,

@@ -1,10 +1,8 @@
 # Bärenwald CRM — UI/UX-Konzept (Soll-Zustand)
 
-**Stand:** Juli 2026  
+**Stand:** Juni 2026  
 **Zielgruppe:** Product, Design, Entwicklung, Stakeholder  
 **Zweck:** Vollständiges **Zielbild** für UI und UX — verständlich, intuitiv, umsetzbar. Ergänzt das Ist-Audit in [DESIGN_AUDIT_CRM_FUNDAMENT.md](./DESIGN_AUDIT_CRM_FUNDAMENT.md).
-
-**Aktualisierung Juli 2026:** Abnahmeprotokoll-Wizard und Vor-Ort-Tab sind im Ist-Audit (§5.7 / §9.3) als **kritisch** bewertet — Soll in [§9 Wizards](#9-wizards--ein-muster) und [§7.3 Auftrag](#73-auftrag-projektleitung).
 
 **Kernversprechen in einem Satz:**
 
@@ -337,13 +335,10 @@ Kein separater Desktop-Tab „Stammdaten“ — Zone eingeklappt oben.
 | Tab | Default PL | Inhalt |
 |-----|------------|--------|
 | **Positionen** | ✅ | Gewerke, Leistungen, HW, Baufortschritt |
-| **Vor Ort** | bei Status Abnahme / in Arbeit | **First-Class Kern-Tab** (beschlossen #3) — Segment: Abnahme \| Tagebuch \| Abschluss |
-| **Nächste Schritte** | Vertrieb | ggf. unter Übersicht / Mehr |
-| **Verlauf → Aktivität** | | Timeline (Kern-Tab #3) |
-| **Dokumente** | | unter „Mehr“ mobil |
-| **Finanzen → Zahlung** | | **Kern-Tab** (#3) — Zahlungsplan, Rechnungen |
-
-**Mobil Kern-Tabs (SoT #3):** Übersicht · Leistungen · Zahlung · Vor Ort · Aktivität · **Mehr** (Rest).
+| **Nächste Schritte** | Vertrieb | Checkliste projektweit |
+| **Verlauf** | | Timeline |
+| **Dokumente** | | Verträge, HW-Uploads, Abnahme, CRM-Uploads |
+| **Finanzen** | | Zahlungsplan, Rechnungen, Marge |
 
 **Compliance & Baustelle:** Abschnitte in Positionen oder Nächste Schritte — **keine** eigenen Top-Level-Tabs.
 
@@ -409,38 +404,26 @@ Bearbeiten, Notiz, Löschen → `⋯` pro Zeile.
 
 ## 9. Wizards — ein Muster
 
-Gilt für: **Angebot**, **Rechnung**, **Abnahmeprotokoll**, **Projektvertrag** (optional).
-
-**Ausführliche Mobile/Desktop-Regel (Apple-Style Sheets):** [WIZARD-UI-MUSTER.md](./WIZARD-UI-MUSTER.md)  
-**Lexware-Dokument-Canvas (Angebot/RE wie Field-App):** [WIZARD-LEXWARE-KONZEPT.md](./WIZARD-LEXWARE-KONZEPT.md)
+Gilt für: **Angebot**, **Rechnung**, **Projektvertrag** (optional).
 
 ```
-Dokument-Canvas (eine Seite)
-  ├─ Kunde / Meta          → Picker-Sheet
-  ├─ Positionen            → Add/Edit-Sheet (+ Neu nested)
-  ├─ Summen / Fuß          → inline oder Sheet
-  └─ Toolbar Vorschau|Senden
+Schritt 1          Schritt 2           Schritt 3
+Was?               Details             Versand
+────────           ───────             ───────
+Leistungen         Gültigkeit,         PDF prüfen,
+auswählen          Zahlungsplan,       Mail, Senden
+                   Texte
 ```
-
-| Wizard | Soll-Modell | Kern |
-|--------|-------------|------|
-| Angebot / Rechnung | **DocumentCanvas + Sheets** (Lexware) | Positionen & Kunde per Sheet |
-| **Abnahme** | Canvas angleichen (≤3 Steps Übergang ok) | Checkliste + Add-Sheet |
-| Vertrag | Canvas oder Shell | Parteien / Leistung |
 
 | Regel | Detail |
 |-------|--------|
-| Container | `DocumentCanvas` / `WizardShell` |
-| Mobile | Bottom Sheet für Picker & Anlegen |
-| Desktop | **Detail → Slide-over**; **aus Canvas → Center-Modal** ([SURFACE-KONSOLIDIERUNG](./SURFACE-KONSOLIDIERUNG.md) S1) |
-| Speichern | Header ✓ = Entwurf; Senden = Toolbar |
-| Hierarchie | Primary im Vorgang-Header; Nav ohne ⋯; Edit Inline/Sheet |
+| Container | Fullscreen-Modal (`AppFlowScreen`) |
+| Fortschritt | `① ─── ② ─── ③` oben |
+| Speichern | Auto-Save ab Schritt 2; Anzeige mit **Datum + Uhrzeit** |
+| Abbrechen | „Als Entwurf speichern?“ |
+| Neue Anfrage | Gleiche Shell-Logik als Modal, nicht eigene leere Page |
 
-**Surfaces gesamt (4):** DocumentCanvas · EditorSheet · ActionSheet · Inline — siehe [SURFACE-KONSOLIDIERUNG.md](./SURFACE-KONSOLIDIERUNG.md).
-
-**Abnahme (Juli 2026):** Shell + Sheet-Pattern wie Angebot; Step-Anzahl weiter verdichten (W9).
-
-**Anfrage/Rechnung neu:** Einstieg → Canvas/Wizard; Stammdaten-Create (Kunde) → EditorSheet, nicht zweite Fullpage-Wahrheit.
+**Anfrage neu** und **Rechnung neu** von Listen aus per Modal — Routen `/anfragen/neu`, `/rechnungen/neu` redirecten oder öffnen Modal.
 
 ---
 

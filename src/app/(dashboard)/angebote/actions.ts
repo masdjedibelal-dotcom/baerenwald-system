@@ -71,13 +71,11 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
+import { leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { resolveStatusEinfach } from '@/lib/angebot-einfach'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { auftragsbestaetigungMailFromEmpfaenger } from '@/lib/mail/auftragsbestaetigung-mail'
-import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
-import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type { LeadStatus } from '@/lib/types'
 import type {
   AngebotDetail,
@@ -100,35 +98,6 @@ import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfas
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
 import { provisionProjektVertraegeFuerAuftrag, provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
-import { parseRechtshinweiseFromWizardMeta } from '@/lib/angebote/angebot-rechtshinweise'
-import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
-import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-
-function angebotMailSummen(
-  positionen: AngebotPosition[],
-  detail: Pick<AngebotDetail, 'notizen'> & { kunden?: { typ?: string | null } | null },
-  firm: FirmenEinstellungen
-) {
-  const rh = parseRechtshinweiseFromWizardMeta(
-    (() => {
-      try {
-        return (JSON.parse(detail.notizen ?? '{}') as { wizard_meta?: unknown }).wizard_meta ?? null
-      } catch {
-        return null
-      }
-    })(),
-    detail.kunden?.typ,
-    firm
-  )
-  const firmMwst = Math.max(0, parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ)
-  const mwstSatz =
-    rh.hinweis_13b || parseKleinunternehmerSetting(firm.kleinunternehmer) ? 0 : firmMwst
-  return {
-    summen: summenAusPositionen(positionen, mwstSatz),
-    reverseCharge: rh.hinweis_13b,
-  }
-}
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
   return normalizeAngebotPositionen(raw)
@@ -213,33 +182,15 @@ export async function searchKunden(q: string) {
 }
 
 export async function createKundeQuick(input: {
-  vorname?: string | null
-  nachname?: string | null
-  /** @deprecated Prefer vorname/nachname — kept for callers that still pass a full name */
-  name?: string | null
+  name: string
   email: string | null
   telefon: string | null
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const vorname = (input.vorname ?? '').trim()
-  const nachname = (input.nachname ?? '').trim()
-  const legacy = (input.name ?? '').trim()
-  if (!vorname && !nachname && !legacy) {
-    return { ok: false, message: 'Vorname oder Nachname ist Pflicht.' }
-  }
-  let v = vorname
-  let n = nachname
-  if (!v && !n && legacy) {
-    const parts = legacy.split(/\s+/)
-    v = parts[0] ?? ''
-    n = parts.slice(1).join(' ')
-  }
   const { data, error } = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
       .insert({
-        name: null,
-        vorname: v || null,
-        nachname: n || null,
+        name: input.name.trim(),
         email: input.email?.trim() || null,
         telefon: input.telefon?.trim() || null,
         typ: 'privat',
@@ -282,9 +233,6 @@ export type CreateAngebotInput = {
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
-  /** Bestand / wiederkehrend */
-  ist_wiederkehrend?: boolean | null
-  wiederkehr_turnus?: string | null
 }
 
 async function zahlungsbedingungenFuerSpeichern(
@@ -363,48 +311,6 @@ export async function markLeadAngeboteAbgelehnt(
   }
 }
 
-/**
- * Weitere offene Anfragen desselben Kunden ohne Angebot schließen —
- * verhindert Doppel-Einträge unter Anfrage + Angebot in „Offen“.
- */
-async function schliesseAndereOffeneAnfragenOhneAngebot(
-  supabase: ReturnType<typeof createClient> | typeof supabaseAdmin,
-  keepLeadId: string,
-  kundeId: string | null | undefined
-): Promise<void> {
-  const kid = kundeId?.trim()
-  if (!kid) return
-
-  const { data: siblings } = await supabase
-    .from('leads')
-    .select('id, status, angebote(id)')
-    .or(`kunde_id.eq.${kid},auftraggeber_kunde_id.eq.${kid}`)
-    .in('status', [...LEAD_STATUS_VOR_ANGEBOT])
-    .neq('id', keepLeadId)
-    .limit(30)
-
-  const now = new Date().toISOString()
-  for (const row of siblings ?? []) {
-    const angs = row.angebote
-    const hasAng = Array.isArray(angs) ? angs.length > 0 : Boolean(angs)
-    if (hasAng) continue
-    await supabase
-      .from('leads')
-      .update({
-        status: 'abgebrochen',
-        updated_at: now,
-      })
-      .eq('id', row.id as string)
-    await supabase.from('leads_status_history').insert({
-      lead_id: row.id as string,
-      status_alt: row.status,
-      status_neu: 'abgebrochen',
-      user_id: null,
-      notiz: 'Automatisch geschlossen — Angebot über andere Anfrage desselben Kunden.',
-    })
-  }
-}
-
 export async function createAngebot(
   input: CreateAngebotInput,
   opts?: { asSystem?: boolean }
@@ -423,16 +329,11 @@ export async function createAngebot(
 
   const angebotsnr = await nextAngebotsnummerJahr()
 
-  // Bei HV-/Mieter-Meldungen: Vertragskunde = Hausverwaltung (nicht Melder)
-  const kundeId =
-    (await resolveVertragsKundeIdForLead(supabase, input.lead_id, input.kunde_id)) ??
-    input.kunde_id
-
   const { data: row, error } = await supabase
     .from('angebote')
     .insert({
       lead_id: input.lead_id,
-      kunde_id: kundeId,
+      kunde_id: input.kunde_id,
       status: 'entwurf' as AngebotStatus,
       status_einfach: 'entwurf',
       positionen,
@@ -455,11 +356,6 @@ export async function createAngebot(
       varianten: input.varianten ?? null,
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
-      ist_wiederkehrend: input.ist_wiederkehrend === true,
-      wiederkehr_turnus:
-        input.ist_wiederkehrend === true
-          ? input.wiederkehr_turnus?.trim() || null
-          : null,
     })
     .select('id')
     .single()
@@ -491,30 +387,14 @@ export async function createAngebot(
   if (input.lead_id) {
     await markLeadAngeboteErsetzt(supabase, input.lead_id, id)
 
-    if (input.ist_wiederkehrend !== undefined) {
-      await supabase
-        .from('leads')
-        .update({
-          ist_wiederkehrend: input.ist_wiederkehrend === true,
-          wiederkehr_turnus:
-            input.ist_wiederkehrend === true
-              ? input.wiederkehr_turnus?.trim() || null
-              : null,
-        })
-        .eq('id', input.lead_id)
-    }
-
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
+    void syncAngebotMitOrgFreigabe({
       leadId: input.lead_id,
       angebotId: id,
       betragEur: summen.nettoMax,
     })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
 
     const { data: leadRow } = await supabase
       .from('leads')
@@ -541,8 +421,6 @@ export async function createAngebot(
         if (!leadUpd.ok) return leadUpd
       }
     }
-
-    await schliesseAndereOffeneAnfragenOhneAngebot(supabase, input.lead_id, kundeId)
   }
 
   if (!opts?.asSystem) {
@@ -605,8 +483,6 @@ export async function updateAngebot(
 
   const positionen = normalizeAngebotPositionen(input.positionen)
   const summen = summenAusPositionen(positionen, 19)
-  const gesamtFix =
-    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
 
   const preislisteSyncUpd = syncInputsFromAngebotPositionen(positionen)
   if (input.varianten !== undefined) {
@@ -652,21 +528,14 @@ export async function updateAngebot(
 
   const zahlungsbedingungen = await zahlungsbedingungenFuerSpeichern(supabase, input)
 
-  // Bei HV-/Mieter-Meldungen: Vertragskunde = Hausverwaltung (nicht Melder)
-  const leadIdForKunde = input.lead_id ?? (current.lead_id as string | null)
-  const kundeId =
-    (await resolveVertragsKundeIdForLead(supabase, leadIdForKunde, input.kunde_id)) ??
-    input.kunde_id
-
   const { error } = await supabase
     .from('angebote')
     .update({
       lead_id: input.lead_id,
-      kunde_id: kundeId,
+      kunde_id: input.kunde_id,
       positionen,
       gesamt_min: summen.nettoMin,
       gesamt_max: summen.nettoMax,
-      gesamt_fix: gesamtFix,
       notizen: input.notizen,
       preis_typ: input.preis_typ ?? 'fix',
       vorlage_id: input.vorlage_id ?? null,
@@ -679,15 +548,6 @@ export async function updateAngebot(
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
         : {}),
-      ...(input.ist_wiederkehrend !== undefined
-        ? {
-            ist_wiederkehrend: input.ist_wiederkehrend === true,
-            wiederkehr_turnus:
-              input.ist_wiederkehrend === true
-                ? input.wiederkehr_turnus?.trim() || null
-                : null,
-          }
-        : {}),
       updated_at: new Date().toISOString(),
       ...docPatch,
     })
@@ -695,53 +555,12 @@ export async function updateAngebot(
 
   if (error) return { ok: false, message: error.message }
 
-  if (input.ist_wiederkehrend !== undefined && leadIdForKunde) {
-    await supabase
-      .from('leads')
-      .update({
-        ist_wiederkehrend: input.ist_wiederkehrend === true,
-        wiederkehr_turnus:
-          input.ist_wiederkehrend === true
-            ? input.wiederkehr_turnus?.trim() || null
-            : null,
-      })
-      .eq('id', leadIdForKunde)
-  }
-
   const warBereitsGesendet = Boolean(
     current.gesendet_kunde_at ||
       current.status === 'gesendet_kunde' ||
       current.status_einfach === 'gesendet'
   )
   const leadId = input.lead_id ?? (current.lead_id as string | null)
-  if (leadId) {
-    const { data: leadRow } = await supabase
-      .from('leads')
-      .select('status')
-      .eq('id', leadId)
-      .maybeSingle()
-    const ls = (leadRow?.status ?? 'neu') as LeadStatus
-    if (leadStatusVorAngebot(ls)) {
-      if (opts?.asSystem) {
-        const now = new Date().toISOString()
-        await supabaseAdmin
-          .from('leads')
-          .update({ status: 'angebot', updated_at: now })
-          .eq('id', leadId)
-        await supabaseAdmin.from('leads_status_history').insert({
-          lead_id: leadId,
-          status_alt: ls,
-          status_neu: 'angebot',
-          user_id: null,
-          notiz: 'Angebot gespeichert',
-        })
-      } else {
-        const leadUpd = await updateLeadStatus(leadId, 'angebot', 'Angebot gespeichert')
-        if (!leadUpd.ok) return leadUpd
-      }
-    }
-    await schliesseAndereOffeneAnfragenOhneAngebot(supabase, leadId, kundeId)
-  }
   if (warBereitsGesendet && leadId) {
     const tl = await insertLeadTimelineEvent(supabase, {
       lead_id: leadId,
@@ -805,14 +624,11 @@ export async function updateAngebot(
   if (leadId) {
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
+    void syncAngebotMitOrgFreigabe({
       leadId,
       angebotId,
       betragEur: summen.nettoMax,
     })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
   }
 
   if (!opts?.asSystem) {
@@ -1228,121 +1044,6 @@ export async function crmManuelleHandwerkerEinreichung(
 }
 
 /**
- * CRM: Handwerker-Anfrage löschen (Zuweisung entfernen).
- * Erlaubt bei ausstehend/angefragt/abgelehnt/ersetzt — nicht bei Einreichung oder Übernahme.
- */
-export async function loescheHandwerkerAnfrage(input: {
-  angebotId: string
-  zuweisungId: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
-
-  const angebotId = input.angebotId.trim()
-  const zuweisungId = input.zuweisungId.trim()
-  if (!angebotId || !zuweisungId) {
-    return { ok: false, message: 'Angebot oder Zuweisung fehlt.' }
-  }
-
-  const { data: zu, error: zErr } = await supabase
-    .from('angebot_handwerker')
-    .select(
-      `
-      id,
-      status,
-      hw_eingereicht_at,
-      hw_status,
-      handwerker(name),
-      gewerke(name),
-      angebote(id, lead_id)
-    `
-    )
-    .eq('id', zuweisungId)
-    .eq('angebot_id', angebotId)
-    .maybeSingle()
-
-  if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
-
-  const hwSt = String(zu.hw_status ?? '').toLowerCase()
-  if (zu.hw_eingereicht_at?.trim() || hwSt === 'eingereicht' || hwSt === 'bestaetigt' || hwSt === 'uebernommen') {
-    return {
-      ok: false,
-      message: 'Anfrage mit Einreichung/Übernahme kann nicht gelöscht werden — bitte zuerst ablehnen oder Partner ersetzen.',
-    }
-  }
-
-  const st = String(zu.status ?? '').toLowerCase()
-  if (st === 'akzeptiert' && hwSt && hwSt !== 'offen' && hwSt !== '') {
-    return { ok: false, message: 'Akzeptierte Anfrage mit Partner-Status kann nicht gelöscht werden.' }
-  }
-
-  const { error: delErr } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .delete()
-    .eq('id', zuweisungId)
-    .eq('angebot_id', angebotId)
-
-  if (delErr) return { ok: false, message: delErr.message }
-
-  const angebot = Array.isArray(zu.angebote) ? zu.angebote[0] : zu.angebote
-  const leadId = (angebot as { lead_id?: string | null } | null)?.lead_id
-  const hw = Array.isArray(zu.handwerker) ? zu.handwerker[0] : zu.handwerker
-  const gw = Array.isArray(zu.gewerke) ? zu.gewerke[0] : zu.gewerke
-  if (leadId) {
-    await insertLeadTimelineEvent(supabaseAdmin, {
-      lead_id: leadId,
-      angebot_id: angebotId,
-      typ: 'handwerker',
-      titel: 'Handwerker-Anfrage gelöscht',
-      beschreibung: `${(hw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${(gw as { name?: string } | null)?.name?.trim() || 'Gewerk'}`,
-    })
-  }
-
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
-  return { ok: true }
-}
-
-/**
- * CRM: Handwerker-Anfrage im Namen des Partners annehmen (kanonisch status → akzeptiert).
- * Parallele Anfragen zum selben Gewerk → ersetzt; Timeline + Intern-Mail wie Token/Portal.
- */
-export async function crmBestaetigeHandwerkerAnfrage(input: {
-  angebotId: string
-  zuweisungId: string
-  notiz?: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
-
-  const angebotId = input.angebotId.trim()
-  const zuweisungId = input.zuweisungId.trim()
-  if (!angebotId || !zuweisungId) {
-    return { ok: false, message: 'Angebot oder Zuweisung fehlt.' }
-  }
-
-  const { acceptHandwerkerZuweisung } = await import('@/lib/angebote/handwerker-annahme')
-  const r = await acceptHandwerkerZuweisung({
-    zuweisungId,
-    angebotId,
-    antwort: 'akzeptiert',
-    notiz: input.notiz,
-    quelle: 'crm',
-  })
-  if (!r.ok) return { ok: false, message: r.message }
-
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
-  return { ok: true }
-}
-
-/**
  * CRM-Bestätigung: vereinbarten Preis übernehmen (Einkaufspreis + ggf. Auftrag), Mail an Handwerker.
  * Bei vorhandenem Auftrag: Rückgabe für Nachunternehmervertrag-Wizard (Unterlagen + PDF).
  */
@@ -1723,17 +1424,13 @@ export async function sendAngebotToKunde(
   }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
+  const summenMail = summenAusPositionen(posMail, 19)
   const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
     fetchFirmenEinstellungen(supabaseAdmin),
     getMailBranding(supabaseAdmin),
     projektOderStatusLink(detail.lead_id),
     loadKiVizMailPreviewUrl(angebotId),
   ])
-  const { summen: summenMail, reverseCharge: mailReverseCharge } = angebotMailSummen(
-    posMail,
-    detail,
-    firmMail
-  )
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
@@ -1785,7 +1482,6 @@ export async function sendAngebotToKunde(
             portalLink: portalLink ?? undefined,
             portalAudience,
             visualisierung_vorschau_url: vizPreviewUrl,
-            reverseCharge: mailReverseCharge,
           },
           branding
         ),
@@ -1801,7 +1497,6 @@ export async function sendAngebotToKunde(
           statusLink,
           kundeTyp,
           visualisierung_vorschau_url: vizPreviewUrl,
-          reverseCharge: mailReverseCharge,
         },
         branding
       )
@@ -1843,17 +1538,6 @@ export async function sendAngebotToKunde(
     revalidatePath(`/anfragen/${detail.lead_id}`)
   }
 
-  if (detail.lead_id && !options?.statusBeibehalten) {
-    try {
-      const { syncPortalLeadStatusAfterAngebotGesendet } = await import(
-        '@/lib/portal/sync-portal-lead-status'
-      )
-      await syncPortalLeadStatusAfterAngebotGesendet({ leadId: detail.lead_id })
-    } catch (e) {
-      console.warn('[sendAngebotToKunde] portal sync', e)
-    }
-  }
-
   return { ok: true as const }
 }
 
@@ -1864,11 +1548,6 @@ export async function previewAngebotKundeMail(input: {
   einleitung?: string | null
   schluss?: string | null
   leistungsumfang?: string | null
-  /** Live aus dem Wizard — sonst Summe aus gespeicherten Positionen (kann veraltet sein). */
-  gesamtBrutto?: number | null
-  gesamtNetto?: number | null
-  /** Live Gültig-bis (YYYY-MM-DD oder ISO), sonst DB/Fallback. */
-  gueltigBis?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const angebotId = input.angebotId.trim()
   if (!angebotId) return { ok: false, message: 'Angebot fehlt' }
@@ -1877,38 +1556,21 @@ export async function previewAngebotKundeMail(input: {
   if (!detail) return { ok: false, message: 'Angebot nicht gefunden' }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
+  const summenMail = summenAusPositionen(posMail, 19)
   const [firmMail, branding, statusLink, vizPreviewUrl] = await Promise.all([
     fetchFirmenEinstellungen(supabaseAdmin),
     getMailBranding(supabaseAdmin),
     projektOderStatusLink(detail.lead_id),
     loadKiVizMailPreviewUrl(angebotId),
   ])
-  const { summen: summenMail, reverseCharge: mailReverseCharge } = angebotMailSummen(
-    posMail,
-    detail,
-    firmMail
-  )
-  const liveBrutto =
-    input.gesamtBrutto != null && Number.isFinite(Number(input.gesamtBrutto))
-      ? Number(input.gesamtBrutto)
-      : null
-  const liveNetto =
-    input.gesamtNetto != null && Number.isFinite(Number(input.gesamtNetto))
-      ? Number(input.gesamtNetto)
-      : null
-  const bruttoAnzeige = liveBrutto ?? summenMail.bruttoMin
-  const nettoAnzeige = liveNetto ?? summenMail.nettoMin
-  const nettoMaxAnzeige = liveNetto ?? summenMail.nettoMax
-
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
   const gueltigFallback = new Date(
     Date.now() + gueltigTage * 24 * 60 * 60 * 1000
   ).toLocaleDateString('de-DE')
-  const gueltigSource = input.gueltigBis?.trim() || detail.gueltig_bis
-  const gueltig = gueltigSource
+  const gueltig = detail.gueltig_bis
     ? (() => {
         try {
-          return new Date(gueltigSource as string).toLocaleDateString('de-DE')
+          return new Date(detail.gueltig_bis as string).toLocaleDateString('de-DE')
         } catch {
           return gueltigFallback
         }
@@ -1946,7 +1608,7 @@ export async function previewAngebotKundeMail(input: {
         ...kundenAnrede,
         angebotsnr: angebotNr,
         leistungsumfang,
-        gesamt_brutto: bruttoAnzeige,
+        gesamt_brutto: summenMail.bruttoMin,
         gueltig_bis: gueltig,
         anrede,
         einleitung: einleitung ?? undefined,
@@ -1955,7 +1617,6 @@ export async function previewAngebotKundeMail(input: {
         portalLink: portalLink ?? undefined,
         portalAudience,
         visualisierung_vorschau_url: vizPreviewUrl,
-        reverseCharge: mailReverseCharge,
       },
       branding
     )
@@ -1966,14 +1627,13 @@ export async function previewAngebotKundeMail(input: {
     {
       name: kundenAnrede.name,
       positionen: posMail,
-      gesamt_min: nettoAnzeige,
-      gesamt_max: nettoMaxAnzeige,
+      gesamt_min: summenMail.nettoMin,
+      gesamt_max: summenMail.nettoMax,
       lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
       gueltig_bis: gueltig,
       statusLink,
       kundeTyp,
       visualisierung_vorschau_url: vizPreviewUrl,
-      reverseCharge: mailReverseCharge,
     },
     branding
   )
@@ -1999,24 +1659,12 @@ export async function recordKundeAbgelehntMitDetails(
   const supabase = createClient()
   const { data: row } = await supabase
     .from('angebote')
-    .select('id, status, status_einfach')
+    .select('id, status')
     .eq('id', angebotId)
     .maybeSingle()
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
-  const status = String(row.status ?? '').trim().toLowerCase()
-  const statusEinfach = String(row.status_einfach ?? '')
-    .trim()
-    .toLowerCase()
-  const erlaubt =
-    status === 'gesendet_kunde' ||
-    status === 'gesendet' ||
-    statusEinfach === 'gesendet' ||
-    statusEinfach === 'abgelaufen'
-  if (!erlaubt) {
-    return {
-      ok: false,
-      message: 'Ablehnung nur bei gesendetem oder abgelaufenem Angebot möglich.',
-    }
+  if (row.status !== 'gesendet_kunde') {
+    return { ok: false, message: 'Ablehnung nur bei Status „Gesendet Kunde“ möglich.' }
   }
   if (!isKundeAblehnungGrund(input.grund)) {
     return { ok: false, message: 'Ungültiger Ablehnungsgrund.' }
@@ -2029,7 +1677,6 @@ export async function recordKundeAbgelehntMitDetails(
     .from('angebote')
     .update({
       status: 'abgelehnt' as AngebotStatus,
-      status_einfach: 'abgelehnt',
       ablehnung_grund: input.grund,
       ablehnung_konkurrenz_preis: kp,
       ablehnung_notiz: input.notiz?.trim() || null,
@@ -2306,10 +1953,7 @@ export async function createAuftragFromAngebot(
   const gewerkNamen = Array.from(new Set(pos.map((p) => p.gewerk_name).filter(Boolean)))
   const titel = `${gewerkNamen.join(', ')} — ${angebot.kunden.name}`.slice(0, 240)
 
-  const { isHwZuweisungAkzeptiertLenient } = await import('@/lib/angebote/handwerker-annahme')
-  const hwRows = (angebot.angebot_handwerker ?? []).filter((h) =>
-    isHwZuweisungAkzeptiertLenient(h.status)
-  )
+  const hwRows = (angebot.angebot_handwerker ?? []).filter((h) => h.status === 'akzeptiert')
 
   const kundenToken = randomBytes(32).toString('hex')
 
@@ -2325,39 +1969,13 @@ export async function createAuftragFromAngebot(
   } = await supabaseAuth.auth.getUser()
 
   let istBauprojekt = false
-  let kundeId = angebot.kunde_id
   if (angebot.lead_id) {
     const { data: leadRow } = await supabaseAdmin
       .from('leads')
-      .select('ist_bauprojekt, ist_wiederkehrend, wiederkehr_turnus, kunde_id, auftraggeber_kunde_id')
+      .select('ist_bauprojekt')
       .eq('id', angebot.lead_id)
       .maybeSingle()
     istBauprojekt = leadRow?.ist_bauprojekt === true
-    if (leadRow) {
-      kundeId = leadVertragsKundeId(leadRow) ?? angebot.kunde_id
-    }
-  }
-
-  // Bestand bevorzugt vom Angebot, sonst Lead
-  const { data: angWieder } = await supabaseAdmin
-    .from('angebote')
-    .select('ist_wiederkehrend, wiederkehr_turnus')
-    .eq('id', angebotId)
-    .maybeSingle()
-
-  let istWiederkehrend = angWieder?.ist_wiederkehrend === true
-  let wiederkehrTurnus =
-    istWiederkehrend ? (angWieder?.wiederkehr_turnus as string | null) ?? null : null
-  if (!istWiederkehrend && angebot.lead_id) {
-    const { data: leadW } = await supabaseAdmin
-      .from('leads')
-      .select('ist_wiederkehrend, wiederkehr_turnus')
-      .eq('id', angebot.lead_id)
-      .maybeSingle()
-    istWiederkehrend = leadW?.ist_wiederkehrend === true
-    wiederkehrTurnus = istWiederkehrend
-      ? (leadW?.wiederkehr_turnus as string | null) ?? null
-      : null
   }
 
   const { data: auftrag, error: aErr } = await supabaseAdmin
@@ -2365,7 +1983,7 @@ export async function createAuftragFromAngebot(
     .insert({
       angebot_id: angebotId,
       lead_id: angebot.lead_id,
-      kunde_id: kundeId,
+      kunde_id: angebot.kunde_id,
       status: 'offen',
       titel,
       notizen: notizenAuftrag,
@@ -2378,8 +1996,6 @@ export async function createAuftragFromAngebot(
       betreuer_id: authUser?.id ?? null,
       zahlungsplan: zahlungsplan ?? null,
       ist_bauprojekt: istBauprojekt,
-      ist_wiederkehrend: istWiederkehrend,
-      wiederkehr_turnus: wiederkehrTurnus,
     })
     .select('id, kunden_token')
     .single()
@@ -2548,7 +2164,6 @@ export async function createAuftragFromAngebot(
     maximumFractionDigits: 2,
   })} €`
 
-  let kundeMailLogId: string | null = null
   if (sendKunde && kunde.email?.trim()) {
     const toList =
       opts?.to?.map((e) => e.trim()).filter(Boolean) ??
@@ -2583,7 +2198,6 @@ export async function createAuftragFromAngebot(
     if (!mailRes.success) {
       return { ok: false, message: mailRes.error ?? 'Kunden-Mail fehlgeschlagen' }
     }
-    kundeMailLogId = mailRes.emailLogId ?? null
     if (angebot.lead_id && mailRes.emailLogId) {
       const tl = await insertLeadTimelineEvent(supabaseAdmin, {
         lead_id: angebot.lead_id,
@@ -2597,7 +2211,6 @@ export async function createAuftragFromAngebot(
     }
   }
 
-  const hwMailLogById = new Map<string, string>()
   if (sendHw) {
     const partnerLink = buildPartnerLoginLink()
     await Promise.all(
@@ -2623,7 +2236,7 @@ export async function createAuftragFromAngebot(
           },
           branding
         )
-        const hwMail = await sendMail({
+        await sendMail({
           typ: 'handwerker_anfrage',
           an: email,
           anName: z.handwerker?.name ?? null,
@@ -2634,7 +2247,6 @@ export async function createAuftragFromAngebot(
           angebotId,
           auftragId,
         })
-        if (hwMail.emailLogId) hwMailLogById.set(z.handwerker_id, hwMail.emailLogId)
       })
     )
   }
@@ -2670,7 +2282,6 @@ export async function createAuftragFromAngebot(
         titel: 'E-Mail an Kundin (Auftragsbestätigung)',
         beschreibung: `An ${kunde.email.trim()}`,
         sichtbar_fuer_kunde: true,
-        email_log_id: kundeMailLogId,
       })
     )
   }
@@ -2686,7 +2297,6 @@ export async function createAuftragFromAngebot(
           titel: `E-Mail an Handwerker: ${z.handwerker?.name ?? '—'}`,
           beschreibung: `An ${email}`,
           handwerker_id: z.handwerker_id,
-          email_log_id: hwMailLogById.get(z.handwerker_id) ?? null,
         })
       )
     }

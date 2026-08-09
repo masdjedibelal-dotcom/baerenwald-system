@@ -1,16 +1,10 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
-import { DateInput } from '@/components/ui/DateInput'
-import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { TimeInput } from '@/components/ui/TimeInput'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
 import {
   createAuftragBautagesbericht,
@@ -120,7 +114,7 @@ export function AuftragBautagesberichtCard({
   handwerker?: AuftragHandwerkerRow[]
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState(initial)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
   const [addOpen, setAddOpen] = useState(false)
@@ -157,12 +151,6 @@ export function AuftragBautagesberichtCard({
       })
     )
     setEditId(null)
-  }
-
-  function closeForm() {
-    setAddOpen(false)
-    setEditId(null)
-    resetNeu()
   }
 
   function startEdit(b: AuftragBautagesbericht) {
@@ -234,7 +222,7 @@ export function AuftragBautagesberichtCard({
           return
         }
         toast.success('Bautagesbericht gespeichert')
-        closeForm()
+        setEditId(null)
       } else {
         const r = await createAuftragBautagesbericht({ auftrag_id: auftragId, ...payload })
         if (!r.ok) {
@@ -242,7 +230,8 @@ export function AuftragBautagesberichtCard({
           return
         }
         toast.success(`Bautagesbericht Tag ${String(naechsterTag).padStart(2, '0')} angelegt`)
-        closeForm()
+        setAddOpen(false)
+        resetNeu()
       }
       const list = await listAuftragBautagesberichte(auftragId)
       setRows(list)
@@ -266,14 +255,15 @@ export function AuftragBautagesberichtCard({
 
   const formOpen = addOpen || editId != null
 
-  const sheetTitle = editId
-    ? 'Bautagesbericht bearbeiten'
-    : `Tag ${String(naechsterTag).padStart(2, '0')}`
-
   return (
     <div className="space-y-4">
-      {rows.length === 0 ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Bautagesberichte.</p>
+      <p className="text-sm text-bw-text-muted">
+        Ausführlicher Bautagesbericht für Bauprojekte — PDF im Bärenwald-Standardlayout (wie
+        Abschlussdokumentation).
+      </p>
+
+      {rows.length === 0 && !formOpen ? (
+        <p className="text-sm text-bw-text-muted">Noch keine Bautagesberichte.</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((b) => {
@@ -301,14 +291,14 @@ export function AuftragBautagesberichtCard({
                       Tag {tag} · {formatDatum(b.datum)}
                     </span>
                     {b.personal_namen.length > 0 ? (
-                      <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                      <span className="text-xs text-bw-text-muted">
                         {b.personal_namen.length} MA
                       </span>
                     ) : null}
                   </button>
                   <a
                     href={`/api/auftraege/${auftragId}/bautagesbericht/${b.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-primary/10"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-bw-primary hover:bg-bw-primary/10"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -329,7 +319,7 @@ export function AuftragBautagesberichtCard({
                   </Button>
                 </div>
                 {open ? (
-                  <div className="border-t border-bw-border px-3 py-3 text-[length:var(--fs-text)] text-bw-text-muted space-y-2">
+                  <div className="border-t border-bw-border px-3 py-3 text-sm text-bw-text-muted space-y-2">
                     {b.zusammenfassung ? <p>{b.zusammenfassung}</p> : null}
                     {b.leistungen.length > 0 ? (
                       <ul className="list-disc pl-5">
@@ -360,36 +350,16 @@ export function AuftragBautagesberichtCard({
         </ul>
       )}
 
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="gap-1"
-        onClick={() => {
-          resetNeu()
-          setAddOpen(true)
-        }}
-      >
-        <Plus className="h-4 w-4" />
-        Bautagesbericht Tag {String(naechsterTag).padStart(2, '0')}
-      </Button>
-
-      <EditorSheet
-        open={formOpen}
-        onClose={closeForm}
-        title={sheetTitle}
-        crumb="Bautagebuch >"
-        context="detail"
-        dirty
-        size="lg"
-        footer={<BautagesberichtFormFooter pending={pending} onSave={save} />}
-      >
-        <div className="space-y-4">
+      {formOpen ? (
+        <div className="rounded-lg border border-bw-border bg-bw-surface p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-bw-text">
+            {editId ? 'Bautagesbericht bearbeiten' : `Neuer Bautagesbericht — Tag ${String(naechsterTag).padStart(2, '0')}`}
+          </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="form-field">
               <label className="form-field-label">Datum</label>
-              <DateInput
-                size="sm"
+              <Input
+                type="date"
                 value={form.datum}
                 onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
               />
@@ -402,24 +372,20 @@ export function AuftragBautagesberichtCard({
                 placeholder="z. B. Sonnig, trocken"
               />
             </div>
-            <div className="form-field sm:col-span-2">
-              <FilterRangeRow
-                title="Arbeitszeit"
-                className="!mb-0"
-                von={
-                  <TimeInput
-                    size="sm"
-                    value={form.arbeitszeit_von}
-                    onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_von: e.target.value }))}
-                  />
-                }
-                bis={
-                  <TimeInput
-                    size="sm"
-                    value={form.arbeitszeit_bis}
-                    onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_bis: e.target.value }))}
-                  />
-                }
+            <div className="form-field">
+              <label className="form-field-label">Arbeitszeit von</label>
+              <Input
+                type="time"
+                value={form.arbeitszeit_von}
+                onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_von: e.target.value }))}
+              />
+            </div>
+            <div className="form-field">
+              <label className="form-field-label">Arbeitszeit bis</label>
+              <Input
+                type="time"
+                value={form.arbeitszeit_bis}
+                onChange={(e) => setForm((f) => ({ ...f, arbeitszeit_bis: e.target.value }))}
               />
             </div>
             <div className="form-field">
@@ -444,32 +410,20 @@ export function AuftragBautagesberichtCard({
             placeholder="Leistung beschreiben…"
           />
           <div className="form-field">
-            <KiAssistFieldLabel
-              label="Behinderungen und Besonderheiten"
+            <label className="form-field-label">Behinderungen und Besonderheiten</label>
+            <Textarea
+              rows={3}
               value={form.behinderungen}
-              onApply={(text) => setForm((f) => ({ ...f, behinderungen: text }))}
-              extraHint="Bautagesbericht — Behinderungen (PDF)."
-            >
-              <Textarea
-                rows={3}
-                value={form.behinderungen}
-                onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
-              />
-            </KiAssistFieldLabel>
+              onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
+            />
           </div>
           <div className="form-field">
-            <KiAssistFieldLabel
-              label="Qualitätssicherung und Dokumentation"
+            <label className="form-field-label">Qualitätssicherung und Dokumentation</label>
+            <Textarea
+              rows={3}
               value={form.qualitaetssicherung}
-              onApply={(text) => setForm((f) => ({ ...f, qualitaetssicherung: text }))}
-              extraHint="Bautagesbericht — Qualitätssicherung (PDF)."
-            >
-              <Textarea
-                rows={3}
-                value={form.qualitaetssicherung}
-                onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
-              />
-            </KiAssistFieldLabel>
+              onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
+            />
           </div>
           <StringListEditor
             label="Risiken & Hinweise"
@@ -477,18 +431,12 @@ export function AuftragBautagesberichtCard({
             onChange={(risiken) => setForm((f) => ({ ...f, risiken }))}
           />
           <div className="form-field">
-            <KiAssistFieldLabel
-              label="Zusammenfassung"
+            <label className="form-field-label">Zusammenfassung</label>
+            <Textarea
+              rows={3}
               value={form.zusammenfassung}
-              onApply={(text) => setForm((f) => ({ ...f, zusammenfassung: text }))}
-              extraHint="Bautagesbericht — Zusammenfassung (PDF)."
-            >
-              <Textarea
-                rows={3}
-                value={form.zusammenfassung}
-                onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
-              />
-            </KiAssistFieldLabel>
+              onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
+            />
           </div>
           <StringListEditor
             label="Personalnachweis (Namen)"
@@ -553,28 +501,39 @@ export function AuftragBautagesberichtCard({
               }}
             />
           </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setAddOpen(false)
+                setEditId(null)
+                resetNeu()
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" size="sm" loading={pending} onClick={save}>
+              Speichern
+            </Button>
+          </div>
         </div>
-      </EditorSheet>
-    </div>
-  )
-}
-
-function BautagesberichtFormFooter({
-  pending,
-  onSave,
-}: {
-  pending: boolean
-  onSave: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </Button>
-      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
-        Speichern
-      </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="gap-1"
+          onClick={() => {
+            resetNeu()
+            setAddOpen(true)
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          Bautagesbericht Tag {String(naechsterTag).padStart(2, '0')}
+        </Button>
+      )}
     </div>
   )
 }

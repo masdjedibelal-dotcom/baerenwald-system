@@ -38,13 +38,13 @@ export function AngebotOrgFreigabeBanner({
       <div className="flex flex-wrap items-center gap-2">
         <MockBadge kind={hubSpotStatusToMockBadgeKind(badgeStatus)}>{ORG_FREIGABE_LABELS[status]}</MockBadge>
         {status === 'ausstehend' ? (
-          <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
+          <span className="text-[12px] text-bw-text-muted">
             Partner- und Handwerker-Anfragen sind bis zur Freigabe blockiert.
           </span>
         ) : null}
       </div>
       {orgFreigabeLog && orgFreigabeLog.length > 0 ? (
-        <ul className="mt-3 divide-y divide-bw-border border-t border-bw-border pt-2 text-[length:var(--fs-meta)]">
+        <ul className="mt-3 divide-y divide-bw-border border-t border-bw-border pt-2 text-[12px]">
           {orgFreigabeLog.slice(0, 5).map((e) => (
             <li key={e.id} className="flex justify-between gap-3 py-1.5">
               <span className="capitalize text-bw-text">{e.aktion}</span>

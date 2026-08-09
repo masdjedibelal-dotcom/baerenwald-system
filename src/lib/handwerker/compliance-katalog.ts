@@ -27,44 +27,9 @@ export const COMPLIANCE_SCOPE_LABELS: Record<ComplianceScope, string> = {
   gewerk: 'Gewerkspezifisch',
 }
 
-export type ComplianceDokumentStatus =
-  | 'fehlend'
-  | 'ok'
-  | 'warnung'
-  | 'abgelaufen'
-  | 'in_pruefung'
-  | 'abgelehnt'
+export type ComplianceDokumentStatus = 'fehlend' | 'ok' | 'warnung' | 'abgelaufen'
 
-/**
- * Freie Partner-/CRM-Uploads (kein Katalog-Typ).
- * Portal erwartet denselben Slug (`eigenes_dokument`); `individuell` bleibt Alias für Altbestand.
- */
-export const INDIVIDUELL_TYP_SLUG = 'eigenes_dokument'
-export const INDIVIDUELL_TYP_SLUG_LEGACY = 'individuell'
-
-export function istEigeneUnterlageTyp(slug: string | null | undefined): boolean {
-  const s = (slug ?? '').trim()
-  return s === INDIVIDUELL_TYP_SLUG || s === INDIVIDUELL_TYP_SLUG_LEGACY
-}
-
-/** UI-Label für Compliance-Listen (nicht „Bald fällig“ für In Prüfung). */
-export function complianceDokumentStatusLabel(status: ComplianceDokumentStatus): string {
-  if (status === 'ok') return 'Gültig'
-  if (status === 'warnung') return 'Bald fällig'
-  if (status === 'abgelaufen') return 'Abgelaufen'
-  if (status === 'in_pruefung') return 'In Prüfung'
-  if (status === 'abgelehnt') return 'Abgelehnt'
-  return 'Fehlt'
-}
-
-export function complianceDokumentStatusTone(
-  status: ComplianceDokumentStatus
-): 'ok' | 'warn' | 'bad' | 'neutral' {
-  if (status === 'ok') return 'ok'
-  if (status === 'warnung' || status === 'in_pruefung') return 'warn'
-  if (status === 'abgelaufen' || status === 'fehlend' || status === 'abgelehnt') return 'bad'
-  return 'neutral'
-}
+export const INDIVIDUELL_TYP_SLUG = 'individuell'
 
 export function isStandardScope(typ: ComplianceDokumentTyp): boolean {
   const ebene = normalizeComplianceEbene(typ)
@@ -100,11 +65,11 @@ export function filterProjektComplianceTypen(
     handwerkerGewerke,
     alleGewerke,
     istBauprojekt
-  ).filter((t) => !t.mehrfach_erlaubt || istEigeneUnterlageTyp(t.slug))
+  ).filter((t) => !t.mehrfach_erlaubt || t.slug === INDIVIDUELL_TYP_SLUG)
 }
 
 export function individuellTyp(typen: ComplianceDokumentTyp[]): ComplianceDokumentTyp | undefined {
-  return typen.find((t) => istEigeneUnterlageTyp(t.slug) && t.aktiv !== false)
+  return typen.find((t) => t.slug === INDIVIDUELL_TYP_SLUG && t.aktiv !== false)
 }
 
 export function gruppeComplianceTypen(
@@ -189,13 +154,10 @@ export function complianceDokumentStatus(
   doc: PartnerDokument | undefined,
   now = new Date()
 ): ComplianceDokumentStatus {
-  void typ
   if (!doc?.datei_url?.trim()) return 'fehlend'
-  const workflow = (doc.status ?? '').toLowerCase()
-  if (workflow === 'abgelehnt') return 'abgelehnt'
   if (!partnerDokumentIstFreigegeben(doc.status)) {
-    // Hochgeladen / eingereicht — nicht mit Ablauf-Warnung vermischen
-    return 'in_pruefung'
+    if ((doc.status ?? '').toLowerCase() === 'abgelehnt') return 'fehlend'
+    return 'warnung'
   }
   if (!doc.gueltig_bis) return 'ok'
   const bis = new Date(doc.gueltig_bis)

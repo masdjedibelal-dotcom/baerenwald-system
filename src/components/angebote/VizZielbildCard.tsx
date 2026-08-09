@@ -75,8 +75,8 @@ export function VizZielbildCard({
   return (
     <div className={cn('rounded-xl border border-bw-border bg-bw-bg p-3', className)}>
       <div className="mb-2">
-        <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">Zielbild-Vorschau</p>
-        <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+        <p className="text-sm font-semibold text-bw-text">Zielbild-Vorschau</p>
+        <p className="text-xs text-bw-text-muted">
           Feed 4:5 (1080×1350) · Vorher &amp; Nachher · wie Website — PNG zum Teilen oder fürs Angebot.
         </p>
       </div>
@@ -91,7 +91,7 @@ export function VizZielbildCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={previewUrl} alt="Bärenwald Zielbild" className={zielbildPreviewMediaClass} />
         ) : (
-          <p className={cn(zielbildPreviewPlaceholderClass, 'py-6 text-[length:var(--fs-text)]')}>
+          <p className={cn(zielbildPreviewPlaceholderClass, 'py-6 text-sm')}>
             {error ?? 'Keine Vorschau'}
           </p>
         )}
@@ -118,7 +118,7 @@ export function VizZielbildCard({
       </Button>
 
       {error && previewUrl ? (
-        <p className="mt-2 text-[length:var(--fs-meta)] text-status-cancel-text">{error}</p>
+        <p className="mt-2 text-xs text-status-cancel-text">{error}</p>
       ) : null}
     </div>
   )

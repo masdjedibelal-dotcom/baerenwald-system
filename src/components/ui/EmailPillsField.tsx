@@ -86,7 +86,7 @@ export function EmailPillsField({
           ref={inputRef}
           type="email"
           autoComplete="off"
-          className="min-w-[140px] flex-1 border-0 bg-transparent py-1 text-[13px] text-bw-text outline-none placeholder:text-[12px] placeholder:font-normal placeholder:text-bw-text-muted"
+          className="min-w-[140px] flex-1 border-0 bg-transparent py-1 text-[13px] text-bw-text outline-none placeholder:text-bw-text-muted"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}

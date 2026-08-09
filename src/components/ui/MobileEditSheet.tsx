@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Check, Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
+import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
-/** Bottom Sheet mit ✓ — nutzt EditorSheet (Surface B). */
+/** Bottom Sheet mit Standard-Footer „Fertig“. */
 export function MobileEditSheet({
   open,
   onClose,
@@ -13,8 +15,6 @@ export function MobileEditSheet({
   children,
   footer,
   className,
-  dirty,
-  onConfirm,
 }: {
   open: boolean
   onClose: () => void
@@ -22,22 +22,24 @@ export function MobileEditSheet({
   children: ReactNode
   footer?: ReactNode
   className?: string
-  dirty?: boolean
-  onConfirm?: () => void
 }) {
   return (
-    <EditorSheet
+    <MobileListFilterSheet
       open={open}
       onClose={onClose}
       title={title}
-      context="detail"
-      dirty={dirty}
-      onConfirm={onConfirm ?? onClose}
       className={className}
+      footer={
+        footer ?? (
+          <Button type="button" variant="primary" size="sm" className="w-full gap-1.5" onClick={onClose}>
+            <Check className="h-3.5 w-3.5" aria-hidden />
+            Fertig
+          </Button>
+        )
+      }
     >
       {children}
-      {footer ? <div className="mt-3">{footer}</div> : null}
-    </EditorSheet>
+    </MobileListFilterSheet>
   )
 }
 
@@ -54,8 +56,8 @@ type MobileEditableBlockProps = {
 }
 
 /**
- * Mobile: Overview → EditorSheet.
- * Desktop: children inline (Grenze ≤6 Felder).
+ * Mobile: Read-only Übersicht + Bearbeiten-Button → Sheet.
+ * Desktop: `children` (Formular) direkt inline.
  */
 export function MobileEditableBlock({
   sheetTitle,
@@ -79,42 +81,42 @@ export function MobileEditableBlock({
 
   return (
     <>
-      <div className={cn('mobile-editable-overview', overviewClassName)}>
+      <div className={cn('mobile-editable-overview space-y-3', overviewClassName)}>
         {overview}
-        {!hideEditButton && !disabled ? (
-          <button
+        {!disabled && !hideEditButton ? (
+          <Button
             type="button"
-            className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-primary"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
             onClick={() => setSheetOpen(true)}
           >
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
             {editLabel}
-          </button>
+          </Button>
         ) : null}
       </div>
-      <EditorSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={sheetTitle}
-        context="detail"
-        onConfirm={() => setSheetOpen(false)}
-      >
+      <MobileEditSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={sheetTitle}>
         {children}
-      </EditorSheet>
+      </MobileEditSheet>
     </>
   )
 }
 
+/** Kurze Label/Wert-Zeile für Mobile-Übersichten. */
 export function MobileOverviewField({
   label,
   value,
+  className,
 }: {
   label: string
   value: ReactNode
+  className?: string
 }) {
   return (
-    <div className="flex justify-between gap-3 py-1 text-[length:var(--fs-text)]">
-      <span className="text-bw-text-muted">{label}</span>
-      <span className="text-right text-bw-text">{value}</span>
+    <div className={className}>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm text-bw-text">{value ?? '—'}</dd>
     </div>
   )
 }

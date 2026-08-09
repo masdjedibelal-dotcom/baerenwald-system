@@ -112,8 +112,6 @@ const AUFTRAG_DETAIL_SELECT_FALLBACK = `
       kunden(*),
       angebote(*, angebot_handwerker(${ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT})),
       auftrag_timeline(*),
-      nachtraege(*),
-      baustopps(*),
       auftrag_positionen(
         *,
         handwerker(id, name, email, telefon)
@@ -162,20 +160,8 @@ async function fetchAuftragDetailRow(
   }
 }
 
-export type LoadAuftragDetailOpts = {
-  /**
-   * shell = nur Kern-Select (Rechnung/Schnellpfad)
-   * tabs = + Bautagebuch/Baustelle parallel (Default Detailseite)
-   */
-  mode?: 'shell' | 'tabs'
-}
-
 /** CRM-Detail: Service Role, damit verschachtelte Daten (Kunde, Angebot) zuverlässig geladen werden. */
-export async function loadAuftragDetail(
-  id: string,
-  opts?: LoadAuftragDetailOpts
-): Promise<AuftragDetail | null> {
-  const mode = opts?.mode ?? 'tabs'
+export async function loadAuftragDetail(id: string): Promise<AuftragDetail | null> {
   try {
     let { data, error } = await fetchAuftragDetailRow(id, AUFTRAG_DETAIL_SELECT)
 
@@ -195,47 +181,13 @@ export async function loadAuftragDetail(
     const parsed = parseAuftragDetailRow(
       data as AuftragDetail & { angebote?: { positionen?: unknown } | null }
     )
-
-    if (mode === 'shell') {
-      parsed.auftrag_bautagebuch = []
-      parsed.auftrag_bautagesberichte = []
-      parsed.auftrag_baustelle_team = {
-        bauleiter_name: (parsed as { bauleiter_name?: string | null }).bauleiter_name ?? null,
-        bauleiter_telefon: (parsed as { bauleiter_telefon?: string | null }).bauleiter_telefon ?? null,
-        bauleiter_email: (parsed as { bauleiter_email?: string | null }).bauleiter_email ?? null,
-        bau_mannschaft: parseStringListJson((parsed as { bau_mannschaft?: unknown }).bau_mannschaft),
-        bau_nachunternehmer_name:
-          (parsed as { bau_nachunternehmer_name?: string | null }).bau_nachunternehmer_name ?? null,
-        bau_nachunternehmer_firma:
-          (parsed as { bau_nachunternehmer_firma?: string | null }).bau_nachunternehmer_firma ?? null,
-      }
-      parsed.auftrag_regiearbeiten = []
-      parsed.auftrag_wochenberichte = []
-      parsed.auftrag_baustellen_dokumente = []
-      return parsed
-    }
-
-    // Extras parallel statt nacheinander
-    const [bautagebuch, bautagesberichte, baustelleBundle] = await Promise.all([
-      listAuftragBautagebuch(id),
-      listAuftragBautagesberichte(id),
-      parsed.ist_bauprojekt
-        ? Promise.all([
-            loadAuftragBaustelleTeam(id),
-            listAuftragRegiearbeiten(id),
-            listAuftragWochenberichte(id),
-            listAuftragBaustellenDokumente(id),
-          ]).then(([team, regie, wochen, doks]) => ({ team, regie, wochen, doks }))
-        : Promise.resolve(null),
-    ])
-
-    parsed.auftrag_bautagebuch = bautagebuch
-    parsed.auftrag_bautagesberichte = bautagesberichte
-    if (baustelleBundle) {
-      parsed.auftrag_baustelle_team = baustelleBundle.team
-      parsed.auftrag_regiearbeiten = baustelleBundle.regie
-      parsed.auftrag_wochenberichte = baustelleBundle.wochen
-      parsed.auftrag_baustellen_dokumente = baustelleBundle.doks
+    parsed.auftrag_bautagebuch = await listAuftragBautagebuch(id)
+    parsed.auftrag_bautagesberichte = await listAuftragBautagesberichte(id)
+    if (parsed.ist_bauprojekt) {
+      parsed.auftrag_baustelle_team = await loadAuftragBaustelleTeam(id)
+      parsed.auftrag_regiearbeiten = await listAuftragRegiearbeiten(id)
+      parsed.auftrag_wochenberichte = await listAuftragWochenberichte(id)
+      parsed.auftrag_baustellen_dokumente = await listAuftragBaustellenDokumente(id)
     } else {
       parsed.auftrag_baustelle_team = {
         bauleiter_name: (parsed as { bauleiter_name?: string | null }).bauleiter_name ?? null,
@@ -286,25 +238,14 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, beleg_typ, bezug_rechnung_id, created_at, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, reklamation_am, reklamation_grund'
+      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id'
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
 
   if (error) {
-    // Fallback ohne neuere Spalten (Migration ggf. ausstehend)
-    const { data: fallback, error: err2 } = await supabase
-      .from('rechnungen')
-      .select(
-        'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, reklamation_am, reklamation_grund'
-      )
-      .eq('auftrag_id', auftragId)
-      .order('created_at', { ascending: false })
-    if (err2) {
-      console.warn('[loadRechnungenForAuftrag]', error.message, err2.message)
-      return []
-    }
-    return fallback ?? []
+    console.warn('[loadRechnungenForAuftrag]', error.message)
+    return []
   }
   return data ?? []
 }

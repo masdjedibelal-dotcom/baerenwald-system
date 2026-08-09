@@ -1,13 +1,11 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Check, Wrench } from 'lucide-react'
 import { AuftragBaustelleScreen } from '@/components/auftraege/AuftragBaustelleScreen'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
 import {
   loadAbnahmeprotokollSummary,
@@ -33,7 +31,7 @@ export function AbnahmeMaengelBearbeitenFlow({
   onClose: () => void
   onDone: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [loading, setLoading] = useState(true)
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [maengel, setMaengel] = useState<AbnahmeMangel[]>([])
@@ -135,20 +133,20 @@ export function AbnahmeMaengelBearbeitenFlow({
   const offen = countOffeneMaengel(maengel)
 
   const footer = (
-    <div className="sheet-footer-actions">
-      <Button type="button" variant="secondary" onClick={onClose}>
+    <div className="flex justify-between gap-2">
+      <Button type="button" variant="ghost" size="sm" onClick={onClose}>
         Schließen
       </Button>
-      <Button type="button" variant="primary" onClick={onDone} disabled={pending}>
+      <Button type="button" variant="primary" size="sm" onClick={onDone} disabled={pending}>
         Fertig
       </Button>
     </div>
   )
 
   const body = loading ? (
-    <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Mängel werden geladen…</p>
+    <p className="py-8 text-center text-sm text-bw-text-muted">Mängel werden geladen…</p>
   ) : maengel.length === 0 ? (
-    <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Mängel im Protokoll — alles abgenommen.</p>
+    <p className="text-sm text-bw-text-muted">Keine Mängel im Protokoll — alles abgenommen.</p>
   ) : (
     <>
       <input
@@ -162,7 +160,7 @@ export function AbnahmeMaengelBearbeitenFlow({
           e.target.value = ''
         }}
       />
-      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+      <p className="mb-3 text-sm text-bw-text-muted">
         Nacharbeit für <strong>{kundeName}</strong>
         {offen > 0 ? (
           <>
@@ -187,42 +185,32 @@ export function AbnahmeMaengelBearbeitenFlow({
             >
               <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">{punkt?.beschreibung ?? m.beschreibung}</p>
-                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                  <p className="text-[13px] font-semibold text-bw-text">{punkt?.beschreibung ?? m.beschreibung}</p>
+                  <p className="text-[11px] text-bw-text-muted">
                     {punkt?.gewerk}
                     {punkt?.leistung_name ? ` · ${punkt.leistung_name}` : ''}
                   </p>
                 </div>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                    'rounded-full px-2 py-0.5 text-[11px] font-medium',
                     offenItem ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
                   )}
                 >
                   {mangelStatusLabel(m.status)}
                 </span>
               </div>
-              <KiAssistFieldLabel
+              <Textarea
                 label="Beschreibung"
+                rows={2}
                 value={m.beschreibung}
-                onApply={(text) => {
-                  setMaengel((prev) =>
-                    prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, beschreibung: text } : x))
+                onChange={(e) => {
+                  const next = maengel.map((x) =>
+                    x.punkt_id === m.punkt_id ? { ...x, beschreibung: e.target.value } : x
                   )
+                  setMaengel(next)
                 }}
-                extraHint="Mangel-Beschreibung für Abnahme/PDF (kundensichtbar)."
-              >
-                <Textarea
-                  rows={2}
-                  value={m.beschreibung}
-                  onChange={(e) => {
-                    const next = maengel.map((x) =>
-                      x.punkt_id === m.punkt_id ? { ...x, beschreibung: e.target.value } : x
-                    )
-                    setMaengel(next)
-                  }}
-                />
-              </KiAssistFieldLabel>
+              />
               <Input
                 label="Frist"
                 type="date"
@@ -264,7 +252,7 @@ export function AbnahmeMaengelBearbeitenFlow({
                 </div>
               ) : null}
               {(m.verlauf ?? []).length > 0 ? (
-                <ul className="mt-2 space-y-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+                <ul className="mt-2 space-y-0.5 text-[11px] text-bw-text-muted">
                   {m.verlauf!.map((v, i) => (
                     <li key={`${v.at}-${i}`}>
                       {formatDatum(v.at.slice(0, 10))} · {v.typ}

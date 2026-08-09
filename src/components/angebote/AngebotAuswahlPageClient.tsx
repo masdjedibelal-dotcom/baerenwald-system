@@ -11,17 +11,13 @@ import {
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
   () =>
     import('@/components/angebote/AngebotWizard').then((mod) => ({
       default: mod.AngebotWizard,
     })),
-  {
-    ssr: false,
-    loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
-  }
+  { ssr: false }
 )
 
 export function AngebotAuswahlPageClient({

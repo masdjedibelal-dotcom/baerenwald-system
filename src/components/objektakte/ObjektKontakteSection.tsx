@@ -1,12 +1,10 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { Mail, Pencil, Phone, Plus, Trash2, UserRound } from 'lucide-react'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
@@ -19,7 +17,6 @@ import {
   OBJEKT_KONTAKT_ROLLE_LABELS,
   OBJEKT_KONTAKT_ROLLEN,
 } from '@/lib/objektakte/labels'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { ObjektKontakt, ObjektKontaktInput, ObjektKontaktRolle } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
@@ -27,8 +24,6 @@ const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.map((r) => ({
   value: r,
   label: OBJEKT_KONTAKT_ROLLE_LABELS[r],
 }))
-
-const COLS = 'minmax(0, 1.3fr) 120px minmax(0, 1.2fr) 44px'
 
 export function ObjektKontakteSection({
   kundeId,
@@ -52,7 +47,6 @@ export function ObjektKontakteSection({
   const [email, setEmail] = useState('')
   const [notiz, setNotiz] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     setListe(initial)
@@ -66,7 +60,6 @@ export function ObjektKontakteSection({
     setEmail('')
     setNotiz('')
     setErr(null)
-    setDirty(false)
     setModalOpen(true)
   }
 
@@ -78,7 +71,6 @@ export function ObjektKontakteSection({
     setEmail(k.email ?? '')
     setNotiz(k.notiz ?? '')
     setErr(null)
-    setDirty(false)
     setModalOpen(true)
   }
 
@@ -122,7 +114,6 @@ export function ObjektKontakteSection({
         setListe((prev) => [...prev, r.kontakt])
         toast.success('Kontakt angelegt')
       }
-      setDirty(false)
       setModalOpen(false)
       onChanged()
     })
@@ -142,160 +133,107 @@ export function ObjektKontakteSection({
     })
   }
 
-  function rowMenuItems(k: ObjektKontakt): EntityMenuItem[] {
-    return [
-      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openBearbeiten(k) },
-      'sep',
-      {
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () => {
-          if (pending) return
-          entfernen(k)
-        },
-      },
-    ]
-  }
-
   return (
     <>
       <MockCard
-        title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
-        icon="user"
+        collapsible
+        title={
+          <>
+            <UserRound className="inline h-4 w-4 text-bw-primary" aria-hidden /> Kontakte vor Ort
+          </>
+        }
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+          <button type="button" className="btn ghost sm gap-1" onClick={openNeu}>
+            <Plus className="h-3.5 w-3.5" aria-hidden />
             Hinzufügen
-          </MockBtn>
+          </button>
         }
       >
-        <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-3 text-[12px] text-bw-text-muted">
           Hausmeister, Beirat, Notfallkontakte — für die Disposition.
         </p>
         {liste.length === 0 ? (
-          <MockEmpty icon="user" title="Noch keine Kontakte" hint="Kontakt hinzufügen" />
+          <p className="text-[13px] text-bw-text-muted">Noch keine Kontakte hinterlegt.</p>
         ) : (
-          <div className="listcard">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div>Name</div>
-              <div>Rolle</div>
-              <div>Kontakt</div>
-              <div />
-            </div>
-            {liste.map((k) => {
-              const kontaktZeile = [k.telefon?.trim(), k.email?.trim()].filter(Boolean).join(' · ') || '—'
-              return (
-                <div key={k.id} className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {k.name}
-                    {k.notiz ? (
-                      <div
-                        className="lc-sub"
-                        style={{
-                          fontSize: 'var(--fs-meta)',
-                          fontWeight: 400,
-                          color: 'var(--text-3)',
-                          marginTop: 2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={k.notiz}
-                      >
-                        {k.notiz}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="lc-pills">
-                    <span className="pill-tag" style={{ cursor: 'default' }}>
+          <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+            {liste.map((k) => (
+              <li key={k.id} className="flex gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] font-medium text-bw-text">{k.name}</span>
+                    <span className="rounded bg-bw-muted px-1.5 py-0.5 text-[10px] font-medium text-bw-text-muted">
                       {OBJEKT_KONTAKT_ROLLE_LABELS[k.rolle]}
                     </span>
                   </div>
-                  <div
-                    className="lc-sub"
-                    style={{
-                      color: 'var(--text-2)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={kontaktZeile}
-                  >
-                    {kontaktZeile}
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
+                    {k.telefon ? (
+                      <a href={`tel:${k.telefon}`} className="inline-flex items-center gap-1 text-bw-link">
+                        <Phone className="h-3 w-3" aria-hidden />
+                        {k.telefon}
+                      </a>
+                    ) : null}
+                    {k.email ? (
+                      <a href={`mailto:${k.email}`} className="inline-flex items-center gap-1 text-bw-link">
+                        <Mail className="h-3 w-3" aria-hidden />
+                        {k.email}
+                      </a>
+                    ) : null}
                   </div>
-                  <div
-                    className="row-actions always"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ justifyContent: 'flex-end' }}
-                  >
-                    <MockEntityRowMenu items={rowMenuItems(k)} title="Kontakt" />
-                  </div>
+                  {k.notiz ? <p className="mt-1 text-[12px] text-bw-text-muted">{k.notiz}</p> : null}
                 </div>
-              )
-            })}
-          </div>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    aria-label="Bearbeiten"
+                    onClick={() => openBearbeiten(k)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm text-danger"
+                    aria-label="Löschen"
+                    disabled={pending}
+                    onClick={() => entfernen(k)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </MockCard>
 
-      <EditorSheet
+      <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Kontakt"
-        context="detail"
-        dirty={dirty}
-        confirmBusy={pending}
-        onConfirm={speichern}
+        title={edit ? 'Kontakt bearbeiten' : 'Kontakt anlegen'}
       >
-        <div className="space-y-3">
+        <div className="space-y-3 p-1">
           <Select
             label="Rolle"
             name="rolle"
             value={rolle}
-            onChange={(e) => {
-              setDirty(true)
-              setRolle(e.target.value as ObjektKontaktRolle)
-            }}
+            onChange={(e) => setRolle(e.target.value as ObjektKontaktRolle)}
             options={ROLLE_OPTIONS}
           />
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => {
-              setDirty(true)
-              setName(e.target.value)
-            }}
-            required
-          />
-          <Input
-            label="Telefon"
-            value={telefon}
-            onChange={(e) => {
-              setDirty(true)
-              setTelefon(e.target.value)
-            }}
-            type="tel"
-          />
-          <Input
-            label="E-Mail"
-            value={email}
-            onChange={(e) => {
-              setDirty(true)
-              setEmail(e.target.value)
-            }}
-            type="email"
-          />
-          <Textarea
-            label="Notiz"
-            value={notiz}
-            onChange={(e) => {
-              setDirty(true)
-              setNotiz(e.target.value)
-            }}
-            rows={3}
-          />
-          {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
+          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <Input label="Telefon" value={telefon} onChange={(e) => setTelefon(e.target.value)} type="tel" />
+          <Input label="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+          <Textarea label="Notiz" value={notiz} onChange={(e) => setNotiz(e.target.value)} rows={3} />
+          {err ? <p className="text-sm text-danger">{err}</p> : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" onClick={speichern} disabled={pending}>
+              Speichern
+            </Button>
+          </div>
         </div>
-      </EditorSheet>
+      </Modal>
     </>
   )
 }

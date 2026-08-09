@@ -1,7 +1,6 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { Mail, Send, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -25,7 +24,7 @@ export function AuftragKundenUpdatePanel({
   leadStatus?: LeadStatus | null
   onChanged: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotos, setFotos] = useState<string[]>([])
@@ -86,16 +85,16 @@ export function AuftragKundenUpdatePanel({
 
   return (
     <section className="mb-8 rounded-lg border border-bw-border bg-bw-card p-4">
-      <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-bw-text">
         <Send className="h-4 w-4 text-bw-primary" aria-hidden />
         Kunden-Update erstellen
       </h3>
-      <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
+      <p className="mb-4 text-xs text-bw-text-muted">
         Status-Update mit Fotos — erscheint auf der Kunden-Statusseite und optional per E-Mail (mit Phasen-Anzeige oben).
       </p>
 
       <div className="mb-4 overflow-x-auto rounded-lg bg-bw-hover/60 p-3">
-        <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
+        <p className="mb-2 text-xs font-medium text-bw-text-muted">
           Aktuelle Phase: {auftragStatusLabelDe(detail.status)} · {PROJEKT_PHASEN[phaseIdx]}
         </p>
         <div className="flex min-w-[420px] items-center justify-between gap-1">
@@ -106,7 +105,7 @@ export function AuftragKundenUpdatePanel({
               <div key={label} className="flex flex-1 flex-col items-center text-center">
                 <span
                   className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-full border-2 text-[length:var(--fs-meta)] font-bold',
+                    'flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold',
                     done && 'border-bw-primary bg-bw-primary text-white',
                     active && !done && 'border-bw-primary bg-white text-bw-dark',
                     !done && !active && 'border-bw-border text-bw-text-muted'
@@ -114,7 +113,7 @@ export function AuftragKundenUpdatePanel({
                 >
                   {done ? '✓' : i + 1}
                 </span>
-                <span className={cn('mt-1 text-[length:var(--fs-meta)]', active ? 'font-semibold text-bw-text' : 'text-bw-text-muted')}>
+                <span className={cn('mt-1 text-[10px]', active ? 'font-semibold text-bw-text' : 'text-bw-text-muted')}>
                   {label}
                 </span>
               </div>
@@ -152,7 +151,7 @@ export function AuftragKundenUpdatePanel({
             ))}
             <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-bw-border text-bw-text-muted hover:bg-bw-hover">
               <Upload className="h-5 w-5" aria-hidden />
-              <span className="mt-1 text-[length:var(--fs-meta)]">{uploading ? '…' : 'Foto'}</span>
+              <span className="mt-1 text-[10px]">{uploading ? '…' : 'Foto'}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -169,12 +168,12 @@ export function AuftragKundenUpdatePanel({
         </div>
 
         <div className="rounded-lg border border-bw-border bg-bw-hover/40 p-3 space-y-2">
-          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kundin</p>
-          <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kundin</p>
+          <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={sendMail} onChange={(e) => setSendMail(e.target.checked)} />
             Kunde per E-Mail informieren
           </label>
-          <label className="flex items-start gap-2 text-[length:var(--fs-text)]">
+          <label className="flex items-start gap-2 text-sm">
             <input
               type="radio"
               name="mail-modus"
@@ -185,7 +184,7 @@ export function AuftragKundenUpdatePanel({
               <strong>Schlicht</strong> — Phasen-Leiste + Kurzhinweis + Link (empfohlen, weniger Spam)
             </span>
           </label>
-          <label className="flex items-start gap-2 text-[length:var(--fs-text)]">
+          <label className="flex items-start gap-2 text-sm">
             <input
               type="radio"
               name="mail-modus"

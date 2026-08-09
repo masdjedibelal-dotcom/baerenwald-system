@@ -3,29 +3,27 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
-import { actionBusy } from '@/components/ui/action-busy'
 
 type ConfirmState = {
   label: string
-  onConfirm: () => void | Promise<void>
+  onConfirm: () => void
 }
 
 type ConfirmDeleteContextValue = {
-  confirmDelete: (label: string, onConfirm: () => void | Promise<void>) => void
+  confirmDelete: (label: string, onConfirm: () => void) => void
 }
 
 const ConfirmDeleteContext = createContext<ConfirmDeleteContextValue | null>(null)
 
-let globalConfirmDelete: ((label: string, onConfirm: () => void | Promise<void>) => void) | null =
-  null
+let globalConfirmDelete: ((label: string, onConfirm: () => void) => void) | null = null
 
 /** Wie Mock `window.__confirmDelete` — für entityMenu-Löschaktionen */
-export function confirmDelete(label: string, onConfirm: () => void | Promise<void>) {
+export function confirmDelete(label: string, onConfirm: () => void) {
   if (globalConfirmDelete) {
     globalConfirmDelete(label, onConfirm)
     return
   }
-  void Promise.resolve(onConfirm())
+  onConfirm()
 }
 
 export function useConfirmDelete() {
@@ -36,29 +34,12 @@ export function useConfirmDelete() {
 
 export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConfirmState | null>(null)
-  const [pending, setPending] = useState(false)
 
-  const confirmDeleteFn = useCallback((label: string, onConfirm: () => void | Promise<void>) => {
-    setPending(false)
+  const confirmDeleteFn = useCallback((label: string, onConfirm: () => void) => {
     setState({ label, onConfirm })
   }, [])
 
   globalConfirmDelete = confirmDeleteFn
-
-  async function handleConfirm() {
-    if (!state || pending) return
-    setPending(true)
-    actionBusy.show('Wird gelöscht…')
-    try {
-      await Promise.resolve(state.onConfirm())
-      setState(null)
-    } catch {
-      // Fehler-Toast kommt vom Aufrufer — Modal bleibt zum erneuten Versuch
-    } finally {
-      actionBusy.hide()
-      setPending(false)
-    }
-  }
 
   return (
     <ConfirmDeleteContext.Provider value={{ confirmDelete: confirmDeleteFn }}>
@@ -69,25 +50,29 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
           icon="trash"
           title="Wirklich löschen?"
           sub={state.label}
-          onClose={() => {
-            if (!pending) setState(null)
-          }}
+          onClose={() => setState(null)}
           footer={
             <>
-              <MockBtn kind="ghost" disabled={pending} onClick={() => setState(null)}>
+              <MockBtn kind="ghost" onClick={() => setState(null)}>
                 Abbrechen
               </MockBtn>
               <div style={{ flex: 1 }} />
-              <MockBtn kind="danger" icon={pending ? undefined : 'trash'} disabled={pending} onClick={() => void handleConfirm()}>
-                {pending ? 'Wird gelöscht…' : 'Löschen'}
+              <MockBtn
+                kind="danger"
+                icon="trash"
+                onClick={() => {
+                  const fn = state.onConfirm
+                  setState(null)
+                  fn()
+                }}
+              >
+                Löschen
               </MockBtn>
             </>
           }
         >
           <div style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
-            {pending
-              ? 'Bitte warten — der Vorgang wird gelöscht…'
-              : `${state.label} wird dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.`}
+            {state.label} wird dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.
           </div>
         </MockModal>
       ) : null}

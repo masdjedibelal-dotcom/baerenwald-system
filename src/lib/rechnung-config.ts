@@ -35,6 +35,6 @@ export const HINWEIS_REVERSE_CHARGE_13B =
 
 /** § 35a Abs. 3 EStG — nur wenn Lohnkosten auf der Rechnung ausgewiesen sind (Platzhalter {lohnNetto}) */
 export const HINWEIS_35A_TEMPLATE =
-  'Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von {lohnNetto} (inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) kann bei der Einkommensteuer geltend gemacht werden.'
+  'Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von {lohnNetto} kann bei der Einkommensteuer geltend gemacht werden.'
 
 export const MWST_SAETZE_RECHNUNG = [0, 7, 19] as const

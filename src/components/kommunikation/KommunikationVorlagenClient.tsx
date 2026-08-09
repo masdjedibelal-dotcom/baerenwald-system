@@ -1,15 +1,13 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteKommunikationMailVorlage,
@@ -114,14 +112,14 @@ export function KommunikationVorlagenClient({
         }
       >
         {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Vorlagen angelegt.</p>
+          <p className="text-sm text-bw-text-muted">Noch keine Vorlagen angelegt.</p>
         ) : (
           <ul className="divide-y divide-bw-border">
             {rows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0">
                 <div className="min-w-0">
                   <p className="font-medium text-bw-text">{r.name}</p>
-                  <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+                  <p className="text-xs text-bw-text-muted">
                     {KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS.find((o) => o.value === r.kontext_typ)?.label ??
                       r.kontext_typ}
                     {r.betreff ? ` · ${r.betreff}` : ''}
@@ -151,14 +149,21 @@ export function KommunikationVorlagenClient({
         )}
       </Card>
 
-      <EditorSheet
+      <Modal
         open={editOpen && !!edit}
         onClose={() => setEditOpen(false)}
         title={edit?.id ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
-        context="detail"
         size="md"
-        confirmBusy={pending}
-        onConfirm={save}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={save}>
+              Speichern
+            </Button>
+          </div>
+        }
       >
         {edit ? (
           <div className="space-y-3">
@@ -178,31 +183,20 @@ export function KommunikationVorlagenClient({
                 label: o.label,
               }))}
             />
-            <KiAssistFieldLabel
+            <Input
               label="Betreff (optional)"
               value={edit.betreff}
-              onApply={(text) => setEdit({ ...edit, betreff: text })}
-              multiline={false}
-            >
-              <Input
-                value={edit.betreff}
-                onChange={(e) => setEdit({ ...edit, betreff: e.target.value })}
-              />
-            </KiAssistFieldLabel>
-            <KiAssistFieldLabel
+              onChange={(e) => setEdit({ ...edit, betreff: e.target.value })}
+            />
+            <Textarea
               label="Nachricht"
+              rows={8}
               value={edit.body_text}
-              onApply={(text) => setEdit({ ...edit, body_text: text })}
-            >
-              <Textarea
-                rows={8}
-                value={edit.body_text}
-                onChange={(e) => setEdit({ ...edit, body_text: e.target.value })}
-              />
-            </KiAssistFieldLabel>
+              onChange={(e) => setEdit({ ...edit, body_text: e.target.value })}
+            />
           </div>
         ) : null}
-      </EditorSheet>
+      </Modal>
     </>
   )
 }

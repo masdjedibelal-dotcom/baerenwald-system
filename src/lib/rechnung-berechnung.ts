@@ -1,4 +1,4 @@
-import { ZEILE_SLUG_FREITEXT, ZEILE_SLUG_GESAMTRABATT, istPreisPosition } from '@/lib/dokument-zeilen'
+import { ZEILE_SLUG_FREITEXT, ZEILE_SLUG_GESAMTRABATT } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
 
 export type MwstAufschluesselungZeile = {
@@ -35,12 +35,6 @@ function istSonderzeile(p: AngebotPosition): boolean {
   return slug === ZEILE_SLUG_FREITEXT || slug === ZEILE_SLUG_GESAMTRABATT
 }
 
-function istAbschlagAbzugZeile(p: AngebotPosition): boolean {
-  const slug = (p.gewerk_slug ?? '').toLowerCase()
-  if (slug === 'abschlag_abzug') return true
-  return (p.leistung ?? '').toLowerCase().startsWith('abzüglich')
-}
-
 export function positionNettoZeile(p: AngebotPosition): number {
   const m = p.menge || 1
   return round2((p.lohn_netto + p.material_netto) * m)
@@ -75,8 +69,7 @@ export function berechneRechnung(
     const m = p.menge || 1
     const l = round2(p.lohn_netto * m)
     const mat = round2(p.material_netto * m)
-    // Abzugszeilen (bereits gestellte Abschläge) nicht in Lohn/Material-Aufstellung
-    if (!istSonderzeile(p) && !istAbschlagAbzugZeile(p)) {
+    if (!istSonderzeile(p)) {
       lohn_netto += l
       material_netto += mat
     }
@@ -138,76 +131,7 @@ export function abschlag35aEur(lohnNetto: number): number {
   return round2(lohnNetto * 0.2)
 }
 
-export type Hinweis35aAnteil = {
-  /**
-   * Ausgewiesener §35a-Betrag:
-   * - Allgemein (kein Materialsplit) → Brutto dieser Rechnung (inkl. USt, BMF)
-   * - Mit Materialsplit → Lohnanteil netto (Rechnungsnetto abzgl. Material)
-   */
-  lohn_netto: number
-  /** Explizit als Material markierte Positionen (netto) */
-  material_netto: number
-  /** Mindestens eine Position ist explizit „Material“ */
-  hat_materialausweis: boolean
-  /** true = `lohn_netto` ist Brutto (Allgemein-Fall) */
-  ist_brutto: boolean
-}
-
-/**
- * § 35a-Lohnanteil:
- * - Alles „Allgemein“ → Rechnungsbrutto als Lohnanteil (Arbeitskosten inkl. USt)
- * - Explizites Material → Rechnungsnetto abzüglich Material; Material wird ausgewiesen
- * - Bei Teilrechnung/Schluss: `rechnungNetto`/`rechnungBrutto` = Betrag dieser Rechnung
- *   (z. B. Rest nach Abschlag); optional `vollNetto` skaliert Material anteilig
- */
-export function berechneHinweis35aAnteil(
-  positionen: AngebotPosition[] | null | undefined,
-  rechnungNetto: number,
-  opts?: { vollNetto?: number | null; rechnungBrutto?: number | null }
-): Hinweis35aAnteil {
-  const netto = round2(Math.max(0, Number(rechnungNetto) || 0))
-  const bruttoOpt = Number(opts?.rechnungBrutto)
-  const brutto =
-    Number.isFinite(bruttoOpt) && bruttoOpt >= 0 ? round2(bruttoOpt) : netto
-  let material = 0
-  let hatMaterial = false
-  for (const p of Array.isArray(positionen) ? positionen : []) {
-    if (!istPreisPosition(p)) continue
-    const kv = p.kostenverteilung ?? 'allgemein'
-    if (kv !== 'material') continue
-    hatMaterial = true
-    const m = p.menge || 1
-    material += (Number(p.material_netto) || 0) * m
-  }
-  material = round2(material)
-  const voll = Number(opts?.vollNetto)
-  if (
-    hatMaterial &&
-    material > 0 &&
-    Number.isFinite(voll) &&
-    voll > 0.02 &&
-    Math.abs(voll - netto) > 0.02
-  ) {
-    material = round2(material * (netto / voll))
-  }
-  if (!hatMaterial || material <= 0) {
-    const ausweis = brutto > 0 ? brutto : netto
-    return {
-      lohn_netto: ausweis,
-      material_netto: 0,
-      hat_materialausweis: false,
-      ist_brutto: Math.abs(ausweis - netto) > 0.02,
-    }
-  }
-  return {
-    lohn_netto: round2(Math.max(0, netto - material)),
-    material_netto: material,
-    hat_materialausweis: true,
-    ist_brutto: false,
-  }
-}
-
-/** § 35a-Hinweis auf Rechnungen: nur Privatkunde, positiver Lohnanteil. */
+/** § 35a-Hinweis auf Rechnungen: nur Privatkunde, Lohnkosten in Kostenaufstellung ausgewiesen. */
 export function rechnungZeigtHinweis35a(
   kundeTyp: string | null | undefined,
   lohnNettoAusgewiesen: number,
@@ -228,32 +152,12 @@ export function resolveRechnungHinweis35a(
   return rechnungZeigtHinweis35a(kundeTyp, lohnNettoAusgewiesen, kleinunternehmer)
 }
 
-function formatEurDe(n: number): string {
-  return n.toLocaleString('de-DE', {
+export function formatHinweis35aRechnung(lohnNetto: number): string {
+  const betrag = lohnNetto.toLocaleString('de-DE', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-}
-
-export function formatHinweis35aRechnung(
-  lohnNetto: number,
-  opts?: { materialNetto?: number | null }
-): string {
-  const betrag = formatEurDe(lohnNetto)
-  const mat = Number(opts?.materialNetto) || 0
-  if (mat > 0) {
-    return (
-      `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € ` +
-      `(Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${formatEurDe(mat)} €; ` +
-      `inkl. Anfahrt und Maschinenkosten, soweit enthalten) ` +
-      `kann bei der Einkommensteuer geltend gemacht werden.`
-    )
-  }
-  return (
-    `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € ` +
-    `(inkl. USt sowie Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) ` +
-    `kann bei der Einkommensteuer geltend gemacht werden.`
-  )
+  return `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € kann bei der Einkommensteuer geltend gemacht werden.`
 }
 
 export function kundeZeigt35a(typ: string | null | undefined): boolean {

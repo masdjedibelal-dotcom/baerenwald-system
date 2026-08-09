@@ -21,8 +21,6 @@ export function InlineEditSection({
   children,
   className,
   editLabel = 'Bearbeiten',
-  /** Kein Stift im Header (z. B. Stammdaten ohne ⋯/Icon-Edit). */
-  hideEditTrigger = false,
 }: {
   title: string
   icon?: string
@@ -35,7 +33,6 @@ export function InlineEditSection({
   children: ReactNode
   className?: string
   editLabel?: string
-  hideEditTrigger?: boolean
 }) {
   return (
     <div className={cn('card', editing && 'inline-edit-section--active', className)}>
@@ -54,7 +51,7 @@ export function InlineEditSection({
                 {saving ? 'Speichern…' : 'Speichern'}
               </MockBtn>
             </div>
-          ) : hideEditTrigger ? null : (
+          ) : (
             <MockBtn
               sm
               kind="ghost"

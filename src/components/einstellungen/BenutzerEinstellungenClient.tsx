@@ -1,23 +1,52 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
-import { useIsMobile } from '@/hooks/useIsMobile'
+import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
   inviteBenutzer,
   loadBenutzerListe,
+  setBenutzerAktiv,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 
-const COLS = '42px 2fr 1.5fr 1fr'
+const COLS = '42px 2fr 1.5fr 1fr 90px'
+
+function Sec({
+  title,
+  actions,
+  children,
+}: {
+  title: string
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          paddingBottom: 8,
+          borderBottom: '0.5px solid var(--border)',
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
+        <div style={{ flex: 1 }} />
+        {actions}
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
 
 function initialsFromName(name: string, email: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -43,7 +72,6 @@ function avatarColor(u: BenutzerZeile, index: number): string {
 
 export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeile[] }) {
   const router = useRouter()
-  const isMobile = useIsMobile()
   const [rows, setRows] = useState(initial)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -101,147 +129,139 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     })
   }
 
-  const inviteBtn = (
-    <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
-      Einladen
-    </MockBtn>
-  )
-
-  const empty = (
-    <p className="m-0 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
-      Noch keine Benutzer.
-    </p>
-  )
-
-  const mobileList =
-    rows.length === 0 ? (
-      empty
-    ) : (
-      <div className="dok-cards">
-        {rows.map((u, i) => {
-          const initials = initialsFromName(u.name, u.email)
-          const color = avatarColor(u, i)
-          return (
-            <DokMobileCard
-              key={u.id}
-              title={u.name}
-              meta={
-                [u.email || null, !u.aktiv ? 'deaktiviert' : null].filter(Boolean).join(' · ') ||
-                null
-              }
-              onClick={() => openEdit(u)}
-              badge={<MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>}
-              className={!u.aktiv ? 'opacity-55' : undefined}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <div className={`avatar ${color}`.trim()} aria-hidden>
-                  {initials}
-                </div>
-              </div>
-            </DokMobileCard>
-          )
-        })}
-      </div>
-    )
-
-  const desktopList =
-    rows.length === 0 ? (
-      empty
-    ) : (
-      <div style={{ margin: 0 }}>
-        <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
-          <div />
-          <div>Name</div>
-          <div>E-Mail</div>
-          <div>Rolle</div>
-        </div>
-        {rows.map((u, i) => {
-          const initials = initialsFromName(u.name, u.email)
-          const color = avatarColor(u, i)
-          return (
-            <div
-              key={u.id}
-              role="button"
-              tabIndex={0}
-              className="list-row"
-              style={{
-                gridTemplateColumns: COLS,
-                cursor: 'pointer',
-                alignItems: 'center',
-                opacity: u.aktiv ? 1 : 0.55,
-              }}
-              onClick={() => openEdit(u)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openEdit(u)
-                }
-              }}
-            >
-              <div className={`avatar ${color}`.trim()} aria-hidden>
-                {initials}
-              </div>
-              <div
-                style={{
-                  fontSize: 'var(--fs-text)',
-                  fontWeight: 500,
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {u.name}
-                {!u.aktiv ? (
-                  <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  fontSize: 'var(--fs-meta)',
-                  color: 'var(--text-3)',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {u.email || '—'}
-              </div>
-              <div>
-                <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
+  function removeUser(u: BenutzerZeile) {
+    startTransition(async () => {
+      const r = await setBenutzerAktiv(u.id, false)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Teammitglied entfernt')
+      await refresh()
+    })
+  }
 
   return (
     <>
-      {isMobile ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="m-0 text-[length:var(--fs-text)] font-semibold text-[var(--text)]">
-              Teammitglieder
-            </h2>
-            {inviteBtn}
+      <Sec
+        title="Teammitglieder"
+        actions={
+          <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
+            Einladen
+          </MockBtn>
+        }
+      >
+        {rows.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '8px 0' }}>Noch keine Benutzer.</p>
+        ) : (
+          <div style={{ margin: 0 }}>
+            <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
+              <div />
+              <div>Name</div>
+              <div>E-Mail</div>
+              <div>Rolle</div>
+              <div />
+            </div>
+            {rows.map((u, i) => {
+              const initials = initialsFromName(u.name, u.email)
+              const color = avatarColor(u, i)
+              return (
+                <div
+                  key={u.id}
+                  className="list-row"
+                  style={{
+                    gridTemplateColumns: COLS,
+                    cursor: 'default',
+                    alignItems: 'center',
+                    opacity: u.aktiv ? 1 : 0.55,
+                  }}
+                >
+                  <div className={`avatar ${color}`.trim()} aria-hidden>
+                    {initials}
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.name}
+                    {!u.aktiv ? (
+                      <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.email || '—'}
+                  </div>
+                  <div>
+                    <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} className="row-actions always">
+                    <MockEntityRowMenu
+                      items={[
+                        {
+                          icon: 'pencil',
+                          label: 'Bearbeiten',
+                          onClick: () => openEdit(u),
+                        },
+                        {
+                          icon: 'user',
+                          label: 'Rolle ändern',
+                          onClick: () => openEdit(u),
+                        },
+                        {
+                          icon: 'mail',
+                          label: 'E-Mail schreiben',
+                          onClick: () => {
+                            if (u.email) window.open(`mailto:${u.email}`)
+                          },
+                        },
+                        'sep' as const,
+                        ...(u.aktiv
+                          ? [
+                              {
+                                icon: 'trash' as const,
+                                label: 'Entfernen',
+                                danger: true as const,
+                                onClick: () => removeUser(u),
+                              },
+                            ]
+                          : [
+                              {
+                                icon: 'check' as const,
+                                label: 'Aktivieren',
+                                onClick: () => {
+                                  startTransition(async () => {
+                                    const r = await setBenutzerAktiv(u.id, true)
+                                    if (!r.ok) {
+                                      toast.error(r.message)
+                                      return
+                                    }
+                                    toast.success('Wieder aktiviert')
+                                    await refresh()
+                                  })
+                                },
+                              },
+                            ]),
+                      ]}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          {mobileList}
-        </div>
-      ) : (
-        <MockCard title="Teammitglieder" icon="users" actions={inviteBtn}>
-          {desktopList}
-        </MockCard>
-      )}
+        )}
+      </Sec>
 
-      <EditorSheet
+      <Modal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         title="Benutzer einladen"
-        context="detail"
-        confirmBusy={pending}
-        onConfirm={() => sendInvite()}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => sendInvite()}>
+              Einladen
+            </Button>
+          </div>
+        }
       >
         <div className="space-y-3">
           <Input
@@ -252,7 +272,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             onChange={(e) => setInviteEmail(e.target.value)}
           />
           <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+          <p className="text-xs text-bw-text-muted">
             Nur CRM-Mitarbeiter. Handwerker-, Partner- und Kunden-Logins werden hier nicht
             verwaltet — bitte eine eigene Mitarbeiter-E-Mail verwenden.
           </p>
@@ -271,15 +291,22 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </select>
           </div>
         </div>
-      </EditorSheet>
+      </Modal>
 
-      <EditorSheet
+      <Modal
         open={Boolean(edit)}
         onClose={() => setEdit(null)}
         title="Benutzer bearbeiten"
-        context="detail"
-        confirmBusy={pending}
-        onConfirm={() => saveEdit()}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setEdit(null)}>
+              Abbrechen
+            </Button>
+            <Button type="button" variant="primary" loading={pending} onClick={() => saveEdit()}>
+              Speichern
+            </Button>
+          </div>
+        }
       >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -305,7 +332,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             </select>
           </div>
         </div>
-      </EditorSheet>
+      </Modal>
     </>
   )
 }

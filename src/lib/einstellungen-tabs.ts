@@ -22,7 +22,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     label: 'Firma',
     icon: Building2,
     mockIcon: 'building',
-    matchPrefixes: ['/einstellungen/firma'],
+    matchPrefixes: ['/einstellungen/firma', '/einstellungen/profil'],
   },
   {
     id: 'team',

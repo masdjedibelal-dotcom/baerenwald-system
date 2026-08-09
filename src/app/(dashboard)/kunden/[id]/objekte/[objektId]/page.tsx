@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { ObjektAkteDetailClient } from '@/components/objektakte/ObjektAkteDetailClient'
 import { loadKundeDetail } from '@/lib/kunden/load-kunde-detail'
 import { loadKundenObjektForAkte, loadObjektAkteDetail } from '@/lib/objektakte/load-objekt-akte'
-import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
 
 export async function generateMetadata({
   params,
@@ -21,10 +20,9 @@ export default async function ObjektAktePage({
   params: Promise<{ id: string; objektId: string }>
 }) {
   const { id: kundeId, objektId } = await params
-  const [kunde, akte, vorgaenge] = await Promise.all([
+  const [kunde, akte] = await Promise.all([
     loadKundeDetail(kundeId),
     loadObjektAkteDetail(kundeId, objektId),
-    loadVorgaengeListe({ kundeId }),
   ])
 
   if (!kunde || !akte) notFound()
@@ -32,12 +30,5 @@ export default async function ObjektAktePage({
   const objekt = await loadKundenObjektForAkte(kundeId, objektId)
   if (!objekt) notFound()
 
-  return (
-    <ObjektAkteDetailClient
-      kunde={kunde}
-      objekt={objekt}
-      akte={akte}
-      vorgaengeRows={vorgaenge.rows}
-    />
-  )
+  return <ObjektAkteDetailClient kunde={kunde} objekt={objekt} akte={akte} />
 }

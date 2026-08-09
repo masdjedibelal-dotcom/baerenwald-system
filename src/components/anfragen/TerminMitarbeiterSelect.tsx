@@ -31,6 +31,9 @@ export function TerminMitarbeiterSelect({ team, value, onChange, loading, requir
           </option>
         ))}
       </select>
+      <p className="form-field-hint mt-1">
+        Erscheint in der Kunden-Mail und im Kalender mit Kundendetails.
+      </p>
     </label>
   )
 }

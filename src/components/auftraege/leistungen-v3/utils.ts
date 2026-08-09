@@ -15,7 +15,6 @@ export function groupPositionenByGewerkSlug(
 ): AuftragGewerkBlock[] {
   const sorted = [...positionen]
     .filter((p) => !istInterneAuftragGewerkBeschreibung(p))
-    .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   const blocks: AuftragGewerkBlock[] = []

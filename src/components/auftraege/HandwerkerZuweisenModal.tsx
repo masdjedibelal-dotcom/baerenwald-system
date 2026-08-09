@@ -1,12 +1,14 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
+import { FormSheet } from '@/components/ui/FormSheet'
 import { Accordion } from '@/components/ui/Accordion'
+import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   assignAuftragHandwerkerGewerk,
   assignAuftragHandwerkerPosition,
@@ -19,6 +21,7 @@ import {
 import { cn, formatDatum } from '@/lib/utils'
 import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 import type { AuftragPosition } from '@/lib/types'
+
 
 const ToolIcon = resolveMockIcon('tool')
 
@@ -71,7 +74,7 @@ function HandwerkerPickRow({
         disabled={disabled}
         onChange={onSelect}
       />
-      <div className="min-w-0 flex-1 text-[length:var(--fs-text)]">
+      <div className="min-w-0 flex-1 text-sm">
         <p className="font-medium text-bw-text">
           {h.name}
           {h.firma ? <span className="text-bw-text-muted"> · {h.firma}</span> : null}
@@ -85,7 +88,7 @@ function HandwerkerPickRow({
         )}
         <span
           className={cn(
-            'mt-1 inline-block rounded px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+            'mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium',
             h.verfuegbar ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'
           )}
         >
@@ -114,6 +117,7 @@ export function HandwerkerZuweisenModal({
   onMailOpen: (mail: HandwerkerZuweisungMailTarget) => void
   projektName?: string
 }) {
+  const isMobile = useIsMobile()
   const [pending, startTransition] = useTransition()
   const [loadingList, setLoadingList] = useState(false)
   const [empfohlen, setEmpfohlen] = useState<HandwerkerGewerkListeEintrag[]>([])
@@ -216,15 +220,32 @@ export function HandwerkerZuweisenModal({
       ? `Handwerker — ${scope.position.leistung_name}`
       : scopeLeistungenCount > 1
         ? `Handwerker — ${scopeLeistungenCount} Leistungen (${gewerkName})`
-        : `Partner — ${gewerkName}`
+        : `Handwerker — ${gewerkName}`
+
+  const footer = (
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="secondary" onClick={onClose}>
+        Abbrechen
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        loading={pending}
+        disabled={!selectedId || loadingList}
+        onClick={zuweisen}
+      >
+        {isReplace ? 'Partner disponieren & anfragen' : 'Zuweisen'}
+      </Button>
+    </div>
+  )
 
   const leistungenPreview =
     scope?.type === 'gewerk' && scope.leistungen.length > 0 ? (
       <div className="mb-4 rounded-lg border border-bw-border bg-bw-bg-soft/50 p-3">
-        <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
           {scope.leistungen.length === 1 ? 'Leistung in der Anfrage' : `${scope.leistungen.length} Leistungen in einer Anfrage`}
         </p>
-        <ul className="space-y-1.5 text-[length:var(--fs-text)] text-bw-text">
+        <ul className="space-y-1.5 text-sm text-bw-text">
           {scope.leistungen.map((l, i) => (
             <li key={i} className="flex gap-2">
               <span className="font-semibold text-bw-primary">{i + 1}.</span>
@@ -237,14 +258,14 @@ export function HandwerkerZuweisenModal({
 
   const body = (
     <>
-      <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+      <p className="mb-3 text-sm text-bw-text-muted">
         {isReplace
-          ? 'Ersatz wählen — Anfrage geht ans Portal.'
+          ? 'Der vorherige Partner hat abgelehnt. Wählen Sie einen Ersatz — die Anfrage geht direkt ins Partner-Portal.'
           : scope?.type === 'position'
-            ? 'Partner für diese Leistung wählen.'
+            ? 'Handwerker für diese Leistung auswählen. Danach öffnet sich die Partner-Mail-Vorschau.'
             : scopeLeistungenCount > 1
-              ? `${scopeLeistungenCount} Leistungen · ein Partner.`
-              : `Partner für „${gewerkName}“ wählen.`}
+              ? `${scopeLeistungenCount} Leistungen in „${gewerkName}“ — ein Handwerker, eine Partner-Mail.`
+              : `Handwerker für das Gewerk „${gewerkName}“ auswählen. Danach öffnet sich die Partner-Mail-Vorschau.`}
       </p>
       {isReplace ? null : (
         <Select
@@ -258,7 +279,7 @@ export function HandwerkerZuweisenModal({
       )}
       {leistungenPreview}
       {(kontext.startDatum || kontext.endDatum) && (
-        <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
+        <p className="mb-3 text-xs text-bw-text-muted">
           Zeitraum: {kontext.startDatum ? formatDatum(kontext.startDatum) : '—'}
           {' – '}
           {kontext.endDatum ? formatDatum(kontext.endDatum) : '—'}
@@ -266,11 +287,11 @@ export function HandwerkerZuweisenModal({
           {kontext.kundeName}
         </p>
       )}
-      {listErr ? <p className="mb-2 text-[length:var(--fs-text)] text-danger">{listErr}</p> : null}
+      {listErr ? <p className="mb-2 text-sm text-danger">{listErr}</p> : null}
       {loadingList ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Handwerker werden geladen…</p>
+        <p className="text-sm text-bw-text-muted">Handwerker werden geladen…</p>
       ) : empfohlen.length === 0 && alle.length === 0 ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
+        <p className="text-sm text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
       ) : (
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           <Accordion
@@ -279,7 +300,7 @@ export function HandwerkerZuweisenModal({
             className="hw-pick-accordion"
           >
             {empfohlen.length === 0 ? (
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+              <p className="text-sm text-bw-text-muted">
                 Keine Handwerker mit diesem Gewerk in den Stammdaten — alle Partner unten.
               </p>
             ) : (
@@ -303,7 +324,7 @@ export function HandwerkerZuweisenModal({
             className="hw-pick-accordion"
           >
             {alle.length === 0 ? (
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine weiteren Handwerker.</p>
+              <p className="text-sm text-bw-text-muted">Keine weiteren Handwerker.</p>
             ) : (
               <ul className="space-y-2">
                 {alle.map((h) => (
@@ -322,7 +343,7 @@ export function HandwerkerZuweisenModal({
         </div>
       )}
       {selectedHw ? (
-        <p className="mt-3 flex items-center gap-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+        <p className="mt-3 flex items-center gap-2 text-xs text-bw-text-muted">
           <ToolIcon className="h-3.5 w-3.5 text-bw-primary" aria-hidden />
           Ausgewählt: <span className="font-medium text-bw-text">{selectedHw.name}</span>
         </p>
@@ -330,18 +351,17 @@ export function HandwerkerZuweisenModal({
     </>
   )
 
+  if (isMobile) {
+    return (
+      <FormSheet open={open} onClose={onClose} breadcrumb="Auftrag" title={title} footer={footer} width="lg">
+        {body}
+      </FormSheet>
+    )
+  }
+
   return (
-    <EditorSheet
-      open={open}
-      onClose={onClose}
-      title={isReplace ? 'Partner' : 'Partner'}
-      context="detail"
-      size="lg"
-      onConfirm={selectedId && !loadingList && !pending ? zuweisen : undefined}
-      confirmBusy={pending}
-      confirmDisabled={!selectedId || loadingList}
-    >
+    <Modal open={open} onClose={onClose} title={title} size="lg" footer={footer}>
       {body}
-    </EditorSheet>
+    </Modal>
   )
 }

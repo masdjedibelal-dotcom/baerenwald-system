@@ -101,11 +101,11 @@ export function LeadNaechsteSchritteCard({
                 {step.done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
               </span>
               <span
-                className={`flex-1 text-[length:var(--fs-text)] ${step.done ? 'text-bw-text-muted line-through' : 'text-bw-text'}`}
+                className={`flex-1 text-[13px] ${step.done ? 'text-bw-text-muted line-through' : 'text-bw-text'}`}
               >
                 {step.label}
               </span>
-              <span className="text-[length:var(--fs-meta)] text-bw-text-muted">{step.dateLabel}</span>
+              <span className="text-xs text-bw-text-muted">{step.dateLabel}</span>
             </>
           )
 

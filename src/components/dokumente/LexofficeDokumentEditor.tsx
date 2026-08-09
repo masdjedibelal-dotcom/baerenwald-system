@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { AlignLeft, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
-import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Textarea } from '@/components/ui/Textarea'
 import {
@@ -173,12 +172,16 @@ export function LexofficeDokumentEditor({
                   })()}
                 </LexField>
                 <LexField label="Menge" className="lex-col-menge">
-                  <ClearableNumberInput
+                  <input
+                    type="number"
                     min={0}
-                    className="input w-full"
+                    step="0.01"
+                    className="input w-full tabular-nums"
                     value={z.menge}
-                    onValueChange={(menge) =>
-                      patchZeile(z.id, { menge } as Partial<DokumentArtikelZeile>)
+                    onChange={(e) =>
+                      patchZeile(z.id, {
+                        menge: Math.max(Number(e.target.value) || 0, 0),
+                      } as Partial<DokumentArtikelZeile>)
                     }
                   />
                 </LexField>
@@ -202,13 +205,17 @@ export function LexofficeDokumentEditor({
                 </LexField>
                 <LexField label="Rabatt" className="lex-col-rabatt">
                   <div className="relative">
-                    <ClearableNumberInput
+                    <input
+                      type="number"
                       min={0}
                       max={100}
-                      className="input w-full pr-6"
-                      value={z.rabattProzent ?? 0}
-                      onValueChange={(rabattProzent) =>
-                        patchZeile(z.id, { rabattProzent } as Partial<DokumentArtikelZeile>)
+                      step="0.01"
+                      className="input w-full pr-6 tabular-nums"
+                      value={z.rabattProzent || ''}
+                      onChange={(e) =>
+                        patchZeile(z.id, {
+                          rabattProzent: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                        } as Partial<DokumentArtikelZeile>)
                       }
                     />
                     <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-bw-text-muted">

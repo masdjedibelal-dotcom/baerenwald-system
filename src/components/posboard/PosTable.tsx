@@ -5,7 +5,6 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { PosAddRow, type PosAddKind } from '@/components/posboard/PosAddRow'
-import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 
@@ -20,9 +19,6 @@ export type PosTableItem = {
   name: string
   beschreibung?: string
   mengeLabel?: string
-  /** Rohwert für Inline-Edit */
-  menge?: number
-  einheit?: string
   preisLabel?: string
   badge?: PosTableBadge | null
 }
@@ -78,15 +74,11 @@ export function PosTable({
   onReorder,
   onDropToGroup,
   onReorderGroup,
-  onItemOpen,
-  onMengeChange,
   showTotals,
   netto,
   ust,
   brutto,
   disabledAddKinds,
-  /** Mobil: keine Inline-Add-Row/Gewerk-+ — ein zentraler Plus-Button außen */
-  unifiedAdd = false,
 }: {
   groups: PosTableGroup[]
   /** @deprecated Prefer onAddKind — kept for per-group fallback */
@@ -105,16 +97,11 @@ export function PosTable({
   onDropToGroup?: (draggedId: string, gewerk: string) => void
   /** Gewerk-Abschnitte per Drag umsortieren */
   onReorderGroup?: (draggedGewerk: string, targetGewerk: string) => void
-  /** Tip auf Zeile (mobil: Karte öffnen) */
-  onItemOpen?: (item: PosTableItem, group: PosTableGroup) => void
-  /** Inline Menge — feste Zellbreite, kein Layout-Shift */
-  onMengeChange?: (id: string, menge: number) => void
   showTotals?: boolean
   netto?: number
   ust?: number
   brutto?: number
   disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
-  unifiedAdd?: boolean
 }) {
   const sel = selected ?? {}
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null)
@@ -133,7 +120,7 @@ export function PosTable({
   }
 
   return (
-    <div className={unifiedAdd ? 'postable2 postable2--unified-add' : 'postable2'}>
+    <div className="postable2">
       {(groups ?? []).map((g) => {
         const items = g.items ?? []
         const allSel = Boolean(selectable && items.length > 0 && items.every((it) => sel[it.id]))
@@ -231,7 +218,7 @@ export function PosTable({
               <span className="g">{g.gewerk || 'Ohne Gewerk'}</span>
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
-              {onAddKind && !unifiedAdd ? (
+              {onAddKind ? (
                 <button
                   type="button"
                   className={`pt2-gewerk-add${addOpen ? ' is-open' : ''}`}
@@ -251,10 +238,9 @@ export function PosTable({
             </div>
             {items.length === 0 && !addOpen ? (
               <div
-                className="pt2-empty"
                 style={{
                   padding: '12px 14px',
-                  fontSize: 'var(--fs-meta)',
+                  fontSize: 12.5,
                   color: 'var(--text-4)',
                   borderBottom: '0.5px solid var(--border)',
                 }}
@@ -272,30 +258,7 @@ export function PosTable({
               return (
                 <div
                   key={it.id}
-                  className={`pt2-row${sel[it.id] ? ' sel' : ''}${onItemOpen ? ' pt2-row--tap' : ''}`}
-                  role={onItemOpen ? 'button' : undefined}
-                  tabIndex={onItemOpen ? 0 : undefined}
-                  onClick={
-                    onItemOpen
-                      ? (e) => {
-                          const t = e.target as HTMLElement
-                          if (t.closest('button, a, .pt2-ctrl, .pt2-act, .row-actions, input, select')) {
-                            return
-                          }
-                          onItemOpen(it, g)
-                        }
-                      : undefined
-                  }
-                  onKeyDown={
-                    onItemOpen
-                      ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            onItemOpen(it, g)
-                          }
-                        }
-                      : undefined
-                  }
+                  className={`pt2-row${sel[it.id] ? ' sel' : ''}`}
                   draggable={dnd || undefined}
                   onDragStart={
                     dnd
@@ -359,62 +322,33 @@ export function PosTable({
                     ) : null}
                   </div>
                   <div className="pt2-main">
-                    {it.badge ? (
-                      <div className="pt2-status-row">
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span className="pt-name">{it.name}</span>
+                      {it.badge ? (
                         <MockBadge kind={it.badge.kind}>
                           {it.badge.icon ? <MockIcon ctx="default" n={it.badge.icon} size={10} /> : null}
                           {it.badge.label}
                         </MockBadge>
-                      </div>
-                    ) : null}
-                    <span className="pt-name">{it.name}</span>
-                    {it.beschreibung ? (
-                      <div className="pt-desc pt-desc--clamp2">{it.beschreibung}</div>
-                    ) : null}
-                    <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !onMengeChange}>
-                      {onMengeChange ? (
-                        <span className="pt2-menge pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
-                          <ClearableNumberInput
-                            className="pt2-menge-input"
-                            min={0.01}
-                            aria-label="Menge"
-                            value={it.menge ?? 0}
-                            blurEmptyValue={0.01}
-                            onValueChange={(n) => onMengeChange(it.id, n)}
-                          />
-                          {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
-                        </span>
-                      ) : it.mengeLabel ? (
-                        <span className="pt2-menge">{it.mengeLabel}</span>
                       ) : null}
-                      {it.preisLabel ? <span className="pt2-preis">{it.preisLabel}</span> : null}
                     </div>
+                    {it.beschreibung ? <div className="pt-desc">{it.beschreibung}</div> : null}
                   </div>
-                  <div className="pt2-menge pt2-menge--desk">
-                    {onMengeChange ? (
-                      <span className="pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
-                        <ClearableNumberInput
-                          className="pt2-menge-input"
-                          min={0.01}
-                          aria-label="Menge"
-                          value={it.menge ?? 0}
-                          blurEmptyValue={0.01}
-                          onValueChange={(n) => onMengeChange(it.id, n)}
-                        />
-                        {it.einheit ? <span className="pt2-menge-unit">{it.einheit}</span> : null}
-                      </span>
-                    ) : (
-                      (it.mengeLabel ?? '')
-                    )}
-                  </div>
-                  <div className="pt2-preis pt2-preis--desk">{it.preisLabel ?? ''}</div>
+                  <div className="pt2-menge">{it.mengeLabel ?? ''}</div>
+                  <div className="pt2-preis">{it.preisLabel ?? ''}</div>
                   <div className="pt2-act">
                     {itemActions ? <PosTableMenu items={itemActions(g, it)} /> : null}
                   </div>
                 </div>
               )
             })}
-            {addOpen && !unifiedAdd ? (
+            {addOpen ? (
               <div className="pt2-gewerk-add-panel">
                 <PosAddRow
                   onAdd={(kind) => {
@@ -425,7 +359,7 @@ export function PosTable({
                 />
               </div>
             ) : null}
-            {!onAddKind && onAddItem && !unifiedAdd ? (
+            {!onAddKind && onAddItem ? (
               <button
                 type="button"
                 className="pt-add"
@@ -438,12 +372,12 @@ export function PosTable({
           </div>
         )
       })}
-      {onAddKind && !hasGroups && !unifiedAdd ? (
+      {onAddKind && !hasGroups ? (
         <div style={{ padding: '12px 0 4px' }}>
           <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
         </div>
       ) : null}
-      {onAddGroup && !unifiedAdd ? (
+      {onAddGroup ? (
         <button
           type="button"
           className="pt-add"

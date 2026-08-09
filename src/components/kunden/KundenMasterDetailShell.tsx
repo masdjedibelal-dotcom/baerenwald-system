@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { KundenListeClient } from '@/components/kunden/KundenListeClient'
 import { AppMasterDetailLayout } from '@/components/layout/app/AppMasterDetailLayout'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { kundenFullBleedSubRoute } from '@/lib/crm/master-detail-paths'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 
@@ -23,7 +22,13 @@ export function KundenMasterDetailShell({
       basePath="/kunden"
       fullBleed={fullBleed}
       list={
-        <Suspense fallback={<CrmInlineLoading label="Kunden werden geladen …" minHeight={120} />}>
+        <Suspense
+          fallback={
+            <div className="py-8 text-center text-sm text-bw-text-muted" aria-busy="true">
+              Kunden werden geladen…
+            </div>
+          }
+        >
           <KundenListeClient kunden={kunden} />
         </Suspense>
       }

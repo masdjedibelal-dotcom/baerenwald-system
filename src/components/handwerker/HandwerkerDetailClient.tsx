@@ -1,34 +1,26 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
-import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { ActionsMenu } from '@/components/ui/actions-menu'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
-import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
+import { ComplianceBadge } from '@/components/handwerker/ComplianceBadge'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
   filterStandardComplianceTypen,
-  istEigeneUnterlageTyp,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
-import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
+import { DetailHead } from '@/components/layout/DetailHead'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon, mockMenuIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
+import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
-import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
@@ -47,7 +39,6 @@ import {
   updateHandwerker,
   updateHandwerkerNotizen,
   getPartnerPortalLoginHint,
-  setHandwerkerPortalGesperrt,
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
@@ -57,10 +48,6 @@ import {
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
 import {
-  composeHandwerkerAdresse,
-  resolveHandwerkerAnschrift,
-} from '@/lib/handwerker-anschrift'
-import {
   getPartnerPortalMailDraft,
   previewPartnerPortalMail,
   sendPartnerPortalLinkMail,
@@ -68,15 +55,15 @@ import {
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
 import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
-import {
-  FabVorgangStartModal,
-  type FabVorgangArt,
-} from '@/components/neu/FabVorgangStartModal'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
+import { buildEntityMenu, entityMenuToActionItems } from '@/lib/entity-menu'
+import { runDuplicateHandwerker } from '@/lib/list-actions'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
 
-type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
+type HandwerkerDetailTab = 'uebersicht' | 'stammdaten' | 'vorgaenge' | 'dokumente' | 'notizen'
 
 function gewerkSlugsFromField(gewerke: unknown): string[] {
   if (gewerke == null) return []
@@ -148,7 +135,6 @@ export function HandwerkerDetailClient({
   vorgaengeRows?: VorgangListeRow[]
 }) {
   const router = useRouter()
-  const isMobile = useIsMobile()
   const hw = payload.handwerker as Handwerker
   const slugToName = useMemo(
     () => new Map(gewerkeSlugs.map((g) => [g.slug.toLowerCase(), g.name])),
@@ -156,6 +142,11 @@ export function HandwerkerDetailClient({
   )
   const gewerkNamen = useMemo(() => gewerkTagsFromSlugs(hw.gewerke, slugToName), [hw.gewerke, slugToName])
   const hwGewerkSlugs = useMemo(() => gewerkSlugsFromField(hw.gewerke), [hw.gewerke])
+  const dokumenteAnzahl = useMemo(
+    () => standardDokumente(payload.dokumente).length,
+    [payload.dokumente]
+  )
+
   const [tab, setTab] = useState<HandwerkerDetailTab>('uebersicht')
   const [notizen, setNotizen] = useState(hw.notizen ?? '')
   const [notizDraft, setNotizDraft] = useState('')
@@ -167,7 +158,7 @@ export function HandwerkerDetailClient({
   const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
     useState<RahmenVertragWizardBootstrap | null>(null)
   const [rahmenWizardKey, setRahmenWizardKey] = useState(0)
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
 
   const [portalModalOpen, setPortalModalOpen] = useState(false)
@@ -178,44 +169,17 @@ export function HandwerkerDetailClient({
   const [portalBetreff, setPortalBetreff] = useState('')
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
-  const [vorgangArt, setVorgangArt] = useState<FabVorgangArt | null>(null)
-  const [portalGesperrtPending, setPortalGesperrtPending] = useState(false)
-  const [istPortalGesperrt, setIstPortalGesperrt] = useState(Boolean(hw.ist_portal_gesperrt))
-
-  useEffect(() => {
-    setIstPortalGesperrt(Boolean(hw.ist_portal_gesperrt))
-  }, [hw.id, hw.ist_portal_gesperrt])
-
-  function togglePortalGesperrt() {
-    const next = !istPortalGesperrt
-    const label = next
-      ? 'Partner vom Portal ausschließen? Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
-      : 'Portal-Ausschluss aufheben? Login und Registrierung sind danach wieder möglich.'
-    if (!confirm(label)) return
-    setPortalGesperrtPending(true)
-    void setHandwerkerPortalGesperrt(hw.id, next).then((r) => {
-      setPortalGesperrtPending(false)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setIstPortalGesperrt(next)
-      toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
-      router.refresh()
-    })
-  }
+  const [hasPortalAccount, setHasPortalAccount] = useState(false)
+  const isCrmAdmin = useIsCrmAdmin()
+  const [impersonating, setImpersonating] = useState(false)
 
   const legacyKontakt = normalizeHandwerkerNamen(hw)
-  const initialAnschrift = resolveHandwerkerAnschrift(hw)
   const [formFirma, setFormFirma] = useState(legacyKontakt.firma)
   const [formVorname, setFormVorname] = useState(legacyKontakt.vorname)
   const [formNachname, setFormNachname] = useState(legacyKontakt.nachname)
   const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
   const [formEmail, setFormEmail] = useState(hw.email ?? '')
-  const [formStrasse, setFormStrasse] = useState(initialAnschrift.strasse)
-  const [formHausnummer, setFormHausnummer] = useState(initialAnschrift.hausnummer)
-  const [formPlz, setFormPlz] = useState(initialAnschrift.plz)
-  const [formOrt, setFormOrt] = useState(initialAnschrift.ort)
+  const [formAdresse, setFormAdresse] = useState(hw.adresse ?? '')
   const [formIban, setFormIban] = useState(hw.iban ?? '')
   const [formUstid, setFormUstid] = useState(hw.ustid ?? '')
   const [formSteuernummer, setFormSteuernummer] = useState(hw.steuernummer ?? '')
@@ -227,16 +191,12 @@ export function HandwerkerDetailClient({
   useEffect(() => {
     if (editingKontakt || editingBank) return
     const k = normalizeHandwerkerNamen(hw)
-    const a = resolveHandwerkerAnschrift(hw)
     setFormFirma(k.firma)
     setFormVorname(k.vorname)
     setFormNachname(k.nachname)
     setFormTelefon(hw.telefon ?? '')
     setFormEmail(hw.email ?? '')
-    setFormStrasse(a.strasse)
-    setFormHausnummer(a.hausnummer)
-    setFormPlz(a.plz)
-    setFormOrt(a.ort)
+    setFormAdresse(hw.adresse ?? '')
     setFormIban(hw.iban ?? '')
     setFormUstid(hw.ustid ?? '')
     setFormSteuernummer(hw.steuernummer ?? '')
@@ -244,16 +204,12 @@ export function HandwerkerDetailClient({
 
   function syncFormFromHw() {
     const k = normalizeHandwerkerNamen(hw)
-    const a = resolveHandwerkerAnschrift(hw)
     setFormFirma(k.firma)
     setFormVorname(k.vorname)
     setFormNachname(k.nachname)
     setFormTelefon(hw.telefon ?? '')
     setFormEmail(hw.email ?? '')
-    setFormStrasse(a.strasse)
-    setFormHausnummer(a.hausnummer)
-    setFormPlz(a.plz)
-    setFormOrt(a.ort)
+    setFormAdresse(hw.adresse ?? '')
     setFormIban(hw.iban ?? '')
     setFormUstid(hw.ustid ?? '')
     setFormSteuernummer(hw.steuernummer ?? '')
@@ -283,6 +239,7 @@ export function HandwerkerDetailClient({
       const hint = await getPartnerPortalLoginHint(hw.id)
       if (hint.ok) {
         setPortalLink(hint.loginLink)
+        setHasPortalAccount(hint.hasAuthAccount)
       } else {
         setPortalLink(buildPartnerDashboardLink())
       }
@@ -338,12 +295,6 @@ export function HandwerkerDetailClient({
       setErr(pflicht)
       return
     }
-    const anschrift = {
-      strasse: formStrasse.trim(),
-      hausnummer: formHausnummer.trim(),
-      plz: formPlz.trim(),
-      ort: formOrt.trim(),
-    }
     const input: HandwerkerFormInput = {
       firma: formFirma.trim() || null,
       vorname: formVorname.trim() || null,
@@ -352,11 +303,7 @@ export function HandwerkerDetailClient({
       telefon: formTelefon.trim() || null,
       whatsapp: hw.whatsapp?.trim() || null,
       webseite: hw.webseite?.trim() || null,
-      adresse: composeHandwerkerAdresse(anschrift),
-      strasse: anschrift.strasse || null,
-      hausnummer: anschrift.hausnummer || null,
-      plz: anschrift.plz || null,
-      ort: anschrift.ort || null,
+      adresse: formAdresse.trim() || null,
       gewerke: hw.gewerke ?? [],
       subkategorie: hw.subkategorie,
       ist_fachbetrieb: hw.ist_fachbetrieb,
@@ -386,10 +333,7 @@ export function HandwerkerDetailClient({
     formNachname,
     formEmail,
     formTelefon,
-    formStrasse,
-    formHausnummer,
-    formPlz,
-    formOrt,
+    formAdresse,
     formIban,
     formUstid,
     formSteuernummer,
@@ -449,161 +393,66 @@ export function HandwerkerDetailClient({
     return () => clearTimeout(timer)
   }, [portalModalOpen, portalText, hw.id])
 
+  const handwerkerMenuItems = useMemo(() => {
+    const extra: import('@/lib/entity-menu').EntityMenuItem[] = []
+    if (!isCrmAdmin) {
+      extra.push({
+        icon: 'send',
+        label: 'Handwerker-Link versenden',
+        onClick: () => void openPortalModal(),
+      })
+    }
+    extra.push('sep', {
+      icon: 'file-pencil',
+      label: 'Rahmenvertrag',
+      onClick: () => void openRahmenvertrag(),
+    })
 
-  const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
-  const anschriftView = resolveHandwerkerAnschrift(hw)
-  const adresseView =
-    [
-      [anschriftView.strasse, anschriftView.hausnummer].filter(Boolean).join(' '),
-      [anschriftView.plz, anschriftView.ort].filter(Boolean).join(' '),
-    ]
-      .filter(Boolean)
-      .join(', ') ||
-    hw.adresse?.trim() ||
-    '—'
+    const items = buildEntityMenu(
+      'handwerker',
+      {
+        name: handwerkerDisplayName(hw),
+        tel: hw.telefon,
+        mail: hw.email,
+      },
+      {
+        onEdit: () => {
+          setTab('stammdaten')
+          beginEditKontakt()
+        },
+        onCopy: () => runDuplicateHandwerker(hw.id, router),
+        onPortal: isCrmAdmin
+          ? () => {
+              if (!hasPortalAccount) {
+                toast.error('Kein Portal-Account')
+                return
+              }
+              if (impersonating) {
+                toast.error('Anmeldung läuft bereits…')
+                return
+              }
+              setImpersonating(true)
+              void openPortalAsHandwerker(hw.id).then((r) => {
+                setImpersonating(false)
+                if (!r.ok) {
+                  toast.error(r.message)
+                  return
+                }
+                window.open(r.url, '_blank', 'noopener,noreferrer')
+              })
+            }
+          : undefined,
+        onPortalLink: () => void openPortalModal(),
+        tel: hw.telefon,
+        mail: hw.email,
+        extra,
+      }
+    )
+    return entityMenuToActionItems(items, (n, size) => mockMenuIcon(n as Parameters<typeof mockMenuIcon>[0], size))
+  }, [hw, isCrmAdmin, hasPortalAccount, impersonating, router, openRahmenvertrag])
 
   const uebersichtInhalt = (
-    <div className="space-y-4">
-      {editingKontakt ? (
-        <div className="card">
-          <div className="card-h">
-            <div className="card-title title">Stammdaten</div>
-            <div className="inline-edit-actions">
-              <MockBtn sm kind="ghost" onClick={cancelEditStamm} disabled={pending}>
-                Abbrechen
-              </MockBtn>
-              <MockBtn
-                sm
-                kind="primary"
-                icon="check"
-                onClick={saveHandwerkerStamm}
-                disabled={pending}
-              >
-                {pending ? 'Speichern…' : 'Speichern'}
-              </MockBtn>
-            </div>
-          </div>
-          <div className="card-b">
-            <div className="props">
-              {err ? (
-                <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
-              ) : null}
-              <InlineEditField label="Betrieb" editing value={formFirma}>
-                <input
-                  className="input"
-                  value={formFirma}
-                  onChange={(e) => setFormFirma(e.target.value)}
-                  placeholder="Firmenname"
-                  autoFocus
-                />
-              </InlineEditField>
-              <InlineEditField label="Vorname (GF)" editing value={formVorname}>
-                <input
-                  className="input"
-                  value={formVorname}
-                  onChange={(e) => setFormVorname(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Nachname (GF)" editing value={formNachname}>
-                <input
-                  className="input"
-                  value={formNachname}
-                  onChange={(e) => setFormNachname(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Telefon" editing value={formTelefon}>
-                <input
-                  className="input"
-                  type="tel"
-                  value={formTelefon}
-                  onChange={(e) => setFormTelefon(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="E-Mail" editing value={formEmail}>
-                <input
-                  className="input"
-                  type="email"
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Straße" editing value={formStrasse}>
-                <input
-                  className="input"
-                  value={formStrasse}
-                  onChange={(e) => setFormStrasse(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Hausnummer" editing value={formHausnummer}>
-                <input
-                  className="input"
-                  value={formHausnummer}
-                  onChange={(e) => setFormHausnummer(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="PLZ" editing value={formPlz}>
-                <input
-                  className="input"
-                  value={formPlz}
-                  onChange={(e) => setFormPlz(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Ort" editing value={formOrt}>
-                <input
-                  className="input"
-                  value={formOrt}
-                  onChange={(e) => setFormOrt(e.target.value)}
-                />
-              </InlineEditField>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <EntityHandwerkerStammdatenCard
-          handwerkerId={hw.id}
-          initial={{
-            displayName: handwerkerDisplayName(hw),
-            firma: hw.firma ?? '',
-            geschaeftsfuehrer: handwerkerGfName(hw),
-            gewerkLabel: gewerkNamen.join(' · ') || kategorie,
-            telefon: hw.telefon ?? '',
-            email: hw.email ?? '',
-            adresse: adresseView === '—' ? '' : adresseView,
-          }}
-          portalGesperrt={istPortalGesperrt}
-          onInvite={() => void openPortalModal()}
-          onEdit={beginEditKontakt}
-        />
-      )}
-
-      <InlineEditSection
-        title="Bank & Steuer"
-        editing={editingBank}
-        onStartEdit={beginEditBank}
-        onCancel={cancelEditStamm}
-        onSave={saveHandwerkerStamm}
-        saving={pending}
-      >
-        {err && editingBank ? (
-          <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
-        ) : null}
-        <div className="props">
-          <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
-            <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="USt-ID" editing={editingBank} value={hw.ustid || '—'}>
-            <input className="input" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="Steuernummer" editing={editingBank} value={hw.steuernummer || '—'}>
-            <input
-              className="input"
-              value={formSteuernummer}
-              onChange={(e) => setFormSteuernummer(e.target.value)}
-            />
-          </InlineEditField>
-        </div>
-      </InlineEditSection>
-
+    <div className="space-y-5">
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
       <div className="card">
@@ -616,7 +465,7 @@ export function HandwerkerDetailClient({
         <div className="card-b">
           <div className="mb-4 flex flex-wrap items-baseline gap-3">
             <div
-              className="text-[length:var(--fs-head)] font-semibold leading-none tabular-nums"
+              className="text-[36px] font-semibold leading-none tabular-nums"
               style={{ color: '#D9A800' }}
             >
               {bewertungGesamt != null && bewertungGesamt > 0
@@ -625,7 +474,7 @@ export function HandwerkerDetailClient({
             </div>
             <div>
               <RatingStars value={bewertungGesamt} size={14} />
-              <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+              <div className="mt-0.5 text-[12px] text-[var(--text-3)]">
                 {bewertungAnzahl > 0
                   ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
                   : 'Noch keine Bewertungen'}
@@ -641,10 +490,10 @@ export function HandwerkerDetailClient({
                   className="border-b border-[var(--border)] py-2.5 last:border-0"
                 >
                   <div className="mb-1 flex items-center justify-between gap-3">
-                    <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">
+                    <div className="text-[13px] font-medium text-[var(--text)]">
                       {b.kundeName || 'Kunde'}
                     </div>
-                    <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                    <div className="text-[12px] text-[var(--text-3)]">
                       {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
                     </div>
                   </div>
@@ -652,7 +501,7 @@ export function HandwerkerDetailClient({
                     <RatingStars value={b.note} />
                   </div>
                   {b.notiz?.trim() ? (
-                    <p className="text-[length:var(--fs-text)] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
+                    <p className="text-[13px] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
                   ) : null}
                 </li>
               ))}
@@ -667,8 +516,8 @@ export function HandwerkerDetailClient({
                     className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
                   >
                     <div className="min-w-0">
-                      <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">{k.label}</div>
-                      <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{k.hint}</div>
+                      <div className="text-[13px] font-medium text-[var(--text)]">{k.label}</div>
+                      <div className="text-[11.5px] text-[var(--text-3)]">{k.hint}</div>
                     </div>
                     <RatingStars value={val} />
                   </li>
@@ -692,7 +541,13 @@ export function HandwerkerDetailClient({
         onSave={saveHandwerkerStamm}
         saving={pending}
       >
-        {err && editingKontakt ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
+        {editingKontakt ? (
+          <p className="inline-edit-hint">
+            <MockIcon ctx="default" n="info-circle" size={14} />
+            Hervorgehobene Felder sind bearbeitbar.
+          </p>
+        ) : null}
+        {err && editingKontakt ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField
             label="Betrieb"
@@ -773,47 +628,14 @@ export function HandwerkerDetailClient({
             />
           </InlineEditField>
           <InlineEditField
-            label="Straße"
+            label="Einsatzgebiet"
             editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).strasse || '—'}
+            value={hw.adresse || '—'}
           >
             <input
               className="input"
-              value={formStrasse}
-              onChange={(e) => setFormStrasse(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="Hausnummer"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).hausnummer || '—'}
-          >
-            <input
-              className="input"
-              value={formHausnummer}
-              onChange={(e) => setFormHausnummer(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="PLZ"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).plz || '—'}
-          >
-            <input
-              className="input"
-              value={formPlz}
-              onChange={(e) => setFormPlz(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="Ort"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).ort || '—'}
-          >
-            <input
-              className="input"
-              value={formOrt}
-              onChange={(e) => setFormOrt(e.target.value)}
+              value={formAdresse}
+              onChange={(e) => setFormAdresse(e.target.value)}
             />
           </InlineEditField>
         </div>
@@ -827,7 +649,13 @@ export function HandwerkerDetailClient({
         onSave={saveHandwerkerStamm}
         saving={pending}
       >
-        {err && editingBank ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
+        {editingBank ? (
+          <p className="inline-edit-hint">
+            <MockIcon ctx="default" n="info-circle" size={14} />
+            Hervorgehobene Felder sind bearbeitbar.
+          </p>
+        ) : null}
+        {err && editingBank ? <p className="mb-2 text-sm text-status-cancel-text">{err}</p> : null}
         <div className="props">
           <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
             <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
@@ -866,7 +694,13 @@ export function HandwerkerDetailClient({
   )
 
   const vorgaengeInhalt = (
-    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
+    <Suspense
+      fallback={
+        <p className="py-6 text-center text-sm text-bw-text-muted" aria-busy="true">
+          Vorgänge werden geladen…
+        </p>
+      }
+    >
       <VorgaengeListeClient rows={vorgaengeRows} embedded restrictHandwerkerId={hw.id} />
     </Suspense>
   )
@@ -886,55 +720,40 @@ export function HandwerkerDetailClient({
           ? [{ autor: 'Notiz', text: notizen.trim() }]
           : []
       }
-      emptyHint={
-        isMobile
-          ? 'Noch keine Notizen. Über „Notiz“ oben hinzufügen.'
-          : undefined
-      }
       composer={
-        isMobile ? undefined : (
-          <MockNotizComposer
-            value={notizDraft}
-            onChange={setNotizDraft}
-            onSubmit={appendNotiz}
-            placeholder="Notiz schreiben"
-          />
-        )
+        <MockNotizComposer
+          value={notizDraft}
+          onChange={setNotizDraft}
+          onSubmit={appendNotiz}
+          placeholder="Notiz schreiben… (Enter senden · Shift+Enter neue Zeile)"
+        />
       }
     />
   )
 
-  const akteDateien = (
-    <HandwerkerAkteDokumente handwerkerId={hw.id} dokumente={payload.dokumente} />
-  )
-
-  const complianceInhalt = (
-    <HandwerkerComplianceUnterlagenTable
-      handwerkerId={hw.id}
-      dokumente={payload.dokumente}
-      typen={complianceTypenStandard}
-    />
-  )
-
-  const akteInhalt = (
-    <VorgangAkteTab dateien={akteDateien} notizen={notizenInhalt} />
+  const dokumenteInhalt = (
+    <div className="card">
+      <div className="card-h">
+        <div className="card-title title">
+          <MockIcon ctx="emphasis" n="shield-check" size={16} />
+          Compliance
+        </div>
+        <ComplianceBadge status={hw.compliance_status} />
+      </div>
+      <div className="card-b">
+        <HandwerkerComplianceUnterlagenTable
+          handwerkerId={hw.id}
+          dokumente={payload.dokumente}
+          typen={complianceTypenStandard}
+        />
+      </div>
+    </div>
   )
 
   const vorgaengeCount = useMemo(
     () => vorgaengeRows.filter((r) => (r.handwerkerIds ?? []).includes(hw.id)).length,
     [vorgaengeRows, hw.id]
   )
-
-  const complianceAnzahl = useMemo(
-    () => standardDokumente(payload.dokumente).length,
-    [payload.dokumente]
-  )
-  const akteDocsAnzahl = useMemo(
-    () =>
-      standardDokumente(payload.dokumente).filter((d) => istEigeneUnterlageTyp(d.typ)).length,
-    [payload.dokumente]
-  )
-  const akteAnzahl = akteDocsAnzahl + (hw.notizen?.trim() ? 1 : 0)
 
   const detailShellGroups: DetailShellGroup[] = [
     {
@@ -944,6 +763,12 @@ export function HandwerkerDetailClient({
       render: () => uebersichtInhalt,
     },
     {
+      id: 'stammdaten',
+      label: 'Stammdaten',
+      icon: 'clipboard-list',
+      render: () => stammdatenInhalt,
+    },
+    {
       id: 'vorgaenge',
       label: 'Vorgänge',
       icon: 'folders',
@@ -951,68 +776,72 @@ export function HandwerkerDetailClient({
       render: () => vorgaengeInhalt,
     },
     {
-      id: 'compliance',
-      label: 'Compliance',
-      icon: 'shield-check',
-      count: complianceAnzahl || undefined,
-      render: () => complianceInhalt,
+      id: 'dokumente',
+      label: 'Dokumente',
+      icon: 'files',
+      count: dokumenteAnzahl || undefined,
+      render: () => dokumenteInhalt,
     },
     {
-      id: 'akte',
-      label: 'Akte',
-      icon: 'file-text',
-      count: akteAnzahl || undefined,
-      render: () => akteInhalt,
+      id: 'notizen',
+      label: 'Notizen',
+      icon: 'messages',
+      count: hw.notizen?.trim() ? 1 : undefined,
+      render: () => notizenInhalt,
     },
   ]
 
-  const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
-    telefon: hw.telefon,
-    email: hw.email,
-    notiz: { kind: 'handwerker', handwerkerId: hw.id, initial: hw.notizen ?? '' },
-    dokument: { kind: 'handwerker', handwerkerId: hw.id },
-    onSaved: () => router.refresh(),
-  })
-
   return (
-    <EntityDetailLayout
-      crumbBackHref="/handwerker"
-      crumbBackLabel="Zurück zur Liste"
-      quickBar={quickBar}
-      head={{
-        title: handwerkerDisplayName(hw),
-        titleBadges: undefined,
-        badges: (
+    <>
+      <MockDetailBackLink href="/handwerker" label="Zurück zu Handwerker" />
+      <DetailHead
+        title={handwerkerDisplayName(hw)}
+        badges={
           <>
-            {gewerkNamen.length > 0 ? (
-              <span>{gewerkNamen.join(' · ')}</span>
-            ) : kategorie ? (
-              <span>{kategorie}</span>
-            ) : null}
-            {bewertungGesamt != null && bewertungGesamt > 0 ? (
-              <span className="rating inline-flex items-center gap-1">
+            <ComplianceBadge status={hw.compliance_status} />
+            <MockBadge kind={hasPortalAccount ? 'aktiv' : 'storniert'}>
+              <span className="inline-flex items-center gap-1">
                 <MockIcon
                   ctx="default"
-                  n="star-filled"
-                  size={12}
-                  className="text-[var(--yel-tx,#c9a227)]"
+                  n={hasPortalAccount ? 'plug' : 'circle-x'}
+                  size={10}
                 />
-                {formatHandwerkerBewertung(bewertungGesamt)}
+                Portal {hasPortalAccount ? 'aktiv' : 'inaktiv'}
               </span>
-            ) : null}
-            {istPortalGesperrt ? (
-              <MockBadge kind="storniert">
-                <span className="inline-flex items-center gap-1">
-                  <MockIcon ctx="default" n="shield-x" size={10} />
-                  Portal gesperrt
-                </span>
-              </MockBadge>
-            ) : null}
+            </MockBadge>
           </>
-        ),
-        actions: <DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />,
-      }}
-    >
+        }
+        meta={
+          bewertungGesamt != null && bewertungGesamt > 0 ? (
+            <span className="rating inline-flex items-center gap-1">
+              <MockIcon
+                ctx="default"
+                n="star-filled"
+                size={12}
+                className="text-[var(--yel-tx,#c9a227)]"
+              />
+              {formatHandwerkerBewertung(bewertungGesamt)}
+            </span>
+          ) : undefined
+        }
+        actions={
+          <ActionsMenu
+            trigger={
+              <button
+                type="button"
+                className="btn ghost sm inline-flex shrink-0 gap-1.5 px-2.5"
+                aria-label="Weitere Aktionen"
+              >
+                <MockIcon ctx="btn" n="dots" size={16} />
+                <span className="sr-only">Mehr</span>
+              </button>
+            }
+            items={handwerkerMenuItems}
+            sheetTitle="Handwerker"
+          />
+        }
+      />
+
       <DetailShell
         groups={detailShellGroups}
         value={tab}
@@ -1025,7 +854,7 @@ export function HandwerkerDetailClient({
         title="Handwerker-Link versenden"
         size="lg"
         footer={
-          <div className="kunde-create-footer">
+          <div className="flex w-full justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
             </Button>
@@ -1051,7 +880,7 @@ export function HandwerkerDetailClient({
           <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
           <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
           <div>
-            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
+            <p className="mb-1 text-xs font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Partner-Portal Mail Vorschau"
               sandbox="allow-same-origin"
@@ -1076,14 +905,6 @@ export function HandwerkerDetailClient({
           />
         </ClientOnly>
       ) : null}
-
-      <FabVorgangStartModal
-        open={vorgangArt != null}
-        art={vorgangArt}
-        onClose={() => setVorgangArt(null)}
-      />
-
-      {quickActionSheets}
-    </EntityDetailLayout>
+    </>
   )
 }

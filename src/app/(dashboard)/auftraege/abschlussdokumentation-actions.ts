@@ -221,8 +221,7 @@ async function markAuftragAbgeschlossen(
   auftragId: string,
   beschreibung: string,
   perMail: boolean,
-  abschlussPdfUrl?: string | null,
-  emailLogId?: string | null
+  abschlussPdfUrl?: string | null
 ) {
   const detail = await loadAuftragDetail(auftragId)
   const now = new Date().toISOString()
@@ -265,7 +264,6 @@ async function markAuftragAbgeschlossen(
     sichtbar_fuer_kunde: perMail,
     fuer_kunde_freigegeben: perMail,
     freigegeben_at: perMail ? now : null,
-    email_log_id: perMail ? emailLogId ?? null : null,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)
@@ -329,10 +327,6 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
 }> {
   const detail = await loadAuftragDetail(auftragId)
   const bautagebuch = await listAuftragBautagebuch(auftragId)
-  const { listAuftragPositionEintraege } = await import(
-    '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-  )
-  const posEintraege = await listAuftragPositionEintraege(auftragId)
   const fotos = detail
     ? await collectFotoUrls(detail, bautagebuch)
     : []
@@ -340,10 +334,8 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   const abschlussUrl = detail?.abschlussdokumentation_url?.trim() || null
   return {
     positionenCount: detail?.auftrag_positionen?.length ?? 0,
-    bautagebuchCount: bautagebuch.length + posEintraege.length,
-    fotoCount:
-      fotos.length +
-      posEintraege.reduce((n, e) => n + (e.eintrag_fotos?.length ?? 0), 0),
+    bautagebuchCount: bautagebuch.length,
+    fotoCount: fotos.length,
     hasAbnahme: voraus.hasAbnahme,
     hasAbschlussbericht: Boolean(abschlussUrl),
     hasRechnung: voraus.hasRechnung,
@@ -369,16 +361,23 @@ export async function downloadAbschlussdokumentationPdf(
   }
 }
 
-/** Erzeugt und speichert den Abschlussbericht (ohne Versand / ohne Auftrag abzuschließen).
- * Standard: Dokumentationsformat ohne Preise — Abrechnung bleibt Rechnung/Endabrechnung. */
+/** Erzeugt und speichert den Abschlussbericht (ohne Versand / ohne Auftrag abzuschließen). */
 export async function createAbschlussberichtPdf(
   auftragId: string,
   optionen: AbschlussdokuOptionen = {
     mitBautagebuch: true,
     mitFotos: true,
-    mitPreisen: false,
+    mitPreisen: true,
   }
 ): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
+  const voraus = await loadAbschlussVoraussetzungen(auftragId)
+  if (!voraus.hasAbnahme) {
+    return {
+      ok: false,
+      message: 'Abschlussbericht erst nach Abnahmeprotokoll-PDF möglich.',
+    }
+  }
+
   const built = await buildAbschlussPdf(auftragId, optionen)
   if (!built.ok) return built
 
@@ -404,28 +403,6 @@ export async function createAbschlussberichtPdf(
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath('/auftraege')
   return { ok: true, publicUrl: stored.publicUrl }
-}
-
-/** Ob der Wizard-Block „Abschlussbericht“ Sinn ergibt. */
-export async function loadAbschlussberichtWizardHint(auftragId: string): Promise<{
-  hasAbnahme: boolean
-  hasBautagebuch: boolean
-  hasBericht: boolean
-  berichtUrl: string | null
-  showBlock: boolean
-}> {
-  const detail = await loadAuftragDetail(auftragId)
-  const bt = await listAuftragBautagebuch(auftragId)
-  const hasAbnahme = Boolean(detail?.abnahme_protokoll_url)
-  const hasBautagebuch = bt.length > 0
-  const berichtUrl = detail?.abschlussdokumentation_url?.trim() || null
-  return {
-    hasAbnahme,
-    hasBautagebuch,
-    hasBericht: Boolean(berichtUrl),
-    berichtUrl,
-    showBlock: hasAbnahme || hasBautagebuch || Boolean(berichtUrl),
-  }
 }
 
 export async function getAbschlussdokumentationMailDefaults(auftragId: string): Promise<
@@ -614,13 +591,7 @@ export async function sendAbschlussdokumentationAnKunde(
       ? `Auftrag abgeschlossen. An den Kunden versendet: ${labels.join(', ')}.`
       : 'Auftrag abgeschlossen.'
 
-  await markAuftragAbgeschlossen(
-    auftragId,
-    beschreibung,
-    true,
-    abschlussUrl,
-    sent.emailLogId ?? null
-  )
+  await markAuftragAbgeschlossen(auftragId, beschreibung, true, abschlussUrl)
   return { ok: true, sentLabels: labels, closedWithoutMail: false }
 }
 

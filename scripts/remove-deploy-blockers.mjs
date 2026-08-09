@@ -2,9 +2,6 @@
 /**
  * Entfernt versehentlich im Repo-Root liegende Duplikate und abgelöste Vor-Ort/Vor-Baubeginn-Dateien,
  * die den Netlify-Typecheck blockieren (nicht mehr importiert bzw. durch src/-Varianten ersetzt).
- *
- * WICHTIG: Dieses Skript löscht nur die allowlisteten Pfade unten.
- * Es liest/schreibt KEINE Source-Inhalte (kein slice/replace auf .ts/.tsx).
  */
 import fs from 'fs'
 import path from 'path'
@@ -12,7 +9,6 @@ import { fileURLToPath } from 'url'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Nur diese Pfade dürfen entfernt werden — nie Source-Rewrites. */
 const paths = [
   'vercel.json',
   'StatusActions.tsx',

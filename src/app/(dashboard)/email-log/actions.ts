@@ -18,7 +18,6 @@ export type EmailLogDetail = {
   anhang_dateiname: string | null
   angebot_id: string | null
   auftrag_id: string | null
-  rechnung_id: string | null
   created_at: string
 }
 
@@ -29,7 +28,7 @@ export async function loadEmailLogDetail(
   const { data, error } = await supabase
     .from('email_log')
     .select(
-      'id, typ, kontext_typ, richtung, an_email, von_email, cc_email, an_name, betreff, inhalt_html, status, fehler_nachricht, anhang_dateiname, angebot_id, auftrag_id, rechnung_id, created_at'
+      'id, typ, kontext_typ, richtung, an_email, von_email, cc_email, an_name, betreff, inhalt_html, status, fehler_nachricht, anhang_dateiname, angebot_id, auftrag_id, created_at'
     )
     .eq('id', id)
     .maybeSingle()

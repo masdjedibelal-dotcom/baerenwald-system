@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export type VorgangEntityRef =
   | { kind: 'lead'; id: string }
@@ -19,17 +18,6 @@ async function deleteByIds(
   if (!ids.length) return null
   const { error } = await supabase.from(table).delete().in(column, ids)
   return error ? `${table}: ${error.message}` : null
-}
-
-/** HV-Glocke: Notifs zu diesem Lead entfernen (Link enthält lead-id). */
-async function deleteHvNotificationsForLead(leadId: string): Promise<string | null> {
-  const id = leadId.trim()
-  if (!id) return null
-  const { error } = await supabaseAdmin
-    .from('hv_notifications')
-    .delete()
-    .or(`link.ilike.%id=${id}%,link.ilike.%${id}%`)
-  return error ? `hv_notifications: ${error.message}` : null
 }
 
 /** Lead-ID aus beliebiger Vorgangs-Entität auflösen. */
@@ -131,19 +119,15 @@ export async function deleteVorgang(
     await deleteByIds(supabase, 'angebot_handwerker', 'angebot_id', angebotIds),
     await deleteByIds(supabase, 'angebote', 'id', angebotIds),
     await deleteByIds(supabase, 'auftraege', 'id', auftragIds),
-    await deleteHvNotificationsForLead(id),
   ]) {
     if (err) errors.push(err)
   }
 
-  // Lead erst löschen, wenn Kinder weg — sonst SET NULL auf auftraege.lead_id → Portal-Geister.
+  const { error: leadErr } = await supabase.from('leads').delete().eq('id', id)
+  if (leadErr) errors.push(`leads: ${leadErr.message}`)
+
   if (errors.length) {
     return { ok: false, message: errors.join('\n') }
-  }
-
-  const { error: leadErr } = await supabase.from('leads').delete().eq('id', id)
-  if (leadErr) {
-    return { ok: false, message: `leads: ${leadErr.message}` }
   }
 
   revalidatePath('/vorgaenge')
@@ -153,52 +137,4 @@ export async function deleteVorgang(
   revalidatePath('/rechnungen')
   revalidatePath(`/anfragen/${id}`)
   return { ok: true }
-}
-
-export type BulkDeleteVorgaengeInput = {
-  leadIds: string[]
-  standaloneRechnungIds: string[]
-}
-
-/** Mehrere Vorgänge in einem Client-Roundtrip löschen. */
-export async function bulkDeleteVorgaenge(
-  input: BulkDeleteVorgaengeInput
-): Promise<
-  | { ok: true; okCount: number; failCount: number; errors: string[] }
-  | { ok: false; message: string }
-> {
-  const { deleteRechnungEntwurf } = await import('@/app/(dashboard)/rechnungen/wizard-actions')
-
-  const leadIds = Array.from(new Set(input.leadIds.map((id) => id.trim()).filter(Boolean)))
-  const rechnungIds = Array.from(
-    new Set(input.standaloneRechnungIds.map((id) => id.trim()).filter(Boolean))
-  )
-
-  if (!leadIds.length && !rechnungIds.length) {
-    return { ok: false, message: 'Keine Vorgänge ausgewählt.' }
-  }
-
-  let okCount = 0
-  let failCount = 0
-  const errors: string[] = []
-
-  for (const leadId of leadIds) {
-    const r = await deleteVorgang(leadId)
-    if (r.ok) okCount += 1
-    else {
-      failCount += 1
-      errors.push(r.message)
-    }
-  }
-
-  for (const rechnungId of rechnungIds) {
-    const r = await deleteRechnungEntwurf(rechnungId)
-    if (r.ok) okCount += 1
-    else {
-      failCount += 1
-      errors.push(r.message)
-    }
-  }
-
-  return { ok: true, okCount, failCount, errors }
 }
