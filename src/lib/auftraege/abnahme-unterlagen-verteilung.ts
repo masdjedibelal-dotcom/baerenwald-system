@@ -52,7 +52,7 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       kunde_id,
       lead_id,
       abschlussdokumentation_url,
-      leads(
+      leads!lead_id(
         id,
         auftraggeber_kunde_id,
         kunde_id,

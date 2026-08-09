@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { useDetailMobileTopSlot } from '@/components/layout/detail-mobile-top-slot'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import { cn } from '@/lib/utils'
@@ -123,18 +124,11 @@ export function DetailActionsBar({
   sheetTitle = 'Aktionen',
 }: Props) {
   const [mounted, setMounted] = useState(false)
-  const [topActionsEl, setTopActionsEl] = useState<HTMLElement | null>(null)
+  const topActionsEl = useDetailMobileTopSlot()
   const isMobile = useIsMobile()
   const { scrolled } = useMobileScrollChrome(isMobile)
   const hasMobilePrimary = Boolean(mounted && isMobile && primary)
   useEffect(() => setMounted(true), [])
-  useEffect(() => {
-    if (!mounted || !isMobile) {
-      setTopActionsEl(null)
-      return
-    }
-    setTopActionsEl(document.getElementById('detail-entity-top-overflow'))
-  }, [mounted, isMobile])
 
   /* Hybrid: body-Klassen steuern Bottom-Nav ↔ CTA (CSS). */
   useEffect(() => {

@@ -89,12 +89,11 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
         <div className="hvk-head-l">
           <MockIcon ctx="default" n="inbox" size={14} aria-hidden />
           <span className="hvk-title">HV</span>
-          {istAkut ? <span className={cn('hvk-badge', 'hvk-badge--red')}>Akut</span> : null}
+          {istAkut || notfallAutopass ? (
+            <span className={cn('hvk-badge', 'hvk-badge--amber')}>Direktauftrag</span>
+          ) : null}
           {freigabe && freigabe.tone !== 'muted' ? (
             <span className={cn('hvk-badge', `hvk-badge--${freigabe.tone}`)}>{freigabe.label}</span>
-          ) : null}
-          {notfallAutopass ? (
-            <span className={cn('hvk-badge', 'hvk-badge--red')}>Notfall</span>
           ) : null}
         </div>
       </div>

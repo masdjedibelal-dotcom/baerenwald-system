@@ -698,8 +698,26 @@ export function AnfrageDetailClient({
       quickBar={quickBar}
       head={{
         title: kundeTitel,
-        titleBadges: isMobile ? statusBadge : undefined,
-        badges: isMobile ? undefined : statusBadge,
+        titleBadges: isMobile ? (
+          <>
+            {istAkut ? (
+              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
+                Direktauftrag
+              </span>
+            ) : null}
+            {statusBadge}
+          </>
+        ) : undefined,
+        badges: isMobile ? undefined : (
+          <>
+            {istAkut ? (
+              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
+                Direktauftrag
+              </span>
+            ) : null}
+            {statusBadge}
+          </>
+        ),
         meta: headMeta,
         titleTrailing: <PortalLoginIconButton kundeId={portalKundeId} label="Kundenportal öffnen" />,
         actions: (

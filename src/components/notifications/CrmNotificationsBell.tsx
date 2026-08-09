@@ -156,6 +156,7 @@ export function CrmNotificationsBell() {
         subtitle="Portal & externe Meldungen · letzte 7 Tage"
         context="detail"
         size="md"
+        manageHistory={false}
         overlayClassName={detail ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
           unreadCount > 0 ? (
@@ -228,7 +229,7 @@ export function CrmNotificationsBell() {
         context="detail"
         size="md"
         overlayClassName="editor-sheet-overlay--stack"
-        manageHistory={Boolean(detail)}
+        manageHistory={false}
       >
         {detail ? (
           <div className="crm-notif-detail">

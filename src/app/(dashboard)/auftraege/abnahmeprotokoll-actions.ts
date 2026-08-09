@@ -39,6 +39,7 @@ import {
 } from '@/lib/auftraege/abnahme-freigabe'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { sendMail } from '@/lib/mail-service'
+import { verteileAbnahmeAnUnterlagen } from '@/lib/auftraege/abnahme-unterlagen-verteilung'
 
 async function getAuthUserId(): Promise<string | null> {
   const supabase = createClient()
@@ -444,6 +445,16 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     email_log_id: mail.emailLogId ?? null,
   })
 
+  try {
+    await verteileAbnahmeAnUnterlagen({
+      auftragId: input.auftragId,
+      pdfUrl: stored.publicUrl,
+      protokollId: protokollId || null,
+    })
+  } catch (e) {
+    console.warn('[saveAndSendAbnahmeprotokoll] Unterlagen-Verteilung:', e)
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
 }
@@ -739,6 +750,15 @@ export async function saveAbnahmeAndAbschliessen(input: {
             freigegeben_at: new Date().toISOString(),
             email_log_id: mail.emailLogId ?? null,
           })
+          try {
+            await verteileAbnahmeAnUnterlagen({
+              auftragId: input.auftragId,
+              pdfUrl: saved.publicUrl,
+              protokollId: saved.protokollId,
+            })
+          } catch (e) {
+            console.warn('[saveAbnahmeAndAbschliessen] Unterlagen-Verteilung:', e)
+          }
           sentToKunde = true
         }
       }

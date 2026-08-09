@@ -120,11 +120,11 @@ export function buildAnfrageSchwellenHinweis(input: {
       istAkut,
       istMieterMeldung,
       headline: notfallDirektErlaubt
-        ? 'Akut — Direktbeauftragung ohne Angebot möglich'
-        : 'Akut markiert — Org erlaubt Direktbeauftragung nicht (Einstellung)',
+        ? 'Direktauftrag — Sofortmaßnahme ohne Angebot'
+        : 'Sofortmaßnahme — Org erlaubt Direktbeauftragung nicht (Einstellung)',
       detail: notfallDirektErlaubt
-        ? 'Mieter-/Notfallmeldung: Partner direkt beauftragen (Aufwand). HV wird informiert; Folgearbeiten über Schwelle laufen über Angebot.'
-        : 'Unter Organisation → Freigabe „Akut direkt“ aktivieren, oder Angebotsweg nutzen.',
+        ? 'Sofortmaßnahme: Partner direkt beauftragen. HV nur Info; Folgearbeiten über Schwelle laufen über Angebot.'
+        : 'Unter Organisation → „Direktbeauftragung bei Sofortmaßnahmen“ aktivieren, oder Angebotsweg nutzen.',
     }
   }
 
@@ -231,4 +231,26 @@ export function buildAnfrageSchwellenHinweis(input: {
 function formatEur(n: number | null): string {
   if (n == null) return '—'
   return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
+}
+
+/**
+ * Angebot-Detail: Primary „Direkt Auftrag“ statt „Angebot annehmen“.
+ * Org-Freigabe-System aktiv + (Modus direkt ODER Betrag ≤ Schwelle).
+ */
+export function angebotDarfDirektAuftragOhneHvFreigabe(input: {
+  portalModus?: string | null
+  freigabeModus?: string | null
+  schwelleEur?: number | null
+  betragEur: number
+  hatAuftraggeber: boolean
+}): boolean {
+  if (!input.hatAuftraggeber) return false
+  if ((input.portalModus ?? '').trim() !== 'organisation') return false
+  const modus = (input.freigabeModus ?? '').trim()
+  const betrag = Number(input.betragEur)
+  if (!Number.isFinite(betrag) || betrag <= 0) return false
+  if (modus === 'direkt') return true
+  if (modus !== 'freigabe') return false
+  const schwelle = Number(input.schwelleEur)
+  return Number.isFinite(schwelle) && schwelle > 0 && betrag <= schwelle
 }

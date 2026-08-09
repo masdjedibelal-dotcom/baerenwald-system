@@ -10900,6 +10900,7 @@ body.has-editor-sheet .detail-mobile-action-bar * {
 .status-badge-action-pop__trigger {
   display: inline-flex;
   align-items: center;
+  gap: 2px;
   max-width: 100%;
   padding: 0;
   margin: 0;
@@ -10907,6 +10908,14 @@ body.has-editor-sheet .detail-mobile-action-bar * {
   background: transparent;
   cursor: pointer;
   border-radius: 999px;
+}
+.status-badge-action-pop__trigger--with-caret {
+  padding-right: 2px;
+}
+.status-badge-action-pop__caret {
+  flex-shrink: 0;
+  opacity: 0.65;
+  color: var(--text-2, var(--text));
 }
 .status-badge-action-pop__trigger:focus-visible {
   outline: 2px solid var(--bw-primary, #1a7a4c);
@@ -10979,9 +10988,23 @@ body.has-editor-sheet .detail-mobile-action-bar * {
 .detail-entity-top-overflow {
   display: inline-flex;
   align-items: center;
+  min-height: 36px;
 }
 .detail-entity-top-overflow:empty {
   display: none;
+}
+/* Header-⋯ mobil: klar sichtbar auf Hero-Hintergrund */
+@media (max-width: 767px) {
+  .detail-entity-toprow__actions .detail-top-more,
+  .detail-entity-top-overflow .detail-top-more {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--card, #fff) 82%, transparent);
+    border: 0.5px solid color-mix(in srgb, var(--border) 70%, transparent);
+    box-shadow: 0 1px 3px rgba(22, 32, 27, 0.08);
+    color: var(--text);
+  }
 }
 @media (min-width: 768px) {
   .detail-entity-toprow__actions {

@@ -161,6 +161,11 @@ export type AcceptAngebotAndCreateAuftragOptions = {
   betreff?: string
   to?: string[]
   cc?: string[]
+  /**
+   * Unter HV-Schwelle: keine Kunden-Bestätigungsmail, Lead ohne Freigabe
+   * (`nicht_noetig` + Bypass schwelle).
+   */
+  direktOhneHvFreigabe?: boolean
 }
 
 export async function acceptAngebotAndCreateAuftrag(
@@ -176,6 +181,9 @@ export async function acceptAngebotAndCreateAuftrag(
 
   if (!ang) return { ok: false, message: 'Angebot nicht gefunden.' }
 
+  const direktOhneHv = Boolean(opts?.direktOhneHvFreigabe)
+  const sendKundenMail = direktOhneHv ? false : (opts?.send_kunden_email ?? false)
+
   await supabase
     .from('angebote')
     .update({
@@ -188,12 +196,23 @@ export async function acceptAngebotAndCreateAuftrag(
   const leadId = (ang.lead_id as string | null) ?? null
   if (leadId) {
     await markLeadAngeboteAbgelehnt(supabase, leadId, angebotId)
+    if (direktOhneHv) {
+      const now = new Date().toISOString()
+      await supabaseAdmin
+        .from('leads')
+        .update({
+          org_freigabe_status: 'nicht_noetig',
+          freigabe_bypass_grund: 'schwelle',
+          updated_at: now,
+        })
+        .eq('id', leadId)
+    }
   }
 
   const res = await createAuftragFromAngebot(angebotId, {
     start_datum: opts?.start_datum ?? null,
     end_datum: opts?.end_datum ?? null,
-    send_kunden_email: opts?.send_kunden_email ?? false,
+    send_kunden_email: sendKundenMail,
     send_handwerker_email: false,
     betreff: opts?.betreff,
     to: opts?.to,
@@ -203,22 +222,20 @@ export async function acceptAngebotAndCreateAuftrag(
 
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)
+    const timelineTitel = direktOhneHv
+      ? 'Direkt Auftrag (unter Schwelle) — ohne Kundenmail / ohne HV-Freigabe'
+      : 'Angebot angenommen — Auftrag erstellt'
     if (opts?.asSystem) {
       await supabaseAdmin.from('lead_timeline').insert({
         lead_id: ang.lead_id,
         angebot_id: angebotId,
         typ: 'angebot',
-        titel: 'Angebot angenommen — Auftrag erstellt',
+        titel: timelineTitel,
         beschreibung: null,
         erstellt_von: null,
       })
     } else {
-      await insertAngebotTimeline(
-        ang.lead_id,
-        angebotId,
-        'Angebot angenommen — Auftrag erstellt',
-        null
-      )
+      await insertAngebotTimeline(ang.lead_id, angebotId, timelineTitel, null)
       revalidatePath(`/anfragen/${ang.lead_id}`)
     }
   }

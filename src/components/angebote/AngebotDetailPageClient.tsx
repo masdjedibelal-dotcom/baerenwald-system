@@ -2,9 +2,13 @@
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import {
+  angebotDarfDirektAuftragOhneHvFreigabe,
+  resolveAnfrageFreigabeRegeln,
+} from '@/lib/anfragen/anfrage-akut-schwelle'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
@@ -439,14 +443,62 @@ export function AngebotDetailPageClient({
     setAcceptOpen(true)
   }
 
+  const unterSchwelleDirektAuftrag = useMemo(() => {
+    if (auftragId) return false
+    const ag = lead?.auftraggeber
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: ag?.portal_modus,
+      freigabeModus: ag?.freigabe_modus,
+      orgSchwelleEur: ag?.freigabe_schwelle_eur,
+      orgNotfallDirekt: ag?.notfall_direkt,
+      objektSchwelleEur: lead?.kunden_objekte?.freigabe_schwelle_eur,
+      objektNotfallDirekt: lead?.kunden_objekte?.notfall_direkt,
+    })
+    return angebotDarfDirektAuftragOhneHvFreigabe({
+      portalModus: regeln.portalModus,
+      freigabeModus: regeln.freigabeModus,
+      schwelleEur: regeln.schwelleEur,
+      betragEur: summenMail.nettoMax,
+      hatAuftraggeber: Boolean(lead?.auftraggeber_kunde_id?.trim() || ag?.id),
+    })
+  }, [auftragId, lead, summenMail.nettoMax])
+
+  const runDirektAuftrag = useCallback(() => {
+    startTransition(async () => {
+      const res = await acceptAngebotAndCreateAuftrag(detail.id, {
+        start_datum: heuteYmd(),
+        end_datum: null,
+        send_kunden_email: false,
+        direktOhneHvFreigabe: true,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success('Auftrag erstellt — ohne Kundenmail / ohne HV-Freigabe')
+      router.push(`/auftraege/${res.auftragId}`)
+      refresh()
+    })
+  }, [detail.id, router, refresh, startTransition])
+
   const primaryAction = useMemo((): DetailActionDef | null => {
-    const cta = primaryCta('angebot', statusEinfach || detail.status)
+    const cta = primaryCta('angebot', statusEinfach || detail.status, {
+      unterSchwelleDirektAuftrag,
+    })
     if (!cta) return null
     if (cta.id === 'angebot_versenden') {
       return {
         label: cta.label,
         icon: cta.icon,
         onClick: () => setKundeVersandOpen(true),
+        disabled: pending,
+      }
+    }
+    if (cta.id === 'direkt_auftrag') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: runDirektAuftrag,
         disabled: pending,
       }
     }
@@ -459,7 +511,7 @@ export function AngebotDetailPageClient({
       }
     }
     return null
-  }, [statusEinfach, detail.status, pending])
+  }, [statusEinfach, detail.status, pending, unterSchwelleDirektAuftrag, runDirektAuftrag])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (!kannBearbeiten) return null
