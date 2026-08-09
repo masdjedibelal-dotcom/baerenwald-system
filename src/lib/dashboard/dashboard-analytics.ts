@@ -195,8 +195,14 @@ export function auftragNetto(auftrag: {
 export type UmsatzMonat = {
   key: string
   label: string
+  /** Aktive Aufträge (offen / in Arbeit / Abnahme) */
   offen: number
   abgeschlossen: number
+  rechnungen: number
+}
+
+export function umsatzMonatGesamt(m: Pick<UmsatzMonat, 'offen' | 'abgeschlossen' | 'rechnungen'>): number {
+  return (Number(m.offen) || 0) + (Number(m.abgeschlossen) || 0) + (Number(m.rechnungen) || 0)
 }
 
 /** Letzte `monateCount` Kalendermonate inkl. aktueller Monat (default 6). */
@@ -207,6 +213,11 @@ export function buildUmsatzverlauf(
     angebote?: unknown
     auftrag_positionen?: AngebotPosition[] | null
   }>,
+  rechnungen: Array<{
+    status?: string | null
+    created_at: string
+    netto?: number | null
+  }> = [],
   monateCount = 6,
   now = new Date()
 ): UmsatzMonat[] {
@@ -216,7 +227,7 @@ export function buildUmsatzverlauf(
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
-    months.push({ key, label, offen: 0, abgeschlossen: 0 })
+    months.push({ key, label, offen: 0, abgeschlossen: 0, rechnungen: 0 })
   }
   const byKey = new Map(months.map((m) => [m.key, m]))
 
@@ -234,15 +245,25 @@ export function buildUmsatzverlauf(
     }
   }
 
+  for (const r of rechnungen) {
+    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
+    const created = new Date(r.created_at)
+    if (Number.isNaN(created.getTime())) continue
+    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
+    const bucket = byKey.get(key)
+    if (!bucket) continue
+    bucket.rechnungen += Number(r.netto) || 0
+  }
+
   return months
 }
 
-/** @deprecated Nutze buildUmsatzverlauf(..., 12) */
+/** @deprecated Nutze buildUmsatzverlauf(..., [], 12) */
 export function buildUmsatzverlauf12m(
   auftraege: Parameters<typeof buildUmsatzverlauf>[0],
   now = new Date()
 ): UmsatzMonat[] {
-  return buildUmsatzverlauf(auftraege, 12, now)
+  return buildUmsatzverlauf(auftraege, [], 12, now)
 }
 
 export type GewerkUmsatzZeile = {
