@@ -29,12 +29,12 @@ import {
   type RechnungErstellenOpts,
 } from '@/components/vorgang/VorgangZahlungTab'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
+import { AuftragFachdokuCard } from '@/components/auftraege/AuftragFachdokuCard'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -47,7 +47,6 @@ import type {
   Gewerk,
   Lead,
   LeadDetail,
-  LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
@@ -225,14 +224,13 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
-  'aktivitaet',
 ])
 
 const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
@@ -343,7 +341,7 @@ function resolveAuftragDetailTabFromQuery(
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'aktivitaet'
+    return 'uebersicht'
   }
   if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'uebersicht'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
@@ -375,7 +373,6 @@ export function AuftragDetailClient({
   angebotDetail = null,
   gewerke = [],
   preislisten = [],
-  leadTimeline = [],
   team = [],
   rechnungenListe = [],
   vertraegeListe = [],
@@ -392,7 +389,6 @@ export function AuftragDetailClient({
   angebotDetail?: AngebotDetail | null
   gewerke?: GewerkOpt[]
   preislisten?: Preisliste[]
-  leadTimeline?: LeadTimelineRow[]
   team?: CrmTeamMitglied[]
   rechnungenListe?: RechnungAuswahlZeile[]
   vertraegeListe?: HandwerkerVertragRow[]
@@ -813,13 +809,6 @@ export function AuftragDetailClient({
 
   const istStorniert = detail.status === 'storniert'
 
-
-  const timelineCount = useMemo(() => {
-    const lead = leadTimeline.length
-    const auftrag = detail.auftrag_timeline?.length ?? 0
-    return (lead + auftrag) || 1
-  }, [leadTimeline.length, detail.auftrag_timeline])
-
   const dokumenteCount = useMemo(
     () =>
       zaehleAuftragDokumente(
@@ -1062,6 +1051,10 @@ export function AuftragDetailClient({
             leadId={detail.lead_id ?? _leadDetail?.id ?? null}
             onChanged={() => refresh()}
           />
+          <AuftragFachdokuCard
+            auftragId={detail.id}
+            onChanged={() => refresh()}
+          />
           {istBauprojekt ? (
             <AuftragComplianceTab
               detail={detail}
@@ -1077,7 +1070,7 @@ export function AuftragDetailClient({
     />
   )
 
-  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte · Aktivität */
+  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte */
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -1104,13 +1097,6 @@ export function AuftragDetailClient({
       icon: 'files',
       count: dokumenteCount || undefined,
       render: () => akteInhalt,
-    },
-    {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineCount || undefined,
-      render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
     },
   ]
 

@@ -6,12 +6,11 @@ import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
-import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
-import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
@@ -19,7 +18,6 @@ import {
   istEigeneUnterlageTyp,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
-import { buildPartnerWirtschaft } from '@/lib/handwerker/partner-wirtschaft'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -44,20 +42,15 @@ import {
   type HandwerkerBewertungKategorieKey,
 } from '@/lib/handwerker/bewertung-kategorien'
 import {
-  updateHandwerker,
   updateHandwerkerNotizen,
   getPartnerPortalLoginHint,
   setHandwerkerPortalGesperrt,
-  type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import {
   handwerkerDisplayName,
   handwerkerGfName,
-  normalizeHandwerkerNamen,
-  validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
 import {
-  composeHandwerkerAdresse,
   resolveHandwerkerAnschrift,
 } from '@/lib/handwerker-anschrift'
 import {
@@ -161,8 +154,6 @@ export function HandwerkerDetailClient({
   const [notizDraft, setNotizDraft] = useState('')
   const notizenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [editingKontakt, setEditingKontakt] = useState(false)
-  const [editingBank, setEditingBank] = useState(false)
   const [rahmenWizardOpen, setRahmenWizardOpen] = useState(false)
   const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
     useState<RahmenVertragWizardBootstrap | null>(null)
@@ -205,78 +196,9 @@ export function HandwerkerDetailClient({
     })
   }
 
-  const legacyKontakt = normalizeHandwerkerNamen(hw)
-  const initialAnschrift = resolveHandwerkerAnschrift(hw)
-  const [formFirma, setFormFirma] = useState(legacyKontakt.firma)
-  const [formVorname, setFormVorname] = useState(legacyKontakt.vorname)
-  const [formNachname, setFormNachname] = useState(legacyKontakt.nachname)
-  const [formTelefon, setFormTelefon] = useState(hw.telefon ?? '')
-  const [formEmail, setFormEmail] = useState(hw.email ?? '')
-  const [formStrasse, setFormStrasse] = useState(initialAnschrift.strasse)
-  const [formHausnummer, setFormHausnummer] = useState(initialAnschrift.hausnummer)
-  const [formPlz, setFormPlz] = useState(initialAnschrift.plz)
-  const [formOrt, setFormOrt] = useState(initialAnschrift.ort)
-  const [formIban, setFormIban] = useState(hw.iban ?? '')
-  const [formUstid, setFormUstid] = useState(hw.ustid ?? '')
-  const [formSteuernummer, setFormSteuernummer] = useState(hw.steuernummer ?? '')
-
   useEffect(() => {
     setNotizen(hw.notizen ?? '')
   }, [hw.id, hw.notizen])
-
-  useEffect(() => {
-    if (editingKontakt || editingBank) return
-    const k = normalizeHandwerkerNamen(hw)
-    const a = resolveHandwerkerAnschrift(hw)
-    setFormFirma(k.firma)
-    setFormVorname(k.vorname)
-    setFormNachname(k.nachname)
-    setFormTelefon(hw.telefon ?? '')
-    setFormEmail(hw.email ?? '')
-    setFormStrasse(a.strasse)
-    setFormHausnummer(a.hausnummer)
-    setFormPlz(a.plz)
-    setFormOrt(a.ort)
-    setFormIban(hw.iban ?? '')
-    setFormUstid(hw.ustid ?? '')
-    setFormSteuernummer(hw.steuernummer ?? '')
-  }, [hw, editingKontakt, editingBank])
-
-  function syncFormFromHw() {
-    const k = normalizeHandwerkerNamen(hw)
-    const a = resolveHandwerkerAnschrift(hw)
-    setFormFirma(k.firma)
-    setFormVorname(k.vorname)
-    setFormNachname(k.nachname)
-    setFormTelefon(hw.telefon ?? '')
-    setFormEmail(hw.email ?? '')
-    setFormStrasse(a.strasse)
-    setFormHausnummer(a.hausnummer)
-    setFormPlz(a.plz)
-    setFormOrt(a.ort)
-    setFormIban(hw.iban ?? '')
-    setFormUstid(hw.ustid ?? '')
-    setFormSteuernummer(hw.steuernummer ?? '')
-    setErr(null)
-  }
-
-  function beginEditKontakt() {
-    syncFormFromHw()
-    setEditingBank(false)
-    setEditingKontakt(true)
-  }
-
-  function beginEditBank() {
-    syncFormFromHw()
-    setEditingKontakt(false)
-    setEditingBank(true)
-  }
-
-  function cancelEditStamm() {
-    setEditingKontakt(false)
-    setEditingBank(false)
-    syncFormFromHw()
-  }
 
   useEffect(() => {
     void (async () => {
@@ -326,76 +248,6 @@ export function HandwerkerDetailClient({
       setRahmenWizardOpen(true)
     })
   }, [hw.id, rahmenVertrag?.id])
-
-  const saveHandwerkerStamm = useCallback(() => {
-    const pflicht = validateHandwerkerStammPflicht({
-      firma: formFirma,
-      vorname: formVorname,
-      nachname: formNachname,
-    })
-    if (pflicht) {
-      toast.error(pflicht)
-      setErr(pflicht)
-      return
-    }
-    const anschrift = {
-      strasse: formStrasse.trim(),
-      hausnummer: formHausnummer.trim(),
-      plz: formPlz.trim(),
-      ort: formOrt.trim(),
-    }
-    const input: HandwerkerFormInput = {
-      firma: formFirma.trim() || null,
-      vorname: formVorname.trim() || null,
-      nachname: formNachname.trim() || null,
-      email: formEmail.trim() || null,
-      telefon: formTelefon.trim() || null,
-      whatsapp: hw.whatsapp?.trim() || null,
-      webseite: hw.webseite?.trim() || null,
-      adresse: composeHandwerkerAdresse(anschrift),
-      strasse: anschrift.strasse || null,
-      hausnummer: anschrift.hausnummer || null,
-      plz: anschrift.plz || null,
-      ort: anschrift.ort || null,
-      gewerke: hw.gewerke ?? [],
-      subkategorie: hw.subkategorie,
-      ist_fachbetrieb: hw.ist_fachbetrieb,
-      partner_kategorie_id: hw.partner_kategorie_id,
-      steuernummer: formSteuernummer.trim() || null,
-      ustid: formUstid.trim() || null,
-      iban: formIban.replace(/\s+/g, '') || null,
-      aktiv: hw.aktiv,
-      notizen: hw.notizen?.trim() || null,
-    }
-    startTransition(async () => {
-      const r = await updateHandwerker(hw.id, input)
-      if (!r.ok) {
-        toast.error(r.message)
-        setErr(r.message)
-        return
-      }
-      setEditingKontakt(false)
-      setEditingBank(false)
-      setErr(null)
-      toast.success('Gespeichert')
-      router.refresh()
-    })
-  }, [
-    formFirma,
-    formVorname,
-    formNachname,
-    formEmail,
-    formTelefon,
-    formStrasse,
-    formHausnummer,
-    formPlz,
-    formOrt,
-    formIban,
-    formUstid,
-    formSteuernummer,
-    hw,
-    router,
-  ])
 
   async function openPortalModal() {
     const draft = await getPartnerPortalMailDraft(hw.id)
@@ -450,7 +302,6 @@ export function HandwerkerDetailClient({
   }, [portalModalOpen, portalText, hw.id])
 
 
-  const wirtschaftSnap = useMemo(() => buildPartnerWirtschaft(payload, 'all'), [payload])
   const anschriftView = resolveHandwerkerAnschrift(hw)
   const adresseView =
     [
@@ -462,147 +313,32 @@ export function HandwerkerDetailClient({
     hw.adresse?.trim() ||
     '—'
 
+  const gewerkeOptionen = useMemo(
+    () =>
+      gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug })).filter((g) => g.slug),
+    [gewerke]
+  )
+
   const uebersichtInhalt = (
     <div className="space-y-4">
-      {editingKontakt ? (
-        <div className="card">
-          <div className="card-h">
-            <div className="card-title title">Stammdaten</div>
-            <div className="inline-edit-actions">
-              <MockBtn sm kind="ghost" onClick={cancelEditStamm} disabled={pending}>
-                Abbrechen
-              </MockBtn>
-              <MockBtn
-                sm
-                kind="primary"
-                icon="check"
-                onClick={saveHandwerkerStamm}
-                disabled={pending}
-              >
-                {pending ? 'Speichern…' : 'Speichern'}
-              </MockBtn>
-            </div>
-          </div>
-          <div className="card-b">
-            <div className="props">
-              {err ? (
-                <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
-              ) : null}
-              <InlineEditField label="Betrieb" editing value={formFirma}>
-                <input
-                  className="input"
-                  value={formFirma}
-                  onChange={(e) => setFormFirma(e.target.value)}
-                  placeholder="Firmenname"
-                  autoFocus
-                />
-              </InlineEditField>
-              <InlineEditField label="Vorname (GF)" editing value={formVorname}>
-                <input
-                  className="input"
-                  value={formVorname}
-                  onChange={(e) => setFormVorname(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Nachname (GF)" editing value={formNachname}>
-                <input
-                  className="input"
-                  value={formNachname}
-                  onChange={(e) => setFormNachname(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Telefon" editing value={formTelefon}>
-                <input
-                  className="input"
-                  type="tel"
-                  value={formTelefon}
-                  onChange={(e) => setFormTelefon(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="E-Mail" editing value={formEmail}>
-                <input
-                  className="input"
-                  type="email"
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Straße" editing value={formStrasse}>
-                <input
-                  className="input"
-                  value={formStrasse}
-                  onChange={(e) => setFormStrasse(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Hausnummer" editing value={formHausnummer}>
-                <input
-                  className="input"
-                  value={formHausnummer}
-                  onChange={(e) => setFormHausnummer(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="PLZ" editing value={formPlz}>
-                <input
-                  className="input"
-                  value={formPlz}
-                  onChange={(e) => setFormPlz(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Ort" editing value={formOrt}>
-                <input
-                  className="input"
-                  value={formOrt}
-                  onChange={(e) => setFormOrt(e.target.value)}
-                />
-              </InlineEditField>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <EntityHandwerkerStammdatenCard
-          handwerkerId={hw.id}
-          initial={{
-            displayName: handwerkerDisplayName(hw),
-            firma: hw.firma ?? '',
-            geschaeftsfuehrer: handwerkerGfName(hw),
-            gewerkLabel: gewerkNamen.join(' · ') || kategorie,
-            telefon: hw.telefon ?? '',
-            email: hw.email ?? '',
-            adresse: adresseView === '—' ? '' : adresseView,
-          }}
-          portalGesperrt={istPortalGesperrt}
-          onInvite={() => void openPortalModal()}
-          onEdit={beginEditKontakt}
-        />
-      )}
+      <EntityHandwerkerStammdatenCard
+        handwerkerId={hw.id}
+        editHandwerker={hw}
+        gewerkeOptionen={gewerkeOptionen}
+        initial={{
+          displayName: handwerkerDisplayName(hw),
+          firma: hw.firma ?? '',
+          geschaeftsfuehrer: handwerkerGfName(hw),
+          gewerkLabel: gewerkNamen.join(' · ') || kategorie,
+          telefon: hw.telefon ?? '',
+          email: hw.email ?? '',
+          adresse: adresseView === '—' ? '' : adresseView,
+        }}
+        portalGesperrt={istPortalGesperrt}
+        onInvite={() => void openPortalModal()}
+      />
 
-      <InlineEditSection
-        title="Bank & Steuer"
-        editing={editingBank}
-        onStartEdit={beginEditBank}
-        onCancel={cancelEditStamm}
-        onSave={saveHandwerkerStamm}
-        saving={pending}
-      >
-        {err && editingBank ? (
-          <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
-        ) : null}
-        <div className="props">
-          <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
-            <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="USt-ID" editing={editingBank} value={hw.ustid || '—'}>
-            <input className="input" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="Steuernummer" editing={editingBank} value={hw.steuernummer || '—'}>
-            <input
-              className="input"
-              value={formSteuernummer}
-              onChange={(e) => setFormSteuernummer(e.target.value)}
-            />
-          </InlineEditField>
-        </div>
-      </InlineEditSection>
+      <EntityHandwerkerBankCard handwerker={hw} gewerkeOptionen={gewerkeOptionen} />
 
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
@@ -679,190 +415,6 @@ export function HandwerkerDetailClient({
         </div>
       </div>
     </div>
-  )
-
-  const stammdatenInhalt = (
-    <>
-      <InlineEditSection
-        title="Kontakt"
-        icon="users"
-        editing={editingKontakt}
-        onStartEdit={beginEditKontakt}
-        onCancel={cancelEditStamm}
-        onSave={saveHandwerkerStamm}
-        saving={pending}
-      >
-        {err && editingKontakt ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
-        <div className="props">
-          <InlineEditField
-            label="Betrieb"
-            editing={editingKontakt}
-            value={handwerkerDisplayName(hw)}
-          >
-            <input
-              className="input"
-              value={formFirma}
-              onChange={(e) => setFormFirma(e.target.value)}
-              placeholder="Firmenname"
-              autoFocus
-            />
-          </InlineEditField>
-          {editingKontakt ? (
-            <>
-              <InlineEditField label="Vorname (GF)" editing value={formVorname || '—'}>
-                <input
-                  className="input"
-                  value={formVorname}
-                  onChange={(e) => setFormVorname(e.target.value)}
-                />
-              </InlineEditField>
-              <InlineEditField label="Nachname (GF)" editing value={formNachname || '—'}>
-                <input
-                  className="input"
-                  value={formNachname}
-                  onChange={(e) => setFormNachname(e.target.value)}
-                />
-              </InlineEditField>
-            </>
-          ) : handwerkerGfName(hw) ? (
-            <InlineEditField label="Geschäftsführer" editing={false} value={handwerkerGfName(hw)} />
-          ) : null}
-          <InlineEditField
-            label="Gewerk"
-            editing={false}
-            value={gewerkNamen.join(', ') || kategorie || '—'}
-          />
-          <InlineEditField
-            label="Telefon"
-            editing={editingKontakt}
-            value={
-              hw.telefon ? (
-                <a href={`tel:${String(hw.telefon).replace(/\s/g, '')}`} className="text-bw-link hover:underline">
-                  {hw.telefon}
-                </a>
-              ) : (
-                '—'
-              )
-            }
-          >
-            <input
-              className="input"
-              type="tel"
-              value={formTelefon}
-              onChange={(e) => setFormTelefon(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="E-Mail"
-            editing={editingKontakt}
-            value={
-              hw.email ? (
-                <a href={`mailto:${hw.email}`} className="text-bw-link hover:underline">
-                  {hw.email}
-                </a>
-              ) : (
-                '—'
-              )
-            }
-          >
-            <input
-              className="input"
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="Straße"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).strasse || '—'}
-          >
-            <input
-              className="input"
-              value={formStrasse}
-              onChange={(e) => setFormStrasse(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="Hausnummer"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).hausnummer || '—'}
-          >
-            <input
-              className="input"
-              value={formHausnummer}
-              onChange={(e) => setFormHausnummer(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="PLZ"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).plz || '—'}
-          >
-            <input
-              className="input"
-              value={formPlz}
-              onChange={(e) => setFormPlz(e.target.value)}
-            />
-          </InlineEditField>
-          <InlineEditField
-            label="Ort"
-            editing={editingKontakt}
-            value={resolveHandwerkerAnschrift(hw).ort || '—'}
-          >
-            <input
-              className="input"
-              value={formOrt}
-              onChange={(e) => setFormOrt(e.target.value)}
-            />
-          </InlineEditField>
-        </div>
-      </InlineEditSection>
-
-      <InlineEditSection
-        title="Bank & Steuer"
-        editing={editingBank}
-        onStartEdit={beginEditBank}
-        onCancel={cancelEditStamm}
-        onSave={saveHandwerkerStamm}
-        saving={pending}
-      >
-        {err && editingBank ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p> : null}
-        <div className="props">
-          <InlineEditField label="IBAN" editing={editingBank} value={hw.iban || '—'}>
-            <input className="input" value={formIban} onChange={(e) => setFormIban(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="USt-ID" editing={editingBank} value={hw.ustid || '—'}>
-            <input className="input" value={formUstid} onChange={(e) => setFormUstid(e.target.value)} />
-          </InlineEditField>
-          <InlineEditField label="Steuernummer" editing={editingBank} value={hw.steuernummer || '—'}>
-            <input
-              className="input"
-              value={formSteuernummer}
-              onChange={(e) => setFormSteuernummer(e.target.value)}
-            />
-          </InlineEditField>
-        </div>
-      </InlineEditSection>
-
-      {rahmenVertrag?.pdf_url ? (
-        <div className="card">
-          <div className="card-h">
-            <div className="card-title title">Rahmenvertrag</div>
-          </div>
-          <div className="card-b">
-            <a
-              href={rahmenVertrag.pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-bw-link hover:underline"
-            >
-              {rahmenVertrag.vertrags_nr || 'Rahmenvertrag öffnen'}
-            </a>
-          </div>
-        </div>
-      ) : null}
-    </>
   )
 
   const vorgaengeInhalt = (

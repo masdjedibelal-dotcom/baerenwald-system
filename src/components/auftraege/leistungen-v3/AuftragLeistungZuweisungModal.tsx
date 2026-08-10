@@ -122,16 +122,18 @@ export function AuftragLeistungZuweisungModal({
     setZeitModus(start && end && start === end ? 'tag' : 'zeitraum')
     if (sample.handwerker_id) {
       setSelectedHwIds(new Set([sample.handwerker_id]))
-      // Zeile wird beim Öffnen des Pickers / Übernehmen befüllt; Platzhalter bis dahin
+      const hwJoin = Array.isArray(sample.handwerker)
+        ? sample.handwerker[0]
+        : sample.handwerker
       setSelectedHwRows((prev) => {
         const hit = prev.find((h) => h.id === sample.handwerker_id)
         if (hit) return [hit]
         return [
           {
             id: sample.handwerker_id!,
-            name: 'Zugewiesener Partner',
+            name: hwJoin?.name?.trim() || 'Zugewiesener Partner',
             firma: null,
-            telefon: null,
+            telefon: hwJoin?.telefon ?? null,
             letzter_einsatz: null,
             verfuegbar: true,
             gewerke: sample.gewerk_slug ? [sample.gewerk_slug] : null,

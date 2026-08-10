@@ -132,6 +132,8 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   if (!rows?.length) return { ok: false, message: 'Positionen nicht gefunden.' }
 
   let updated = 0
+  const gewerkIdsTouched = new Set<string>()
+
   for (const row of rows) {
     const current = row as PositionPartnerSnapshotRow
     const partnerPatch =
@@ -163,6 +165,39 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       gewerkSlug: row.gewerk_slug as string | null,
       gewerkName: String(row.gewerk_name ?? ''),
     })
+
+    const slug = String(row.gewerk_slug ?? '').trim()
+    const name = String(row.gewerk_name ?? '').trim()
+    if (slug || name) {
+      let gwQ = supabaseAdmin.from('gewerke').select('id')
+      if (slug) gwQ = gwQ.eq('slug', slug)
+      else gwQ = gwQ.eq('name', name)
+      const { data: gw } = await gwQ.maybeSingle()
+      if (gw?.id) gewerkIdsTouched.add(String(gw.id))
+    }
+  }
+
+  // Auftrag-Zuweisungstabelle mitziehen (Tagebuch anfordern / Partner-UI liest daraus).
+  for (const gewerkId of gewerkIdsTouched) {
+    const { data: existing } = await supabaseAdmin
+      .from('auftrag_handwerker')
+      .select('id')
+      .eq('auftrag_id', input.auftragId)
+      .eq('gewerk_id', gewerkId)
+      .maybeSingle()
+    if (existing?.id) {
+      await supabaseAdmin
+        .from('auftrag_handwerker')
+        .update({ handwerker_id: hwId, status: 'zugewiesen' })
+        .eq('id', existing.id)
+    } else {
+      await supabaseAdmin.from('auftrag_handwerker').insert({
+        auftrag_id: input.auftragId,
+        gewerk_id: gewerkId,
+        handwerker_id: hwId,
+        status: 'zugewiesen',
+      })
+    }
   }
 
   provisionProjektvertragFireAndForget(input.auftragId, hwId)

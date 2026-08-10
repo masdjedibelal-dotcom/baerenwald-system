@@ -27,6 +27,7 @@ import {
   angebotHandwerkerAusAuftragDetail,
   dedupeDokumentZeilenByHref,
   dokumentTypLabel,
+  fachdokuDokumentZeilen,
   handwerkerDokumentZeilen,
   leadDokumentZeilen,
   rechnungDokumentZeilen,
@@ -37,6 +38,8 @@ import {
   type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
+import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku-actions'
+import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { AuftragDetail, AuftragTimelineEvent, LeadDokumentRow } from '@/lib/types'
@@ -47,7 +50,9 @@ export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helper
 
 function freigabeLabel(row: AuftragDokumentZeile): string {
   if (row.fuerKunde) return 'Kunde'
-  if (row.quelle === 'vertrag' || row.quelle === 'handwerker') return 'Partner'
+  if (row.quelle === 'vertrag' || row.quelle === 'handwerker' || row.quelle === 'fachdoku') {
+    return 'Partner'
+  }
   return 'intern'
 }
 
@@ -74,6 +79,7 @@ export function AuftragDokumenteTab({
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [hwSignedUrls, setHwSignedUrls] = useState<Record<string, string>>({})
+  const [fachdokuSlots, setFachdokuSlots] = useState<FachdokuSlotRow[]>([])
   const [sortKey, setSortKey] = useState<DokumentSortKey>('datum')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -84,8 +90,28 @@ export function AuftragDokumenteTab({
     [detail]
   )
 
+  const fachdokuZeilen = useMemo(
+    () => fachdokuDokumentZeilen(fachdokuSlots),
+    [fachdokuSlots]
+  )
+
   useEffect(() => {
-    const paths = handwerkerZeilen.map((z) => z.storagePath).filter(Boolean) as string[]
+    let cancelled = false
+    void ensureAndLoadFachdokuSlots(detail.id).then((res) => {
+      if (cancelled) return
+      if (res.ok) setFachdokuSlots(res.slots)
+      else setFachdokuSlots([])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [detail.id])
+
+  useEffect(() => {
+    const paths = [
+      ...handwerkerZeilen.map((z) => z.storagePath).filter(Boolean),
+      ...fachdokuZeilen.map((z) => z.storagePath).filter(Boolean),
+    ] as string[]
     if (!paths.length) {
       setHwSignedUrls({})
       return
@@ -98,7 +124,7 @@ export function AuftragDokumenteTab({
     return () => {
       cancelled = true
     }
-  }, [handwerkerZeilen])
+  }, [handwerkerZeilen, fachdokuZeilen])
 
   const zeilenRaw = useMemo(() => {
     const rows = [
@@ -107,6 +133,7 @@ export function AuftragDokumenteTab({
       ...rechnungDokumentZeilen(rechnungen),
       ...vertragDokumentZeilen(vertraege),
       ...handwerkerZeilen,
+      ...fachdokuZeilen,
     ]
     const ang = angebotAusAuftragDetail(detail)
     const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null
@@ -116,7 +143,7 @@ export function AuftragDokumenteTab({
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
     return dedupeDokumentZeilenByHref(rows)
-  }, [detail, rechnungen, vertraege, handwerkerZeilen, leadDokumente])
+  }, [detail, rechnungen, vertraege, handwerkerZeilen, fachdokuZeilen, leadDokumente])
 
   const zeilen = useMemo(
     () => sortDokumentZeilen(zeilenRaw, sortKey, sortDir),

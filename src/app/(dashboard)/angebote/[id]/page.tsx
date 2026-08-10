@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase-server'
 import { AngebotDetailPageClient } from '@/components/angebote/AngebotDetailPageClient'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
-import type { AngebotDetail, Handwerker, LeadDetail, LeadTimelineRow } from '@/lib/types'
+import type { AngebotDetail, Handwerker, LeadDetail } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { loadKiVisualisierungenForAngebot } from '@/lib/visualize/queries'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
@@ -49,24 +49,6 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     .eq('angebot_id', params.id)
     .maybeSingle()
 
-  let timeline: LeadTimelineRow[] = []
-  const { data: tlByAngebot } = await supabase
-    .from('lead_timeline')
-    .select('*')
-    .eq('angebot_id', params.id)
-    .order('created_at', { ascending: true })
-
-  if (tlByAngebot?.length) {
-    timeline = tlByAngebot as LeadTimelineRow[]
-  } else if (detail.lead_id) {
-    const { data: tlByLead } = await supabase
-      .from('lead_timeline')
-      .select('*')
-      .eq('lead_id', detail.lead_id)
-      .order('created_at', { ascending: true })
-    timeline = (tlByLead ?? []) as LeadTimelineRow[]
-  }
-
   const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext, { data: hwRows }] =
     await Promise.all([
       loadWizardContext(supabase),
@@ -86,7 +68,6 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
   return (
     <AngebotDetailPageClient
       detail={detail}
-      timeline={timeline}
       auftragId={(auftrag as { id: string } | null)?.id ?? null}
       gewerke={gewerke}
       wizardPreislisten={wizardPreislisten}

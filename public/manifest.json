@@ -1,7 +1,7 @@
 {
-  "name": "Bärenwald CRM",
+  "name": "Bärenwald",
   "short_name": "Bärenwald",
-  "description": "Bärenwald München — CRM",
+  "description": "Bärenwald München",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

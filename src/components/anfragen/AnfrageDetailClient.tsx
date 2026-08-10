@@ -37,9 +37,7 @@ import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
-import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
-import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
+import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
@@ -54,7 +52,6 @@ const AngebotWizard = dynamic(
     loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
   }
 )
-import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
@@ -69,18 +66,17 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum, kanalLabel } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
-  'aktivitaet',
 ])
 const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'uebersicht'
 
@@ -128,7 +124,7 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'aktivitaet'
+    return 'uebersicht'
   }
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'uebersicht'
@@ -279,49 +275,6 @@ export function AnfrageDetailClient({
     }
   }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote, angeboteListe, dbAuftragId])
 
-  const timelineItems = useMemo(() => {
-    const base = buildLeadVerlaufItems(lead.lead_timeline ?? [], {
-      fallbackCreatedAt: lead.created_at,
-      fallbackCreatedLabel: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
-    })
-
-    const hasAngebote = angeboteListe.length > 0
-    const anKundeGesendet = Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet)
-    const hatAuftrag = Boolean(leadStatusData.auftrag_id)
-    const openSteps: VerlaufBuiltItem[] = []
-    if (!hatAuftrag) {
-      if (!hasAngebote || !anKundeGesendet) {
-        openSteps.push({
-          id: 'open-angebot',
-          text: 'Angebot erstellen',
-          time: 'offen',
-          state: 'open',
-          inspect: null,
-          ts: Number.MAX_SAFE_INTEGER - 1,
-          source: 'open',
-        })
-      }
-      openSteps.push({
-        id: 'open-auftrag',
-        text: 'Auftragsbestätigung',
-        time: 'offen',
-        state: 'open',
-        inspect: null,
-        ts: Number.MAX_SAFE_INTEGER,
-        source: 'open',
-      })
-    }
-
-    return [...base, ...openSteps]
-  }, [
-    lead.lead_timeline,
-    lead.created_at,
-    lead.kanal,
-    angeboteListe.length,
-    angebotFlowSnapshot?.angebotAnKundeGesendet,
-    leadStatusData.auftrag_id,
-  ])
-
   const notizenRows = useMemo(() => {
     const raw = lead.lead_notizen
     if (!Array.isArray(raw)) return [] as LeadNotizRow[]
@@ -469,7 +422,21 @@ export function AnfrageDetailClient({
     setAngebotAuswahlOpen(true)
   }, [angeboteListe.length, openAngebotWizard])
 
-  const openAngebotErstellen = openAngebotAuswahl
+  const matrixCta = primaryCta('anfrage', lead.status)
+  const istAkut = leadIstAkut(lead)
+  const wartetAufHvFreigabe = leadWartetAufHvStartFreigabe(lead)
+  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
+
+  const openAngebotErstellen = useCallback(() => {
+    if (wartetAufHvFreigabe) {
+      toast.message('Warte auf HV-Freigabe', {
+        description:
+          'Die Hausverwaltung muss den Vorgang erst freigeben, bevor du ein Angebot erstellst.',
+      })
+      return
+    }
+    openAngebotAuswahl()
+  }, [openAngebotAuswahl, wartetAufHvFreigabe])
 
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -482,10 +449,6 @@ export function AnfrageDetailClient({
     if (href) router.push(`${href}#angebot-versand-kunde`)
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
-  const matrixCta = primaryCta('anfrage', lead.status)
-  const istAkut = leadIstAkut(lead)
-  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
-
   const openDirektBeauftragen = useCallback(() => {
     void (async () => {
       const ok = await ensureWizardData()
@@ -497,9 +460,16 @@ export function AnfrageDetailClient({
   const primaryCtaAction = useCallback(() => {
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
+      if (wartetAufHvFreigabe) {
+        toast.message('Warte auf HV-Freigabe', {
+          description:
+            'Die Hausverwaltung muss den Vorgang erst freigeben (Angebot einfordern), bevor du ein Angebot erstellst.',
+        })
+        return
+      }
       openAngebotErstellen()
     }
-  }, [matrixCta, openAngebotErstellen])
+  }, [matrixCta, openAngebotErstellen, wartetAufHvFreigabe])
 
   const detailPrimary = useMemo(() => {
     if (hatAuftrag) return null
@@ -509,6 +479,19 @@ export function AnfrageDetailClient({
         icon: 'alert-triangle',
         onClick: openDirektBeauftragen,
         disabled: pending,
+      }
+    }
+    if (wartetAufHvFreigabe) {
+      return {
+        label: 'Warte auf HV-Freigabe',
+        icon: 'clock',
+        onClick: () => {
+          toast.message('Warte auf HV-Freigabe', {
+            description:
+              'Mieter-Meldung: HV muss „Vorgang freigeben“ — danach erscheint „Angebot erstellen“.',
+          })
+        },
+        disabled: false,
       }
     }
     if (!matrixCta) return null
@@ -521,6 +504,7 @@ export function AnfrageDetailClient({
   }, [
     hatAuftrag,
     istAkut,
+    wartetAufHvFreigabe,
     matrixCta,
     openDirektBeauftragen,
     pending,
@@ -528,7 +512,7 @@ export function AnfrageDetailClient({
   ])
 
   const detailSecondary = useMemo(() => {
-    if (hatAuftrag || istAkut) return null
+    if (hatAuftrag || istAkut || wartetAufHvFreigabe) return null
     if (matrixCta?.id !== 'angebot_erstellen') return null
     return {
       label: 'Direkt beauftragen',
@@ -536,7 +520,7 @@ export function AnfrageDetailClient({
       onClick: openDirektBeauftragen,
       disabled: pending,
     }
-  }, [hatAuftrag, istAkut, matrixCta, openDirektBeauftragen, pending])
+  }, [hatAuftrag, istAkut, wartetAufHvFreigabe, matrixCta, openDirektBeauftragen, pending])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
@@ -627,8 +611,6 @@ export function AnfrageDetailClient({
     return parts.filter(Boolean).join(' · ')
   }, [vorhabenTitel, lead.created_at])
 
-  const timelineTab = <VerlaufPanel items={timelineItems} />
-
   const stammdatenInhalt = (
     <>
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
@@ -640,8 +622,26 @@ export function AnfrageDetailClient({
     <LeistungenTab
       phase="anfrage"
       rows={leistungenFromAnfrage(lead.funnel_daten)}
-      onOpenDokument={istAkut || !hatAuftrag ? openDirektBeauftragen : openAngebotErstellen}
-      dokumentActionLabel={istAkut ? 'Direkt beauftragen' : 'Angebot erstellen'}
+      onOpenDokument={
+        istAkut
+          ? openDirektBeauftragen
+          : wartetAufHvFreigabe
+            ? () =>
+                toast.message('Warte auf HV-Freigabe', {
+                  description:
+                    'HV muss den Vorgang erst freigeben — danach kannst du ein Angebot erstellen.',
+                })
+            : !hatAuftrag
+              ? openDirektBeauftragen
+              : openAngebotErstellen
+      }
+      dokumentActionLabel={
+        istAkut
+          ? 'Direkt beauftragen'
+          : wartetAufHvFreigabe
+            ? 'Warte auf HV-Freigabe'
+            : 'Angebot erstellen'
+      }
       emptyTitle="Noch keine Leistungen"
     />
   )
@@ -701,13 +701,6 @@ export function AnfrageDetailClient({
           notizen={notizenInhalt}
         />
       ),
-    },
-    {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => timelineTab,
     },
   ]
 

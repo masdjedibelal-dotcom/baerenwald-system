@@ -228,7 +228,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
 
   let posQuery = supabase
     .from('auftrag_positionen')
-    .select('id, preis_partner, lohn_fix, material_fix')
+    .select('id, preis_partner, lohn_fix, material_fix, leistung_name')
     .eq('auftrag_id', input.auftragId)
 
   if (input.positionIds?.length) {
@@ -242,15 +242,12 @@ export async function assignAuftragHandwerkerGewerk(input: {
   const { data: posRows } = await posQuery
   if (posRows?.length) {
     for (const p of posRows) {
-      const ekFallback = (Number(p.lohn_fix) || 0) + (Number(p.material_fix) || 0)
       const patch: Record<string, unknown> = {
         handwerker_id: input.handwerkerId,
         handwerker_status: status,
         handwerker_angefragt_at: status === 'angefragt' ? now : null,
       }
-      if ((p.preis_partner == null || Number(p.preis_partner) <= 0) && ekFallback > 0) {
-        patch.preis_partner = ekFallback
-      }
+      // preis_partner nur aus EK/Kondition — nie lohn_fix+material_fix (Kunden-VK)
       const { error: posErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
       if (posErr) return { ok: false, message: posErr.message }
     }
@@ -269,6 +266,35 @@ export async function assignAuftragHandwerkerGewerk(input: {
     gewerkSlug: gw.slug as string | null,
     gewerkName: gw.name as string,
   })
+
+  {
+    const { data: auf } = await supabase
+      .from('auftraege')
+      .select('titel')
+      .eq('id', input.auftragId)
+      .maybeSingle()
+    const projektName =
+      String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
+    const posIds = (posRows ?? []).map((p) => String(p.id))
+    const notify = await notifyPartnerUnified({
+      handwerkerId: input.handwerkerId,
+      typ: 'neu',
+      projektName,
+      link: partnerVorgangLink(input.auftragId),
+      leistungName:
+        posRows?.length === 1
+          ? String((posRows[0] as { leistung_name?: string | null }).leistung_name ?? gw.name)
+          : posRows?.length
+            ? `${posRows.length} Leistungen`
+            : String(gw.name ?? 'Leistung'),
+      auftragId: input.auftragId,
+      positionIds: posIds.length ? posIds : undefined,
+      aenderungTyp: 'neu',
+    })
+    if (!notify.ok) {
+      console.warn('[assignAuftragHandwerkerGewerk] Partner-Notify:', notify.error)
+    }
+  }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   revalidatePath('/auftraege')
@@ -311,10 +337,6 @@ export async function assignAuftragHandwerkerPosition(input: {
     handwerker_id: input.handwerkerId,
     handwerker_status: status,
     handwerker_angefragt_at: status === 'angefragt' ? now : null,
-  }
-  const ekFallback = (Number(pos.lohn_fix) || 0) + (Number(pos.material_fix) || 0)
-  if ((pos.preis_partner == null || Number(pos.preis_partner) <= 0) && ekFallback > 0) {
-    posPatch.preis_partner = ekFallback
   }
 
   const { error } = await supabase
@@ -366,6 +388,29 @@ export async function assignAuftragHandwerkerPosition(input: {
     gewerkName: String(pos.gewerk_name ?? ''),
   })
 
+  {
+    const { data: auf } = await supabase
+      .from('auftraege')
+      .select('titel')
+      .eq('id', input.auftragId)
+      .maybeSingle()
+    const projektName =
+      String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
+    const notify = await notifyPartnerUnified({
+      handwerkerId: input.handwerkerId,
+      typ: 'neu',
+      projektName,
+      link: partnerVorgangLink(input.auftragId),
+      leistungName: String(pos.leistung_name ?? pos.gewerk_name ?? 'Leistung'),
+      auftragId: input.auftragId,
+      positionIds: [input.positionId],
+      aenderungTyp: 'neu',
+    })
+    if (!notify.ok) {
+      console.warn('[assignAuftragHandwerkerPosition] Partner-Notify:', notify.error)
+    }
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
 }
@@ -400,8 +445,17 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   if (zErr || !zuAlt) return { ok: false, message: 'Zuweisung nicht gefunden.' }
 
   const altStatus = String(zuAlt.status ?? '').toLowerCase()
-  if (altStatus !== 'abgelehnt') {
-    return { ok: false, message: 'Nur abgelehnte Zuweisungen können neu disponiert werden.' }
+  const replaceable = new Set([
+    'ausstehend',
+    'angefragt',
+    'akzeptiert',
+    'angenommen',
+    'abgelehnt',
+    'zugewiesen',
+    'warten',
+  ])
+  if (!replaceable.has(altStatus)) {
+    return { ok: false, message: 'Diese Zuweisung kann nicht mehr neu disponiert werden.' }
   }
 
   const alterHandwerkerId = String(zuAlt.handwerker_id)
@@ -491,7 +545,6 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
 
   const posIds: string[] = []
   for (const p of posRows ?? []) {
-    const ekFallback = (Number(p.lohn_fix) || 0) + (Number(p.material_fix) || 0)
     const sendPatch = metaBeimSendenAnHandwerker({
       aenderung_typ: (p as { aenderung_typ?: string | null }).aenderung_typ,
     })
@@ -500,9 +553,6 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       aenderung_typ: 'neu',
       preis_alt: null,
       ...sendPatch,
-    }
-    if ((p.preis_partner == null || Number(p.preis_partner) <= 0) && ekFallback > 0) {
-      patch.preis_partner = ekFallback
     }
     const { error: upPosErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
     if (upPosErr) return { ok: false, message: upPosErr.message }

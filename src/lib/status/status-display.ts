@@ -65,6 +65,16 @@ export function anfrageStatusDisplay(
 
 /** Nutzer-sichtbares Label + semantische Farbe für Angebot (`status_einfach`). */
 export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDisplay {
+  const db = String(row.status ?? '')
+    .trim()
+    .toLowerCase()
+  /* Fein-Status vor Einfach-Collapse: sonst bleibt Badge bei „Gesendet“/blau */
+  if (db === 'handwerker_akzeptiert') {
+    return { label: 'Partner akzeptiert', variant: 'success' }
+  }
+  if (db === 'gesendet_handwerker') {
+    return { label: 'An Partner gesendet', variant: 'active' }
+  }
   const einfach = resolveStatusEinfach(row)
   return {
     label: ANGEBOT_EINFACH_LABELS[einfach],

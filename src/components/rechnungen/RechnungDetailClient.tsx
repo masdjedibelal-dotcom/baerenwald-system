@@ -43,12 +43,6 @@ import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteT
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import {
-  buildLeadVerlaufItems,
-  buildRechnungMahnVerlaufItems,
-  type RechnungMahnMailZeile,
-} from '@/lib/crm/verlauf'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -79,21 +73,19 @@ import type {
   Gewerk,
   LeadDetail,
   LeadNotizRow,
-  LeadTimelineRow,
   Preisliste,
   Rechnung,
   RechnungBelegTyp,
   RechnungStatus,
 } from '@/lib/types'
 
-type RechnungDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type RechnungDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
 const RECHNUNG_DETAIL_TAB_IDS = new Set<RechnungDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
-  'aktivitaet',
 ])
 const RECHNUNG_DETAIL_DEFAULT_TAB: RechnungDetailTab = 'uebersicht'
 
@@ -134,7 +126,7 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'aktivitaet'
+    return 'uebersicht'
   }
   if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
   return RECHNUNG_DETAIL_DEFAULT_TAB
@@ -177,7 +169,6 @@ export function RechnungDetailClient({
   gewerke = [],
   preislisten = [],
   firm,
-  mahnMails = [],
   projektKontext,
   pipelineLead = null,
   lead = null,
@@ -186,14 +177,12 @@ export function RechnungDetailClient({
   auftragRechnungen = [],
   nachfolgerRechnungId = null,
   darfStornoZuruecknehmen = false,
-  timeline: timelineInitial = [],
 }: {
   detail: Rechnung
   kleinunternehmerFirma: boolean
   gewerke?: Gewerk[]
   preislisten?: Preisliste[]
   firm?: FirmenEinstellungen
-  mahnMails?: RechnungMahnMailZeile[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
   pipelineLead?: PipelineKontextLead | null
   lead?: LeadDetail | null
@@ -205,7 +194,6 @@ export function RechnungDetailClient({
   nachfolgerRechnungId?: string | null
   /** Soft-Storno ohne Gutschrift → zurücknehmbar */
   darfStornoZuruecknehmen?: boolean
-  timeline?: LeadTimelineRow[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -278,39 +266,6 @@ export function RechnungDetailClient({
     dokument: leadId ? { kind: 'lead', leadId } : null,
     onSaved: () => refresh(),
   })
-
-  const timelineItems = useMemo(() => {
-    const base = buildLeadVerlaufItems(timelineInitial ?? [], {
-      fallbackCreatedAt: detail.created_at,
-      fallbackCreatedLabel: `Rechnung angelegt${detail.rechnungsnummer?.trim() ? ` — ${detail.rechnungsnummer.trim()}` : ''}`,
-    })
-
-    const mapped = base.map((item) => {
-      if (item.inspect?.kind === 'rechnung' || item.source === 'fallback') {
-        return {
-          ...item,
-          inspect: {
-            kind: 'rechnung' as const,
-            title: item.inspect?.title ?? item.text,
-            description: item.inspect?.description,
-            createdAt: item.inspect?.createdAt ?? detail.created_at,
-            typ: item.inspect?.typ,
-            rechnungId: detail.id,
-            href: `/rechnungen/${detail.id}`,
-            hrefLabel: 'Zur Rechnung',
-          },
-        }
-      }
-      return item
-    })
-
-    const mahn =
-      belegTyp === 'rechnung'
-        ? buildRechnungMahnVerlaufItems(detail, mahnMails)
-        : []
-
-    return [...mapped, ...mahn].sort((a, b) => a.ts - b.ts)
-  }, [timelineInitial, detail, belegTyp, mahnMails])
 
   async function setStatus(s: RechnungStatus, opts?: { notifyKunde?: boolean }) {
     const r = await updateRechnungStatus(detail.id, s, opts)
@@ -541,8 +496,6 @@ export function RechnungDetailClient({
     />
   )
 
-  const verlaufInhalt = <VerlaufPanel items={timelineItems} />
-
   const dokumenteInhalt = (
     <RechnungDokumenteTab
       detail={detail}
@@ -627,13 +580,6 @@ export function RechnungDetailClient({
           notizen={notizenInhalt}
         />
       ),
-    },
-    {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => verlaufInhalt,
     },
   ]
 

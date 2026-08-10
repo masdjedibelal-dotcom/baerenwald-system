@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Bottom-Nav Spec §3: Dashboard · Vorgänge | + | Kunden · Mehr
- * Mobil: nur Icons (Labels als aria-label) — schlankere Leiste.
+ * Browser-Mobil: nur Icons (schlank). PWA/Home-Screen: Labels + normale Höhe.
  */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'
@@ -33,6 +33,7 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
           title={item.label}
         >
           <MockIcon ctx="sidebar" n={item.iconName} size={20} />
+          <span className="bottomnav-item__lbl">{item.label}</span>
         </Link>
       ))}
 
@@ -57,6 +58,7 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
           title={item.label}
         >
           <MockIcon ctx="sidebar" n={item.iconName} size={20} />
+          <span className="bottomnav-item__lbl">{item.label}</span>
         </Link>
       ))}
 
@@ -67,6 +69,7 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
         title="Mehr"
       >
         <MockIcon ctx="sidebar" n="dots" size={20} />
+        <span className="bottomnav-item__lbl">Mehr</span>
       </Link>
     </nav>
   )

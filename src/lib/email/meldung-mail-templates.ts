@@ -231,7 +231,7 @@ export function mailOrgAngebotZurInfo(
     <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
       data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
     )}</strong> vor.</p>
-    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Der Auftrag wird automatisch angelegt — diese Mail dient nur der Information.</p>
+    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Bärenwald kann den Auftrag direkt anlegen — diese Mail dient nur der Information.</p>
   `
   return {
     betreff,

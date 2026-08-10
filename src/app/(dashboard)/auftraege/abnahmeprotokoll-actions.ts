@@ -1342,10 +1342,12 @@ export async function freigebenAbnahmeprotokoll(
   })
 
   const hwId = String(row.handwerker_id ?? '').trim()
+  const gate = await getGesamtabnahmeGate(auftragId)
+
   if (hwId) {
     const { data: auftrag } = await supabaseAdmin
       .from('auftraege')
-      .select('titel, projekt_name')
+      .select('titel, projekt_name, lead_id')
       .eq('id', auftragId)
       .maybeSingle()
     const projekt =
@@ -1359,9 +1361,46 @@ export async function freigebenAbnahmeprotokoll(
       auftragId,
       sendMail: true,
     })
+
+    const [{ data: hw }, { data: protoFull }, { data: protokolle }] =
+      await Promise.all([
+        supabaseAdmin.from('handwerker').select('name').eq('id', hwId).maybeSingle(),
+        supabaseAdmin
+          .from('auftrag_abnahmeprotokolle')
+          .select('punkte')
+          .eq('id', protokollId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('auftrag_abnahmeprotokolle')
+          .select('id, freigabe_status')
+          .eq('auftrag_id', auftragId)
+          .eq('handwerker_id', hwId),
+      ])
+
+    const punkteRaw = Array.isArray(protoFull?.punkte) ? protoFull.punkte : []
+    const leistungen = punkteRaw
+      .map((p: unknown) => {
+        if (!p || typeof p !== 'object') return ''
+        return String((p as { leistung_name?: string }).leistung_name ?? '').trim()
+      })
+      .filter(Boolean)
+    const andereOffen = (protokolle ?? []).some((p) => {
+      if (String(p.id) === protokollId) return false
+      const st = normalizeAbnahmeFreigabeStatus(p.freigabe_status)
+      return st === 'zur_freigabe' || st === 'entwurf' || st === 'abgelehnt'
+    })
+    const { notifyPortalPartnerErledigtFromCrm } = await import(
+      '@/lib/portal/notify-portal-partner-erledigt'
+    )
+    await notifyPortalPartnerErledigtFromCrm({
+      auftragId,
+      leadId: (auftrag as { lead_id?: string | null } | null)?.lead_id,
+      handwerkerName: String(hw?.name ?? 'Partner').trim() || 'Partner',
+      leistungen: leistungen.length ? leistungen : [projekt],
+      vollstaendig: !andereOffen && gate.ok,
+    })
   }
 
-  const gate = await getGesamtabnahmeGate(auftragId)
   const bereitZumAbschliessen = hatHwAbnahmeZurAbschlussVorschau(gate.zeilen)
   if (gate.ok) {
     /* Status „abnahme“ → Primary-CTA bleibt grün „Auftrag abschließen“ */

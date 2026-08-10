@@ -39,7 +39,7 @@ import {
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
   if (v === 'angefragt') return 'Angefragt'
-  if (v === 'akzeptiert') return 'Akzeptiert'
+  if (v === 'akzeptiert' || v === 'angenommen') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'zugewiesen') return 'Zugewiesen'
   if (v === 'ersetzt') return 'Ersetzt'
@@ -48,9 +48,12 @@ function hwStatusLabel(s: string | null | undefined): string {
 
 function hwBadgeClass(s: string | null | undefined): string {
   const v = (s ?? '').toLowerCase()
-  if (v === 'akzeptiert') return 'bg-emerald-100 text-emerald-900'
+  if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
+    return 'bg-emerald-100 text-emerald-900'
+  }
   if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
-  if (v === 'angefragt') return 'bg-blue-100 text-blue-900'
+  if (v === 'angefragt' || v === 'warten') return 'bg-blue-100 text-blue-900'
+  if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
   return 'bg-canvas text-muted'
 }
 

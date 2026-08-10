@@ -1,4 +1,4 @@
-/* Bärenwald CRM — Service Worker (PWA Push) */
+/* Bärenwald — Service Worker (PWA Push) */
 self.addEventListener('install', (event) => {
   self.skipWaiting()
 })
@@ -9,7 +9,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'Bärenwald CRM',
+    title: 'Bärenwald',
     body: 'Neue Benachrichtigung',
     url: '/login',
   }
@@ -34,7 +34,7 @@ self.addEventListener('push', (event) => {
       : `/login?next=${encodeURIComponent(targetUrl)}`
 
   event.waitUntil(
-    self.registration.showNotification(String(data.title || 'Bärenwald CRM'), {
+    self.registration.showNotification(String(data.title || 'Bärenwald'), {
       body: String(data.body || ''),
       icon: '/icons/pwa-192.png',
       badge: '/icons/pwa-192.png',

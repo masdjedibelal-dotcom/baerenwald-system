@@ -7,6 +7,10 @@ import { sendAngebotToKunde, createAuftragFromAngebot, sendAngebotNachfassManuel
 import { erledigeInterneNachfassTodos } from '@/lib/kalender-auto-termine'
 import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
 import { isKundeAblehnungGrund, KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
+import {
+  angebotDarfDirektAuftragOhneHvFreigabe,
+  resolveAnfrageFreigabeRegeln,
+} from '@/lib/anfragen/anfrage-akut-schwelle'
 
 async function insertAngebotTimeline(
   leadId: string | null,
@@ -175,13 +179,74 @@ export async function acceptAngebotAndCreateAuftrag(
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const { data: ang } = await supabase
     .from('angebote')
-    .select('id, lead_id, status')
+    .select('id, lead_id, status, gesamt_preis, gesamt_max')
     .eq('id', angebotId)
     .maybeSingle()
 
   if (!ang) return { ok: false, message: 'Angebot nicht gefunden.' }
 
   const direktOhneHv = Boolean(opts?.direktOhneHvFreigabe)
+  if (direktOhneHv) {
+    const leadIdCheck = (ang.lead_id as string | null)?.trim() ?? ''
+    if (!leadIdCheck) {
+      return { ok: false, message: 'Direkt Auftrag ohne Lead nicht möglich.' }
+    }
+    const { data: leadRow } = await supabaseAdmin
+      .from('leads')
+      .select('id, auftraggeber_kunde_id, kunde_objekt_id')
+      .eq('id', leadIdCheck)
+      .maybeSingle()
+    const orgId = (leadRow as { auftraggeber_kunde_id?: string | null } | null)
+      ?.auftraggeber_kunde_id?.trim()
+    if (!orgId) {
+      return {
+        ok: false,
+        message: 'Direkt Auftrag ohne HV-Freigabe nur bei Organisations-Auftraggeber.',
+      }
+    }
+    const { data: org } = await supabaseAdmin
+      .from('kunden')
+      .select('portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt')
+      .eq('id', orgId)
+      .maybeSingle()
+    const objektId = (leadRow as { kunde_objekt_id?: string | null } | null)
+      ?.kunde_objekt_id?.trim()
+    const { data: objekt } = objektId
+      ? await supabaseAdmin
+          .from('kunden_objekte')
+          .select('freigabe_schwelle_eur, notfall_direkt')
+          .eq('id', objektId)
+          .maybeSingle()
+      : { data: null }
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: (org as { portal_modus?: string | null } | null)?.portal_modus,
+      freigabeModus: (org as { freigabe_modus?: string | null } | null)?.freigabe_modus,
+      orgSchwelleEur: (org as { freigabe_schwelle_eur?: number | null } | null)
+        ?.freigabe_schwelle_eur,
+      orgNotfallDirekt: (org as { notfall_direkt?: boolean | null } | null)?.notfall_direkt,
+      objektSchwelleEur: (objekt as { freigabe_schwelle_eur?: number | null } | null)
+        ?.freigabe_schwelle_eur,
+      objektNotfallDirekt: (objekt as { notfall_direkt?: boolean | null } | null)
+        ?.notfall_direkt,
+    })
+    const fix = ang.gesamt_preis != null ? Number(ang.gesamt_preis) : 0
+    const max = ang.gesamt_max != null ? Number(ang.gesamt_max) : 0
+    const betrag = fix > 0 ? fix : max > 0 ? max : 0
+    const erlaubt = angebotDarfDirektAuftragOhneHvFreigabe({
+      portalModus: regeln.portalModus,
+      freigabeModus: regeln.freigabeModus,
+      schwelleEur: regeln.schwelleEur,
+      betragEur: betrag,
+      hatAuftraggeber: true,
+    })
+    if (!erlaubt) {
+      return {
+        ok: false,
+        message:
+          'Direkt Auftrag ohne HV-Freigabe nur unter der Freigabeschwelle (oder Modus „direkt“).',
+      }
+    }
+  }
   const sendKundenMail = direktOhneHv ? false : (opts?.send_kunden_email ?? false)
 
   await supabase

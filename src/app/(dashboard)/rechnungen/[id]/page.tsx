@@ -18,19 +18,13 @@ import {
   type RechnungKorrekturSibling,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
-import type { Gewerk, LeadDetail, LeadTimelineRow, Preisliste, Rechnung } from '@/lib/types'
+import type { Gewerk, LeadDetail, Preisliste, Rechnung } from '@/lib/types'
 
 export default async function RechnungDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const [firm, wizardCtx, mahnRes, { data, error }] = await Promise.all([
+  const [firm, wizardCtx, { data, error }] = await Promise.all([
     fetchFirmenEinstellungen(supabase),
     loadWizardContext(supabase),
-    supabase
-      .from('email_log')
-      .select('id, betreff, created_at')
-      .eq('rechnung_id', params.id)
-      .eq('typ', 'zahlungserinnerung')
-      .order('created_at', { ascending: true }),
     withCrmReadFallback(async (db) =>
       db
         .from('rechnungen')
@@ -75,21 +69,12 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     anlass?: string | null
   } | null = null
   let lead: LeadDetail | null = null
-  let timeline: LeadTimelineRow[] = []
 
   const [leadBundle, angebotDetail, auftragDetail, auftragRechnungenRaw, siblingRes] =
     await Promise.all([
       leadId
-        ? Promise.all([
-            loadAnfrageDetail(supabase, leadId),
-            supabase
-              .from('lead_timeline')
-              .select('*')
-              .eq('lead_id', leadId)
-              .order('created_at', { ascending: true }),
-          ]).then(([leadDetail, tlRes]) => ({
+        ? loadAnfrageDetail(supabase, leadId).then((leadDetail) => ({
             lead: leadDetail,
-            timeline: (tlRes.data ?? []) as LeadTimelineRow[],
             pipelineLead: leadDetail
               ? {
                   kanal: leadDetail.kanal as string | null,
@@ -100,7 +85,6 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
           }))
         : Promise.resolve({
             lead: null as LeadDetail | null,
-            timeline: [] as LeadTimelineRow[],
             pipelineLead: null as {
               kanal?: string | null
               auftraggeber_kunde_id?: string | null
@@ -129,7 +113,6 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     ])
 
   lead = leadBundle.lead
-  timeline = leadBundle.timeline
   pipelineLead = leadBundle.pipelineLead
 
   const auftragRechnungen = (auftragRechnungenRaw ?? []) as RechnungAuswahlZeile[]
@@ -156,7 +139,6 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       gewerke={(gwRes.data ?? []) as Gewerk[]}
       preislisten={(plRes.data ?? []) as Preisliste[]}
       firm={firm}
-      mahnMails={mahnRes.data ?? []}
       projektKontext={projektKontext}
       pipelineLead={pipelineLead}
       lead={lead}
@@ -165,7 +147,6 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       auftragRechnungen={auftragRechnungen}
       nachfolgerRechnungId={nachfolgerRechnungId}
       darfStornoZuruecknehmen={darfStornoZurueck}
-      timeline={timeline}
     />
   )
 }

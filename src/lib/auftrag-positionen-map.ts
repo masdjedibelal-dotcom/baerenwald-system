@@ -53,7 +53,6 @@ export function angebotPositionenToAuftragRows(
     const leistung_name = (p.leistung_name || p.leistung || p.beschreibung || 'Leistung').toString().slice(0, 500)
     const lohnZeile = Math.round(p.lohn_netto * m * 100) / 100
     const matZeile = Math.round(p.material_netto * m * 100) / 100
-    const hatHandwerker = !!p.handwerker_id?.trim()
     const konditionPreis =
       p.id && posPreisMap?.has(p.id) ? posPreisMap.get(p.id)! : null
     const ekZeile =
@@ -67,15 +66,10 @@ export function angebotPositionenToAuftragRows(
         ? konditionPreis
         : ekZeile != null && ekZeile > 0
           ? ekZeile
-          : hatHandwerker
-            ? gewerkEk != null && gewerkEk > 0
-              ? gewerkEk
-              : lohnZeile + matZeile > 0
-                ? lohnZeile + matZeile
-                : null
-            : gewerkEk != null && gewerkEk > 0
-              ? gewerkEk
-              : null
+          : gewerkEk != null && gewerkEk > 0
+            ? gewerkEk
+            : null
+    // Kein Fallback auf lohn/material (Kunden-VK) — sonst sieht der HW den VK als EK.
     const isRegie = String(p.verguetung ?? '').toLowerCase() === 'aufwand'
     const stundensatz =
       isRegie && Number(p.stundensatz) > 0

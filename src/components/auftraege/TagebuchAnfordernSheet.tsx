@@ -6,10 +6,32 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { anfrageHandwerkerBautagebuchEintrag } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
-import type { AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
+import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 type HwOpt = { id: string; name: string; email?: string | null }
+
+type HwLite = {
+  id?: string
+  name?: string | null
+  email?: string | null
+}
+
+/** PostgREST liefert Joins teils als Objekt, teils als 1-Element-Array. */
+function unwrapHandwerker(raw: unknown): HwLite | null {
+  if (!raw) return null
+  if (Array.isArray(raw)) {
+    const first = raw[0]
+    return first && typeof first === 'object' ? (first as HwLite) : null
+  }
+  if (typeof raw === 'object') return raw as HwLite
+  return null
+}
+
+function isPlaceholderName(name: string): boolean {
+  const n = name.trim().toLowerCase()
+  return !n || n === 'zugewiesener partner' || n === 'handwerker'
+}
 
 /**
  * Tagebuch anfordern: Handwerker wählen → Leistungen anhaken → Senden.
@@ -21,6 +43,7 @@ export function TagebuchAnfordernSheet({
   auftragId,
   auftragHandwerker,
   positionen,
+  angebotHandwerker,
   onSent,
 }: {
   open: boolean
@@ -28,6 +51,8 @@ export function TagebuchAnfordernSheet({
   auftragId: string
   auftragHandwerker: AuftragHandwerkerRow[]
   positionen: AuftragPosition[]
+  /** Fallback: Partner aus Angebotsphase (falls noch nicht in auftrag_handwerker). */
+  angebotHandwerker?: AngebotHandwerkerRow[] | null
   onSent?: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -37,30 +62,46 @@ export function TagebuchAnfordernSheet({
 
   const hwOptions = useMemo(() => {
     const map = new Map<string, HwOpt>()
-    for (const row of auftragHandwerker) {
-      const id = row.handwerker_id?.trim()
-      if (!id) continue
-      const name =
-        row.handwerker?.name?.trim() ||
-        (typeof row.handwerker === 'object' && row.handwerker && 'name' in row.handwerker
-          ? String((row.handwerker as { name?: string }).name ?? '').trim()
-          : '') ||
-        'Handwerker'
-      if (!map.has(id)) {
+
+    const upsert = (idRaw: string | null | undefined, hw: HwLite | null) => {
+      const id = idRaw?.trim()
+      if (!id) return
+      const name = hw?.name?.trim() || ''
+      const email = hw?.email?.trim() || null
+      const existing = map.get(id)
+      if (!existing) {
         map.set(id, {
           id,
-          name,
-          email: row.handwerker?.email ?? null,
+          name: name || 'Zugewiesener Partner',
+          email,
         })
+        return
       }
+      if (name && isPlaceholderName(existing.name)) {
+        existing.name = name
+      }
+      if (email && !existing.email) existing.email = email
     }
+
+    for (const row of auftragHandwerker) {
+      upsert(row.handwerker_id, unwrapHandwerker(row.handwerker))
+    }
+
     for (const p of positionen) {
-      const id = p.handwerker_id?.trim()
-      if (!id || map.has(id)) continue
-      map.set(id, { id, name: 'Zugewiesener Partner', email: null })
+      if ((p.aenderung_typ ?? '').toLowerCase() === 'entfernt') continue
+      upsert(p.handwerker_id, unwrapHandwerker(p.handwerker))
     }
+
+    for (const row of angebotHandwerker ?? []) {
+      const st = String(row.status ?? '')
+        .trim()
+        .toLowerCase()
+      if (st === 'abgelehnt' || st === 'ersetzt') continue
+      upsert(row.handwerker_id, unwrapHandwerker(row.handwerker))
+    }
+
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'de'))
-  }, [auftragHandwerker, positionen])
+  }, [auftragHandwerker, positionen, angebotHandwerker])
 
   const leistungen = useMemo(() => {
     if (!handwerkerId) return []

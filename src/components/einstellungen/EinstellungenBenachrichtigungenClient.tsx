@@ -67,7 +67,7 @@ function statusCopy(status: PushCapabilityStatus, hasSub: boolean): {
     case 'permission_denied':
       return {
         title: 'Berechtigung blockiert',
-        sub: 'In den System-/Browser-Einstellungen für Bärenwald CRM Benachrichtigungen erlauben.',
+        sub: 'In den System-/Browser-Einstellungen für Bärenwald Benachrichtigungen erlauben.',
       }
     case 'permission_default':
       return {

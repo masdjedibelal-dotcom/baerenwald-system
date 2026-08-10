@@ -19,6 +19,23 @@ export function leadIstMieterMeldung(lead: {
   return !anlass || anlass === 'meldung'
 }
 
+/**
+ * Mieter-Meldung wartet noch auf HV-Start-Freigabe („Vorgang freigeben“).
+ * Akut-Direktauftrag: kein Gate — BW kann sofort disponieren.
+ */
+export function leadWartetAufHvStartFreigabe(
+  lead: Pick<Lead, 'situation' | 'funnel_daten' | 'freigabe_bypass_grund'> & {
+    erfassung_von?: string | null
+    anlass?: string | null
+    hv_meldung_status?: string | null
+  }
+): boolean {
+  if (!leadIstMieterMeldung(lead)) return false
+  if (leadIstAkut(lead)) return false
+  const st = (lead.hv_meldung_status ?? 'neu').trim().toLowerCase()
+  return st === 'neu' || st === ''
+}
+
 /** Effektive Schwelle / Notfall-Direkt: Objekt überschreibt Org (NULL = erben). */
 export function resolveAnfrageFreigabeRegeln(input: {
   portalModus?: string | null

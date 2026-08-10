@@ -35,6 +35,8 @@ export type AuftragDokumentQuelle =
   | 'handwerker'
   /** Manuelle Uploads am Lead (= kanonische Vorgangs-Akte) */
   | 'lead'
+  /** Gewerk-Fachnachweise (Mess-/Prüfprotokolle) */
+  | 'fachdoku'
 
 export type AuftragDokumentZeile = {
   id: string
@@ -61,6 +63,8 @@ export function dokumentTypLabel(quelle: AuftragDokumentQuelle): string {
       return 'Vertrag'
     case 'handwerker':
       return 'Partner'
+    case 'fachdoku':
+      return 'Fachnachweis'
     case 'protokoll':
       return 'Protokoll'
     case 'lead':
@@ -330,6 +334,43 @@ export function angebotDokumentZeile(
   }
 }
 
+export function fachdokuDokumentZeilen(
+  slots: Array<{
+    id: string
+    label?: string | null
+    slot_code?: string | null
+    status?: string | null
+    datei_url?: string | null
+    datei_name?: string | null
+    erledigt_am?: string | null
+    signed_url?: string | null
+  }>
+): AuftragDokumentZeile[] {
+  const out: AuftragDokumentZeile[] = []
+  for (const s of slots) {
+    const st = String(s.status ?? '').toLowerCase()
+    const path = String(s.datei_url ?? '').trim()
+    if (st !== 'erledigt' || !path) continue
+    const name =
+      String(s.datei_name ?? '').trim() ||
+      String(s.label ?? '').trim() ||
+      String(s.slot_code ?? '').trim() ||
+      'Fachnachweis'
+    const isHttp = /^https?:\/\//i.test(path)
+    out.push({
+      id: `fachdoku-${s.id}`,
+      name,
+      beschreibung: String(s.label ?? s.slot_code ?? 'Fachnachweis').trim() || 'Fachnachweis',
+      datum: s.erledigt_am ?? '',
+      fuerKunde: false,
+      href: isHttp ? path : s.signed_url?.trim() || '#',
+      storagePath: isHttp ? undefined : path,
+      quelle: 'fachdoku',
+    })
+  }
+  return out
+}
+
 /** Lead-Uploads = kanonische Vorgangs-Akte (sichtbar in jeder Phase). */
 export function leadDokumentZeilen(dokumente: LeadDokumentRow[] | null | undefined): AuftragDokumentZeile[] {
   return (dokumente ?? [])
@@ -362,7 +403,8 @@ export function zaehleAuftragDokumente(
   detail: AuftragDetail,
   rechnungen: RechnungAuswahlZeile[] = [],
   vertraege: HandwerkerVertragRow[] = [],
-  leadDokumente: LeadDokumentRow[] = []
+  leadDokumente: LeadDokumentRow[] = [],
+  fachdokuSlots: Parameters<typeof fachdokuDokumentZeilen>[0] = []
 ): number {
   const rows = [
     ...leadDokumentZeilen(leadDokumente),
@@ -370,6 +412,7 @@ export function zaehleAuftragDokumente(
     ...rechnungDokumentZeilen(rechnungen),
     ...vertragDokumentZeilen(vertraege),
     ...handwerkerDokumentZeilen(angebotHandwerkerAusAuftragDetail(detail)),
+    ...fachdokuDokumentZeilen(fachdokuSlots),
   ]
   const ang = angebotAusAuftragDetail(detail)
   const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null

@@ -30,7 +30,7 @@ import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
+import type { AngebotDetail, AngebotHandwerkerRow, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -393,6 +393,10 @@ export function AuftragLeistungenTab({
         auftragId={detail.id}
         auftragHandwerker={detail.auftrag_handwerker ?? []}
         positionen={detail.auftrag_positionen ?? []}
+        angebotHandwerker={
+          (detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null)
+            ?.angebot_handwerker ?? null
+        }
         onSent={() => onSaved?.()}
       />
     </div>

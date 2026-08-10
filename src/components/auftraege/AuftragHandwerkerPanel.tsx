@@ -157,11 +157,18 @@ export function AuftragHandwerkerPanel({
       toast.error('Gewerk nicht in Stammdaten.')
       return
     }
+    const z = gruppe.zuweisung
+    const replaceId =
+      position.handwerker_id && z?.id && String(z.status).toLowerCase() !== 'ersetzt'
+        ? z.id
+        : undefined
     setModalScope({
       type: 'position',
       position,
       gewerkId: gruppe.gewerkId,
-      gewerkName: gruppe.gewerkName })
+      gewerkName: gruppe.gewerkName,
+      replaceZuweisungId: replaceId,
+    })
   }
 
   function changeGewerkStatus(zuweisungId: string, status: AuftragHandwerkerZuweisungStatus) {
@@ -205,7 +212,9 @@ export function AuftragHandwerkerPanel({
       <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
         <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
-          Handwerker zuweisen
+          {handwerkerRows.some((z) => z.handwerker_id && String(z.status).toLowerCase() !== 'ersetzt')
+            ? 'Handwerker bearbeiten'
+            : 'Handwerker zuweisen'}
         </h3>
         <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
           Pro Gewerk oder einzelne Leistung — Nachricht mit Ort, Zeitraum und Leistungen wird automatisch befüllt.
@@ -300,10 +309,15 @@ export function AuftragHandwerkerPanel({
                       variant="secondary"
                       size="sm"
                       disabled={!gruppe.gewerkId || pending}
-                      onClick={() => openGewerkModal(gruppe)}
+                      onClick={() =>
+                        openGewerkModal(
+                          gruppe,
+                          z && String(z.status).toLowerCase() !== 'ersetzt' ? z.id : undefined
+                        )
+                      }
                     >
                       <UserPlus className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
-                      {hwName ? 'Gewerk ändern' : 'Gewerk zuweisen'}
+                      {hwName && !abgelehnt ? 'Handwerker bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
                     </Button>
                   </div>
                 </div>
@@ -366,7 +380,7 @@ export function AuftragHandwerkerPanel({
                               disabled={!gruppe.gewerkId || pending}
                               onClick={() => openPositionModal(gruppe, p)}
                             >
-                              {p.handwerker_id ? 'Ändern' : 'Zuweisen'}
+                              {p.handwerker_id ? 'Handwerker bearbeiten' : 'Zuweisen'}
                             </Button>
                           </div>
                         </li>

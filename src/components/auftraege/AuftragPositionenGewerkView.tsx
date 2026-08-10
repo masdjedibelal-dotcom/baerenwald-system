@@ -155,6 +155,9 @@ export function AuftragPositionenGewerkView({
       toast.error('Gewerk nicht in Stammdaten — bitte Position mit gültigem Gewerk anlegen.')
       return
     }
+    const z = zuweisungForBlock(block)
+    const replaceId =
+      z?.id && z.handwerker_id && String(z.status).toLowerCase() !== 'ersetzt' ? z.id : undefined
     setModalScope({
       type: 'gewerk',
       gewerkId: block.gewerkId,
@@ -164,7 +167,9 @@ export function AuftragPositionenGewerkView({
       leistungen: block.positionen.map((p) => {
         const qty = posQtyLabel(p)
         return `${p.leistung_name}${p.beschreibung ? ` — ${p.beschreibung}` : ''} (${qty})`
-      }) })
+      }),
+      replaceZuweisungId: replaceId,
+    })
   }
 
   function openPositionModal(block: (typeof blocks)[0], position: AuftragPosition) {
@@ -172,11 +177,18 @@ export function AuftragPositionenGewerkView({
       toast.error('Gewerk nicht in Stammdaten.')
       return
     }
+    const z = zuweisungForBlock(block)
+    const replaceId =
+      position.handwerker_id && z?.id && String(z.status).toLowerCase() !== 'ersetzt'
+        ? z.id
+        : undefined
     setModalScope({
       type: 'position',
       position,
       gewerkId: block.gewerkId,
-      gewerkName: block.gewerkName })
+      gewerkName: block.gewerkName,
+      replaceZuweisungId: replaceId,
+    })
   }
 
   function changePositionStatus(positionId: string, status: AuftragHandwerkerZuweisungStatus) {
@@ -344,7 +356,7 @@ export function AuftragPositionenGewerkView({
                                 onClick={() => openPositionModal(block, pos)}
                               >
                                 <UserPlus className="mr-1 h-3 w-3" aria-hidden />
-                                {pos.handwerker_id ? 'HW ändern' : 'HW zuweisen'}
+                                {pos.handwerker_id ? 'Handwerker bearbeiten' : 'HW zuweisen'}
                               </Button>
                               {pos.handwerker_id ? (
                                 <>
@@ -423,7 +435,9 @@ export function AuftragPositionenGewerkView({
                       onClick={() => openGewerkModal(block)}
                     >
                       <ToolIcon className="h-3.5 w-3.5" aria-hidden />
-                      Handwerker fürs Gewerk
+                      {zuweisungForBlock(block)?.handwerker_id
+                        ? 'Handwerker bearbeiten'
+                        : 'Handwerker fürs Gewerk'}
                     </button>
                   </div>
                 </div>

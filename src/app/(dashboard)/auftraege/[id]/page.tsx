@@ -13,7 +13,7 @@ import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
-import type { AngebotDetail, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
+import type { AngebotDetail, LeadDetail, Preisliste } from '@/lib/types'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
@@ -48,7 +48,7 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       )
     )
 
-    const [rahmenVertraegeByHandwerker, projektKontext, leadBundle] = await Promise.all([
+    const [rahmenVertraegeByHandwerker, projektKontext, leadDetail] = await Promise.all([
       loadRahmenVertraegeForHandwerker(handwerkerIds),
       loadProjektKontext(supabase, {
         activeKind: 'auftrag',
@@ -59,25 +59,10 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         angebotId: detail.angebot_id,
       }),
       detail.lead_id
-        ? Promise.all([
-            supabase
-              .from('lead_timeline')
-              .select('*')
-              .eq('lead_id', detail.lead_id)
-              .order('created_at', { ascending: true }),
-            loadAnfrageDetail(supabase, detail.lead_id),
-          ]).then(([tlRes, leadDetail]) => ({
-            timeline: (tlRes.data ?? []) as LeadTimelineRow[],
-            leadDetail,
-          }))
-        : Promise.resolve({
-            timeline: [] as LeadTimelineRow[],
-            leadDetail: null as LeadDetail | null,
-          }),
+        ? loadAnfrageDetail(supabase, detail.lead_id)
+        : Promise.resolve(null as LeadDetail | null),
     ])
 
-    const leadTimeline = leadBundle.timeline
-    const leadDetail = leadBundle.leadDetail
     const angebotDetail = (detail.angebote ?? null) as unknown as AngebotDetail | null
 
     return (
@@ -88,7 +73,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
         angebotDetail={angebotDetail}
         gewerke={wizardCtx.gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug }))}
         preislisten={wizardCtx.preislisten as Preisliste[]}
-        leadTimeline={leadTimeline}
         team={team}
         rechnungenListe={rechnungenListe}
         vertraegeListe={vertraegeListe}

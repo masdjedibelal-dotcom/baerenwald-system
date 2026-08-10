@@ -27,8 +27,6 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
@@ -66,6 +64,7 @@ import {
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
+import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -76,7 +75,6 @@ import type {
   LeadDetail,
   LeadDokumentRow,
   LeadNotizRow,
-  LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
@@ -87,14 +85,13 @@ import {
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 
-type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
 const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
-  'aktivitaet',
 ])
 const ANGEBOT_DETAIL_DEFAULT_TAB: AngebotDetailTab = 'uebersicht'
 
@@ -138,7 +135,7 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'aktivitaet'
+    return 'uebersicht'
   }
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'uebersicht'
@@ -148,7 +145,6 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
 
 export function AngebotDetailPageClient({
   detail,
-  timeline: timelineInitial,
   auftragId,
   gewerke,
   wizardPreislisten,
@@ -159,7 +155,6 @@ export function AngebotDetailPageClient({
   projektKontext,
 }: {
   detail: AngebotDetail
-  timeline: LeadTimelineRow[]
   auftragId: string | null
   gewerke: Gewerk[]
   wizardPreislisten: Preisliste[]
@@ -327,62 +322,6 @@ export function AngebotDetailPageClient({
     )
   }, [lead?.lead_dokumente])
 
-  const timelineItems = useMemo(() => {
-    const base = buildLeadVerlaufItems(timelineInitial ?? [], {
-      fallbackCreatedAt: detail.created_at,
-      fallbackCreatedLabel: `Angebot erstellt${detail.angebotsnr?.trim() ? ` — ${detail.angebotsnr.trim()}` : ''}`,
-    })
-
-    const withAngebotLink: VerlaufBuiltItem[] = base.map((item) => {
-      if (item.inspect && !item.inspect.angebotId && !item.inspect.href) {
-        return {
-          ...item,
-          inspect: {
-            ...item.inspect,
-            kind: item.inspect.kind === 'email' ? ('email' as const) : ('angebot' as const),
-            angebotId: detail.id,
-            href: `/angebote/${detail.id}`,
-            hrefLabel: 'Zum Angebot',
-          },
-        }
-      }
-      return item
-    })
-
-    const openSteps: VerlaufBuiltItem[] = []
-    if (!auftragId && statusEinfach !== 'angenommen') {
-      if (statusEinfach === 'entwurf') {
-        openSteps.push({
-          id: 'open-versand',
-          text: 'Angebot an Kunden senden',
-          time: 'offen',
-          state: 'open',
-          inspect: null,
-          ts: Number.MAX_SAFE_INTEGER - 1,
-          source: 'open',
-        })
-      }
-      openSteps.push({
-        id: 'open-auftrag',
-        text: 'Auftragsbestätigung',
-        time: 'offen',
-        state: 'open',
-        inspect: null,
-        ts: Number.MAX_SAFE_INTEGER,
-        source: 'open',
-      })
-    }
-
-    return [...withAngebotLink, ...openSteps]
-  }, [
-    timelineInitial,
-    detail.created_at,
-    detail.angebotsnr,
-    detail.id,
-    auftragId,
-    statusEinfach,
-  ])
-
   const anhaengeCount = useMemo(() => {
     const hasLead = Boolean(detail.lead_id ?? lead?.id)
     const rechnungenCount = (projektKontext?.rechnungen ?? []).filter((r) =>
@@ -534,8 +473,6 @@ export function AngebotDetailPageClient({
     <AngebotLeistungenTab detail={detail} onOpenDokument={openWizardBearbeiten} />
   )
 
-  const verlaufInhalt = <VerlaufPanel items={timelineItems} />
-
   const dokumenteInhalt = (
     <AngebotAnhaengeTab
       detail={detail}
@@ -644,13 +581,6 @@ export function AngebotDetailPageClient({
         />
       ),
     },
-    {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => <div className="space-y-6">{verlaufInhalt}</div>,
-    },
   ]
 
   return (
@@ -674,7 +604,13 @@ export function AngebotDetailPageClient({
         badges: (
           <StatusBadgeActionPopover
             title="Status"
-            badge={<StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />}
+            badge={
+              <StatusBadge
+                status={detail.status}
+                label={angebotStatus.label}
+                kind={variantToMockBadgeKind(angebotStatus.variant)}
+              />
+            }
             actions={
               (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId
                 ? [

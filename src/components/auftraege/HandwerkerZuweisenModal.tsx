@@ -40,7 +40,7 @@ export type HandwerkerZuweisenScope =
       gewerkSlug?: string | null
       positionIds?: string[]
       leistungen: string[]
-      /** TC-11d: abgelehnte Zuweisung ersetzen statt normal zuweisen */
+      /** Bestehende Zuweisung ersetzen (bearbeiten / nach Ablehnung) */
       replaceZuweisungId?: string
     }
   | {
@@ -171,7 +171,7 @@ export function HandwerkerZuweisenModal({
           toast.error(r.message)
           return
         }
-        toast.success('Neuer Partner disponiert — Anfrage im Portal gesendet.')
+        toast.success('Neuer Partner — Anfrage gesendet, muss neu annehmen.')
         onDone()
         onClose()
         return
@@ -210,13 +210,13 @@ export function HandwerkerZuweisenModal({
 
   const title = isReplace
     ? scope?.type === 'position'
-      ? `Anderen Partner — ${scope.position.leistung_name}`
-      : `Anderen Partner — ${gewerkName}`
+      ? `Handwerker bearbeiten — ${scope.position.leistung_name}`
+      : `Handwerker bearbeiten — ${gewerkName}`
     : scope?.type === 'position'
-      ? `Handwerker — ${scope.position.leistung_name}`
+      ? `Handwerker zuweisen — ${scope.position.leistung_name}`
       : scopeLeistungenCount > 1
-        ? `Handwerker — ${scopeLeistungenCount} Leistungen (${gewerkName})`
-        : `Partner — ${gewerkName}`
+        ? `Handwerker zuweisen — ${scopeLeistungenCount} Leistungen (${gewerkName})`
+        : `Handwerker zuweisen — ${gewerkName}`
 
   const leistungenPreview =
     scope?.type === 'gewerk' && scope.leistungen.length > 0 ? (
@@ -334,7 +334,7 @@ export function HandwerkerZuweisenModal({
     <EditorSheet
       open={open}
       onClose={onClose}
-      title={isReplace ? 'Partner' : 'Partner'}
+      title={title}
       context="detail"
       size="lg"
       onConfirm={selectedId && !loadingList && !pending ? zuweisen : undefined}

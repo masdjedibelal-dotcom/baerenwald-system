@@ -8835,10 +8835,15 @@ body.has-editor-sheet .bottomnav,
 body.has-editor-sheet .fab-wrap {
   visibility: hidden !important;
   pointer-events: none !important;
+  /* iOS: auch wenn visibility:hidden, sicherheitshalber aus dem Hit-Test */
+  z-index: -1 !important;
 }
 body.has-blocking-overlay .detail-mobile-action-bar *,
+body.has-blocking-overlay .bottomnav *,
 body.has-document-canvas .detail-mobile-action-bar *,
-body.has-editor-sheet .detail-mobile-action-bar * {
+body.has-document-canvas .bottomnav *,
+body.has-editor-sheet .detail-mobile-action-bar *,
+body.has-editor-sheet .bottomnav * {
   pointer-events: none !important;
 }
 
@@ -8870,7 +8875,7 @@ body.has-editor-sheet .detail-mobile-action-bar * {
   }
 
   
-.bottomnav-item span { display: none; }
+.bottomnav-item__lbl { display: none; }
 
   
 /* Zentraler Erstellen-CTA in der Bottom-Nav (nur Mobil) */
@@ -8934,6 +8939,98 @@ body.has-editor-sheet .detail-mobile-action-bar * {
   background: #fff;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+/* PWA (Home-Bildschirm): Bottom-Nav normale App-Größe inkl. Labels */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    --mobile-bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
+    --topbar-h: 52px;
+  }
+  .bottomnav {
+    height: 60px;
+  }
+  .bottomnav-item {
+    gap: 2px;
+    min-height: 60px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .bottomnav-item__lbl {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 2px;
+  }
+  .bottomnav-item.active::before {
+    width: 48px;
+    height: 28px;
+    transform: translate(-50%, calc(-50% - 6px));
+  }
+  .bottomnav-item.active::after {
+    display: none;
+  }
+  .bottomnav-cta {
+    top: -10px;
+  }
+  .bottomnav-cta-fab {
+    width: 50px;
+    height: 50px;
+  }
+  .topbar {
+    min-height: var(--topbar-h);
+  }
+}
+
+/* Fallback iOS / Klasse aus JS */
+body.is-pwa-standalone {
+  --mobile-bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
+  --topbar-h: 52px;
+}
+body.is-pwa-standalone .bottomnav {
+  height: 60px;
+}
+body.is-pwa-standalone .bottomnav-item {
+  gap: 2px;
+  min-height: 60px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+body.is-pwa-standalone .bottomnav-item__lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+body.is-pwa-standalone .bottomnav-item.active::before {
+  width: 48px;
+  height: 28px;
+  transform: translate(-50%, calc(-50% - 6px));
+}
+body.is-pwa-standalone .bottomnav-item.active::after {
+  display: none;
+}
+body.is-pwa-standalone .bottomnav-cta {
+  top: -10px;
+}
+body.is-pwa-standalone .bottomnav-cta-fab {
+  width: 50px;
+  height: 50px;
+}
+body.is-pwa-standalone .topbar {
+  min-height: var(--topbar-h);
 }
 
 
@@ -10280,21 +10377,42 @@ body.has-editor-sheet .detail-mobile-action-bar * {
   .assistent-panel {
     inset: 0;
     width: 100%;
+    /* Höhe setzt useVisualViewportFrame (PWA); Fallback ohne JS */
     height: 100%;
     height: 100dvh;
     max-height: none;
     border-radius: 0;
     box-shadow: none;
     animation: fadein 160ms ease;
-    padding-top: env(safe-area-inset-top, 0);
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    padding-bottom: 0;
+    box-sizing: border-box;
+    /* Über Bottom-Nav / Floating-CTA hinaus (Chrome-Lock ergänzt) */
+    z-index: 200;
+  }
+
+  .assistent-panel--over-sheet {
+    z-index: 570;
   }
 
   .assistent-panel__handle {
     display: none;
   }
 
+  .assistent-panel__head {
+    padding-top: 10px;
+    min-height: 52px;
+  }
+
+  .assistent-panel__close {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
   .assistent-panel__foot {
-    padding-bottom: max(12px, env(safe-area-inset-bottom, 0));
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -18736,6 +18854,8 @@ body.has-blocking-overlay .app {
   @apply items-end justify-stretch p-0;
   /* padding-bottom setzt EditorSheet per visualViewport (sichtbarer Boden). */
   box-sizing: border-box;
+  /* Notch/Statusleiste: Sheet darf nicht in die tote Top-Zone ragen */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .editor-sheet-overlay--slide {
   /* Immer rechts — nie links (Mock Split-over). Nur @apply: Raw-CSS nach @apply fällt im Build oft weg. */
@@ -18761,7 +18881,11 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet--stack-bottom {
   height: auto !important;
-  max-height: min(88dvh, 100%) !important;
+  max-height: min(
+    88dvh,
+    100%,
+    calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+  ) !important;
   min-height: min(62dvh, 100%);
 }
 /* Verwerfen-Confirm liegt darüber — Sheet darf Klicks/Backdrop nicht abfangen (iOS) */
@@ -18777,9 +18901,13 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet--bottom {
   @apply w-full rounded-t-2xl;
-  /* Inhalt bestimmt Höhe; Cap verhindert Vollbild-Leere (Phasen-Sheets etc.) */
+  /* Inhalt bestimmt Höhe; Cap unter Safe-Area-Top (PWA Notch) */
   height: auto;
-  max-height: min(92dvh, 100%);
+  max-height: min(
+    92dvh,
+    100%,
+    calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+  );
   margin-top: auto;
   align-self: stretch;
   overflow: hidden;
@@ -18816,6 +18944,7 @@ body.has-blocking-overlay .app {
   background: var(--card, #fff);
   box-sizing: border-box;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  touch-action: manipulation;
 }
 .editor-sheet__icon-btn:hover,
 .editor-sheet__icon-btn:active {
@@ -18855,9 +18984,10 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet__footer {
   @apply shrink-0 border-t border-[var(--app-separator)] bg-[var(--card)] px-4 py-3;
-  /* Tastatur-Inset liegt am Sheet — Footer nur Safe-Area */
+  /* Tastatur-Inset liegt am Sheet — Footer inkl. Home-Indicator-Abstand */
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   background: var(--card, #fff);
+  touch-action: manipulation;
 }
 
 @media (max-width: 767px) {
@@ -19464,7 +19594,11 @@ body.has-blocking-overlay .app {
     flex-direction: column;
     overflow: hidden;
     height: auto;
-    max-height: min(92dvh, 100%);
+    max-height: min(
+      92dvh,
+      100%,
+      calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+    );
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
@@ -19486,6 +19620,9 @@ body.has-blocking-overlay .app {
     flex-shrink: 0;
     z-index: 2;
     background: var(--card, #fff);
+    /* Touches auf Header/Footer, nicht an darunterliegende Chrome */
+    pointer-events: auto;
+    touch-action: manipulation;
   }
   .editor-sheet-overlay--bottom .editor-sheet__header,
   .editor-sheet-overlay--over-wizard .editor-sheet__header {
@@ -19495,7 +19632,7 @@ body.has-blocking-overlay .app {
   .editor-sheet-overlay--over-wizard .editor-sheet__footer {
     bottom: 0;
     box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, 0.28);
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
   /* Bottom-Sheet-Header: kompakter Titel, Crumb/Subline weg → mehr Platz für Inhalt.
      Titel vertikal mittig zu den Icon-Buttons (auch bei 1 Zeile). */
@@ -19504,6 +19641,16 @@ body.has-blocking-overlay .app {
     align-items: center;
     gap: 10px;
     padding: 8px 14px 10px;
+  }
+  .editor-sheet-overlay--bottom .editor-sheet__icon-btn,
+  .editor-sheet-overlay--over-wizard .editor-sheet__icon-btn,
+  .editor-sheet-overlay--bottom .editor-sheet__confirm,
+  .editor-sheet-overlay--over-wizard .editor-sheet__confirm {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
   }
   .editor-sheet-overlay--bottom .editor-sheet__crumb,
   .editor-sheet-overlay--over-wizard .editor-sheet__crumb,

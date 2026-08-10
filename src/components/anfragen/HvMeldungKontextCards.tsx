@@ -6,7 +6,11 @@ import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
+import {
+  buildAnfrageSchwellenHinweis,
+  leadIstAkut,
+  resolveAnfrageFreigabeRegeln,
+} from '@/lib/anfragen/anfrage-akut-schwelle'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -71,6 +75,22 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
     : null
   const notfallAutopass = (lead.hv_meldung_status ?? '').trim() === 'notmassnahme'
   const istAkut = leadIstAkut(lead)
+  const ag = lead.auftraggeber
+  const regeln = resolveAnfrageFreigabeRegeln({
+    portalModus: ag?.portal_modus,
+    freigabeModus: ag?.freigabe_modus,
+    orgSchwelleEur: ag?.freigabe_schwelle_eur,
+    orgNotfallDirekt: ag?.notfall_direkt,
+    objektSchwelleEur: objekt?.freigabe_schwelle_eur,
+    objektNotfallDirekt: objekt?.notfall_direkt,
+  })
+  const schwellenHinweis = buildAnfrageSchwellenHinweis({
+    lead,
+    freigabeModus: regeln.freigabeModus,
+    portalModus: regeln.portalModus,
+    schwelleEur: regeln.schwelleEur,
+    notfallDirekt: regeln.notfallDirekt,
+  })
 
   const melderTel = lead.melder_telefon?.trim() || lead.kontakt_telefon?.trim() || null
   const melderMail = lead.melder_email?.trim() || lead.kontakt_email?.trim() || null
@@ -91,6 +111,16 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
         </div>
       </div>
       <div className="card-b">
+        {schwellenHinweis.freigabeAktiv || schwellenHinweis.istAkut ? (
+          <div className="mb-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--surface-2,#f7f7f5)] px-3 py-2">
+            <div className="text-[length:var(--fs-meta)] font-semibold text-[var(--text)]">
+              {schwellenHinweis.headline}
+            </div>
+            <p className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+              {schwellenHinweis.detail}
+            </p>
+          </div>
+        ) : null}
         <div className="props">
           <PropRow label="Name" value={melderName(lead)} />
           <PropRow
