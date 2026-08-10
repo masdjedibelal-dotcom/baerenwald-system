@@ -119,7 +119,7 @@ export function KundeDetailClient({
   const [portalBetreff, setPortalBetreff] = useState('')
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
-  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
+  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('sie')
 
   const [spamPending, setSpamPending] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
@@ -256,7 +256,7 @@ export function KundeDetailClient({
     setPortalBetreff(draft.betreff)
     setPortalText(draft.text)
     setPortalHtml(draft.html)
-    setPortalAnrede(draft.anrede)
+    setPortalAnrede('sie')
     setPortalModalOpen(true)
   }
 
@@ -607,32 +607,11 @@ export function KundeDetailClient({
             onChange={(e) => setPortalCc(e.target.value)}
             placeholder="intern@baerenwald.de; team@baerenwald.de"
           />
-          <Select
-            label="Anrede"
-            name="portal-anrede"
-            value={portalAnrede}
-            onChange={(e) => {
-              const next = e.target.value === 'du' ? 'du' : 'sie'
-              setPortalAnrede(next)
-              const istOrg = kunde.portal_modus === 'organisation'
-              setPortalBetreff(defaultPortalInviteBetreff(next, { organisation: istOrg }))
-              setPortalText(
-                defaultPortalInviteText(next, {
-                  organisation: istOrg,
-                  orgName: kunde.org_anzeigename ?? kunde.name,
-                })
-              )
-            }}
-            options={[
-              { value: 'du', label: 'Du' },
-              { value: 'sie', label: 'Sie' },
-            ]}
-          />
           <KiAssistFieldLabel
             label="Betreff"
             value={portalBetreff}
             onApply={setPortalBetreff}
-            extraHint="Portal-Einladung Betreff an den Kunden."
+            extraHint="Portal-Einladung Betreff an den Kunden (Sie-Anrede)."
             multiline={false}
           >
             <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />

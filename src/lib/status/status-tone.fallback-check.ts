@@ -14,7 +14,7 @@ if (unknown.tone !== 'blau') {
 }
 
 if (primaryCta('anfrage', 'neu')?.id !== 'angebot_erstellen') throw new Error('anfrage neu')
-if (primaryCta('angebot', 'entwurf')?.id !== 'angebot_versenden') throw new Error('angebot entwurf')
+if (primaryCta('angebot', 'entwurf')?.id !== 'angebot_annehmen') throw new Error('angebot entwurf')
 if (
   primaryCta('angebot', 'entwurf', { unterSchwelleDirektAuftrag: true })?.id !== 'direkt_auftrag'
 ) {

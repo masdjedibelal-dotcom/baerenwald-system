@@ -542,6 +542,43 @@ export function AngebotDetailPageClient({
       leadId={detail.lead_id ?? lead?.id ?? null}
       dokumente={dokumenteRows}
       rechnungen={projektKontext?.rechnungen ?? []}
+      geschwisterAngebote={(projektKontext?.angebote ?? []).map((a) => ({
+        id: a.id,
+        created_at: a.created_at,
+        angebotsnr: a.angebotsnr,
+        pdf_url: a.pdf_url ?? null,
+      }))}
+      protokolle={
+        projektKontext?.auftrag
+          ? [
+              ...(projektKontext.auftrag.abnahme_protokoll_url
+                ? [
+                    {
+                      id: 'abnahme-protokoll',
+                      name: 'Abnahmeprotokoll',
+                      href: projektKontext.auftrag.abnahme_protokoll_url,
+                      created_at: projektKontext.auftrag.created_at ?? null,
+                      beschreibung: 'Abnahme',
+                    },
+                  ]
+                : []),
+              ...(projektKontext.auftrag.abschlussdokumentation_url
+                ? [
+                    {
+                      id: 'abschluss-doku',
+                      name: 'Abschlussdokumentation',
+                      href: projektKontext.auftrag.abschlussdokumentation_url,
+                      created_at:
+                        projektKontext.auftrag.abschlussdokumentation_gesendet_at ??
+                        projektKontext.auftrag.created_at ??
+                        null,
+                      beschreibung: 'Abschluss',
+                    },
+                  ]
+                : []),
+            ]
+          : []
+      }
       onReload={() => refresh()}
     />
   )

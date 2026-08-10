@@ -41,7 +41,7 @@ export type PrimaryCtaContext = {
   /** `null` = Zahlung abgeschlossen → Bewertung */
   naechsteRechnungAktion?: 'versenden' | 'bezahlt' | 'erstellen' | null
   /**
-   * Angebot gesendet: Betrag unter HV-Schwelle (oder Freigabe-Modus „direkt“)
+   * Angebot (Entwurf oder gesendet): Betrag unter HV-Schwelle (oder Freigabe-Modus „direkt“)
    * → Primary „Direkt Auftrag“ statt „Angebot annehmen“.
    */
   unterSchwelleDirektAuftrag?: boolean
@@ -108,14 +108,9 @@ export function primaryCta(
   }
 
   if (phase === 'angebot') {
-    if (ui === 'entwurf') {
-      // Unter Schwelle: sofort Auftrag statt erst versenden/annehmen
-      if (ctx.unterSchwelleDirektAuftrag) {
-        return { id: 'direkt_auftrag', label: 'Direkt Auftrag', icon: 'briefcase' }
-      }
-      return { id: 'angebot_versenden', label: 'Angebot versenden', icon: 'send' }
-    }
-    if (ui === 'gesendet_kunde') {
+    if (ui === 'entwurf' || ui === 'gesendet_kunde') {
+      // Entwurf: Annehmen (Auftrag) ist Primary — E-Mail-Versand nur über Bearbeiten/Senden.
+      // Portal zeigt Angebote mit PDF sowieso; „Versenden“ = nur Mail.
       if (ctx.unterSchwelleDirektAuftrag) {
         return { id: 'direkt_auftrag', label: 'Direkt Auftrag', icon: 'briefcase' }
       }

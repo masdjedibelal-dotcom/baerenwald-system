@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
+  mailAngebotEntscheidung,
   mailOrgFreigabeErgebnis,
   mailOrgNeueMeldung,
 } from '@/lib/email/meldung-mail-templates'
@@ -161,5 +162,68 @@ export async function notifyOrgFreigabeErgebnis(input: {
     if (!mail.success) return { ok: false, message: mail.error ?? 'Org-Mail fehlgeschlagen.' }
   }
 
+  return { ok: true }
+}
+
+/** Portal: Angebot angenommen / abgelehnt → internes Team. */
+export async function notifyAngebotEntscheidung(input: {
+  leadId: string
+  aktion: 'angenommen' | 'abgelehnt'
+  notiz?: string | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const leadId = input.leadId?.trim()
+  if (!leadId) return { ok: false, message: 'Lead-ID fehlt.' }
+
+  const { data: lead, error } = await supabaseAdmin
+    .from('leads')
+    .select(
+      `
+      id, kontakt_name, auftraggeber_kunde_id, kunde_id, kunde_objekt_id,
+      auftraggeber:kunden!leads_auftraggeber_kunde_id_fkey(id, name, org_anzeigename),
+      kunde:kunden!leads_kunde_id_fkey(id, name),
+      kunden_objekte(titel)
+    `
+    )
+    .eq('id', leadId)
+    .maybeSingle()
+
+  if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
+
+  const row = lead as Record<string, unknown>
+  const objRaw = row.kunden_objekte
+  const objekt = (Array.isArray(objRaw) ? objRaw[0] : objRaw) as { titel?: string } | null | undefined
+  const objektTitel = objekt?.titel?.trim() || 'Objekt'
+
+  const agRaw = row.auftraggeber
+  const ag = (Array.isArray(agRaw) ? agRaw[0] : agRaw) as
+    | { name?: string; org_anzeigename?: string }
+    | null
+    | undefined
+  const kundeRaw = row.kunde
+  const kunde = (Array.isArray(kundeRaw) ? kundeRaw[0] : kundeRaw) as
+    | { name?: string }
+    | null
+    | undefined
+
+  const entscheidenderName =
+    ag?.org_anzeigename?.trim() ||
+    ag?.name?.trim() ||
+    kunde?.name?.trim() ||
+    String(row.kontakt_name ?? '').trim() ||
+    'Kunde'
+
+  const branding = await getMailBranding(supabaseAdmin)
+  const tpl = mailAngebotEntscheidung(
+    {
+      entscheidenderName,
+      objektTitel,
+      aktion: input.aktion,
+      notiz: input.notiz,
+    },
+    branding
+  )
+
+  const intern = await sendInternNotifyEmail({ subject: tpl.betreff, html: tpl.html })
+  if (!intern.ok) return intern
   return { ok: true }
 }

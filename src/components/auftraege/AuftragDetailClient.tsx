@@ -421,7 +421,10 @@ export function AuftragDetailClient({
       auftragId: detail.id,
       initial: detail.notizen ?? '',
     },
-    dokument: { kind: 'auftrag', auftragId: detail.id },
+    dokument:
+      detail.lead_id || _leadDetail?.id
+        ? { kind: 'lead', leadId: (detail.lead_id ?? _leadDetail?.id)! }
+        : { kind: 'auftrag', auftragId: detail.id },
     onSaved: () => refresh(),
   })
 
@@ -818,8 +821,14 @@ export function AuftragDetailClient({
   }, [leadTimeline.length, detail.auftrag_timeline])
 
   const dokumenteCount = useMemo(
-    () => zaehleAuftragDokumente(detail, rechnungenListe, vertraegeListe),
-    [detail, rechnungenListe, vertraegeListe]
+    () =>
+      zaehleAuftragDokumente(
+        detail,
+        rechnungenListe,
+        vertraegeListe,
+        _leadDetail?.lead_dokumente ?? []
+      ),
+    [detail, rechnungenListe, vertraegeListe, _leadDetail?.lead_dokumente]
   )
 
   const stammdatenInhalt = (
@@ -1049,6 +1058,8 @@ export function AuftragDetailClient({
             detail={detail}
             rechnungen={rechnungenListe}
             vertraege={vertraegeListe}
+            leadDokumente={_leadDetail?.lead_dokumente ?? []}
+            leadId={detail.lead_id ?? _leadDetail?.id ?? null}
             onChanged={() => refresh()}
           />
           {istBauprojekt ? (

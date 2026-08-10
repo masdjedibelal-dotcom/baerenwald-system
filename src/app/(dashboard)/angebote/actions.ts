@@ -902,12 +902,57 @@ export async function persistPdfForAngebot(
   const { data: pub } = supabaseAdmin.storage.from('angebote-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl
 
+  // PDF speichern = fürs Portal „vorgelegt“ (wie Versand). E-Mail bleibt optional über „Senden“.
+  const st = String(detail.status_einfach ?? detail.status ?? '')
+    .trim()
+    .toLowerCase()
+  const terminal = [
+    'angenommen',
+    'kunde_akzeptiert',
+    'abgelehnt',
+    'ersetzt',
+    'abgelaufen',
+    'beauftragt',
+  ].includes(st)
+  const hadTimestamps = Boolean(
+    String(detail.gesendet_am ?? detail.gesendet_kunde_at ?? '').trim()
+  )
+  const wasEntwurf = st === 'entwurf' || !st
+  const shouldPromote = !terminal && (wasEntwurf || !hadTimestamps)
+  const now = new Date().toISOString()
+
   const { error: dbErr } = await supabaseAdmin
     .from('angebote')
-    .update({ pdf_url: publicUrl, updated_at: new Date().toISOString() })
+    .update({
+      pdf_url: publicUrl,
+      updated_at: now,
+      ...(shouldPromote
+        ? {
+            status_einfach: 'gesendet' as const,
+            status: 'gesendet_kunde' as const,
+            ...(!hadTimestamps
+              ? { gesendet_am: now, gesendet_kunde_at: now }
+              : {}),
+          }
+        : {}),
+    })
     .eq('id', angebotId)
 
   if (dbErr) return { ok: false, message: dbErr.message }
+
+  if (shouldPromote && detail.lead_id) {
+    try {
+      const { syncPortalLeadStatusAfterAngebotGesendet } = await import(
+        '@/lib/portal/sync-portal-lead-status'
+      )
+      await syncPortalLeadStatusAfterAngebotGesendet({
+        leadId: detail.lead_id,
+        skipMieterMail: true,
+      })
+    } catch (e) {
+      console.warn('[persistPdfForAngebot] portal sync', e)
+    }
+  }
 
   if (!opts?.skipRevalidate) revalidatePath(`/angebote/${angebotId}`)
   return { ok: true, buffer, publicUrl }

@@ -331,116 +331,118 @@ export function KundenListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Kundentyp">
-          {(
-            [
-              ['alle', 'Alle', typCounts.alle],
-              ['privat', 'Privat', typCounts.privat],
-              ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
-              ['gewerbe', 'Gewerbe', typCounts.gewerbe],
-            ] as const
-          ).map(([value, label, count]) => (
-            <MockChip
-              key={value}
-              active={typFilter === value}
-              count={count}
-              onClick={() => setTypFilter(value)}
-            >
-              {label}
-            </MockChip>
-          ))}
-        </div>
-        <ListbarActionsMenu
-          title="Listen-Aktionen"
-          activeHint={activeFilterCount}
-          items={[
-            {
-              icon: 'filter',
-              label: 'Filter & Suchen',
-              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
-              active: activeFilterCount > 0,
-              onSelect: () => setFilterOpen(true),
-            },
-            {
-              icon: 'checks',
-              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
-              hint: selectMode ? `${selectedCount} gewählt` : undefined,
-              active: selectMode,
-              onSelect: () => {
-                setSelectMode((m) => !m)
-                setSelected({})
+        <div className="listbar-main">
+          <div className="listbar-chips" role="group" aria-label="Kundentyp">
+            {(
+              [
+                ['alle', 'Alle', typCounts.alle],
+                ['privat', 'Privat', typCounts.privat],
+                ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
+                ['gewerbe', 'Gewerbe', typCounts.gewerbe],
+              ] as const
+            ).map(([value, label, count]) => (
+              <MockChip
+                key={value}
+                active={typFilter === value}
+                count={count}
+                onClick={() => setTypFilter(value)}
+              >
+                {label}
+              </MockChip>
+            ))}
+          </div>
+          <ListbarActionsMenu
+            title="Listen-Aktionen"
+            activeHint={activeFilterCount}
+            items={[
+              {
+                icon: 'filter',
+                label: 'Filter & Suchen',
+                hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+                active: activeFilterCount > 0,
+                onSelect: () => setFilterOpen(true),
               },
-            },
-            ...(selectMode && selectedCount === 2
-              ? [
-                  {
-                    icon: 'users' as const,
-                    label: 'Zusammenführen',
-                    onSelect: () => setMergeListOpen(true),
-                  },
-                ]
-              : []),
-            {
-              icon: 'download',
-              label: 'CSV exportieren',
-              onSelect: () =>
-                runMockListExport(
-                  exportToCSV,
-                  (filtered.length ? filtered : kunden).map(toExportRow),
-                  EXPORT_FIELDS,
-                  'kunden'
-                ),
-            },
-          ]}
-          desktop={
-            <>
-              <MockBtn
-                icon="filter"
-                kind={activeFilterCount ? 'primary' : 'ghost'}
-                sm
-                title={
-                  activeFilterCount
-                    ? `Filter & Suchen (${activeFilterCount})`
-                    : 'Filter & Suchen'
-                }
-                onClick={() => setFilterOpen(true)}
-              />
-              <MockBtn
-                icon="checks"
-                kind={selectMode ? 'primary' : 'ghost'}
-                sm
-                title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
-                onClick={() => {
+              {
+                icon: 'checks',
+                label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
+                hint: selectMode ? `${selectedCount} gewählt` : undefined,
+                active: selectMode,
+                onSelect: () => {
                   setSelectMode((m) => !m)
                   setSelected({})
-                }}
-              />
-              {selectMode && selectedCount === 2 ? (
-                <MockBtn
-                  icon="users"
-                  kind="primary"
-                  sm
-                  title="Zusammenführen"
-                  onClick={() => setMergeListOpen(true)}
-                />
-              ) : null}
-              <MockBtn
-                icon="download"
-                kind="ghost"
-                sm
-                title="CSV exportieren"
-                onClick={() =>
+                },
+              },
+              ...(selectMode && selectedCount === 2
+                ? [
+                    {
+                      icon: 'users' as const,
+                      label: 'Zusammenführen',
+                      onSelect: () => setMergeListOpen(true),
+                    },
+                  ]
+                : []),
+              {
+                icon: 'download',
+                label: 'CSV exportieren',
+                onSelect: () =>
                   runMockListExport(
                     exportToCSV,
                     (filtered.length ? filtered : kunden).map(toExportRow),
                     EXPORT_FIELDS,
                     'kunden'
-                  )
-                }
-              />
-            </>
-          }
-        />
+                  ),
+              },
+            ]}
+            desktop={
+              <>
+                <MockBtn
+                  icon="filter"
+                  kind={activeFilterCount ? 'primary' : 'ghost'}
+                  sm
+                  title={
+                    activeFilterCount
+                      ? `Filter & Suchen (${activeFilterCount})`
+                      : 'Filter & Suchen'
+                  }
+                  onClick={() => setFilterOpen(true)}
+                />
+                <MockBtn
+                  icon="checks"
+                  kind={selectMode ? 'primary' : 'ghost'}
+                  sm
+                  title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
+                  onClick={() => {
+                    setSelectMode((m) => !m)
+                    setSelected({})
+                  }}
+                />
+                {selectMode && selectedCount === 2 ? (
+                  <MockBtn
+                    icon="users"
+                    kind="primary"
+                    sm
+                    title="Zusammenführen"
+                    onClick={() => setMergeListOpen(true)}
+                  />
+                ) : null}
+                <MockBtn
+                  icon="download"
+                  kind="ghost"
+                  sm
+                  title="CSV exportieren"
+                  onClick={() =>
+                    runMockListExport(
+                      exportToCSV,
+                      (filtered.length ? filtered : kunden).map(toExportRow),
+                      EXPORT_FIELDS,
+                      'kunden'
+                    )
+                  }
+                />
+              </>
+            }
+          />
+        </div>
       </div>
 
       {isMobile ? (

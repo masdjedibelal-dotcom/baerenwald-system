@@ -192,6 +192,8 @@ export type HandwerkerDetailPayload = {
     gewerk_name: string | null
     kunde_name: string | null
     vereinbarter_preis: number
+    angebot_leistungsumfang?: string | null
+    angebot_notizen?: string | null
   }[]
   /** Angebot-Zuweisungen (für Zeitraum-Filter in der Übersicht) */
   angebotZuweisungen: { id: string; created_at: string }[]
@@ -304,7 +306,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         `
         id, status, created_at, vereinbarter_preis,
         gewerke ( name ),
-        auftraege ( id, titel, status, created_at, kunden ( name ) )
+        auftraege ( id, titel, status, created_at, kunden ( name ), angebote ( leistungsumfang, notizen ) )
       `
       )
       .eq('handwerker_id', id)
@@ -359,12 +361,22 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         status: string
         created_at: string
         kunden: { name: string } | { name: string }[] | null
+        angebote?:
+          | { leistungsumfang?: string | null; notizen?: string | null }
+          | { leistungsumfang?: string | null; notizen?: string | null }[]
+          | null
       } | null
       if (!a?.id) return null
       const gRaw = r.gewerke as unknown
       const g = (Array.isArray(gRaw) ? gRaw[0] : gRaw) as { name: string } | null | undefined
       const kRaw = a.kunden
       const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { name: string } | null | undefined
+      const angRaw = a.angebote
+      const angList = Array.isArray(angRaw) ? angRaw : angRaw ? [angRaw] : []
+      const ang =
+        angList.find((x) => Boolean(x.leistungsumfang?.trim() || x.notizen?.trim())) ??
+        angList[0] ??
+        null
       return {
         id: a.id,
         titel: a.titel,
@@ -374,6 +386,8 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         gewerk_name: g?.name ?? null,
         kunde_name: k?.name ?? null,
         vereinbarter_preis: Number((r as { vereinbarter_preis?: number | null }).vereinbarter_preis) || 0,
+        angebot_leistungsumfang: ang?.leistungsumfang ?? null,
+        angebot_notizen: ang?.notizen ?? null,
       }
     })
     .filter(Boolean) as (HandwerkerDetailPayload['auftraege'][number] & { vereinbarter_preis: number })[]

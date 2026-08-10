@@ -1,6 +1,5 @@
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
-import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import {
@@ -17,20 +16,13 @@ import type { PortalMailAudience } from '@/lib/portal-utils'
 export type AngebotMailAnrede = 'du' | 'sie'
 
 /**
- * Anrede aus wizard_meta in notizen; sonst automatisch aus Kundentyp (Privat → du, Gewerbe → sie).
+ * Kundenkommunikation immer Sie (wizard_meta-/Kundentyp-Anrede wird ignoriert).
  */
 export function parseAngebotAnrede(
-  notizen?: string | null,
-  kundeTyp?: string | null
+  _notizen?: string | null,
+  _kundeTyp?: string | null
 ): AngebotMailAnrede {
-  try {
-    const j = JSON.parse(notizen ?? '{}') as { wizard_meta?: { anrede?: string } }
-    if (j.wizard_meta?.anrede === 'sie') return 'sie'
-    if (j.wizard_meta?.anrede === 'du') return 'du'
-  } catch {
-    /* leer / kein JSON */
-  }
-  return mailAnredeFromKundeTyp(kundeTyp)
+  return 'sie'
 }
 
 export function parseWizardMetaFromNotizen(

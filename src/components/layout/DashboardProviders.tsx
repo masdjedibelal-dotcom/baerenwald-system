@@ -2,6 +2,7 @@
 
 import { ChunkLoadRecovery } from '@/components/layout/ChunkLoadRecovery'
 import { SessionGuard } from '@/components/layout/SessionGuard'
+import { PushSwRegistrar } from '@/components/push/PushSwRegistrar'
 import { ActionBusyProvider } from '@/components/ui/action-busy'
 import { ConfirmDeleteProvider } from '@/components/ui/confirm-delete'
 
@@ -12,6 +13,7 @@ export function DashboardProviders({ children }: { children: React.ReactNode }) 
         {children}
         <SessionGuard />
         <ChunkLoadRecovery />
+        <PushSwRegistrar />
       </ConfirmDeleteProvider>
     </ActionBusyProvider>
   )

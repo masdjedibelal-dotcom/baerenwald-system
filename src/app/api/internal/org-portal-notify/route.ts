@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
-import { notifyInterneNeueMeldung, notifyOrgFreigabeErgebnis } from '@/lib/org/org-mail-notify'
+import {
+  notifyAngebotEntscheidung,
+  notifyInterneNeueMeldung,
+  notifyOrgFreigabeErgebnis,
+} from '@/lib/org/org-mail-notify'
 
 function authorize(req: Request): boolean {
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
@@ -29,6 +33,13 @@ export async function POST(req: Request) {
   if (body.typ === 'freigabe_ergebnis') {
     const aktion = body.aktion === 'abgelehnt' ? 'abgelehnt' : 'freigegeben'
     const res = await notifyOrgFreigabeErgebnis({ leadId, aktion, notiz: body.notiz })
+    if (!res.ok) return NextResponse.json({ ok: false, error: res.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  if (body.typ === 'angebot_entscheidung') {
+    const aktion = body.aktion === 'abgelehnt' ? 'abgelehnt' : 'angenommen'
+    const res = await notifyAngebotEntscheidung({ leadId, aktion, notiz: body.notiz })
     if (!res.ok) return NextResponse.json({ ok: false, error: res.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   }

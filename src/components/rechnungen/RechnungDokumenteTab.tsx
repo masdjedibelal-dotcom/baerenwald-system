@@ -94,12 +94,13 @@ function protokolleFromAuftrag(
   return Array.from(byHref.values())
 }
 
-/** Eine Dokumente-Liste: aktuelle RE + Geschwister + Abnahme/Abschluss + Uploads. */
+/** Eine Dokumente-Liste: aktuelle RE + Geschwister + Angebote + Abnahme/Abschluss + Uploads. */
 export function RechnungDokumenteTab({
   detail,
   leadId,
   dokumente = [],
   rechnungen = [],
+  angebote = [],
   auftragDetail = null,
   onReload,
 }: {
@@ -107,6 +108,12 @@ export function RechnungDokumenteTab({
   leadId?: string | null
   dokumente?: LeadDokumentRow[]
   rechnungen?: RechnungKurz[]
+  angebote?: {
+    id: string
+    created_at: string
+    angebotsnr?: string | null
+    pdf_url?: string | null
+  }[]
   auftragDetail?: AuftragDetail | null
   onReload: () => void
 }) {
@@ -167,7 +174,7 @@ export function RechnungDokumenteTab({
       <AnfrageDokumenteTab
         leadId={leadId}
         dokumente={dokumente}
-        angebote={[]}
+        angebote={angebote}
         rechnungen={alleRechnungen}
         immerRechnungIds={[detail.id]}
         protokolle={protokolle}

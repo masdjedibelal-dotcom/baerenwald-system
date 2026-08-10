@@ -2,7 +2,7 @@ import { gesendetAmWert } from '@/lib/angebot-einfach'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { Angebot, AngebotHandwerkerRow, AuftragDetail } from '@/lib/types'
+import type { Angebot, AngebotHandwerkerRow, AuftragDetail, LeadDokumentRow } from '@/lib/types'
 import {
   parseHwAnhangStoragePaths,
   partnerHwDokumentListenName,
@@ -33,6 +33,8 @@ export type AuftragDokumentQuelle =
   | 'angebot'
   | 'vertrag'
   | 'handwerker'
+  /** Manuelle Uploads am Lead (= kanonische Vorgangs-Akte) */
+  | 'lead'
 
 export type AuftragDokumentZeile = {
   id: string
@@ -61,6 +63,8 @@ export function dokumentTypLabel(quelle: AuftragDokumentQuelle): string {
       return 'Partner'
     case 'protokoll':
       return 'Protokoll'
+    case 'lead':
+      return 'Akte'
     case 'timeline':
       return 'Upload'
     default:
@@ -326,18 +330,53 @@ export function angebotDokumentZeile(
   }
 }
 
+/** Lead-Uploads = kanonische Vorgangs-Akte (sichtbar in jeder Phase). */
+export function leadDokumentZeilen(dokumente: LeadDokumentRow[] | null | undefined): AuftragDokumentZeile[] {
+  return (dokumente ?? [])
+    .filter((d) => d.datei_url?.trim())
+    .map((d) => ({
+      id: `lead-${d.id}`,
+      name: d.name?.trim() || 'Dokument',
+      beschreibung: 'Akte',
+      datum: d.created_at,
+      fuerKunde: false,
+      href: d.datei_url.trim(),
+      quelle: 'lead' as const,
+    }))
+}
+
+/** Dedupliziert nach href (gleiche Datei aus Lead + Timeline nicht doppelt). */
+export function dedupeDokumentZeilenByHref(rows: AuftragDokumentZeile[]): AuftragDokumentZeile[] {
+  const seen = new Set<string>()
+  const out: AuftragDokumentZeile[] = []
+  for (const row of rows) {
+    const key = row.href?.trim() || row.id
+    if (!key || key === '#' || seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+  }
+  return out
+}
+
 export function zaehleAuftragDokumente(
   detail: AuftragDetail,
   rechnungen: RechnungAuswahlZeile[] = [],
-  vertraege: HandwerkerVertragRow[] = []
+  vertraege: HandwerkerVertragRow[] = [],
+  leadDokumente: LeadDokumentRow[] = []
 ): number {
-  let n = timelineDokumentZeilen(detail).length
-  n += rechnungDokumentZeilen(rechnungen).length
-  n += vertragDokumentZeilen(vertraege).length
+  const rows = [
+    ...leadDokumentZeilen(leadDokumente),
+    ...timelineDokumentZeilen(detail),
+    ...rechnungDokumentZeilen(rechnungen),
+    ...vertragDokumentZeilen(vertraege),
+    ...handwerkerDokumentZeilen(angebotHandwerkerAusAuftragDetail(detail)),
+  ]
   const ang = angebotAusAuftragDetail(detail)
-  if (ang?.pdf_url?.trim()) n += 1
-  if (detail.abnahme_protokoll_url) n += 1
-  if (abschlussdokumentZeile(detail)) n += 1
-  n += zaehleHandwerkerDokumente(angebotHandwerkerAusAuftragDetail(detail))
-  return n
+  const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null
+  if (angebotZeile) rows.push(angebotZeile)
+  const abnahme = abnahmeDokumentZeile(detail)
+  if (abnahme) rows.push(abnahme)
+  const abschluss = abschlussdokumentZeile(detail)
+  if (abschluss) rows.push(abschluss)
+  return dedupeDokumentZeilenByHref(rows).length
 }

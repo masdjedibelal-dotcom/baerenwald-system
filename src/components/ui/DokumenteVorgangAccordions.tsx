@@ -50,6 +50,9 @@ export function groupByVorgangTitel<T extends { groupKey: string; groupTitle: st
     const existing = map.get(key)
     if (existing) {
       existing.items.push(item)
+      if (title && title !== 'Allgemein' && existing.title === 'Allgemein') {
+        existing.title = title
+      }
     } else {
       map.set(key, { key, title, items: [item] })
     }

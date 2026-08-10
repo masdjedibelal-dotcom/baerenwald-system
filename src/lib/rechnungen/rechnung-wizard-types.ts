@@ -1,7 +1,6 @@
 import type { RechnungArt, RechnungAbschlagLink, Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import { standardRechnungZahlungstext } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
@@ -105,8 +104,9 @@ function addDaysYmd(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function defaultZahlungszielTage(kundeTyp?: string | null): number {
-  return istPrivatKundeTyp(kundeTyp) ? 14 : 30
+/** Standard-Zahlungsziel: immer 7 Tage (unabhängig vom Kundentyp). */
+export function defaultZahlungszielTage(_kundeTyp?: string | null): number {
+  return 7
 }
 
 export function defaultRechnungWizardMeta(
@@ -123,7 +123,7 @@ export function defaultRechnungWizardMeta(
   const heute = opts?.rechnungsdatum ?? new Date().toISOString().slice(0, 10)
   const von = opts?.leistungszeitraum_von?.trim() || heute
   const bis = opts?.leistungszeitraum_bis?.trim() || heute
-  const anrede: AngebotMailAnrede = istPrivatKundeTyp(opts?.kundeTyp) ? 'du' : 'sie'
+  const anrede: AngebotMailAnrede = 'sie'
   const einleitung = defaultRechnungEinleitung(anrede)
   const mailEinleitung = defaultRechnungMailEinleitung(anrede)
   const hinweise = defaultRechnungHinweise()

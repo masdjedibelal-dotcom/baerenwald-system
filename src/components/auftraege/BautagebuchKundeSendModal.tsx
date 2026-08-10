@@ -15,7 +15,6 @@ import {
   previewBautagebuchKundenMail,
   sendBautagebuchAnKunde,
 } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
-import { defaultBautagebuchKundenNachricht } from '@/lib/mail/bautagebuch-kunden-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
 
@@ -76,7 +75,7 @@ export function BautagebuchKundeSendModal({
         toast.error(r.message)
         return
       }
-      setAnrede(r.defaultAnrede)
+      setAnrede('sie')
       setBetreff(r.defaultBetreff)
       setNachricht(r.defaultNachricht)
       setProjektTitel(r.projektTitel)
@@ -110,13 +109,6 @@ export function BautagebuchKundeSendModal({
     if (!open || !mailReady) return
     refreshPreview()
   }, [open, mailReady, betreff, nachricht, anrede, refreshPreview])
-
-  function onAnredeChange(next: AngebotMailAnrede) {
-    if (!eintrag) return
-    setAnrede(next)
-    setNachricht(defaultBautagebuchKundenNachricht(next, eintrag, projektTitel || kundeName))
-    setDirty(true)
-  }
 
   function senden() {
     if (!eintrag || !betreff.trim() || !nachricht.trim()) {
@@ -183,17 +175,6 @@ export function BautagebuchKundeSendModal({
           }}
           disabled={pending}
         />
-
-        <div className="flex gap-4 border-b border-bw-border pb-4 text-[length:var(--fs-text)]">
-          <label className="flex items-center gap-2">
-            <input type="radio" checked={anrede === 'sie'} onChange={() => onAnredeChange('sie')} />
-            Sie
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" checked={anrede === 'du'} onChange={() => onAnredeChange('du')} />
-            Du
-          </label>
-        </div>
 
         <KiAssistFieldLabel
           label="Betreff"

@@ -198,13 +198,12 @@ export function KundenObjekteCard({
           {liste.map((o) => {
             const strasse = kundenObjektStrasseZeile(o) || '—'
             const st = statsById[o.id]
-            const einheitenAnzahl =
-              st && st.einheitenTotal > 0
-                ? st.einheitenTotal
-                : (() => {
-                    const m = o.einheiten_hinweis?.match(/\d+/)
-                    return m ? Number(m[0]) : null
-                  })()
+            const mieterAnzahl =
+              st && st.mieterTotal > 0
+                ? st.mieterTotal
+                : st && st.einheitenTotal > 0
+                  ? st.einheitenTotal
+                  : null
 
             return (
               <button
@@ -224,8 +223,8 @@ export function KundenObjekteCard({
                     <div className="objekte-card__sub" title={strasse}>
                       {strasse}
                     </div>
-                    {einheitenAnzahl != null ? (
-                      <div className="objekte-card__meta">{einheitenAnzahl}</div>
+                    {mieterAnzahl != null ? (
+                      <div className="objekte-card__meta">{mieterAnzahl} Mieter</div>
                     ) : null}
                   </div>
                   <MockIcon

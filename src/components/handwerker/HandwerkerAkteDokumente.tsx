@@ -15,6 +15,7 @@ import {
   istEigeneUnterlageTyp,
 } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const AKTE_UPLOAD_TYP: ComplianceDokumentTyp = {
@@ -46,7 +47,8 @@ type AkteDocRow = PartnerDokument & {
 
 /**
  * Akte → Dokumente: nach Vorgangstitel gruppiert (Accordions).
- * Freie Stamm-Uploads unter „Allgemein“; projektbezogene eigene Unterlagen unter dem Auftragstitel.
+ * Freie Stamm-Uploads unter „Allgemein“; projektbezogene eigene Unterlagen
+ * unter Angebotstitel → Auftragstitel.
  */
 export function HandwerkerAkteDokumente({
   handwerkerId,
@@ -55,7 +57,12 @@ export function HandwerkerAkteDokumente({
 }: {
   handwerkerId: string
   dokumente: PartnerDokument[]
-  auftraege?: { id: string; titel: string | null }[]
+  auftraege?: {
+    id: string
+    titel: string | null
+    angebot_leistungsumfang?: string | null
+    angebot_notizen?: string | null
+  }[]
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -65,7 +72,17 @@ export function HandwerkerAkteDokumente({
   const titelByAuftrag = useMemo(() => {
     const m = new Map<string, string>()
     for (const a of auftraege) {
-      m.set(a.id, a.titel?.trim() || 'Auftrag')
+      m.set(
+        a.id,
+        resolveAkteVorgangTitel({
+          angebot: {
+            leistungsumfang: a.angebot_leistungsumfang,
+            notizen: a.angebot_notizen,
+          },
+          auftragTitel: a.titel,
+          fallback: 'Auftrag',
+        })
+      )
     }
     return m
   }, [auftraege])

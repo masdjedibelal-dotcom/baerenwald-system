@@ -39,10 +39,7 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
-import {
-  ANFRAGE_WARTE_AUF_HV_LABEL,
-  rechnungStatusDisplay,
-} from '@/lib/status/status-display'
+import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import { HwEingangsrechnungenListe } from '@/components/rechnungen/HwEingangsrechnungenListe'
@@ -132,7 +129,6 @@ const EXPORT_FIELDS: ExportField[] = [
 type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 function statusKind(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return 'warten'
   const u = row.unterstatus.toLowerCase()
   // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
   if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
@@ -155,15 +151,11 @@ function statusKind(row: VorgangListeRow): string {
   return 'aktiv'
 }
 
-const STATUS_FILTER_WARTET_FREIGABE = 'wartet_freigabe'
-
 function statusFilterKey(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return STATUS_FILTER_WARTET_FREIGABE
   return row.unterstatus
 }
 
 function statusLabel(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return ANFRAGE_WARTE_AUF_HV_LABEL
   return row.unterstatusLabel
 }
 
@@ -463,25 +455,12 @@ export function VorgaengeListeClient({
       ]
     }
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
-    const phaseRows =
-      filter === 'alle' || filter === 'bestand'
-        ? lifecycleRows
-        : lifecycleRows.filter((v) => v.phase === filter)
-    const hatWartetFreigabe = phaseRows.some((v) => v.badges.wartet_freigabe)
-
     if (filter !== 'alle' && filter !== 'bestand' && filter in PHASE_UNTERSTATUS_VALUES) {
       const phase = filter as VorgangPhase
-      const opts = PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
+      return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
         value: u,
         label: unterstatusLabel(phase, u),
       }))
-      if (hatWartetFreigabe) {
-        opts.unshift({
-          value: STATUS_FILTER_WARTET_FREIGABE,
-          label: ANFRAGE_WARTE_AUF_HV_LABEL,
-        })
-      }
-      return opts
     }
     const byKey = new Map<string, string>()
     for (const v of lifecycleRows) {

@@ -54,11 +54,13 @@ export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[
 }
 
 export type KundenObjektListenStats = {
+  /** @deprecated Alias für mieterTotal — UI zeigt Mieter */
   einheitenTotal: number
   einheitenVermietet: number
+  mieterTotal: number
 }
 
-/** Einheiten-/Vermietet-Zähler für Objekte-Liste (Mock-Spalten). */
+/** Mieter-/Einheiten-Zähler für Objekte-Liste. */
 export async function fetchKundenObjektListenStats(
   kundeId: string,
   objektIds: string[]
@@ -84,24 +86,35 @@ export async function fetchKundenObjektListenStats(
 
   const units = einheiten ?? []
   const einheitIds = units.map((e) => e.id as string)
-  let vermietetSet = new Set<string>()
+  const bewohnerByEinheit = new Map<string, number>()
   if (einheitIds.length > 0) {
     const { data: bewohner } = await supabase
       .from('einheit_bewohner')
       .select('objekt_einheit_id')
       .in('objekt_einheit_id', einheitIds)
       .eq('aktiv', true)
-    vermietetSet = new Set(
-      (bewohner ?? []).map((b) => b.objekt_einheit_id as string).filter(Boolean)
-    )
+      .is('anonymisiert_am', null)
+    for (const b of bewohner ?? []) {
+      const eid = b.objekt_einheit_id as string
+      if (!eid) continue
+      bewohnerByEinheit.set(eid, (bewohnerByEinheit.get(eid) ?? 0) + 1)
+    }
   }
 
   const next: Record<string, KundenObjektListenStats> = {}
   for (const id of Array.from(allowed)) {
     const u = units.filter((e) => e.kunde_objekt_id === id)
+    let mieterTotal = 0
+    let vermietet = 0
+    for (const e of u) {
+      const n = bewohnerByEinheit.get(e.id as string) ?? 0
+      mieterTotal += n
+      if (n > 0) vermietet += 1
+    }
     next[id] = {
-      einheitenTotal: u.length,
-      einheitenVermietet: u.filter((x) => vermietetSet.has(x.id as string)).length,
+      einheitenTotal: mieterTotal,
+      einheitenVermietet: vermietet,
+      mieterTotal,
     }
   }
   return next

@@ -596,7 +596,7 @@ async function sendZahlungsbestaetigungForRechnung(
   )
 
   const branding = await getMailBranding(supabaseAdmin)
-  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const anrede = 'sie'
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
@@ -908,7 +908,7 @@ export async function sendRechnung(
   if (!toList.length && !email) return { ok: false, message: 'Kunden-E-Mail fehlt' }
 
   const branding = await getMailBranding(supabaseAdmin)
-  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const anrede = 'sie'
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
@@ -927,9 +927,7 @@ export async function sendRechnung(
   })
 
   const stornoHinweis = stornoAnhang
-    ? anrede === 'du'
-      ? `Im Anhang: Storno-Gutschrift ${stornoAnhang.nr} und die korrigierte Rechnung ${rechnungsnummer}.`
-      : `Im Anhang: Storno-Gutschrift ${stornoAnhang.nr} und die korrigierte Rechnung ${rechnungsnummer}.`
+    ? `Im Anhang: Storno-Gutschrift ${stornoAnhang.nr} und die korrigierte Rechnung ${rechnungsnummer}.`
     : null
 
   /** Optional: Abschlussbericht mit Rechnung versenden. */
@@ -975,9 +973,7 @@ export async function sendRechnung(
   }
 
   const abschlussHinweis = abschlussAnhang
-    ? anrede === 'du'
-      ? 'Zusätzlich im Anhang: der Abschlussbericht zu deinem Auftrag.'
-      : 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
+    ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
     : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
   const mailEinleitung = [stornoHinweis, abschlussHinweis, mailEinleitungBase]
@@ -1220,7 +1216,7 @@ export async function previewRechnungKundeMail(input: {
   }
 
   const branding = await getMailBranding(supabaseAdmin)
-  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const anrede = 'sie'
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
@@ -1328,7 +1324,7 @@ function buildZahlungserinnerungVorschau(
 ) {
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
-  const anrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const anrede = 'sie'
   const zahlbarBisIso = zahlungserinnerungZahlbarBis(rec.faellig_am)
   const iban = branding.iban || process.env.EMAIL_FIRMEN_IBAN || ''
 

@@ -1,6 +1,5 @@
 import type { PortalRole, ResolvedVorgang } from '@/lib/vorgang/types'
 import { ACTOR_LABELS, PHASE_LABELS } from '@/lib/vorgang/vorgang-labels'
-import { ANFRAGE_WARTE_AUF_HV_LABEL } from '@/lib/status/status-display'
 
 export type VorgangDisplayStatus = {
   phaseLabel: string
@@ -26,8 +25,13 @@ const HV_PHASE: Record<string, string> = {
 
 function pillKind(resolved: ResolvedVorgang): VorgangDisplayStatus['pillKind'] {
   if (resolved.unterstatus === 'storniert' || resolved.unterstatus === 'abgebrochen') return 'storniert'
-  if (resolved.badges.wartet_freigabe) return 'warten'
   if (resolved.phase === 'anfrage') return 'neu'
+  if (
+    resolved.phase === 'angebot' &&
+    (resolved.unterstatus === 'gesendet' || resolved.unterstatus === 'entwurf')
+  ) {
+    return 'warten'
+  }
   if (resolved.phase === 'rechnung' && resolved.unterstatus === 'bezahlt') return 'fertig'
   if (resolved.phase === 'auftrag' && resolved.unterstatus === 'abgeschlossen') return 'fertig'
   return 'aktiv'
@@ -37,8 +41,8 @@ function actionHint(resolved: ResolvedVorgang, role: PortalRole): string | null 
   if (!resolved.needsAction || !resolved.actor) return null
   if (role === 'mieter') return null
   if (role === 'handwerker' && resolved.actor === 'handwerker') return 'Aktion nötig'
-  if (role === 'hv' && resolved.actor === 'freigabe') return ANFRAGE_WARTE_AUF_HV_LABEL
   if (role === 'kunde' && resolved.actor === 'kunde') return 'Angebot liegt vor'
+  if (role === 'hv' && resolved.actor === 'kunde') return 'Angebot liegt vor'
   if (role === 'crm' || role === 'hv') return ACTOR_LABELS[resolved.actor] ?? null
   return ACTOR_LABELS[resolved.actor] ?? null
 }
@@ -56,9 +60,7 @@ export function resolveVorgangDisplay(resolved: ResolvedVorgang, role: PortalRol
 
   return {
     phaseLabel,
-    unterstatusLabel: resolved.badges.wartet_freigabe
-      ? ANFRAGE_WARTE_AUF_HV_LABEL
-      : resolved.unterstatusLabel,
+    unterstatusLabel: resolved.unterstatusLabel,
     pillKind: pillKind(resolved),
     metaLine: metaParts.length ? metaParts.join(' · ') : null,
     actionHint: actionHint(resolved, role),

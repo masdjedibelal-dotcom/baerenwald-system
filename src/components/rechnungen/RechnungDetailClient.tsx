@@ -549,6 +549,12 @@ export function RechnungDetailClient({
       leadId={leadId}
       dokumente={dokumenteRows}
       rechnungen={auftragRechnungen}
+      angebote={(projektKontext?.angebote ?? []).map((a) => ({
+        id: a.id,
+        created_at: a.created_at,
+        angebotsnr: a.angebotsnr,
+        pdf_url: a.pdf_url ?? null,
+      }))}
       auftragDetail={auftragDetail}
       onReload={() => refresh()}
     />

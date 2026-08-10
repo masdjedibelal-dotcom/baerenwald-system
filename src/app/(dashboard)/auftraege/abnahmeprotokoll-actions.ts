@@ -250,7 +250,7 @@ export async function getAbnahmeprotokollMailDefaults(auftragId: string): Promis
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const kunde = auf.kunden as { name?: string; typ?: string | null } | null
   const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
-  const defaultAnrede: MailAnrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
+  const defaultAnrede: MailAnrede = 'sie'
   return {
     ok: true,
     defaultAnrede,

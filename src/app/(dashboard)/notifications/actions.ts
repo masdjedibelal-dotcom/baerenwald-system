@@ -14,6 +14,7 @@ export type CrmNotificationTyp =
   | 'handwerker_einreichung'
   | 'vorgang_angenommen'
   | 'vorgang_abgelehnt'
+  | 'angebot_entscheidung'
   | 'projektvertrag_bestaetigt'
   | 'abnahme_bestaetigt'
   | 'abnahme_freigabe_ausstehend'
@@ -57,6 +58,8 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Vorgang angenommen'
     case 'vorgang_abgelehnt':
       return 'Vorgang abgelehnt'
+    case 'angebot_entscheidung':
+      return 'Angebot entschieden'
     case 'projektvertrag_bestaetigt':
       return 'Projektvertrag bestätigt'
     case 'abnahme_bestaetigt':
@@ -82,6 +85,7 @@ function typIcon(typ: CrmNotificationTyp): string {
       return 'tool'
     case 'handwerker_angenommen':
     case 'vorgang_angenommen':
+    case 'angebot_entscheidung':
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'auftrag_abgeschlossen':
@@ -108,6 +112,9 @@ function ctaLabel(typ: CrmNotificationTyp): string {
       return 'Angebot öffnen'
     case 'vorgang_angenommen':
     case 'vorgang_abgelehnt':
+      return 'Auftrag öffnen'
+    case 'angebot_entscheidung':
+      return 'Vorgang öffnen'
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'abnahme_freigabe_ausstehend':
@@ -134,6 +141,8 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
       return 'Der Partner hat die Leistungsanfrage im Portal abgelehnt.'
+    case 'angebot_entscheidung':
+      return 'Kunde oder Auftraggeber hat das Angebot im Portal angenommen oder abgelehnt.'
     case 'projektvertrag_bestaetigt':
       return 'Der Partner hat den Projektvertrag im Portal bestätigt.'
     case 'abnahme_bestaetigt':
@@ -240,6 +249,7 @@ async function collectCrmNotificationItems(opts?: {
     auftraegeRes,
     posMelRes,
     waRes,
+    angebotEntscheidungTlRes,
   ] = await Promise.all([
     supabase
       .from('leads')
@@ -323,6 +333,14 @@ async function collectCrmNotificationItems(opts?: {
       .from('auftrag_positionen')
       .select('id, auftrag_id, leistung_name, created_at, handwerker:handwerker_id(name)')
       .eq('anerkennung_status', 'in_pruefung')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('lead_timeline')
+      .select('id, lead_id, angebot_id, titel, beschreibung, created_at')
+      .eq('typ', 'angebot')
+      .or('titel.ilike.Angebot angenommen%,titel.eq.Angebot abgelehnt')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(40),
@@ -538,6 +556,50 @@ async function collectCrmNotificationItems(opts?: {
       createdAt: row.created_at as string,
       gelesen: false,
     })
+  }
+
+  // ── Angebot im Portal angenommen / abgelehnt ─────────────────
+  if (!angebotEntscheidungTlRes.error) {
+    const tlRows = angebotEntscheidungTlRes.data ?? []
+    const angebotIds = [
+      ...new Set(
+        tlRows
+          .map((r) => (r.angebot_id as string | null)?.trim())
+          .filter((id): id is string => Boolean(id))
+      ),
+    ]
+    const auftragByAngebot = new Map<string, string>()
+    if (angebotIds.length) {
+      const { data: aufRows } = await supabase
+        .from('auftraege')
+        .select('id, angebot_id')
+        .in('angebot_id', angebotIds)
+      for (const a of aufRows ?? []) {
+        const aid = (a.angebot_id as string | null)?.trim()
+        const id = (a.id as string | null)?.trim()
+        if (aid && id) auftragByAngebot.set(aid, id)
+      }
+    }
+    for (const row of tlRows) {
+      const leadId = (row.lead_id as string | null)?.trim()
+      const angebotId = (row.angebot_id as string | null)?.trim()
+      const titel = (row.titel as string | null)?.trim() || ''
+      const abgelehnt = titel === 'Angebot abgelehnt'
+      const auftragId = angebotId ? auftragByAngebot.get(angebotId) ?? null : null
+      items.push({
+        sourceKey: `angebot_entscheidung:${row.id}`,
+        typ: 'angebot_entscheidung',
+        title: abgelehnt ? 'Angebot abgelehnt' : 'Angebot angenommen',
+        subtitle: (row.beschreibung as string)?.trim() || null,
+        href: hrefVorgang({
+          auftragId,
+          angebotId,
+          leadId,
+        }),
+        createdAt: row.created_at as string,
+        gelesen: false,
+      })
+    }
   }
 
   // ── Teilabnahme zur Freigabe (pro HW-Protokoll) ───────────────

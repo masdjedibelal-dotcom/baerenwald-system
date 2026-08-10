@@ -25,8 +25,10 @@ import {
   angebotAusAuftragDetail,
   angebotDokumentZeile,
   angebotHandwerkerAusAuftragDetail,
+  dedupeDokumentZeilenByHref,
   dokumentTypLabel,
   handwerkerDokumentZeilen,
+  leadDokumentZeilen,
   rechnungDokumentZeilen,
   sortDokumentZeilen,
   timelineDokumentZeilen,
@@ -34,9 +36,10 @@ import {
   type AuftragDokumentZeile,
   type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
+import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { AuftragDetail, AuftragTimelineEvent } from '@/lib/types'
+import type { AuftragDetail, AuftragTimelineEvent, LeadDokumentRow } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 
 export type { AuftragDokumentZeile }
@@ -52,11 +55,16 @@ export function AuftragDokumenteTab({
   detail,
   rechnungen = [],
   vertraege = [],
+  leadDokumente = [],
+  leadId = null,
   onChanged,
 }: {
   detail: AuftragDetail
   rechnungen?: RechnungAuswahlZeile[]
   vertraege?: HandwerkerVertragRow[]
+  /** Kanonische Vorgangs-Uploads (lead_dokumente) — sichtbar in jeder Phase */
+  leadDokumente?: LeadDokumentRow[]
+  leadId?: string | null
   onChanged: () => void
 }) {
   const [pending, startTransition] = useLocalTransition()
@@ -94,6 +102,7 @@ export function AuftragDokumenteTab({
 
   const zeilenRaw = useMemo(() => {
     const rows = [
+      ...leadDokumentZeilen(leadDokumente),
       ...timelineDokumentZeilen(detail),
       ...rechnungDokumentZeilen(rechnungen),
       ...vertragDokumentZeilen(vertraege),
@@ -106,8 +115,8 @@ export function AuftragDokumenteTab({
     if (abnahme) rows.push(abnahme)
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
-    return rows
-  }, [detail, rechnungen, vertraege, handwerkerZeilen])
+    return dedupeDokumentZeilenByHref(rows)
+  }, [detail, rechnungen, vertraege, handwerkerZeilen, leadDokumente])
 
   const zeilen = useMemo(
     () => sortDokumentZeilen(zeilenRaw, sortKey, sortDir),
@@ -127,7 +136,39 @@ export function AuftragDokumenteTab({
     const list = Array.from(files).slice(0, 5)
     if (!list.length) return
     setUploading(true)
+    const kanonLeadId = leadId?.trim() || detail.lead_id?.trim() || null
     try {
+      if (kanonLeadId) {
+        // Mit Lead: in Vorgangs-Akte (lead_dokumente) — erscheint in allen Phasen
+        for (const file of list) {
+          const fd = new FormData()
+          fd.set('file', file)
+          fd.set('filename', file.name)
+          const res = await fetch(`/api/anfragen/${kanonLeadId}/dokument/upload`, {
+            method: 'POST',
+            body: fd,
+          })
+          const json = (await res.json()) as {
+            url?: string
+            groesse_bytes?: number
+            error?: string
+          }
+          if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
+          const ins = await insertLeadDokument({
+            leadId: kanonLeadId,
+            name: file.name,
+            datei_url: json.url,
+            groesse_bytes: json.groesse_bytes ?? file.size,
+          })
+          if (!ins.ok) throw new Error(ins.message)
+        }
+        toast.success(
+          list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`
+        )
+        onChanged()
+        return
+      }
+
       const urls: string[] = []
       for (const file of list) {
         const fd = new FormData()

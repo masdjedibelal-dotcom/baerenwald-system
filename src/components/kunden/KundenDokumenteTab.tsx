@@ -18,7 +18,7 @@ import {
   groupByVorgangTitel,
 } from '@/components/ui/DokumenteVorgangAccordions'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { cn } from '@/lib/utils'
 
 type DocRow = {
@@ -71,12 +71,18 @@ function normalizeAuftragAngebote(
         pdf_url?: string | null
         created_at?: string | null
         status?: string
+        lead_id?: string | null
+        leistungsumfang?: string | null
+        notizen?: string | null
       }
     | {
         id?: string
         pdf_url?: string | null
         created_at?: string | null
         status?: string
+        lead_id?: string | null
+        leistungsumfang?: string | null
+        notizen?: string | null
       }[]
     | null
     | undefined
@@ -85,9 +91,17 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
-function auftragGroup(a: { id: string; titel?: string | null }) {
-  const title = a.titel?.trim() || 'Auftrag'
-  return { groupKey: `auftrag:${a.id}`, groupTitle: title }
+type AngTitelQuelle = {
+  leistungsumfang?: string | null
+  notizen?: string | null
+}
+
+function pickAngebotFuerTitel(list: AngTitelQuelle[]): AngTitelQuelle | null {
+  return (
+    list.find((a) => Boolean(a.leistungsumfang?.trim() || a.notizen?.trim())) ??
+    list[0] ??
+    null
+  )
 }
 
 export function KundenDokumenteTab({
@@ -119,6 +133,73 @@ export function KundenDokumenteTab({
     const rows: DocRow[] = []
     const seen = new Set<string>()
 
+    const leadById = new Map(leads.map((l) => [l.id, l]))
+    const auftragById = new Map(auftraege.map((a) => [a.id, a]))
+    const angebotById = new Map<string, AngTitelQuelle & { id: string; lead_id?: string | null }>()
+
+    for (const l of leads) {
+      for (const ang of l.angebote ?? []) {
+        if (!ang?.id) continue
+        angebotById.set(ang.id, {
+          id: ang.id,
+          lead_id: l.id,
+          leistungsumfang: ang.leistungsumfang,
+          notizen: ang.notizen,
+        })
+      }
+    }
+    for (const a of auftraege) {
+      for (const ang of normalizeAuftragAngebote(a.angebote)) {
+        if (!ang?.id) continue
+        angebotById.set(ang.id, {
+          id: ang.id,
+          lead_id: ang.lead_id ?? a.lead_id ?? null,
+          leistungsumfang: ang.leistungsumfang,
+          notizen: ang.notizen,
+        })
+      }
+    }
+
+    function groupForVorgang(opts: {
+      leadId?: string | null
+      auftragId?: string | null
+      angebot?: AngTitelQuelle | null
+      rechnungTitel?: string | null
+    }): { groupKey: string; groupTitle: string } {
+      const lead = opts.leadId ? leadById.get(opts.leadId) : undefined
+      const auftrag = opts.auftragId ? auftragById.get(opts.auftragId) : undefined
+      const angsFromAuftrag = auftrag
+        ? normalizeAuftragAngebote(auftrag.angebote)
+        : []
+      const angsFromLead = lead?.angebote ?? []
+      const angebot =
+        opts.angebot ??
+        pickAngebotFuerTitel([
+          ...angsFromAuftrag,
+          ...angsFromLead.map((x) => ({
+            leistungsumfang: x.leistungsumfang,
+            notizen: x.notizen,
+          })),
+        ])
+
+      const title = resolveAkteVorgangTitel({
+        angebot,
+        auftragTitel: auftrag?.titel,
+        rechnungTitel: opts.rechnungTitel,
+        situation: lead?.situation,
+        bereiche: lead?.bereiche,
+        fallback: auftrag?.titel || 'Vorgang',
+      })
+
+      if (opts.leadId) {
+        return { groupKey: `lead:${opts.leadId}`, groupTitle: title }
+      }
+      if (opts.auftragId) {
+        return { groupKey: `auftrag:${opts.auftragId}`, groupTitle: title }
+      }
+      return { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
+    }
+
     for (const d of dokumente) {
       if (d.typ === 'protokoll') continue
       const href = d.datei_url?.trim()
@@ -142,7 +223,11 @@ export function KundenDokumenteTab({
     }
 
     for (const a of auftraege) {
-      const group = auftragGroup(a)
+      const leadId =
+        a.lead_id?.trim() ||
+        normalizeAuftragAngebote(a.angebote).find((x) => x.lead_id)?.lead_id ||
+        null
+      const group = groupForVorgang({ leadId, auftragId: a.id })
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         const id = `angebot-${ang.id}`
@@ -193,12 +278,7 @@ export function KundenDokumenteTab({
     }
 
     for (const l of leads) {
-      const leadTitle =
-        situationBereichTitel(
-          (l as { situation?: string | null }).situation,
-          (l as { bereiche?: string[] | null }).bereiche
-        ) || 'Anfrage'
-      const leadGroup = { groupKey: `lead:${l.id}`, groupTitle: leadTitle }
+      const group = groupForVorgang({ leadId: l.id })
       for (const ang of l.angebote ?? []) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         if ('auftrag_id' in ang && ang.auftrag_id) continue
@@ -213,7 +293,7 @@ export function KundenDokumenteTab({
           quelle: 'angebot',
           beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
-          ...leadGroup,
+          ...group,
         })
         seen.add(id)
       }
@@ -222,15 +302,23 @@ export function KundenDokumenteTab({
     for (const r of rechnungen) {
       const id = `rechnung-${r.id}`
       const m = meta[id]
-      const auftragEmbed = r.auftraege
-      const auftragOne = Array.isArray(auftragEmbed) ? auftragEmbed[0] : auftragEmbed
-      const auftragId = (r as { auftrag_id?: string | null }).auftrag_id?.trim()
-      const group = auftragId
-        ? {
-            groupKey: `auftrag:${auftragId}`,
-            groupTitle: auftragOne?.titel?.trim() || 'Auftrag',
-          }
-        : { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
+      const auftragId = (r as { auftrag_id?: string | null }).auftrag_id?.trim() || null
+      const angebotId = (r as { angebot_id?: string | null }).angebot_id?.trim() || null
+      const auftrag = auftragId ? auftragById.get(auftragId) : undefined
+      const ang = angebotId ? angebotById.get(angebotId) : null
+      const leadId =
+        ang?.lead_id?.trim() ||
+        auftrag?.lead_id?.trim() ||
+        normalizeAuftragAngebote(auftrag?.angebote).find((x) => x.lead_id)?.lead_id ||
+        null
+      const group =
+        leadId || auftragId
+          ? groupForVorgang({
+              leadId,
+              auftragId,
+              angebot: ang,
+            })
+          : { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
       rows.push({
         id,
         name: m?.name?.trim() || r.rechnungsnummer?.trim() || 'Rechnung',

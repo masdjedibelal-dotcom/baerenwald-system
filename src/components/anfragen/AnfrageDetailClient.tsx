@@ -334,15 +334,45 @@ export function AnfrageDetailClient({
     return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }, [lead.lead_dokumente])
 
-  const dokumenteCount = useMemo(
-    () =>
+  const dokumenteCount = useMemo(() => {
+    const rechnungen = projektKontext?.rechnungen ?? []
+    const protokolleN =
+      (projektKontext?.auftrag?.abnahme_protokoll_url ? 1 : 0) +
+      (projektKontext?.auftrag?.abschlussdokumentation_url ? 1 : 0)
+    return (
       dokumenteRows.length +
       angeboteListe.length +
-      (projektKontext?.rechnungen ?? []).filter((r) =>
-        rechnungIstAlsAkteUnterlage(r)
-      ).length,
-    [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen]
-  )
+      rechnungen.filter((r) => rechnungIstAlsAkteUnterlage(r)).length +
+      protokolleN
+    )
+  }, [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen, projektKontext?.auftrag])
+
+  const akteProtokolle = useMemo(() => {
+    const auf = projektKontext?.auftrag
+    if (!auf) return [] as { id: string; name: string; href: string; created_at?: string | null; beschreibung?: string | null }[]
+    const out: { id: string; name: string; href: string; created_at?: string | null; beschreibung?: string | null }[] = []
+    const abnahme = auf.abnahme_protokoll_url?.trim()
+    if (abnahme) {
+      out.push({
+        id: 'abnahme-protokoll',
+        name: 'Abnahmeprotokoll',
+        href: abnahme,
+        created_at: auf.created_at ?? null,
+        beschreibung: 'Abnahme',
+      })
+    }
+    const abschluss = auf.abschlussdokumentation_url?.trim()
+    if (abschluss) {
+      out.push({
+        id: 'abschluss-doku',
+        name: 'Abschlussdokumentation',
+        href: abschluss,
+        created_at: auf.abschlussdokumentation_gesendet_at ?? auf.created_at ?? null,
+        beschreibung: 'Abschluss',
+      })
+    }
+    return out
+  }, [projektKontext?.auftrag])
 
   const leadEmail =
     lead.auftraggeber?.email?.trim() ||
@@ -664,6 +694,7 @@ export function AnfrageDetailClient({
               dokumente={dokumenteRows}
               angebote={angeboteListe}
               rechnungen={projektKontext?.rechnungen ?? []}
+              protokolle={akteProtokolle}
               onReload={() => refresh()}
             />
           }
