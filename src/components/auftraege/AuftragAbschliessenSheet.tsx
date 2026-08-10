@@ -399,13 +399,13 @@ function HwProtokollVorschau({
             <ul className="m-0 list-none space-y-1.5 p-0">
               {p.punkte.map((pkt, i) => (
                 <li
-                  key={pkt.leistung_id || `p-${i}`}
+                  key={pkt.id || pkt.leistung_id || `p-${i}`}
                   className="text-[length:var(--fs-text)] text-[var(--text-1)]"
                 >
                   <span className="text-[var(--text-3)]">
                     {String(pkt.status).toLowerCase() === 'ok' ? '✓' : '○'}{' '}
                   </span>
-                  {pkt.titel?.trim() || 'Leistung'}
+                  {(pkt.leistung_name ?? pkt.beschreibung)?.trim() || 'Leistung'}
                 </li>
               ))}
             </ul>
@@ -417,7 +417,7 @@ function HwProtokollVorschau({
               </p>
               <ul className="m-0 list-disc space-y-1 pl-5">
                 {offenMaengel.map((m, i) => (
-                  <li key={m.id || `m-${i}`} className="text-[length:var(--fs-text)]">
+                  <li key={m.punkt_id || `m-${i}`} className="text-[length:var(--fs-text)]">
                     {m.titel?.trim() || m.beschreibung?.trim() || 'Mangel'}
                   </li>
                 ))}

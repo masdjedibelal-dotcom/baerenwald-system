@@ -289,6 +289,7 @@ export type LeadAuftraggeberEmbed = Pick<
   | 'nachname'
   | 'email'
   | 'telefon'
+  | 'adresse'
   | 'plz'
   | 'ort'
   | 'strasse'

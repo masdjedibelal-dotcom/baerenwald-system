@@ -19,7 +19,7 @@ export function RechnungStammdatenCard({
   const k = isHv ? hvKunde : detail.kunden
 
   const name = isHv
-    ? hvKunde?.org_anzeigename?.trim() ||
+    ? lead?.auftraggeber?.org_anzeigename?.trim() ||
       hvKunde?.name?.trim() ||
       (lead ? leadKontaktAnzeigeName(lead, '') : '') ||
       ''
