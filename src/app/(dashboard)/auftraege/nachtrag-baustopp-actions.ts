@@ -11,6 +11,7 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailNachtrag } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import type { AngebotPosition, Kunde } from '@/lib/types'
+import { angebotNachtragMarker } from '@/lib/auftraege/nachtrag-utils'
 import { getPublicAppUrl } from '@/lib/utils'
 
 const DEFAULT_MWST = 19
@@ -255,12 +256,6 @@ export async function createNachtragManuell(input: {
   return { ok: true, id: row.id as string }
 }
 
-const ANGEBOT_NACHTRAG_MARKER = (angebotId: string) => `[crm:angebot:${angebotId}]`
-
-export function angebotNachtragMarker(angebotId: string): string {
-  return ANGEBOT_NACHTRAG_MARKER(angebotId.trim())
-}
-
 /** Nachtrags-Zeile zum Angebots-Dokument (Marker in beschreibung). */
 export async function findNachtragRowByAngebotId(angebotId: string): Promise<{
   id: string
@@ -372,7 +367,7 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
 
   const pos = normalizeAngebotPositionen(input.positionen)
   const summen = summenAusPositionen(pos, DEFAULT_MWST)
-  const marker = ANGEBOT_NACHTRAG_MARKER(input.angebotId.trim())
+  const marker = angebotNachtragMarker(input.angebotId)
   const baseDesc = (input.beschreibung ?? '').trim()
   const beschreibung = baseDesc.includes(marker)
     ? baseDesc
