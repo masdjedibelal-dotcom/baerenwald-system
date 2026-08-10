@@ -905,7 +905,11 @@ export function HandwerkerDetailClient({
   )
 
   const akteDateien = (
-    <HandwerkerAkteDokumente handwerkerId={hw.id} dokumente={payload.dokumente} />
+    <HandwerkerAkteDokumente
+      handwerkerId={hw.id}
+      dokumente={payload.dokumente}
+      auftraege={payload.auftraege}
+    />
   )
 
   const complianceInhalt = (
@@ -931,7 +935,9 @@ export function HandwerkerDetailClient({
   )
   const akteDocsAnzahl = useMemo(
     () =>
-      standardDokumente(payload.dokumente).filter((d) => istEigeneUnterlageTyp(d.typ)).length,
+      payload.dokumente.filter(
+        (d) => d.datei_url?.trim() && istEigeneUnterlageTyp(d.typ)
+      ).length,
     [payload.dokumente]
   )
   const akteAnzahl = akteDocsAnzahl + (hw.notizen?.trim() ? 1 : 0)

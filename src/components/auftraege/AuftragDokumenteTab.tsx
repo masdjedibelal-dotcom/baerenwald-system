@@ -21,6 +21,7 @@ import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   abschlussdokumentZeile,
+  abnahmeDokumentZeile,
   angebotAusAuftragDetail,
   angebotDokumentZeile,
   angebotHandwerkerAusAuftragDetail,
@@ -101,17 +102,8 @@ export function AuftragDokumenteTab({
     const ang = angebotAusAuftragDetail(detail)
     const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null
     if (angebotZeile) rows.unshift(angebotZeile)
-    if (detail.abnahme_protokoll_url) {
-      rows.push({
-        id: 'abnahme-pdf',
-        name: 'Abnahmeprotokoll',
-        beschreibung: 'Abnahme',
-        datum: detail.updated_at ?? detail.created_at,
-        fuerKunde: true,
-        href: detail.abnahme_protokoll_url,
-        quelle: 'protokoll',
-      })
-    }
+    const abnahme = abnahmeDokumentZeile(detail)
+    if (abnahme) rows.push(abnahme)
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
     return rows

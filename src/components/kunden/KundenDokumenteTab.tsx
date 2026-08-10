@@ -13,7 +13,12 @@ import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import {
+  DokumenteVorgangAccordions,
+  groupByVorgangTitel,
+} from '@/components/ui/DokumenteVorgangAccordions'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { cn } from '@/lib/utils'
 
 type DocRow = {
@@ -26,9 +31,13 @@ type DocRow = {
   dokumentId?: string
   beschreibung: string
   freigabe: boolean
+  groupKey: string
+  groupTitle: string
 }
 
 const COLS = 'minmax(0, 1fr) auto'
+const ALLGEMEIN_KEY = 'allgemein'
+const ALLGEMEIN_TITLE = 'Allgemein'
 
 function formatBytes(n: number | null | undefined): string | null {
   if (n == null || n <= 0) return null
@@ -76,6 +85,11 @@ function normalizeAuftragAngebote(
   return Array.isArray(raw) ? raw : [raw]
 }
 
+function auftragGroup(a: { id: string; titel?: string | null }) {
+  const title = a.titel?.trim() || 'Auftrag'
+  return { groupKey: `auftrag:${a.id}`, groupTitle: title }
+}
+
 export function KundenDokumenteTab({
   kundeId,
   dokumente,
@@ -121,11 +135,14 @@ export function KundenDokumenteTab({
         dokumentId: d.id,
         beschreibung: m?.beschreibung ?? '',
         freigabe: m?.freigabe ?? false,
+        groupKey: ALLGEMEIN_KEY,
+        groupTitle: ALLGEMEIN_TITLE,
       })
       seen.add(id)
     }
 
     for (const a of auftraege) {
+      const group = auftragGroup(a)
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         const id = `angebot-${ang.id}`
@@ -137,8 +154,9 @@ export function KundenDokumenteTab({
           created_at: m?.created_at || ang.created_at || a.created_at,
           groesse_bytes: null,
           quelle: 'angebot',
-          beschreibung: m?.beschreibung ?? (a.titel?.trim() || ''),
+          beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...group,
         })
         seen.add(id)
       }
@@ -153,8 +171,9 @@ export function KundenDokumenteTab({
           created_at: m?.created_at || a.created_at,
           groesse_bytes: null,
           quelle: 'dokumentation',
-          beschreibung: m?.beschreibung ?? (a.titel?.trim() || ''),
+          beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...group,
         })
       }
 
@@ -167,12 +186,19 @@ export function KundenDokumenteTab({
         created_at: abschlussMeta?.created_at || a.created_at,
         groesse_bytes: null,
         quelle: 'dokumentation',
-        beschreibung: abschlussMeta?.beschreibung ?? (a.titel?.trim() || ''),
+        beschreibung: abschlussMeta?.beschreibung ?? '',
         freigabe: abschlussMeta?.freigabe ?? true,
+        ...group,
       })
     }
 
     for (const l of leads) {
+      const leadTitle =
+        situationBereichTitel(
+          (l as { situation?: string | null }).situation,
+          (l as { bereiche?: string[] | null }).bereiche
+        ) || 'Anfrage'
+      const leadGroup = { groupKey: `lead:${l.id}`, groupTitle: leadTitle }
       for (const ang of l.angebote ?? []) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         if ('auftrag_id' in ang && ang.auftrag_id) continue
@@ -187,6 +213,7 @@ export function KundenDokumenteTab({
           quelle: 'angebot',
           beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...leadGroup,
         })
         seen.add(id)
       }
@@ -195,6 +222,15 @@ export function KundenDokumenteTab({
     for (const r of rechnungen) {
       const id = `rechnung-${r.id}`
       const m = meta[id]
+      const auftragEmbed = r.auftraege
+      const auftragOne = Array.isArray(auftragEmbed) ? auftragEmbed[0] : auftragEmbed
+      const auftragId = (r as { auftrag_id?: string | null }).auftrag_id?.trim()
+      const group = auftragId
+        ? {
+            groupKey: `auftrag:${auftragId}`,
+            groupTitle: auftragOne?.titel?.trim() || 'Auftrag',
+          }
+        : { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
       rows.push({
         id,
         name: m?.name?.trim() || r.rechnungsnummer?.trim() || 'Rechnung',
@@ -204,6 +240,7 @@ export function KundenDokumenteTab({
         quelle: 'rechnung',
         beschreibung: m?.beschreibung ?? '',
         freigabe: m?.freigabe ?? true,
+        ...group,
       })
     }
 
@@ -211,6 +248,8 @@ export function KundenDokumenteTab({
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
   }, [dokumente, auftraege, leads, rechnungen, meta])
+
+  const groups = useMemo(() => groupByVorgangTitel(docs), [docs])
 
   const upd = (
     id: string,
@@ -281,6 +320,118 @@ export function KundenDokumenteTab({
 
   const busy = uploading || pending
 
+  function renderDocList(items: DocRow[]) {
+    if (isMobile) {
+      return (
+        <div className="dok-cards">
+          {items.map((d) => {
+            const sizeLabel = formatBytes(d.groesse_bytes)
+            const metaLine = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
+            return (
+              <DokMobileCard
+                key={d.id}
+                title={d.name}
+                meta={metaLine}
+                onClick={() => openDokumentDatei(d.href)}
+                badge={
+                  <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
+                    {d.freigabe ? 'Kunde' : 'intern'}
+                  </span>
+                }
+              />
+            )
+          })}
+        </div>
+      )
+    }
+
+    return (
+      <div className="dok-list dok-list--kunde">
+        {items.map((d) => {
+          const editing = editId === d.id
+          const sizeLabel = formatBytes(d.groesse_bytes)
+          const beschreibung = d.beschreibung?.trim() || ''
+          const subline =
+            beschreibung ||
+            [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
+          return (
+            <div
+              key={d.id}
+              className={cn('list-row', !editing && 'dok-list__row--openable')}
+              style={{
+                gridTemplateColumns: COLS,
+                cursor: editing ? 'default' : 'pointer',
+                alignItems: 'center',
+              }}
+              role={editing ? undefined : 'button'}
+              tabIndex={editing ? undefined : 0}
+              onClick={() => {
+                if (!editing) openDokumentDatei(d.href)
+              }}
+              onKeyDown={(e) => {
+                if (editing) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openDokumentDatei(d.href)
+                }
+              }}
+            >
+              {editing ? (
+                <div
+                  className="dok-list__main min-w-0"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    className="txt"
+                    value={d.name}
+                    onChange={(e) => upd(d.id, { name: e.target.value })}
+                    style={{ height: 30 }}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="dok-list__main min-w-0">
+                  <div className="dok-list__name">
+                    {d.name}
+                    {subline ? (
+                      <span className="dok-list__name-size"> · {subline}</span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+              <div
+                className="dok-list__actions"
+                style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {editing ? (
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="check"
+                    title="Fertig"
+                    onClick={() => setEditId(null)}
+                  />
+                ) : null}
+                {d.quelle === 'upload' ? (
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="trash"
+                    title="Löschen"
+                    disabled={busy}
+                    onClick={() => removeDoc(d)}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <>
       <MockDokumenteCard count={docs.length}>
@@ -337,110 +488,8 @@ export function KundenDokumenteTab({
               ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
               : 'Noch keine Dokumente.'}
           </p>
-        ) : isMobile ? (
-          <div className="dok-cards">
-            {docs.map((d) => {
-              const sizeLabel = formatBytes(d.groesse_bytes)
-              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
-              return (
-                <DokMobileCard
-                  key={d.id}
-                  title={d.name}
-                  meta={meta}
-                  onClick={() => openDokumentDatei(d.href)}
-                  badge={
-                    <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
-                      {d.freigabe ? 'Kunde' : 'intern'}
-                    </span>
-                  }
-                />
-              )
-            })}
-          </div>
         ) : (
-          <div className="dok-list dok-list--kunde">
-            {docs.map((d) => {
-              const editing = editId === d.id
-              const sizeLabel = formatBytes(d.groesse_bytes)
-              const beschreibung = d.beschreibung?.trim() || ''
-              const subline =
-                beschreibung ||
-                [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
-              return (
-                <div
-                  key={d.id}
-                  className={cn('list-row', !editing && 'dok-list__row--openable')}
-                  style={{
-                    gridTemplateColumns: COLS,
-                    cursor: editing ? 'default' : 'pointer',
-                    alignItems: 'center',
-                  }}
-                  role={editing ? undefined : 'button'}
-                  tabIndex={editing ? undefined : 0}
-                  onClick={() => {
-                    if (!editing) openDokumentDatei(d.href)
-                  }}
-                  onKeyDown={(e) => {
-                    if (editing) return
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      openDokumentDatei(d.href)
-                    }
-                  }}
-                >
-                  {editing ? (
-                    <div
-                      className="dok-list__main min-w-0"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        className="txt"
-                        value={d.name}
-                        onChange={(e) => upd(d.id, { name: e.target.value })}
-                        style={{ height: 30 }}
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <div className="dok-list__main min-w-0">
-                      <div className="dok-list__name">
-                        {d.name}
-                        {subline ? (
-                          <span className="dok-list__name-size"> · {subline}</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    className="dok-list__actions"
-                    style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {editing ? (
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="check"
-                        title="Fertig"
-                        onClick={() => setEditId(null)}
-                      />
-                    ) : null}
-                    {d.quelle === 'upload' ? (
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="trash"
-                        title="Löschen"
-                        disabled={busy}
-                        onClick={() => removeDoc(d)}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <DokumenteVorgangAccordions groups={groups} renderItems={renderDocList} />
         )}
       </MockDokumenteCard>
     </>

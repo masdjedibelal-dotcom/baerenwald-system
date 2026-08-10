@@ -1088,9 +1088,15 @@ div.input input::placeholder {
   background: color-mix(in srgb, var(--border) 80%, transparent);
   align-self: center;
 }
-/* Mobil: eigene Zeile unter Phasen. Desktop: Toggle rechts in listbar-actions */
+/* Offen/Erledigt: eigene Zeile unter Phasen (Alle + Rechnung), Desktop + Mobil */
 .listbar-lifecycle {
-  display: none;
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.listbar-lifecycle .segment-toggle--listbar {
+  width: 100%;
+  max-width: 320px;
 }
 
 .listbar-actions {
@@ -1186,11 +1192,10 @@ div.input input::placeholder {
     overflow-x: auto;
   }
   .listbar-lifecycle {
-    display: block;
-    width: 100%;
+    margin-top: 0;
   }
   .listbar-lifecycle .segment-toggle--listbar {
-    width: 100%;
+    max-width: none;
   }
   .listbar-lifecycle .segment-toggle-btn {
     padding: 8px 10px;
@@ -11679,6 +11684,21 @@ textarea.input:focus {
 .accordion-body {
     @apply border-t border-bw-border bg-bw-card px-4 py-3;
   }
+
+/** Akte-Dokumente: Vorgangstitel statt Uppercase-Label */
+.dok-vorgang-accordion.accordion {
+  @apply mb-0;
+}
+.dok-vorgang-accordion .accordion-title {
+  @apply normal-case tracking-normal text-[length:var(--fs-text)] font-semibold text-bw-text;
+}
+.dok-vorgang-accordion .accordion-body {
+  @apply px-0 py-0;
+}
+.dok-vorgang-accordion .dok-list,
+.dok-vorgang-accordion .dok-cards {
+  @apply border-0;
+}
 
 .tabs {
     @apply flex gap-0 overflow-x-auto border-b border-bw-border;

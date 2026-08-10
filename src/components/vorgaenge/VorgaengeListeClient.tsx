@@ -321,9 +321,10 @@ export function VorgaengeListeClient({
       setFilter(phase)
       setStatusFilter([])
       if (phase !== 'rechnung') setRechnungRichtung('ausgehend')
-      // Erledigt nur unter „Alle“ — Phasen immer Offen
-      const nextLc = phase === 'alle' ? lifecycle : 'offen'
-      if (phase !== 'alle') setLifecycle('offen')
+      // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
+      const keepsLifecycle = phase === 'alle' || phase === 'rechnung'
+      const nextLc = keepsLifecycle ? lifecycle : 'offen'
+      if (!keepsLifecycle) setLifecycle('offen')
       if (!embedded) {
         syncPhaseToUrl(
           phase,
@@ -362,8 +363,8 @@ export function VorgaengeListeClient({
     if (phase === 'rechnung' && r === 'eingehend') setRechnungRichtung('eingehend')
     else setRechnungRichtung('ausgehend')
     const lc = searchParams.get('lifecycle')
-    // Erledigt-Toggle nur unter „Alle“
-    if (phase === 'alle') {
+    // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
+    if (phase === 'alle' || phase === 'rechnung') {
       if (lc === 'erledigt' || lc === 'offen') setLifecycle(lc)
       else setLifecycle('offen')
     } else {
@@ -417,14 +418,16 @@ export function VorgaengeListeClient({
   }, [localRows, restrictPartnerName, restrictHandwerkerId, restrictKundeId, restrictLeadIds])
 
   const lifecycleCounts = useMemo(() => {
+    const scope =
+      filter === 'rechnung' ? baseRows.filter((v) => v.phase === 'rechnung') : baseRows
     let offen = 0
     let erledigt = 0
-    for (const v of baseRows) {
+    for (const v of scope) {
       if (isVorgangErledigt(v)) erledigt += 1
       else offen += 1
     }
     return { offen, erledigt }
-  }, [baseRows])
+  }, [baseRows, filter])
 
   const hwLifecycleCounts = useMemo(() => {
     let offen = 0
@@ -437,13 +440,13 @@ export function VorgaengeListeClient({
   }, [hwEingangsrechnungen])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
-  /** Offen/Erledigt-Toggle nur bei „Alle“. */
-  const showLifecycleToggle = filter === 'alle'
-  const effectiveLifecycleCounts = lifecycleCounts
+  /** Offen/Erledigt-Toggle bei „Alle“ und „Rechnung“. */
+  const showLifecycleToggle = filter === 'alle' || filter === 'rechnung'
+  const effectiveLifecycleCounts = showHwEingang ? hwLifecycleCounts : lifecycleCounts
 
-  /** Erledigt nur unter „Alle“ — Phasen-Listen immer ohne erledigte Vorgänge. */
+  /** Erledigt-Filter unter „Alle“ und „Rechnung“; andere Phasen nur Offen. */
   const lifecycleRows = useMemo(() => {
-    if (filter === 'alle') {
+    if (filter === 'alle' || filter === 'rechnung') {
       return baseRows.filter((v) =>
         lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
       )
@@ -491,12 +494,16 @@ export function VorgaengeListeClient({
       .map(([value, label]) => ({ value, label }))
   }, [lifecycleRows, filter, showHwEingang])
 
-  /** HW-Eingang: Filter über globales Sheet; ohne Statuswahl nur Offen. */
+  /** HW-Eingang: Filter über globales Sheet; ohne Statuswahl nach Offen/Erledigt. */
   const hwFilteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const statuses = statusFilter.length > 0 ? statusFilter : ['eingereicht']
     return hwEingangsrechnungen.filter((r) => {
-      if (!statuses.includes(r.status)) return false
+      if (statusFilter.length > 0) {
+        if (!statusFilter.includes(r.status)) return false
+      } else {
+        const erledigt = hwRechnungIstErledigt(r.status)
+        if (lifecycle === 'erledigt' ? !erledigt : erledigt) return false
+      }
       if (fKunde) {
         const needle = fKunde.toLowerCase()
         const inKunde = (r.kundeName ?? '').toLowerCase().includes(needle)
@@ -539,6 +546,7 @@ export function VorgaengeListeClient({
   }, [
     hwEingangsrechnungen,
     statusFilter,
+    lifecycle,
     query,
     fKunde,
     fTitel,
@@ -981,7 +989,11 @@ export function VorgaengeListeClient({
                 </MockChip>
                 <MockChip
                   active={rechnungRichtung === 'eingehend'}
-                  count={hwLifecycleCounts.offen}
+                  count={
+                    lifecycle === 'erledigt'
+                      ? hwLifecycleCounts.erledigt
+                      : hwLifecycleCounts.offen
+                  }
                   onClick={() => setRechnungRichtungFilter('eingehend')}
                 >
                   Eingehend
@@ -1015,40 +1027,6 @@ export function VorgaengeListeClient({
             ]}
             desktop={
               <>
-                {showLifecycleToggle ? (
-                  <div
-                    className="segment-toggle segment-toggle--listbar"
-                    role="group"
-                    aria-label="Lebenszyklus"
-                  >
-                    <button
-                      type="button"
-                      className={cn(
-                        'segment-toggle-btn',
-                        lifecycle === 'offen' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setLifecycleFilter('offen')}
-                    >
-                      Offen{' '}
-                      <span className="segment-toggle-count">
-                        {effectiveLifecycleCounts.offen}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        'segment-toggle-btn',
-                        lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setLifecycleFilter('erledigt')}
-                    >
-                      Erledigt{' '}
-                      <span className="segment-toggle-count">
-                        {effectiveLifecycleCounts.erledigt}
-                      </span>
-                    </button>
-                  </div>
-                ) : null}
                 <MockBtn
                   icon="filter"
                   kind={activeFilterCount ? 'primary' : 'ghost'}
@@ -1226,7 +1204,7 @@ export function VorgaengeListeClient({
       {showHwEingang ? (
         <HwEingangsrechnungenListe
           rows={hwFilteredRows}
-          filterKey={`${statusFilter.join(',')}|${query}|${fKunde}|${fTitel}|${fWertVon}|${fWertBis}|${fDatumVon}|${fDatumBis}`}
+          filterKey={`${lifecycle}|${statusFilter.join(',')}|${query}|${fKunde}|${fTitel}|${fWertVon}|${fWertBis}|${fDatumVon}|${fDatumBis}`}
         />
       ) : (
       <div

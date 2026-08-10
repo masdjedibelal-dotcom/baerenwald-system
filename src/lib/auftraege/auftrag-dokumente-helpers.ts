@@ -243,6 +243,25 @@ export function zaehleHandwerkerDokumente(rows: AngebotHandwerkerRow[]): number 
   return handwerkerDokumentZeilen(rows).length
 }
 
+export function abnahmeDokumentZeile(
+  detail: Pick<
+    AuftragDetail,
+    'id' | 'abnahme_protokoll_url' | 'abnahme_datum' | 'updated_at' | 'created_at'
+  >
+): AuftragDokumentZeile | null {
+  const href = detail.abnahme_protokoll_url?.trim()
+  if (!href) return null
+  return {
+    id: 'abnahme-pdf',
+    name: 'Abnahmeprotokoll',
+    beschreibung: 'Abnahme',
+    datum: detail.abnahme_datum ?? detail.updated_at ?? detail.created_at,
+    fuerKunde: true,
+    href,
+    quelle: 'protokoll',
+  }
+}
+
 export function abschlussdokumentZeile(detail: AuftragDetail): AuftragDokumentZeile | null {
   const url =
     (detail as { abschlussdokumentation_url?: string | null }).abschlussdokumentation_url?.trim() ??

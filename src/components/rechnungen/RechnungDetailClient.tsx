@@ -37,7 +37,7 @@ import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCar
 import {
   buildRechnungPhaseSheetProps,
 } from '@/components/rechnungen/RechnungDetailsTab'
-import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
+import { RechnungLeistungenMitBautagebuch } from '@/components/rechnungen/RechnungLeistungenMitBautagebuch'
 import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -52,7 +52,6 @@ import {
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
@@ -529,54 +528,18 @@ export function RechnungDetailClient({
     </div>
   )
 
-  const leistungenInhalt = (() => {
-    const pos = normalizeAngebotPositionen(detail.positionen ?? []).filter(
-      (p) => !istGewerkBeschreibungPosition(p)
-    )
-    const mwstSatz =
-      detail.mwst_satz != null && Number.isFinite(Number(detail.mwst_satz))
-        ? Number(detail.mwst_satz)
-        : 19
-    const summen = summenAusPositionen(pos, mwstSatz)
-    const netto =
-      detail.netto != null && Number.isFinite(Number(detail.netto))
-        ? Number(detail.netto)
-        : summen.nettoMin
-    const mwstBetrag =
-      detail.mwst_betrag != null && Number.isFinite(Number(detail.mwst_betrag))
-        ? Number(detail.mwst_betrag)
-        : summen.mwstBetragMin
-    const brutto =
-      detail.brutto != null && Number.isFinite(Number(detail.brutto))
-        ? Number(detail.brutto)
-        : netto + mwstBetrag
-    return (
-      <LeistungenTab
-        phase="rechnung"
-        rows={leistungenFromAngebotPositionen(
-          pos,
-          {
-            status:
-              detail.status === 'bezahlt'
-                ? 'bezahlt'
-                : detail.status === 'gesendet'
-                  ? 'gestellt'
-                  : 'entwurf',
-            statusLabel:
-              detail.status === 'bezahlt'
-                ? 'Bezahlt'
-                : detail.status === 'gesendet'
-                  ? 'Gestellt'
-                  : 'Entwurf',
-          },
-          { eigenleistungSubline: true }
-        )}
-        groupByGewerk
-        footerNettoMwst={{ netto, mwstSatz, mwstBetrag, brutto }}
-        emptyHint="Noch keine Positionen — über „Rechnung bearbeiten“ anlegen."
-      />
-    )
-  })()
+  const leistungenInhalt = (
+    <RechnungLeistungenMitBautagebuch
+      detail={detail}
+      auftragDetail={auftragDetail}
+      initialView={
+        searchParams.get('view') === 'bautagebuch' ||
+        searchParams.get('segment') === 'bautagebuch'
+          ? 'bautagebuch'
+          : 'leistungen'
+      }
+    />
+  )
 
   const verlaufInhalt = <VerlaufPanel items={timelineItems} />
 
@@ -586,6 +549,7 @@ export function RechnungDetailClient({
       leadId={leadId}
       dokumente={dokumenteRows}
       rechnungen={auftragRechnungen}
+      auftragDetail={auftragDetail}
       onReload={() => refresh()}
     />
   )
