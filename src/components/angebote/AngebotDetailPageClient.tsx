@@ -525,8 +525,8 @@ export function AngebotDetailPageClient({
 
   const stammdatenInhalt = (
     <>
-      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
       <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
     </>
   )
 

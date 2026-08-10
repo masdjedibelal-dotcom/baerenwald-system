@@ -15,6 +15,7 @@ import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragAbschliessenSheet } from '@/components/auftraege/AuftragAbschliessenSheet'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
+import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
@@ -29,7 +30,6 @@ import {
 } from '@/components/vorgang/VorgangZahlungTab'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
-import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
@@ -386,8 +386,8 @@ export function AuftragDetailClient({
   projektKontext,
 }: {
   detail: AuftragDetail
-  lead?: AuftragLeadSnapshot | null
-  /** Voller Lead für Anfrage-Details-Tab */
+  lead?: AuftragLeadSnapshot | LeadDetail | null
+  /** Voller Lead für Melder/Leistungsort + Anfrage-Details */
   leadDetail?: LeadDetail | null
   angebotDetail?: AngebotDetail | null
   gewerke?: GewerkOpt[]
@@ -515,6 +515,17 @@ export function AuftragDetailClient({
   const openAuftragAbschliessen = useCallback(() => {
     setAbschliessenOpen(true)
   }, [])
+
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const id = (e as CustomEvent<{ auftragId?: string }>).detail?.auftragId
+      if (!id || id !== detail.id) return
+      void refresh()
+      setAbschliessenOpen(true)
+    }
+    window.addEventListener('crm-open-auftrag-abschliessen', onOpen)
+    return () => window.removeEventListener('crm-open-auftrag-abschliessen', onOpen)
+  }, [detail.id, refresh])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
@@ -812,11 +823,14 @@ export function AuftragDetailClient({
   )
 
   const stammdatenInhalt = (
-    <AuftragStammdatenCard
-      detail={detail}
-      lead={_leadDetail ?? null}
-      onSaved={() => refresh()}
-    />
+    <>
+      <AuftragStammdatenCard
+        detail={detail}
+        lead={_leadDetail ?? null}
+        onSaved={() => refresh()}
+      />
+      {_leadDetail ? <HvMeldungKontextCards lead={_leadDetail} /> : null}
+    </>
   )
 
   const leistungInhalt = (
@@ -1103,12 +1117,6 @@ export function AuftragDetailClient({
       wiedervorlageEntity="auftrag"
       wiedervorlageEntityId={detail.id}
       onWiedervorlageSaved={() => refresh()}
-      banner={
-        <AuftragNotfallBanner
-          istNotfall={Boolean(detail.ist_notfall)}
-          verguetung={detail.notfall_verguetung}
-        />
-      }
       quickBar={quickBar}
       head={{
         title: name,

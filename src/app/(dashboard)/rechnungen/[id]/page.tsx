@@ -11,6 +11,7 @@ import {
   loadRechnungenForAuftrag,
 } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { loadWizardContext } from '@/lib/wizard-context'
+import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import {
   findeNachfolgerRechnungId,
   rechnungDarfStornoZurueckgenommenWerden,
@@ -80,26 +81,20 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     await Promise.all([
       leadId
         ? Promise.all([
-            supabase
-              .from('leads')
-              .select(
-                'id, status, kanal, anlass, situation, bereiche, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, auftraggeber_kunde_id, org_freigabe_status, kundentyp, created_at, plz, notizen, budget_ca, preis_min, preis_max'
-              )
-              .eq('id', leadId)
-              .maybeSingle(),
+            loadAnfrageDetail(supabase, leadId),
             supabase
               .from('lead_timeline')
               .select('*')
               .eq('lead_id', leadId)
               .order('created_at', { ascending: true }),
-          ]).then(([leadRes, tlRes]) => ({
-            lead: (leadRes.data as LeadDetail | null) ?? null,
+          ]).then(([leadDetail, tlRes]) => ({
+            lead: leadDetail,
             timeline: (tlRes.data ?? []) as LeadTimelineRow[],
-            pipelineLead: leadRes.data
+            pipelineLead: leadDetail
               ? {
-                  kanal: leadRes.data.kanal as string | null,
-                  auftraggeber_kunde_id: leadRes.data.auftraggeber_kunde_id as string | null,
-                  anlass: leadRes.data.anlass as string | null,
+                  kanal: leadDetail.kanal as string | null,
+                  auftraggeber_kunde_id: leadDetail.auftraggeber_kunde_id as string | null,
+                  anlass: leadDetail.anlass as string | null,
                 }
               : null,
           }))

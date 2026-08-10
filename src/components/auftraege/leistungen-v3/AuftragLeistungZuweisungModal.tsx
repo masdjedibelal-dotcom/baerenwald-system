@@ -17,6 +17,7 @@ import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 
 function ymdToDisplay(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
@@ -75,6 +76,15 @@ export function AuftragLeistungZuweisungModal({
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
   const [selectedHwRows, setSelectedHwRows] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const assistent = useAssistentOptional()
+
+  /** KI-over-sheet darf Zuweisungs-Sheet nicht blockieren/„hängen“. */
+  function dismissKiOverSheet() {
+    if (!assistent?.open) return
+    if (assistent.scoped?.layer !== 'over-sheet') return
+    assistent.setOpen(false)
+    assistent.clearScoped()
+  }
 
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -165,6 +175,9 @@ export function AuftragLeistungZuweisungModal({
           ? displayToYmd(bis)
           : vonYmd
 
+    dismissKiOverSheet()
+    setPickerOpen(false)
+
     startTransition(async () => {
       if (isSingle && sample) {
         const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
@@ -239,6 +252,8 @@ export function AuftragLeistungZuweisungModal({
         onConfirm={confirm}
         className="hw-anfrage-modal"
         bodyClassName="hw-anfrage-body"
+        /* Handwerker-Suche darüber → Parent zurücktreten, sonst peekt/verdeckt Zuweisung */
+        overlayClassName={pickerOpen ? 'editor-sheet-overlay--recessed' : undefined}
       >
         <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
         {isSingle ? (
@@ -265,7 +280,7 @@ export function AuftragLeistungZuweisungModal({
                   setBeschreibung(text)
                 }}
                 extraHint="Leistungsbeschreibung für die Handwerker-Anfrage (Partner-Portal / Mail)."
-                disabled={pending}
+                disabled={pending || pickerOpen}
               >
                 <textarea
                   className="input ta"
@@ -316,9 +331,13 @@ export function AuftragLeistungZuweisungModal({
                 <button
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setDirty(true)
                     setZeitModus('zeitraum')
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
                   }}
                   disabled={pending}
                 >
@@ -327,16 +346,22 @@ export function AuftragLeistungZuweisungModal({
                 <button
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setDirty(true)
                     setZeitModus('tag')
                     if (von) setBis(von)
+                    /* iOS: Modus-Wechsel darf Date-Picker nicht auto-öffnen */
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
                   }}
                   disabled={pending}
                 >
                   Einzelner Tag
                 </button>
               </div>
+              {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
               <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
                 <label className="hw-anfrage-field">
                   <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
@@ -359,7 +384,10 @@ export function AuftragLeistungZuweisungModal({
                       tabIndex={-1}
                       disabled={pending}
                       aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
                         const input = (e.currentTarget.parentElement?.querySelector(
                           'input[type="date"]'
                         ) ?? null) as HTMLInputElement | null
@@ -367,7 +395,6 @@ export function AuftragLeistungZuweisungModal({
                           input?.showPicker?.()
                         } catch {
                           input?.focus()
-                          input?.click()
                         }
                       }}
                     >
@@ -375,44 +402,50 @@ export function AuftragLeistungZuweisungModal({
                     </button>
                   </div>
                 </label>
-                {zeitModus === 'zeitraum' ? (
-                  <label className="hw-anfrage-field">
-                    <span className="hw-anfrage-label">Bis</span>
-                    <div className="hw-anfrage-date-field">
-                      <input
-                        type="date"
-                        className="input"
-                        value={bis.trim() ? displayToYmd(bis) : ''}
-                        onChange={(e) => {
-                          setDirty(true)
-                          const v = e.target.value
-                          setBis(v ? ymdToDisplay(v) : '')
-                        }}
-                        disabled={pending}
-                      />
-                      <button
-                        type="button"
-                        className="hw-anfrage-date-icon"
-                        tabIndex={-1}
-                        disabled={pending}
-                        aria-label="Kalender öffnen"
-                        onClick={(e) => {
-                          const input = (e.currentTarget.parentElement?.querySelector(
-                            'input[type="date"]'
-                          ) ?? null) as HTMLInputElement | null
-                          try {
-                            input?.showPicker?.()
-                          } catch {
-                            input?.focus()
-                            input?.click()
-                          }
-                        }}
-                      >
-                        <MockIcon ctx="btn" n="calendar" size={15} />
-                      </button>
-                    </div>
-                  </label>
-                ) : null}
+                <label
+                  className={cn(
+                    'hw-anfrage-field',
+                    zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
+                  )}
+                >
+                  <span className="hw-anfrage-label">Bis</span>
+                  <div className="hw-anfrage-date-field">
+                    <input
+                      type="date"
+                      className="input"
+                      value={bis.trim() ? displayToYmd(bis) : ''}
+                      onChange={(e) => {
+                        setDirty(true)
+                        const v = e.target.value
+                        setBis(v ? ymdToDisplay(v) : '')
+                      }}
+                      disabled={pending || zeitModus === 'tag'}
+                      tabIndex={zeitModus === 'tag' ? -1 : undefined}
+                    />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending || zeitModus === 'tag'}
+                      aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
+                  </div>
+                </label>
               </div>
             </div>
           </>
@@ -505,7 +538,10 @@ export function AuftragLeistungZuweisungModal({
             type="button"
             className="pos-add-btn w-full"
             disabled={pending}
-            onClick={() => setPickerOpen(true)}
+            onClick={() => {
+              dismissKiOverSheet()
+              setPickerOpen(true)
+            }}
           >
             <span className="icon-wrap">
               <MockIcon ctx="default" n="search" size={16} />

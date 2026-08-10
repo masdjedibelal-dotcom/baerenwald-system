@@ -534,7 +534,7 @@ async function collectCrmNotificationItems(opts?: {
       typ: 'abnahme_bestaetigt',
       title: 'Abnahme bestätigt',
       subtitle: (row.beschreibung as string)?.trim() || null,
-      href: `/auftraege/${auftragId}?tab=abnahme`,
+      href: `/auftraege/${auftragId}?tab=leistungen`,
       createdAt: row.created_at as string,
       gelesen: false,
     })
@@ -552,8 +552,8 @@ async function collectCrmNotificationItems(opts?: {
       sourceKey: `abnahme_freigabe_ausstehend:${row.id}`,
       typ: 'abnahme_freigabe_ausstehend',
       title: hwName ? `Abnahme wartet — ${hwName}` : 'Abnahme wartet auf Freigabe',
-      subtitle: aufTitel || 'Teilabnahme prüfen',
-      href: `/auftraege/${auftragId}?tab=abnahme`,
+      subtitle: aufTitel || 'Unter Leistungen prüfen',
+      href: `/auftraege/${auftragId}?tab=leistungen`,
       createdAt: (row.updated_at as string) || (row.created_at as string) || since,
       gelesen: false,
     })

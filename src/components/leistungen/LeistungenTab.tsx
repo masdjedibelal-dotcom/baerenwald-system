@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, Info, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronRight, Info, MoreHorizontal } from 'lucide-react'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -84,6 +84,8 @@ export function LeistungenTab({
   footerNettoMwst,
   bulkActions,
   drawerActionsForRow,
+  onNachtragEntscheiden,
+  nachtragDecidePending = false,
   belowTable,
   emptyTitle = 'Noch keine Leistungen',
   emptyHint,
@@ -108,6 +110,12 @@ export function LeistungenTab({
   /** Sammelaktionen — nur Auftrag (Spec). */
   bulkActions?: LeistungenTabBulkAction[]
   drawerActionsForRow?: (row: LeistungRow) => LeistungDrawerAction[]
+  /** Handwerker-Nachtrag im Sheet bestätigen/ablehnen */
+  onNachtragEntscheiden?: (
+    positionId: string,
+    status: 'anerkannt' | 'abgelehnt'
+  ) => void
+  nachtragDecidePending?: boolean
   /** z. B. Button „Tagebucheintrag“ unter der Tabelle */
   belowTable?: ReactNode
   emptyTitle?: string
@@ -214,6 +222,87 @@ export function LeistungenTab({
   }
 
   const selectedCount = selectedIds.size
+
+  function renderLeistungCard(row: LeistungRow) {
+    const selected = selectedIds.has(row.id)
+    const hwName = row.handwerkerName?.trim() || null
+    const anfrage = row.anfrageStatusLabel?.trim() || null
+    const tone = row.handwerkerStatusTone ?? null
+    const sub =
+      row.subline?.trim() ||
+      (!groupByGewerk ? row.gewerkName?.trim() || null : null) ||
+      null
+
+    return (
+      <div
+        key={row.id}
+        className={cn('lt-card', allowBulk && 'lt-card--bulk', selected && 'sel')}
+        role="button"
+        tabIndex={0}
+        onClick={() => setActiveId(row.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setActiveId(row.id)
+          }
+        }}
+      >
+        {allowBulk ? (
+          <div
+            className="lt-card__chk"
+            onClick={(e) => toggleOne(row.id, e)}
+            role="checkbox"
+            aria-checked={selected}
+          >
+            <span className={cn('lt-box', selected && 'on')}>
+              {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
+            </span>
+          </div>
+        ) : null}
+        <div className="lt-card__body">
+          <div className="lt-card__head">
+            <span className="lt-card__title">{row.bezeichnung}</span>
+            <StatusBadge status={row.status} label={row.statusLabel} />
+          </div>
+          {sub ? <div className="lt-card__sub">{sub}</div> : null}
+          <div className="lt-card__meta">
+            <div className="lt-card__meta-left">
+              {hwName || anfrage ? (
+                <span className="lt-card__hw">
+                  {tone ? (
+                    <span
+                      className={cn(
+                        'lt-card__hw-dot',
+                        tone === 'offen' && 'lt-card__hw-dot--offen',
+                        tone === 'warten' && 'lt-card__hw-dot--warten',
+                        tone === 'zugewiesen' && 'lt-card__hw-dot--zugewiesen'
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <span>
+                    {hwName || 'Handwerker'}
+                    {anfrage ? ` · ${anfrage}` : ''}
+                  </span>
+                </span>
+              ) : phase === 'auftrag' ? (
+                <span className="lt-card__dim">Kein Handwerker</span>
+              ) : (
+                <span className="lt-card__dim">{row.mengeLabel}</span>
+              )}
+              {hwName || anfrage || phase === 'auftrag' ? (
+                <span className="lt-card__dim">{row.mengeLabel}</span>
+              ) : null}
+            </div>
+            <span className="lt-card__meta-right">
+              <span className="lt-card__price">{row.preisLabel}</span>
+              <ChevronRight className="lt-card__chev h-4 w-4" aria-hidden />
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   function renderLeistungRow(row: LeistungRow) {
     const selected = selectedIds.has(row.id)
@@ -377,7 +466,7 @@ export function LeistungenTab({
   }
 
   return (
-    <div className="lt-root space-y-3">
+    <div className="lt-root lt-root--mobile-cards space-y-3">
       <LeistungenMaengelCard maengel={maengel} />
 
       {hint ? (
@@ -413,6 +502,38 @@ export function LeistungenTab({
           </Button>
         </div>
       ) : null}
+
+      {/* Mobil: gestapelte Cards inkl. Handwerker-Anfrage-Status */}
+      <div className="lt-mobile">
+        {allowBulk ? (
+          <div className="lt-mobile-bulk-head">
+            <div
+              className="lt-chk"
+              onClick={toggleAll}
+              role="checkbox"
+              aria-checked={selectedCount === rows.length && rows.length > 0}
+            >
+              <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
+                {selectedCount === rows.length && rows.length > 0 ? (
+                  <Check className="h-2.5 w-2.5" aria-hidden />
+                ) : null}
+              </span>
+            </div>
+            <span>Alle auswählen</span>
+          </div>
+        ) : null}
+        {gewerkGroups
+          ? gewerkGroups.map((g) => (
+              <div key={g.name} className="lt-mobile-gewerk">
+                <div className="lt-mobile-gewerk__head">
+                  <span className="lt-mobile-gewerk__name">{g.name}</span>
+                  <span className="lt-mobile-gewerk__count">{g.items.length}</span>
+                </div>
+                <div className="lt-mobile-gewerk__cards">{g.items.map(renderLeistungCard)}</div>
+              </div>
+            ))
+          : rows.map(renderLeistungCard)}
+      </div>
 
       <div className="lt-wrap">
         <div className="lt" style={{ ['--lt-cols' as string]: cols }}>
@@ -496,10 +617,22 @@ export function LeistungenTab({
         open={Boolean(activeRow)}
         onClose={() => setActiveId(null)}
         row={activeRow}
+        pruefungPending={nachtragDecidePending}
+        onNachtragEntscheiden={
+          activeRow?.brauchtFreigabe && onNachtragEntscheiden
+            ? (status) => {
+                const id = activeRow.id
+                onNachtragEntscheiden(id, status)
+                setActiveId(null)
+              }
+            : undefined
+        }
         actions={
           activeRow
             ? [
-                ...(drawerActionsForRow?.(activeRow) ?? []),
+                ...(activeRow.brauchtFreigabe
+                  ? []
+                  : drawerActionsForRow?.(activeRow) ?? []),
                 ...(onOpenDokument
                   ? [
                       {

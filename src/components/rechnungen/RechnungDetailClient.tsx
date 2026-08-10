@@ -33,6 +33,7 @@ import {
   loadRechnungWizardBootstrapStandalone,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
+import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import {
   buildRechnungPhaseSheetProps,
 } from '@/components/rechnungen/RechnungDetailsTab'
@@ -463,7 +464,10 @@ export function RechnungDetailClient({
       : undefined
 
   const stammdatenInhalt = (
-    <RechnungStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+    <>
+      <RechnungStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
+    </>
   )
 
   const artKurz = (() => {

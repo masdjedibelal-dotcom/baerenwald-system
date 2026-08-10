@@ -12,10 +12,8 @@ import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 import { loadWizardContext } from '@/lib/wizard-context'
-import type { AngebotDetail, Lead, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
-
-const LEAD_STAMMDATEN_SELECT =
-  'id, plz, kontakt_name, kontakt_email, kontakt_telefon, funnel_daten, kanal, auftraggeber_kunde_id, anlass, situation, bereiche, kontakt_nachricht, notizen, budget_ca, preis_min, preis_max, created_at, org_freigabe_status, kundentyp, status'
+import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
+import type { AngebotDetail, LeadDetail, LeadTimelineRow, Preisliste } from '@/lib/types'
 
 export default async function AuftragDetailPage({ params }: { params: { id: string } }) {
   try {
@@ -50,27 +48,6 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       )
     )
 
-    let lead: Pick<
-      Lead,
-      | 'id'
-      | 'plz'
-      | 'kontakt_name'
-      | 'kontakt_email'
-      | 'kontakt_telefon'
-      | 'funnel_daten'
-      | 'kanal'
-      | 'auftraggeber_kunde_id'
-      | 'anlass'
-      | 'situation'
-      | 'kontakt_nachricht'
-      | 'notizen'
-      | 'budget_ca'
-      | 'preis_min'
-      | 'preis_max'
-      | 'created_at'
-    > | null = null
-    let leadTimeline: LeadTimelineRow[] = []
-
     const [rahmenVertraegeByHandwerker, projektKontext, leadBundle] = await Promise.all([
       loadRahmenVertraegeForHandwerker(handwerkerIds),
       loadProjektKontext(supabase, {
@@ -88,27 +65,25 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
               .select('*')
               .eq('lead_id', detail.lead_id)
               .order('created_at', { ascending: true }),
-            supabase
-              .from('leads')
-              .select(LEAD_STAMMDATEN_SELECT)
-              .eq('id', detail.lead_id)
-              .maybeSingle(),
-          ]).then(([tlRes, leadRes]) => ({
+            loadAnfrageDetail(supabase, detail.lead_id),
+          ]).then(([tlRes, leadDetail]) => ({
             timeline: (tlRes.data ?? []) as LeadTimelineRow[],
-            lead: leadRes.data,
+            leadDetail,
           }))
-        : Promise.resolve({ timeline: [] as LeadTimelineRow[], lead: null }),
+        : Promise.resolve({
+            timeline: [] as LeadTimelineRow[],
+            leadDetail: null as LeadDetail | null,
+          }),
     ])
 
-    leadTimeline = leadBundle.timeline
-    lead = (leadBundle.lead as typeof lead) ?? null
-    const leadDetail = lead as LeadDetail | null
+    const leadTimeline = leadBundle.timeline
+    const leadDetail = leadBundle.leadDetail
     const angebotDetail = (detail.angebote ?? null) as unknown as AngebotDetail | null
 
     return (
       <AuftragDetailClient
         detail={detail}
-        lead={lead}
+        lead={leadDetail}
         leadDetail={leadDetail}
         angebotDetail={angebotDetail}
         gewerke={wizardCtx.gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug }))}

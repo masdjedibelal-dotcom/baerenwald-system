@@ -601,8 +601,8 @@ export function AnfrageDetailClient({
 
   const stammdatenInhalt = (
     <>
-      <HvMeldungKontextCards lead={lead} />
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
+      <HvMeldungKontextCards lead={lead} />
     </>
   )
 
