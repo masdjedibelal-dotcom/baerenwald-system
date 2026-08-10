@@ -110,5 +110,15 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
   })
   if (error) {
     console.warn('[notifyPortalRechnungGesendetFromCrm] hv_notifications:', error.message)
+  } else {
+    const { schedulePortalWebPushForOrgKunde } = await import(
+      '@/lib/portal/send-portal-web-push'
+    )
+    schedulePortalWebPushForOrgKunde(orgKundeId, {
+      titel: notifTitel,
+      body,
+      url: link,
+      tag: 'rechnung',
+    })
   }
 }

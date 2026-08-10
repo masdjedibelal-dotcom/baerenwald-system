@@ -447,8 +447,10 @@ async function collectCrmNotificationItems(opts?: {
       .limit(40),
     supabase
       .from('auftrag_timeline')
-      .select('id, auftrag_id, titel, beschreibung, created_at, handwerker_id, handwerker:handwerker_id(name)')
-      .eq('typ', 'partner_unterlage')
+      .select(
+        'id, auftrag_id, titel, beschreibung, created_at, handwerker_id, typ, handwerker:handwerker_id(name)'
+      )
+      .in('typ', ['partner_unterlage', 'partner_angebot', 'partner_rechnung'])
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(40),
@@ -900,17 +902,30 @@ async function collectCrmNotificationItems(opts?: {
     }
   }
 
-  // ── Partner: allgemeine Unterlagen (Timeline-Ping) ───────────
+  // ── Partner: Unterlagen / Auto-Angebot / Rechnung (Timeline-Ping) ─
   if (!unterlageTlRes.error) {
     for (const row of unterlageTlRes.data ?? []) {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
       const hwName = hw?.name?.trim() || 'Handwerker'
+      const tlTyp = String(row.typ ?? '').toLowerCase()
+      const notifTyp =
+        tlTyp === 'partner_rechnung'
+          ? ('hw_rechnung_eingegangen' as const)
+          : tlTyp === 'partner_angebot'
+            ? ('handwerker_einreichung' as const)
+            : ('partner_unterlage' as const)
+      const title =
+        tlTyp === 'partner_rechnung'
+          ? `${hwName}: Rechnung eingereicht`
+          : tlTyp === 'partner_angebot'
+            ? `${hwName}: Angebot eingereicht`
+            : `${hwName}: Unterlage hochgeladen`
       items.push({
-        sourceKey: `partner_unterlage:${row.id}`,
-        typ: 'partner_unterlage',
-        title: `${hwName}: Unterlage hochgeladen`,
+        sourceKey: `${notifTyp}:tl:${row.id}`,
+        typ: notifTyp,
+        title,
         subtitle: (row.beschreibung as string)?.trim() || (row.titel as string)?.trim() || null,
         href: `/auftraege/${auftragId}?tab=akte`,
         createdAt: (row.created_at as string) || since,

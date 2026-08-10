@@ -71,5 +71,15 @@ export async function notifyPortalPartnerErledigtFromCrm(input: {
   })
   if (insErr) {
     console.warn('[notifyPortalPartnerErledigtFromCrm] insert:', insErr.message)
+  } else {
+    const { schedulePortalWebPushForOrgKunde } = await import(
+      '@/lib/portal/send-portal-web-push'
+    )
+    schedulePortalWebPushForOrgKunde(kundeId, {
+      titel,
+      body,
+      url: portalVorgangLink(leadId),
+      tag: 'handwerker_erledigt',
+    })
   }
 }

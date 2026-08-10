@@ -586,7 +586,7 @@ export async function duplicateKunde(
 }
 
 /**
- * Kunde löschen — nur ohne verknüpfte Vorgänge/Rechnungen.
+ * Kunde löschen inkl. aller Vorgänge (Anfragen, Angebote, Aufträge, Rechnungen).
  * Notizen, Dokumente, Objekte (Cascade) gehen mit.
  */
 export async function deleteKunde(
@@ -602,57 +602,117 @@ export async function deleteKunde(
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
   const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id').eq('id', id).maybeSingle()
+    db.from('kunden').select('id, auth_user_id').eq('id', id).maybeSingle()
   )
   if (loadErr || !row) {
     return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
   }
 
-  const [{ count: leadCount }, { count: agCount }, { count: auftragCount }, { data: rechnungen }] =
-    await Promise.all([
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('kunde_id', id),
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('auftraggeber_kunde_id', id),
-      supabase
-        .from('auftraege')
-        .select('id', { count: 'exact', head: true })
-        .eq('kunde_id', id),
-      supabase.from('rechnungen').select('id, status').eq('kunde_id', id),
-    ])
+  const [{ data: leadsAlsKunde }, { data: leadsAlsAg }] = await Promise.all([
+    supabaseAdmin.from('leads').select('id').eq('kunde_id', id),
+    supabaseAdmin.from('leads').select('id').eq('auftraggeber_kunde_id', id),
+  ])
+  const leadIds = Array.from(
+    new Set(
+      [...(leadsAlsKunde ?? []), ...(leadsAlsAg ?? [])]
+        .map((l) => String(l.id ?? '').trim())
+        .filter(Boolean)
+    )
+  )
 
-  const vorgaenge =
-    (leadCount ?? 0) + (agCount ?? 0) + (auftragCount ?? 0) + (rechnungen?.length ?? 0)
-  if (vorgaenge > 0) {
-    const bezahlt = (rechnungen ?? []).filter((r) => r.status === 'bezahlt').length
-    if (bezahlt > 0) {
-      return {
-        ok: false,
-        message: `Kunde kann nicht gelöscht werden — ${bezahlt} bezahlte Rechnung(en). Bitte zuerst stornieren oder buchen.`,
-      }
-    }
+  const { hardDeleteLeadCascade } = await import('@/lib/portal/soft-delete-lead')
+  const vorgangErrors: string[] = []
+  for (const leadId of leadIds) {
+    const r = await hardDeleteLeadCascade(leadId)
+    if (!r.ok) vorgangErrors.push(r.message)
+  }
+  if (vorgangErrors.length) {
     return {
       ok: false,
-      message:
-        'Kunde hat noch Vorgänge oder Rechnungen. Zuerst Vorgänge löschen oder Kunden zusammenführen.',
+      message: `Vorgänge konnten nicht vollständig gelöscht werden:\n${vorgangErrors
+        .slice(0, 5)
+        .join('\n')}`,
     }
   }
 
-  for (const table of ['kunden_notizen', 'kunden_dokumente', 'kunden_objekte', 'kunden_mitglieder'] as const) {
-    const { error } = await supabase.from(table).delete().eq('kunde_id', id)
+  const [{ data: restAuftraege }, { data: restAngebote }, { data: restRechnungen }] =
+    await Promise.all([
+      supabaseAdmin.from('auftraege').select('id').eq('kunde_id', id),
+      supabaseAdmin.from('angebote').select('id').eq('kunde_id', id),
+      supabaseAdmin.from('rechnungen').select('id').eq('kunde_id', id),
+    ])
+
+  const restAuftragIds = (restAuftraege ?? []).map((a) => String(a.id))
+  const restAngebotIds = (restAngebote ?? []).map((a) => String(a.id))
+  const restRechnungIds = (restRechnungen ?? []).map((r) => String(r.id))
+
+  if (restRechnungIds.length) {
+    const { error } = await supabaseAdmin
+      .from('rechnungen')
+      .delete()
+      .in('id', restRechnungIds)
+    if (error) return { ok: false, message: `rechnungen: ${error.message}` }
+  }
+
+  if (restAngebotIds.length) {
+    await supabaseAdmin
+      .from('angebot_handwerker')
+      .delete()
+      .in('angebot_id', restAngebotIds)
+    const { error } = await supabaseAdmin
+      .from('angebote')
+      .delete()
+      .in('id', restAngebotIds)
+    if (error) return { ok: false, message: `angebote: ${error.message}` }
+  }
+
+  if (restAuftragIds.length) {
+    await supabaseAdmin
+      .from('kalender_termine')
+      .delete()
+      .in('auftrag_id', restAuftragIds)
+    const { error } = await supabaseAdmin
+      .from('auftraege')
+      .delete()
+      .in('id', restAuftragIds)
+    if (error) return { ok: false, message: `auftraege: ${error.message}` }
+  }
+
+  for (const table of [
+    'kunden_notizen',
+    'kunden_dokumente',
+    'kunden_objekte',
+    'kunden_mitglieder',
+  ] as const) {
+    const { error } = await supabaseAdmin.from(table).delete().eq('kunde_id', id)
     if (error && !/does not exist|relation|schema cache/i.test(error.message)) {
       return { ok: false, message: `${table}: ${error.message}` }
     }
   }
 
-  const { error: delErr } = await supabase.from('kunden').delete().eq('id', id)
+  const authUserId = String(
+    (row as { auth_user_id?: string | null }).auth_user_id ?? ''
+  ).trim()
+  if (authUserId) {
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(authUserId)
+    } catch (e) {
+      console.warn('[deleteKunde] auth delete:', e)
+    }
+  }
+
+  // HV-Glocken vor Kunden-Zeile entfernen
+  await supabaseAdmin.from('hv_notifications').delete().eq('kunde_id', id)
+
+  const { error: delErr } = await supabaseAdmin.from('kunden').delete().eq('id', id)
   if (delErr) return { ok: false, message: delErr.message }
 
   revalidatePath('/kunden')
   revalidatePath(`/kunden/${id}`)
+  revalidatePath('/vorgaenge')
+  revalidatePath('/anfragen')
+  revalidatePath('/angebote')
+  revalidatePath('/auftraege')
+  revalidatePath('/rechnungen')
   return { ok: true }
 }

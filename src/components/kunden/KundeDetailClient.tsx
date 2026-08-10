@@ -46,6 +46,8 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
+import { runDeleteKunde } from '@/lib/list-actions'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   buildPortalLoginLink,
   defaultPortalInviteBetreff,
@@ -127,6 +129,36 @@ export function KundeDetailClient({
     null
   )
   const istSpam = Boolean(kunde.ist_spam)
+
+  const detailMenuItems = useMemo((): ActionsMenuItem[] => {
+    const items: ActionsMenuItem[] = [
+      {
+        label: istSpam ? 'Spam aufheben' : 'Als Spam markieren',
+        onClick: () => toggleSpam(),
+      },
+      {
+        label: 'Mit anderem Kunden zusammenführen',
+        onClick: () => setMergePickerOpen(true),
+      },
+      'sep',
+      {
+        label: 'Kunde löschen',
+        danger: true,
+        onClick: () => {
+          void (async () => {
+            try {
+              await runDeleteKunde(kunde.id, router, kundeDisplayName(kunde))
+              showRouteBusy('Kundenliste…')
+              router.push('/kunden')
+            } catch {
+              /* Toast kommt aus runDeleteKunde */
+            }
+          })()
+        },
+      },
+    ]
+    return items
+  }, [istSpam, kunde, router])
 
   useEffect(() => {
     void (async () => {
@@ -558,7 +590,7 @@ export function KundeDetailClient({
                 router.push(createRechnungHref(kunde.id))
               },
             }}
-            menuItems={[]}
+            menuItems={detailMenuItems}
           />
         ),
       }}

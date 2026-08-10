@@ -20,6 +20,16 @@ import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
+import { ClientOnly } from '@/components/ui/ClientOnly'
+import {
+  loadRechnungWizardBootstrapFromAuftrag,
+  loadRechnungWizardKunde,
+} from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { buildStandaloneRechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-bootstrap-helpers'
+import {
+  defaultRechnungWizardMeta,
+  type RechnungWizardBootstrap,
+} from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
@@ -50,6 +60,17 @@ const AngebotWizard = dynamic(
   {
     ssr: false,
     loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
+  }
+)
+
+const RechnungWizard = dynamic(
+  () =>
+    import('@/components/rechnungen/RechnungWizard').then((mod) => ({
+      default: mod.RechnungWizard,
+    })),
+  {
+    ssr: false,
+    loading: () => <CrmInlineLoading label="Rechnung-Assistent wird geladen …" minHeight={120} />,
   }
 )
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
@@ -221,6 +242,10 @@ export function AnfrageDetailClient({
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
   const [direktWizardOpen, setDirektWizardOpen] = useState(false)
+  const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
+  const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
+    useState<RechnungWizardBootstrap | null>(null)
+  const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
 
@@ -372,6 +397,57 @@ export function AnfrageDetailClient({
     },
     [ensureWizardData]
   )
+
+  const openWeitereRechnung = useCallback(() => {
+    startTransition(async () => {
+      const ok = await ensureWizardData()
+      if (!ok) return
+      const aufId =
+        projektKontext?.auftrag?.id?.trim() ||
+        (typeof auftragId === 'string' ? auftragId.trim() : '') ||
+        ''
+      if (aufId) {
+        const res = await loadRechnungWizardBootstrapFromAuftrag(aufId, { vollOhnePlan: true })
+        if (!res.ok) {
+          toast.error(res.message)
+          return
+        }
+        setRechnungWizardBootstrap(res.bootstrap)
+        setRechnungWizardKey((k) => k + 1)
+        setRechnungWizardOpen(true)
+        return
+      }
+      const kundeId =
+        leadVertragsKundeId(lead) ||
+        lead.kunden?.id?.trim() ||
+        lead.kunde_id?.trim() ||
+        ''
+      if (!kundeId) {
+        toast.error('Kein Kunde verknüpft — Rechnung nicht möglich.')
+        return
+      }
+      const k = await loadRechnungWizardKunde(kundeId)
+      if (!k.ok) {
+        toast.error(k.message)
+        return
+      }
+      if (!liveFirm) {
+        toast.error('Firmeneinstellungen fehlen.')
+        return
+      }
+      setRechnungWizardBootstrap({
+        ...buildStandaloneRechnungWizardBootstrap(liveFirm),
+        kundeId: k.kunde.id,
+        kunde: k.kunde,
+        meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
+          kundeTyp: k.kunde.typ,
+          firm: liveFirm,
+        }),
+      })
+      setRechnungWizardKey((k) => k + 1)
+      setRechnungWizardOpen(true)
+    })
+  }, [ensureWizardData, projektKontext?.auftrag?.id, auftragId, lead, liveFirm])
 
   useEffect(() => {
     const kopieId = angebotKopieVonQuelleId?.trim()
@@ -678,7 +754,11 @@ export function AnfrageDetailClient({
       label: entityDetailTabLabel('zahlung'),
       icon: 'receipt',
       render: () => (
-        <AnfrageZahlungTab rechnungen={projektKontext?.rechnungen ?? []} />
+        <AnfrageZahlungTab
+          rechnungen={projektKontext?.rechnungen ?? []}
+          onWeitereRechnung={openWeitereRechnung}
+          weitereRechnungDisabled={pending}
+        />
       ),
     },
     {
@@ -805,6 +885,31 @@ export function AnfrageDetailClient({
             refresh()
           }}
         />
+      ) : null}
+
+      {rechnungWizardOpen && rechnungWizardBootstrap && liveFirm ? (
+        <ClientOnly>
+          <RechnungWizard
+            key={rechnungWizardKey}
+            bootstrap={rechnungWizardBootstrap}
+            gewerke={liveGewerke}
+            preislisten={livePreislisten}
+            firm={liveFirm}
+            zahlungszielTage={Math.max(
+              1,
+              parseInt(liveFirm.zahlungsziel_tage ?? '', 10) || 14
+            )}
+            onClose={() => {
+              setRechnungWizardOpen(false)
+              setRechnungWizardBootstrap(null)
+            }}
+            onDone={() => {
+              setRechnungWizardOpen(false)
+              setRechnungWizardBootstrap(null)
+              refresh()
+            }}
+          />
+        </ClientOnly>
       ) : null}
 
       <AngebotAuswahlModal

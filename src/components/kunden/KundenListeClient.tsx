@@ -503,6 +503,43 @@ export function KundenListeClient({
           <MockBtn
             kind="ghost"
             sm
+            icon="trash"
+            onClick={() => {
+              const ids = Object.entries(selected)
+                .filter(([, on]) => on)
+                .map(([id]) => id)
+              if (!ids.length) return
+              const ok = window.confirm(
+                ids.length === 1
+                  ? 'Kunde inkl. aller Vorgänge und Rechnungen wirklich löschen? Das kann nicht rückgängig gemacht werden.'
+                  : `${ids.length} Kunden inkl. aller Vorgänge und Rechnungen wirklich löschen? Das kann nicht rückgängig gemacht werden.`
+              )
+              if (!ok) return
+              void (async () => {
+                const { deleteKunde } = await import('@/app/actions/kunden')
+                let okCount = 0
+                let lastErr: string | null = null
+                for (const id of ids) {
+                  const r = await deleteKunde(id)
+                  if (r.ok) okCount += 1
+                  else lastErr = r.message
+                }
+                setSelected({})
+                if (okCount > 0) {
+                  toast.success(
+                    okCount === 1 ? 'Kunde gelöscht' : `${okCount} Kunden gelöscht`
+                  )
+                  router.refresh()
+                }
+                if (lastErr) toast.error(lastErr)
+              })()
+            }}
+          >
+            Löschen
+          </MockBtn>
+          <MockBtn
+            kind="ghost"
+            sm
             className="qa-btn"
             icon="x"
             onClick={() => setSelected({})}

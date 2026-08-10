@@ -138,6 +138,23 @@ export function AuftragHandwerkerPanel({
       toast.error('Gewerk nicht in Stammdaten — bitte Position mit gültigem Gewerk anlegen.')
       return
     }
+    const alterHwId = replaceZuweisungId
+      ? gruppe.zuweisung?.handwerker_id?.trim() || null
+      : null
+    const replacePositionen = alterHwId
+      ? gruppe.positionen
+          .filter((p) => p.handwerker_id === alterHwId)
+          .map((p) => ({
+            id: p.id,
+            leistung_name: p.leistung_name,
+            leistung_status: p.leistung_status,
+            erledigt_am: p.erledigt_am,
+            preis_partner: p.preis_partner,
+            lohn_fix: p.lohn_fix,
+            material_fix: p.material_fix,
+            handwerker_id: p.handwerker_id,
+          }))
+      : undefined
     setModalScope({
       type: 'gewerk',
       gewerkId: gruppe.gewerkId,
@@ -149,7 +166,9 @@ export function AuftragHandwerkerPanel({
           p.einheit && p.einheit !== 'pauschal' ? `${p.menge ?? 1} ${p.einheit}` : 'Pauschal'
         return `${p.leistung_name}${p.beschreibung ? ` — ${p.beschreibung}` : ''} (${qty})`
       }),
-      replaceZuweisungId })
+      replaceZuweisungId,
+      replacePositionen,
+    })
   }
 
   function openPositionModal(gruppe: GewerkGruppe, position: AuftragPosition) {
@@ -168,6 +187,20 @@ export function AuftragHandwerkerPanel({
       gewerkId: gruppe.gewerkId,
       gewerkName: gruppe.gewerkName,
       replaceZuweisungId: replaceId,
+      replacePositionen: replaceId
+        ? [
+            {
+              id: position.id,
+              leistung_name: position.leistung_name,
+              leistung_status: position.leistung_status,
+              erledigt_am: position.erledigt_am,
+              preis_partner: position.preis_partner,
+              lohn_fix: position.lohn_fix,
+              material_fix: position.material_fix,
+              handwerker_id: position.handwerker_id,
+            },
+          ]
+        : undefined,
     })
   }
 

@@ -220,7 +220,11 @@ export function handwerkerDokumentZeilen(rows: AngebotHandwerkerRow[]): AuftragD
     paths.forEach((path, i) => {
       out.push({
         id: `hw-${row.id}-unterlage-${i}`,
-        name: partnerHwDokumentListenName('unterlage', { index: i, total }),
+        name: partnerHwDokumentListenName('unterlage', {
+          index: i,
+          total,
+          storagePath: path,
+        }),
         beschreibung,
         datum: row.hw_eingereicht_at ?? '',
         fuerKunde: false,

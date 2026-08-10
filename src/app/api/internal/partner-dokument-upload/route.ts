@@ -4,6 +4,7 @@ import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { sendCrmPushToStaff } from '@/lib/push/send'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import type { CrmNotificationTyp } from '@/app/(dashboard)/notifications/actions'
 
 function authorize(req: Request): boolean {
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
@@ -11,6 +12,8 @@ function authorize(req: Request): boolean {
   const auth = req.headers.get('authorization')?.trim() ?? ''
   return auth === `Bearer ${secret}`
 }
+
+type UploadTyp = 'compliance' | 'unterlage' | 'fachdoku' | 'angebot' | 'rechnung'
 
 type Body = {
   typ?: string
@@ -22,9 +25,23 @@ type Body = {
   slotId?: string | null
 }
 
+function parseTyp(raw: string): UploadTyp | null {
+  const t = raw.trim().toLowerCase()
+  if (
+    t === 'compliance' ||
+    t === 'unterlage' ||
+    t === 'fachdoku' ||
+    t === 'angebot' ||
+    t === 'rechnung'
+  ) {
+    return t
+  }
+  return null
+}
+
 /**
- * Portal → CRM: Partner-Upload (Compliance / Unterlage / Fachnachweis).
- * Push + Timeline; Glocke liest zusätzlich aus partner_dokumente / Fachdoku-Slots / Timeline.
+ * Portal → CRM: Partner-Upload (Compliance / Unterlage / Fachnachweis / Angebot / Rechnung).
+ * Push + Timeline; Glocke liest zusätzlich aus DB.
  */
 export async function POST(req: Request) {
   if (!authorize(req)) {
@@ -38,11 +55,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Ungültiger Body' }, { status: 400 })
   }
 
-  const typRaw = String(body.typ ?? '').trim().toLowerCase()
-  const typ =
-    typRaw === 'compliance' || typRaw === 'unterlage' || typRaw === 'fachdoku'
-      ? typRaw
-      : null
+  const typ = parseTyp(String(body.typ ?? ''))
   if (!typ) {
     return NextResponse.json({ ok: false, error: 'typ ungültig' }, { status: 400 })
   }
@@ -103,13 +116,21 @@ export async function POST(req: Request) {
         ? 'partner_compliance'
         : typ === 'fachdoku'
           ? 'partner_fachdoku'
-          : 'partner_unterlage'
+          : typ === 'angebot'
+            ? 'partner_angebot'
+            : typ === 'rechnung'
+              ? 'partner_rechnung'
+              : 'partner_unterlage'
     const timelineTitel =
       typ === 'compliance'
         ? 'Compliance-Dokument zur Prüfung'
         : typ === 'fachdoku'
           ? 'Fachnachweis hochgeladen'
-          : 'Partner-Unterlage hochgeladen'
+          : typ === 'angebot'
+            ? 'Partner-Angebot hochgeladen'
+            : typ === 'rechnung'
+              ? 'Partner-Rechnung eingereicht'
+              : 'Partner-Unterlage hochgeladen'
 
     await insertAuftragTimelineEvent({
       auftrag_id: auftragId,
@@ -135,27 +156,45 @@ export async function POST(req: Request) {
     },
   })
 
-  const pushTyp =
+  const pushTyp: CrmNotificationTyp =
     typ === 'compliance'
-      ? ('partner_compliance_pruefung' as const)
+      ? 'partner_compliance_pruefung'
       : typ === 'fachdoku'
-        ? ('partner_fachdoku' as const)
-        : ('partner_unterlage' as const)
+        ? 'partner_fachdoku'
+        : typ === 'rechnung'
+          ? 'hw_rechnung_eingegangen'
+          : typ === 'angebot'
+            ? 'handwerker_einreichung'
+            : 'partner_unterlage'
 
   const pushTitle =
     typ === 'compliance'
       ? `${hwName}: Dokument zur Freigabe`
       : typ === 'fachdoku'
         ? `${hwName}: Fachnachweis hochgeladen`
-        : `${hwName}: Unterlage hochgeladen`
+        : typ === 'angebot'
+          ? `${hwName}: Angebot eingereicht`
+          : typ === 'rechnung'
+            ? `${hwName}: Rechnung eingereicht`
+            : `${hwName}: Unterlage hochgeladen`
 
-  const pushBody = titel || (typ === 'compliance' ? 'Compliance-Upload wartet auf Prüfung.' : 'Neuer Partner-Upload.')
+  const pushBody =
+    titel ||
+    (typ === 'compliance'
+      ? 'Compliance-Upload wartet auf Prüfung.'
+      : typ === 'angebot'
+        ? 'Partner-Angebot liegt unter Akte → Dokumente.'
+        : typ === 'rechnung'
+          ? 'Partner-Rechnung liegt unter Akte → Dokumente.'
+          : 'Neuer Partner-Upload.')
 
   const href = auftragId
-    ? typ === 'compliance'
-      ? `/auftraege/${auftragId}?tab=akte`
-      : `/auftraege/${auftragId}?tab=akte`
-    : `/handwerker/${handwerkerId}?tab=compliance`
+    ? `/auftraege/${auftragId}?tab=akte`
+    : typ === 'compliance'
+      ? `/handwerker/${handwerkerId}?tab=compliance`
+      : anfrageId
+        ? `/angebote`
+        : `/handwerker/${handwerkerId}`
 
   void sendCrmPushToStaff({
     typ: pushTyp,

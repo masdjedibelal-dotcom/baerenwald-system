@@ -126,6 +126,16 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
     })
     if (error) {
       console.warn('[notifyPortalAngebotGesendetFromCrm] hv_notifications:', error.message)
+    } else {
+      const { schedulePortalWebPushForOrgKunde } = await import(
+        '@/lib/portal/send-portal-web-push'
+      )
+      schedulePortalWebPushForOrgKunde(kundeId, {
+        titel: notifTitel,
+        body,
+        url: portalPath,
+        tag: 'angebot',
+      })
     }
   }
 
@@ -150,6 +160,16 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
         '[notifyPortalAngebotGesendetFromCrm] portal_notifications:',
         error.message
       )
+    } else {
+      const { schedulePortalWebPushToUsers } = await import(
+        '@/lib/portal/send-portal-web-push'
+      )
+      schedulePortalWebPushToUsers([authUserId], {
+        titel: notifTitel,
+        body,
+        url: portalPath,
+        tag: 'angebot',
+      })
     }
   }
 

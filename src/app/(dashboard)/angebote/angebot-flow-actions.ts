@@ -258,9 +258,17 @@ export async function acceptAngebotAndCreateAuftrag(
     })
     .eq('id', angebotId)
 
+  const { findNachtragRowByAngebotId } = await import(
+    '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
+  )
+  const nachtragLink = await findNachtragRowByAngebotId(angebotId)
+
   const leadId = (ang.lead_id as string | null) ?? null
   if (leadId) {
-    await markLeadAngeboteAbgelehnt(supabase, leadId, angebotId)
+    // Nachtrag: Stamm-Angebot am Auftrag nicht als „ersetzt“ markieren
+    if (!nachtragLink) {
+      await markLeadAngeboteAbgelehnt(supabase, leadId, angebotId)
+    }
     if (direktOhneHv) {
       const now = new Date().toISOString()
       await supabaseAdmin
@@ -287,9 +295,11 @@ export async function acceptAngebotAndCreateAuftrag(
 
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)
-    const timelineTitel = direktOhneHv
-      ? 'Direkt Auftrag (unter Schwelle) — ohne Kundenmail / ohne HV-Freigabe'
-      : 'Angebot angenommen — Auftrag erstellt'
+    const timelineTitel = nachtragLink
+      ? 'Nachtrags-Angebot angenommen — Auftrag erweitert'
+      : direktOhneHv
+        ? 'Direkt Auftrag (unter Schwelle) — ohne Kundenmail / ohne HV-Freigabe'
+        : 'Angebot angenommen — Auftrag erstellt'
     if (opts?.asSystem) {
       await supabaseAdmin.from('lead_timeline').insert({
         lead_id: ang.lead_id,

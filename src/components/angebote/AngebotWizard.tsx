@@ -724,9 +724,11 @@ export function AngebotWizard({
         onSaved?.(res.angebotId)
         if (opts?.notify) {
           toast.success(
-            res.angebotsnr?.trim()
-              ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-              : 'Entwurf gespeichert'
+            istNachtrag
+              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
+              : res.angebotsnr?.trim()
+                ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+                : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
@@ -882,9 +884,11 @@ export function AngebotWizard({
         return
       }
       toast.success(
-        istAuftragKorrektur
-          ? 'Korrektur gespeichert und an den Kunden versendet'
-          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+        istNachtrag
+          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
+          : istAuftragKorrektur
+            ? 'Korrektur gespeichert und an den Kunden versendet'
+            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
       onDone?.(id, {
         mode: 'sent',
@@ -941,7 +945,13 @@ export function AngebotWizard({
 
   const versandCrowValue = mailTo[0]?.trim() || sheetEmail?.trim() || 'Empfänger ergänzen'
 
-  const wizardSubtitle = name?.trim() && name !== '—' ? name.trim() : undefined
+  const wizardSubtitle = istNachtrag
+    ? [name?.trim() && name !== '—' ? name.trim() : null, 'Auftrag bleibt bis zur Annahme unverändert']
+        .filter(Boolean)
+        .join(' · ') || 'Auftrag bleibt bis zur Annahme unverändert'
+    : name?.trim() && name !== '—'
+      ? name.trim()
+      : undefined
 
   const headerEnd = (
     <>

@@ -1508,16 +1508,13 @@ export async function saveLeadNichtErreichbar(input: {
   return { ok: true, versuche, vorschlagVerloren }
 }
 
-/** Soft-delete: geloescht_am setzen (kein Hard-Delete). */
+/** Soft-delete: geloescht_am setzen + Portal-Glocken entfernen (kein Hard-Delete). */
 export async function softDeleteAnfrage(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ geloescht_am: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
+  const { softDeleteLeadForPortal } = await import('@/lib/portal/soft-delete-lead')
+  const r = await softDeleteLeadForPortal({ leadId })
+  if (!r.ok) return r
   await insertLeadTimelineEntry(leadId, 'system', 'Anfrage als gelöscht markiert', null)
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')

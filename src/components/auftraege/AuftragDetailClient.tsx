@@ -482,6 +482,7 @@ export function AuftragDetailClient({
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
+      toast.info('Nachtrag-Angebot — der laufende Auftrag bleibt bis zur Annahme unverändert.')
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
@@ -1198,7 +1199,17 @@ export function AuftragDetailClient({
                   }
                 : null
             }
-            menuItems={[]}
+            menuItems={
+              !istStorniert && detail.angebot_id && detail.lead_id
+                ? [
+                    {
+                      label: 'Nachtrag-Angebot erstellen',
+                      hint: 'Neues Angebot — Auftrag bleibt bis zur Annahme unverändert.',
+                      onClick: openNachtragAngebot,
+                    },
+                  ]
+                : []
+            }
           />
         ),
       }}

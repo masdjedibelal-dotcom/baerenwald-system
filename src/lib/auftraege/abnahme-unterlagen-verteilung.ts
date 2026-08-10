@@ -101,6 +101,15 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       body: `Das Abnahmeprotokoll zu „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ liegt in den Unterlagen.`,
       link: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
     })
+    const { schedulePortalWebPushForOrgKunde } = await import(
+      '@/lib/portal/send-portal-web-push'
+    )
+    schedulePortalWebPushForOrgKunde(hvId, {
+      titel: 'Abnahmedokument verfügbar',
+      body: `Das Abnahmeprotokoll zu „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ liegt in den Unterlagen.`,
+      url: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
+      tag: 'abnahme',
+    })
   }
 
   // Mieter nur wenn anderer Kunde als HV

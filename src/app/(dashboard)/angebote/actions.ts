@@ -2357,6 +2357,14 @@ export async function createAuftragFromAngebot(
     return { ok: true, auftragId: String(existingForAngebot.id) }
   }
 
+  const { findNachtragRowByAngebotId, applyNachtragsAngebotAnAuftrag } = await import(
+    '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
+  )
+  const nachtragLink = await findNachtragRowByAngebotId(angebotId)
+  if (nachtragLink) {
+    return applyNachtragsAngebotAnAuftrag(angebotId)
+  }
+
   if (angebot.lead_id) {
     const { data: leadAuftraege } = await supabaseAdmin
       .from('auftraege')
@@ -2371,7 +2379,7 @@ export async function createAuftragFromAngebot(
       return {
         ok: false,
         message:
-          'Zu dieser Anfrage existiert bereits ein Auftrag. Für Änderungen bitte Nachtrag am bestehenden Auftrag nutzen — nicht ein zweites Angebot annehmen.',
+          'Zu dieser Anfrage existiert bereits ein Auftrag. Für Änderungen bitte Nachtrag-Angebot am bestehenden Auftrag nutzen — nicht ein zweites Angebot annehmen.',
       }
     }
   }

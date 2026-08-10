@@ -98,6 +98,18 @@ export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
   return s === 'entwurf' || s === 'gesendet' || s === 'bezahlt' || s === 'versendet'
 }
 
+/** Entwurf, versendet/gesendet, bezahlt und storniert — harte Löschung erlaubt. */
+export function rechnungDarfGeloeschtWerden(status: string): boolean {
+  const s = (status ?? '').toLowerCase()
+  return (
+    s === 'entwurf' ||
+    s === 'gesendet' ||
+    s === 'versendet' ||
+    s === 'bezahlt' ||
+    s === 'storniert'
+  )
+}
+
 function addDaysYmd(ymd: string, days: number): string {
   const d = new Date(`${ymd}T12:00:00`)
   d.setDate(d.getDate() + days)
