@@ -152,6 +152,8 @@ export type LeadListAngebot = {
   gesamt_max: number | null
   created_at?: string | null
   pdf_url?: string | null
+  leistungsumfang?: string | null
+  notizen?: string | null
 }
 
 export type LeadNotizRow = {
