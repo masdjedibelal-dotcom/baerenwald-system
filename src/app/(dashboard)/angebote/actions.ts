@@ -2343,7 +2343,14 @@ export async function createAuftragFromAngebot(
   opts?: Partial<CreateAuftragFromAngebotOptions>
 ): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
   const angebot = await loadAngebotDetailAdmin(angebotId)
-  if (!angebot?.kunden) return { ok: false, message: 'Angebot nicht gefunden' }
+  if (!angebot) return { ok: false, message: 'Angebot nicht gefunden.' }
+  if (!angebot.kunden) {
+    return {
+      ok: false,
+      message:
+        'Angebot hat keinen verknüpften Kunden — bitte Kunde prüfen und speichern, dann erneut annehmen.',
+    }
+  }
   if (angebot.status !== 'kunde_akzeptiert') {
     return { ok: false, message: 'Auftrag nur nach Kundenakzept möglich.' }
   }

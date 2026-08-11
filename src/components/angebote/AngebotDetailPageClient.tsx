@@ -8,7 +8,7 @@ import {
 } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
@@ -35,7 +35,8 @@ import {
   acceptAngebotAndCreateAuftrag,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
-import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
+import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
+import type { AngebotAuswahlZeile } from '@/components/angebote/AngebotAuswahlPanel'
 import {
   previewAuftragsbestaetigungMail,
   recordKundeAbgelehntMitDetails,
@@ -180,7 +181,10 @@ export function AngebotDetailPageClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
-  const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
+  /** Nach Kopie/Neu: gespeicherte ID, falls Close vor onDone */
+  const [wizardSavedAngebotId, setWizardSavedAngebotId] = useState<string | null>(null)
+  const wizardFinishLockRef = useRef(false)
+  const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
   const [ablehnenOpen, setAblehnenOpen] = useState(false)
   const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
@@ -217,10 +221,52 @@ export function AngebotDetailPageClient({
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
 
-  function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap) {
+  const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
+    const fromCtx = (projektKontext?.angebote ?? []).map((a) => ({
+      id: a.id,
+      status: a.status,
+      status_einfach: a.status_einfach,
+      gesamt_fix: a.gesamt_fix,
+      gesamt_min: a.gesamt_min,
+      gesamt_max: a.gesamt_max,
+      created_at: a.created_at,
+      angebotsnr: a.angebotsnr,
+    }))
+    if (!fromCtx.some((a) => a.id === detail.id)) {
+      fromCtx.unshift({
+        id: detail.id,
+        status: detail.status,
+        status_einfach: detail.status_einfach ?? null,
+        gesamt_fix: detail.gesamt_fix ?? null,
+        gesamt_min: detail.gesamt_min ?? null,
+        gesamt_max: detail.gesamt_max ?? null,
+        created_at: detail.created_at ?? new Date().toISOString(),
+        angebotsnr: detail.angebotsnr ?? null,
+      })
+    }
+    return fromCtx
+  }, [projektKontext?.angebote, detail])
+
+  function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap | null) {
+    wizardFinishLockRef.current = false
+    setWizardSavedAngebotId(bootstrap?.angebotId?.trim() || null)
     setWizardBootstrap(bootstrap)
     setWizardSessionKey((k) => k + 1)
     setWizardOpen(true)
+  }
+
+  function finishWizardAndGo(angebotId: string | null | undefined) {
+    if (wizardFinishLockRef.current) return
+    wizardFinishLockRef.current = true
+    const target = (angebotId ?? wizardSavedAngebotId)?.trim() || null
+    setWizardOpen(false)
+    setWizardBootstrap(null)
+    setWizardSavedAngebotId(null)
+    if (target && target !== detail.id) {
+      router.push(`/angebote/${target}`)
+      return
+    }
+    refresh()
   }
 
   function openWizardBearbeiten() {
@@ -232,8 +278,9 @@ export function AngebotDetailPageClient({
       router.push(`/angebote/neu?angebot_id=${detail.id}`)
       return
     }
-    if (statusEinfach !== 'entwurf') {
-      setBearbeitenWahlOpen(true)
+    /* Mehrere Angebote oder kein reiner Entwurf → Auswahl wie an der Anfrage */
+    if (angeboteAuswahlZeilen.length > 1 || statusEinfach !== 'entwurf') {
+      setAngebotAuswahlOpen(true)
       return
     }
     startTransition(async () => {
@@ -266,8 +313,7 @@ export function AngebotDetailPageClient({
   }, [detail.id, detail.angebot_handwerker])
 
   function closeWizard() {
-    setWizardOpen(false)
-    setWizardBootstrap(null)
+    finishWizardAndGo(wizardSavedAngebotId)
   }
 
   const kunde = detail.kunden
@@ -402,6 +448,24 @@ export function AngebotDetailPageClient({
     })
   }, [auftragId, lead, summenMail.nettoMax])
 
+  const direktAuftragUnterSchwelleHinweis = useMemo(() => {
+    if (!unterSchwelleDirektAuftrag || !lead) return null
+    const ag = lead.auftraggeber
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: ag?.portal_modus,
+      freigabeModus: ag?.freigabe_modus,
+      orgSchwelleEur: ag?.freigabe_schwelle_eur,
+      orgNotfallDirekt: ag?.notfall_direkt,
+      objektSchwelleEur: lead.kunden_objekte?.freigabe_schwelle_eur,
+      objektNotfallDirekt: lead.kunden_objekte?.notfall_direkt,
+    })
+    if (regeln.schwelleEur == null || regeln.schwelleEur <= 0) return null
+    return {
+      betragEur: summenMail.nettoMax,
+      schwelleEur: regeln.schwelleEur,
+    }
+  }, [unterSchwelleDirektAuftrag, lead, summenMail.nettoMax])
+
   const runDirektAuftrag = useCallback(() => {
     startTransition(async () => {
       const res = await acceptAngebotAndCreateAuftrag(detail.id, {
@@ -465,7 +529,12 @@ export function AngebotDetailPageClient({
   const stammdatenInhalt = (
     <>
       <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
-      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
+      {lead ? (
+        <HvMeldungKontextCards
+          lead={lead}
+          direktAuftragUnterSchwelle={direktAuftragUnterSchwelleHinweis}
+        />
+      ) : null}
     </>
   )
 
@@ -693,20 +762,34 @@ export function AngebotDetailPageClient({
           firm={wizardFirm}
           bootstrap={wizardBootstrap}
           onClose={closeWizard}
-          onDone={() => {
-            closeWizard()
+          onSaved={(id) => {
+            setWizardSavedAngebotId(id)
             refresh()
+          }}
+          onDone={(id) => {
+            finishWizardAndGo(id)
           }}
         />
       ) : null}
 
       {detail.lead_id ? (
-        <AngebotBearbeitenWahlModal
-          open={bearbeitenWahlOpen}
-          onClose={() => setBearbeitenWahlOpen(false)}
-          angebotId={detail.id}
+        <AngebotAuswahlModal
+          open={angebotAuswahlOpen}
+          onClose={() => setAngebotAuswahlOpen(false)}
           leadId={detail.lead_id}
-          onBearbeiten={openWizardMitBootstrap}
+          angebote={angeboteAuswahlZeilen}
+          onNeuesAngebot={() => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(null)
+          }}
+          onWeiterbearbeiten={(bootstrap) => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(bootstrap)
+          }}
+          onKopie={(bootstrap) => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(bootstrap)
+          }}
         />
       ) : null}
 

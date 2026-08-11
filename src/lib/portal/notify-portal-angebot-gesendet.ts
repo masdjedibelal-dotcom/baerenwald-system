@@ -70,7 +70,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
   const { data: angebot } = await supabaseAdmin
     .from('angebote')
     .select(
-      'id, angebotsnr, leistungsumfang, status_einfach, status, gesendet_am, gesendet_kunde_at, pdf_url, titel, gesamt_preis'
+      'id, angebotsnr, leistungsumfang, status_einfach, status, gesendet_am, gesendet_kunde_at, pdf_url, gesamt_fix, gesamt_max, notizen'
     )
     .eq('lead_id', trimmed)
     .order('gesendet_am', { ascending: false, nullsFirst: false })
@@ -100,8 +100,18 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
     String(angebot.angebotsnr ?? '').trim() ||
     String(angebot.id).slice(0, 8).toUpperCase() ||
     '—'
+  let angebotTitel = ''
+  try {
+    const rawNotizen = String((angebot as { notizen?: string | null }).notizen ?? '').trim()
+    if (rawNotizen.startsWith('{')) {
+      const parsed = JSON.parse(rawNotizen) as { wizard_meta?: { titel?: string } }
+      angebotTitel = String(parsed.wizard_meta?.titel ?? '').trim()
+    }
+  } catch {
+    /* ignore */
+  }
   const titel =
-    String(angebot.titel ?? '').trim() ||
+    angebotTitel ||
     String(angebot.leistungsumfang ?? '').trim() ||
     String((lead as { situation?: string | null }).situation ?? '').trim() ||
     'Ihr Vorgang'

@@ -387,7 +387,9 @@ export function EditorSheet({
         </div>
         <div className="editor-sheet__header-end">{end}</div>
       </header>
-      <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
+      <div className={cn('editor-sheet__body', bodyClassName)} data-scroll-lock-allow>
+        {children}
+      </div>
       {footer ? (
         <EditorSheetApiContext.Provider value={api}>
           <div className="editor-sheet__footer">{footer}</div>

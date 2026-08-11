@@ -234,6 +234,8 @@ export function AnfrageDetailClient({
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
+  const [wizardSavedAngebotId, setWizardSavedAngebotId] = useState<string | null>(null)
+  const angebotWizardFinishLockRef = useRef(false)
   const [liveGewerke, setLiveGewerke] = useState(wizardGewerke)
   const [livePreislisten, setLivePreislisten] = useState(wizardPreislisten)
   const [liveFirm, setLiveFirm] = useState(wizardFirm)
@@ -390,6 +392,8 @@ export function AnfrageDetailClient({
       void (async () => {
         const ok = await ensureWizardData()
         if (!ok) return
+        angebotWizardFinishLockRef.current = false
+        setWizardSavedAngebotId(bootstrap?.angebotId?.trim() || null)
         setAngebotWizardBootstrap(bootstrap)
         setWizardSessionKey((k) => k + 1)
         setAngebotWizardOpen(true)
@@ -601,7 +605,23 @@ export function AnfrageDetailClient({
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
     setAngebotWizardBootstrap(null)
+    setWizardSavedAngebotId(null)
   }, [])
+
+  const finishAngebotWizard = useCallback(
+    (angebotId?: string | null) => {
+      if (angebotWizardFinishLockRef.current) return
+      angebotWizardFinishLockRef.current = true
+      const id = (angebotId ?? wizardSavedAngebotId)?.trim() || null
+      closeAngebotWizard()
+      if (id) {
+        router.push(`/angebote/${id}`)
+        return
+      }
+      refresh()
+    },
+    [closeAngebotWizard, wizardSavedAngebotId, router, refresh]
+  )
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
   const kundeTitel = useMemo(() => kundenName(lead), [lead])
@@ -878,11 +898,13 @@ export function AnfrageDetailClient({
           bootstrap={angebotWizardBootstrap}
           initialStep={angebotWizardInitialStep}
           focusField={angebotWizardFocus}
-          onClose={closeAngebotWizard}
-          onSaved={() => refresh()}
-          onDone={() => {
-            closeAngebotWizard()
+          onClose={() => finishAngebotWizard(wizardSavedAngebotId)}
+          onSaved={(id) => {
+            setWizardSavedAngebotId(id)
             refresh()
+          }}
+          onDone={(id) => {
+            finishAngebotWizard(id)
           }}
         />
       ) : null}

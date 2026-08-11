@@ -6,11 +6,7 @@ import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import {
-  buildAnfrageSchwellenHinweis,
-  leadIstAkut,
-  resolveAnfrageFreigabeRegeln,
-} from '@/lib/anfragen/anfrage-akut-schwelle'
+import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -31,6 +27,10 @@ function melderAdresse(lead: LeadDetail): string {
   const plzOrt = [k?.plz?.trim() || lead.plz?.trim(), k?.ort?.trim()].filter(Boolean).join(' ')
   const einheit = lead.melder_einheit?.trim()
   return [strasse, plzOrt, einheit ? `Einheit ${einheit}` : null].filter(Boolean).join(', ') || '—'
+}
+
+function formatEur(n: number): string {
+  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
 }
 
 const FREIGABE_BADGE: Record<
@@ -60,8 +60,24 @@ function PropRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-/** Eine Card: Melder + Leistungsort-Anschrift (HV steckt schon in Stammdaten). */
-export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
+/**
+ * HV-Meldung: Melder + Leistungsort.
+ * Schwellen-Hinweis nur nach Angebot und nur wenn Direktauftrag unter Schwelle möglich ist.
+ */
+export function HvMeldungKontextCards({
+  lead,
+  direktAuftragUnterSchwelle,
+}: {
+  lead: LeadDetail
+  /**
+   * Nur am Angebot setzen, wenn Betrag ≤ Freigabe-Schwelle → Direktauftrag ohne HV.
+   * Vorher / sonst: kein Schwellen-Hinweis.
+   */
+  direktAuftragUnterSchwelle?: {
+    betragEur: number
+    schwelleEur: number
+  } | null
+}) {
   if (resolvePipelineKontext(lead) !== 'hv_meldung') return null
 
   const objekt = lead.kunden_objekte
@@ -75,25 +91,16 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
     : null
   const notfallAutopass = (lead.hv_meldung_status ?? '').trim() === 'notmassnahme'
   const istAkut = leadIstAkut(lead)
-  const ag = lead.auftraggeber
-  const regeln = resolveAnfrageFreigabeRegeln({
-    portalModus: ag?.portal_modus,
-    freigabeModus: ag?.freigabe_modus,
-    orgSchwelleEur: ag?.freigabe_schwelle_eur,
-    orgNotfallDirekt: ag?.notfall_direkt,
-    objektSchwelleEur: objekt?.freigabe_schwelle_eur,
-    objektNotfallDirekt: objekt?.notfall_direkt,
-  })
-  const schwellenHinweis = buildAnfrageSchwellenHinweis({
-    lead,
-    freigabeModus: regeln.freigabeModus,
-    portalModus: regeln.portalModus,
-    schwelleEur: regeln.schwelleEur,
-    notfallDirekt: regeln.notfallDirekt,
-  })
 
   const melderTel = lead.melder_telefon?.trim() || lead.kontakt_telefon?.trim() || null
   const melderMail = lead.melder_email?.trim() || lead.kontakt_email?.trim() || null
+
+  const showDirektUnterSchwelle =
+    direktAuftragUnterSchwelle != null &&
+    Number.isFinite(direktAuftragUnterSchwelle.betragEur) &&
+    direktAuftragUnterSchwelle.betragEur > 0 &&
+    Number.isFinite(direktAuftragUnterSchwelle.schwelleEur) &&
+    direktAuftragUnterSchwelle.schwelleEur > 0
 
   return (
     <div className="card">
@@ -111,13 +118,15 @@ export function HvMeldungKontextCards({ lead }: { lead: LeadDetail }) {
         </div>
       </div>
       <div className="card-b">
-        {schwellenHinweis.freigabeAktiv || schwellenHinweis.istAkut ? (
+        {showDirektUnterSchwelle && direktAuftragUnterSchwelle ? (
           <div className="mb-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--surface-2,#f7f7f5)] px-3 py-2">
             <div className="text-[length:var(--fs-meta)] font-semibold text-[var(--text)]">
-              {schwellenHinweis.headline}
+              Direktauftrag möglich — unter Freigabe-Schwelle
             </div>
             <p className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-              {schwellenHinweis.detail}
+              Angebotspreis {formatEur(direktAuftragUnterSchwelle.betragEur)} ≤ Schwelle{' '}
+              {formatEur(direktAuftragUnterSchwelle.schwelleEur)}. Auftrag ohne HV-Freigabe /
+              ohne Kundenmail anlegen.
             </p>
           </div>
         ) : null}

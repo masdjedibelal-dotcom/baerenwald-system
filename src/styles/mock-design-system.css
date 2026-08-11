@@ -18834,11 +18834,15 @@ select:focus-visible {
   min-height: 100dvh;
 }
 .editor-sheet-overlay:not(.editor-sheet-overlay--recessed) {
-  touch-action: none;
+  /* Nicht touch-action:none — blockiert auf iOS/PWA oft Child-Scroll trotz pan-y am Body */
+  touch-action: manipulation;
 }
-.editor-sheet-overlay .editor-sheet__body,
-.editor-sheet-overlay .editor-sheet {
+.editor-sheet-overlay .editor-sheet__body {
   touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.editor-sheet-overlay .editor-sheet {
+  touch-action: manipulation;
 }
 
 /* Hintergrund hinter Overlay: kein Scroll / kein Gummiband */
@@ -18880,7 +18884,12 @@ body.has-blocking-overlay .app {
   backdrop-filter: blur(4px);
 }
 .editor-sheet--stack-bottom {
-  height: auto !important;
+  height: min(
+    88dvh,
+    100%,
+    max-content,
+    calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+  ) !important;
   max-height: min(
     88dvh,
     100%,
@@ -18901,8 +18910,16 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet--bottom {
   @apply w-full rounded-t-2xl;
-  /* Inhalt bestimmt Höhe; Cap unter Safe-Area-Top (PWA Notch) */
-  height: auto;
+  /*
+   * Definite height: min(Cap, Inhalt).
+   * Nur max-height + height:auto → Flex-Body wächst mit Inhalt, overflow scrollt nie (PWA/iOS).
+   */
+  height: min(
+    92dvh,
+    100%,
+    max-content,
+    calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+  );
   max-height: min(
     92dvh,
     100%,
@@ -18981,6 +18998,8 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet__body {
   @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 .editor-sheet__footer {
   @apply shrink-0 border-t border-[var(--app-separator)] bg-[var(--card)] px-4 py-3;
@@ -19593,7 +19612,12 @@ body.has-blocking-overlay .app {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    height: auto;
+    height: min(
+      92dvh,
+      100%,
+      max-content,
+      calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 8px)
+    );
     max-height: min(
       92dvh,
       100%,
@@ -19610,6 +19634,7 @@ body.has-blocking-overlay .app {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y;
     padding: 12px 14px 16px;
   }
   .editor-sheet-overlay--bottom .editor-sheet__header,
