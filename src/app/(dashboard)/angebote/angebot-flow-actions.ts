@@ -115,18 +115,27 @@ export async function markAngebotAbgelehntEinfach(input: {
   if (!isKundeAblehnungGrund(input.grund)) {
     return { ok: false, message: 'Ungültiger Ablehnungsgrund.' }
   }
-  const supabase = createClient()
-  const { data: row } = await supabase
+  const id = input.angebotId?.trim()
+  if (!id) return { ok: false, message: 'Angebot nicht gefunden.' }
+
+  const auth = createClient()
+  const {
+    data: { user },
+  } = await auth.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const { data: row, error: loadErr } = await supabaseAdmin
     .from('angebote')
     .select('lead_id')
-    .eq('id', input.angebotId)
+    .eq('id', id)
     .maybeSingle()
+  if (loadErr) return { ok: false, message: loadErr.message }
   if (!row) return { ok: false, message: 'Angebot nicht gefunden.' }
 
   const grundLabel = KUNDE_ABLEHNUNG_GRUND_LABELS[input.grund] ?? input.grund
   const now = new Date().toISOString()
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('angebote')
     .update({
       status_einfach: 'abgelehnt',
@@ -135,7 +144,7 @@ export async function markAngebotAbgelehntEinfach(input: {
       ablehnung_notiz: input.notiz?.trim() || null,
       updated_at: now,
     })
-    .eq('id', input.angebotId)
+    .eq('id', id)
   if (error) return { ok: false, message: error.message }
 
   if (row.lead_id) {
@@ -146,7 +155,7 @@ export async function markAngebotAbgelehntEinfach(input: {
       .eq('id', row.lead_id)
     await insertAngebotTimeline(
       row.lead_id,
-      input.angebotId,
+      id,
       'Angebot abgelehnt',
       grundLabel + (input.notiz?.trim() ? ` — ${input.notiz.trim()}` : '')
     )
@@ -154,7 +163,7 @@ export async function markAngebotAbgelehntEinfach(input: {
   }
 
   revalidatePath('/angebote')
-  revalidatePath(`/angebote/${input.angebotId}`)
+  revalidatePath(`/angebote/${id}`)
   return { ok: true }
 }
 
@@ -176,13 +185,30 @@ export async function acceptAngebotAndCreateAuftrag(
   angebotId: string,
   opts?: AcceptAngebotAndCreateAuftragOptions & { asSystem?: boolean }
 ): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
-  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
-  const { data: ang } = await supabase
+  const id = angebotId?.trim()
+  if (!id) return { ok: false, message: 'Angebot nicht gefunden.' }
+
+  /*
+   * Detail-Seite lädt oft über withCrmReadFallback (Admin bei RLS-Problemen).
+   * Annahme/Direktauftrag darf denselben Datensatz nicht per User-Client „nicht finden“ —
+   * besonders wenn mehrere Angebote (z. B. neues neben bereits gesendetem) existieren.
+   * Nach Auth-Check: Service-Role wie createAuftragFromAngebot.
+   */
+  if (!opts?.asSystem) {
+    const auth = createClient()
+    const {
+      data: { user },
+    } = await auth.auth.getUser()
+    if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+  }
+
+  const { data: ang, error: angErr } = await supabaseAdmin
     .from('angebote')
     .select('id, lead_id, status, gesamt_preis, gesamt_max')
-    .eq('id', angebotId)
+    .eq('id', id)
     .maybeSingle()
 
+  if (angErr) return { ok: false, message: angErr.message }
   if (!ang) return { ok: false, message: 'Angebot nicht gefunden.' }
 
   const direktOhneHv = Boolean(opts?.direktOhneHvFreigabe)
@@ -249,25 +275,26 @@ export async function acceptAngebotAndCreateAuftrag(
   }
   const sendKundenMail = direktOhneHv ? false : (opts?.send_kunden_email ?? false)
 
-  await supabase
+  const { error: acceptErr } = await supabaseAdmin
     .from('angebote')
     .update({
       status_einfach: 'angenommen',
       status: 'kunde_akzeptiert',
       updated_at: new Date().toISOString(),
     })
-    .eq('id', angebotId)
+    .eq('id', id)
+  if (acceptErr) return { ok: false, message: acceptErr.message }
 
   const { findNachtragRowByAngebotId } = await import(
     '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
   )
-  const nachtragLink = await findNachtragRowByAngebotId(angebotId)
+  const nachtragLink = await findNachtragRowByAngebotId(id)
 
   const leadId = (ang.lead_id as string | null) ?? null
   if (leadId) {
     // Nachtrag: Stamm-Angebot am Auftrag nicht als „ersetzt“ markieren
     if (!nachtragLink) {
-      await markLeadAngeboteAbgelehnt(supabase, leadId, angebotId)
+      await markLeadAngeboteAbgelehnt(supabaseAdmin, leadId, id)
     }
     if (direktOhneHv) {
       const now = new Date().toISOString()
@@ -282,7 +309,7 @@ export async function acceptAngebotAndCreateAuftrag(
     }
   }
 
-  const res = await createAuftragFromAngebot(angebotId, {
+  const res = await createAuftragFromAngebot(id, {
     start_datum: opts?.start_datum ?? null,
     end_datum: opts?.end_datum ?? null,
     send_kunden_email: sendKundenMail,
@@ -303,21 +330,21 @@ export async function acceptAngebotAndCreateAuftrag(
     if (opts?.asSystem) {
       await supabaseAdmin.from('lead_timeline').insert({
         lead_id: ang.lead_id,
-        angebot_id: angebotId,
+        angebot_id: id,
         typ: 'angebot',
         titel: timelineTitel,
         beschreibung: null,
         erstellt_von: null,
       })
     } else {
-      await insertAngebotTimeline(ang.lead_id, angebotId, timelineTitel, null)
+      await insertAngebotTimeline(ang.lead_id, id, timelineTitel, null)
       revalidatePath(`/anfragen/${ang.lead_id}`)
     }
   }
 
   if (!opts?.asSystem) {
     revalidatePath('/angebote')
-    revalidatePath(`/angebote/${angebotId}`)
+    revalidatePath(`/angebote/${id}`)
     revalidatePath('/auftraege')
     revalidatePath(`/auftraege/${res.auftragId}`)
   }

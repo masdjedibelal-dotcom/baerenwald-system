@@ -29,6 +29,10 @@ import {
   isCrmStaffFunnel,
   kanalLabel,
 } from '@/lib/utils'
+import {
+  meldeBereichLabel,
+  meldeKategorieLabel,
+} from '@/lib/anfragen/melde-fachdetail-labels'
 
 export type FunnelBedarfLeadPick = {
   situation?: string | null
@@ -100,7 +104,11 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
 
   const staffSelbst = isCrmStaffFunnel(lead.funnel_daten)
 
-  // Selbst erstellt: Anfrageart/Situation/Bereiche stecken schon im Vorhaben
+  /*
+   * Situation + Bereiche nie als ExtraRows: stecken schon im Vorhaben-/Projekttitel
+   * (Situation · Bereich) — Anfrage, Angebot, Auftrag.
+   * Anfrageart bleibt bei Website-Leads (Preis-Modus / Komplex).
+   */
   if (!staffSelbst) {
     const anfrageTyp =
       anfrageTypAnzeige(norm, {
@@ -109,21 +117,21 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
         kanal: lead.kanal ?? undefined,
       }) || (norm.preis_modus === 'komplex' ? 'Individuell / Komplex' : null)
     if (anfrageTyp) extraRows.push({ label: 'Anfrageart', children: anfrageTyp })
+  }
 
-    const sitLabel = (norm.labels.situation || leadSituationDisplay(lead.situation) || '').trim()
-    if (sitLabel && sitLabel !== '—') {
-      extraRows.push({ label: 'Situation', children: sitLabel })
-    }
-
-    const bereicheAnzeige =
-      norm.labels.bereiche.length > 0
-        ? norm.labels.bereiche.join(', ')
-        : bereiche.length > 0
-          ? bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-          : ''
-    if (bereicheAnzeige) {
-      extraRows.push({ label: 'Bereiche', children: bereicheAnzeige })
-    }
+  const meldeKategorie = strFromFunnel(fdRaw, 'melde_kategorie')
+  if (meldeKategorie) {
+    extraRows.push({
+      label: 'Melde-Kategorie',
+      children: meldeKategorieLabel(meldeKategorie),
+    })
+  }
+  const meldeBereich = strFromFunnel(fdRaw, 'melde_bereich')
+  if (meldeBereich) {
+    extraRows.push({
+      label: 'Melde-Bereich',
+      children: meldeBereichLabel(meldeBereich),
+    })
   }
 
   const groessenEntries = Object.entries(norm.groessen)
@@ -345,14 +353,14 @@ export function buildAnfragePhaseSheetProps(lead: {
   const staffSelbst = isCrmStaffFunnel(lead.funnel_daten)
   const hatObjekt = Boolean(lead.kunden_objekte)
   /** Bei HV mit Objekt: keine doppelten Ort/Adresse/Melder-Spiegel aus Funnel/Dump */
-  const skipLabels = new Set<string>(
-    staffSelbst
+  const skipLabels = new Set<string>([
+    'Situation',
+    'Bereiche',
+    ...(staffSelbst
       ? [
           'Auftraggeber',
           'Anliegen',
           'Anfrageart',
-          'Situation',
-          'Bereiche',
           'Preis-Hinweis',
           'Budget-Hinweis',
           'Kunde',
@@ -377,8 +385,8 @@ export function buildAnfragePhaseSheetProps(lead: {
             'Einheit',
             'Objekt',
           ]
-        : ['Auftraggeber', 'Melder', 'Melder-Kontakt', 'Einheit', 'Objekt']
-  )
+        : ['Auftraggeber', 'Melder', 'Melder-Kontakt', 'Einheit', 'Objekt']),
+  ])
 
   const fd =
     lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useTransition } from '@/components/ui/action-busy'
+import { useLocalTransition } from '@/components/ui/action-busy'
 import {
   updateHandwerker,
   type HandwerkerFormInput,
@@ -57,7 +57,7 @@ export function PartnerEditSheet({
   onSaved?: () => void
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, startTransition] = useLocalTransition()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')
   const [vorname, setVorname] = useState('')
@@ -73,9 +73,25 @@ export function PartnerEditSheet({
   const [steuernummer, setSteuernummer] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const wasOpenRef = useRef(false)
+  const syncedHwIdRef = useRef<string | null>(null)
 
+  /*
+   * Hydrate nur beim Öffnen oder Partner-Wechsel.
+   * Nicht bei jeder neuen handwerker-Referenz (router.refresh) — sonst fliegen
+   * ungespeicherte Eingaben weg und man muss „zwischen“ speichern.
+   */
   useEffect(() => {
-    if (!open) return
+    const justOpened = open && !wasOpenRef.current
+    wasOpenRef.current = open
+    if (!open) {
+      syncedHwIdRef.current = null
+      return
+    }
+    const idChanged = syncedHwIdRef.current !== handwerker.id
+    if (!justOpened && !idChanged) return
+    syncedHwIdRef.current = handwerker.id
+
     const k = normalizeHandwerkerNamen(handwerker)
     const a = resolveHandwerkerAnschrift(handwerker)
     const slugs = gewerkSlugsFromField(handwerker.gewerke)
