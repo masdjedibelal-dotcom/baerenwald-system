@@ -204,7 +204,7 @@ export async function acceptAngebotAndCreateAuftrag(
 
   const { data: ang, error: angErr } = await supabaseAdmin
     .from('angebote')
-    .select('id, lead_id, status, gesamt_preis, gesamt_max')
+    .select('id, lead_id, status, gesamt_min, gesamt_max, gesamt_fix')
     .eq('id', id)
     .maybeSingle()
 
@@ -255,9 +255,10 @@ export async function acceptAngebotAndCreateAuftrag(
       objektNotfallDirekt: (objekt as { notfall_direkt?: boolean | null } | null)
         ?.notfall_direkt,
     })
-    const fix = ang.gesamt_preis != null ? Number(ang.gesamt_preis) : 0
+    const fix = ang.gesamt_fix != null ? Number(ang.gesamt_fix) : 0
     const max = ang.gesamt_max != null ? Number(ang.gesamt_max) : 0
-    const betrag = fix > 0 ? fix : max > 0 ? max : 0
+    const min = ang.gesamt_min != null ? Number(ang.gesamt_min) : 0
+    const betrag = fix > 0 ? fix : max > 0 ? max : min > 0 ? min : 0
     const erlaubt = angebotDarfDirektAuftragOhneHvFreigabe({
       portalModus: regeln.portalModus,
       freigabeModus: regeln.freigabeModus,

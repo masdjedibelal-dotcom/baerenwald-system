@@ -1,4 +1,8 @@
 import { parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
+import {
+  parseProjektWasZeilen,
+  wasZeilenToFunnelPositionen,
+} from '@/lib/lead-projekt-was'
 import { positionVkNettoStueck } from '@/lib/angebot-positionen'
 import {
   leistungStatusLabel,
@@ -106,9 +110,14 @@ function normalizeAnerkennung(
   return v || null
 }
 
-/** Anfrage: Funnel-Positionen (read-only). */
+/** Anfrage: Funnel-Positionen (read-only); Fallback auf was_zeilen (Angebot-Sync). */
 export function leistungenFromAnfrage(funnelDaten: unknown): LeistungRow[] {
-  return parseFunnelPositionen(funnelDaten).map((p, i) => {
+  let positionen = parseFunnelPositionen(funnelDaten)
+  if (!positionen.length) {
+    const was = parseProjektWasZeilen(funnelDaten)
+    if (was.length) positionen = wasZeilenToFunnelPositionen(was)
+  }
+  return positionen.map((p, i) => {
     const mid =
       p.preis_min > 0 || p.preis_max > 0
         ? Math.round(((p.preis_min + p.preis_max) / 2) * 100) / 100
