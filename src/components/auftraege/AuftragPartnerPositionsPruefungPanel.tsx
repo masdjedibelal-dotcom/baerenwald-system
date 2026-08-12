@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button'
 import {
   decidePartnerPositionsAnfrageAblehnen,
   decidePartnerPositionsAnfrageIntern,
-  decidePartnerPositionsAnfrageNachtrag,
   decideWeitereArbeitMitNotify,
   listPartnerPositionsAnfragen,
   listWeitereArbeitInPruefung,
@@ -15,14 +14,18 @@ import {
 } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import { formatDatumZeit } from '@/lib/utils'
 
-function schaetzungLabel(row: PartnerPositionsAnfrageRow): string | null {
+type PruefItem =
+  | { kind: 'anfrage'; row: PartnerPositionsAnfrageRow }
+  | { kind: 'regie'; row: WeitereArbeitInPruefungRow }
+
+function schaetzungAnfrage(row: PartnerPositionsAnfrageRow): string | null {
   const parts: string[] = []
   if (row.schaetzung_eur != null && Number.isFinite(row.schaetzung_eur)) {
     parts.push(
-      `${row.schaetzung_eur.toLocaleString('de-DE', {
+      row.schaetzung_eur.toLocaleString('de-DE', {
         style: 'currency',
         currency: 'EUR',
-      })}`
+      })
     )
   }
   if (row.schaetzung_minuten != null && row.schaetzung_minuten > 0) {
@@ -31,6 +34,26 @@ function schaetzungLabel(row: PartnerPositionsAnfrageRow): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
+function schaetzungRegie(row: WeitereArbeitInPruefungRow): string | null {
+  const parts: string[] = []
+  if (row.preis_partner != null && row.preis_partner > 0) {
+    parts.push(
+      row.preis_partner.toLocaleString('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+      })
+    )
+  }
+  if (row.menge != null && row.menge > 0) {
+    parts.push(`${row.menge} ${row.einheit?.trim() || 'Std'}`)
+  }
+  return parts.length ? parts.join(' · ') : null
+}
+
+/**
+ * Flacher Hinweis: Nacharbeit vom Handwerker — nur Annehmen / Ablehnen.
+ * Kein Card-in-Card, kein Kunden-Nachtrag / Intern-zuweisen.
+ */
 export function AuftragPartnerPositionsPruefungPanel({
   auftragId,
   disabled = false,
@@ -63,8 +86,13 @@ export function AuftragPartnerPositionsPruefungPanel({
   }, [auftragId])
 
   const offen = anfragen.filter((a) => a.status === 'offen')
-  if (loading && !offen.length && !regie.length) return null
-  if (!offen.length && !regie.length) return null
+  const items: PruefItem[] = [
+    ...offen.map((row) => ({ kind: 'anfrage' as const, row })),
+    ...regie.map((row) => ({ kind: 'regie' as const, row })),
+  ]
+
+  if (loading && !items.length) return null
+  if (!items.length) return null
 
   function run(fn: () => Promise<{ ok: true; message?: string } | { ok: false; message: string }>) {
     startTransition(async () => {
@@ -80,134 +108,129 @@ export function AuftragPartnerPositionsPruefungPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50/90 px-3 py-3 text-[length:var(--fs-text)] text-amber-950">
-      <div>
-        <p className="font-semibold">Partner-Meldungen zur Prüfung</p>
-        <p className="mt-0.5 text-[length:var(--fs-meta)] text-amber-900/80">
-          Nachtrag/neue Position oder weitere Regie-Arbeit — entscheiden und Partner informieren.
-        </p>
-      </div>
+    <div className="hw-pruef-banner" role="region" aria-label="Nacharbeit zur Prüfung">
+      <p className="hw-pruef-banner__lead">
+        Weitere Nacharbeiten / Regiearbeiten vom Handwerker eingereicht
+      </p>
 
-      {offen.map((row) => (
-        <div
-          key={row.id}
-          className="rounded-md border border-amber-200 bg-white/70 px-3 py-2.5 space-y-2"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="font-medium">{row.titel}</p>
-            <span className="text-[length:var(--fs-meta)] text-amber-900/70">
-              {formatDatumZeit(row.created_at)}
-            </span>
-          </div>
-          {row.handwerker_name ? (
-            <p className="text-[length:var(--fs-meta)]">Partner: {row.handwerker_name}</p>
-          ) : null}
-          {row.begruendung ? (
-            <p className="text-[length:var(--fs-meta)] whitespace-pre-wrap">{row.begruendung}</p>
-          ) : null}
-          {schaetzungLabel(row) ? (
-            <p className="text-[length:var(--fs-meta)]">Schätzung: {schaetzungLabel(row)}</p>
-          ) : null}
-          {!disabled ? (
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    decidePartnerPositionsAnfrageIntern({ anfrageId: row.id })
-                  )
-                }
-              >
-                Intern zuweisen
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    decidePartnerPositionsAnfrageNachtrag({ anfrageId: row.id })
-                  )
-                }
-              >
-                Kunden-Nachtrag
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    decidePartnerPositionsAnfrageAblehnen({ anfrageId: row.id })
-                  )
-                }
-              >
-                Ablehnen
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      ))}
+      <ul className="hw-pruef-banner__list">
+        {items.map((item) => {
+          if (item.kind === 'anfrage') {
+            const row = item.row
+            const sch = schaetzungAnfrage(row)
+            return (
+              <li key={`a-${row.id}`} className="hw-pruef-banner__item">
+                <div className="hw-pruef-banner__item-main">
+                  <p className="hw-pruef-banner__title">{row.titel}</p>
+                  <p className="hw-pruef-banner__meta">
+                    {[
+                      row.handwerker_name ? `Partner: ${row.handwerker_name}` : null,
+                      formatDatumZeit(row.created_at),
+                      sch,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                  {row.begruendung?.trim() ? (
+                    <p className="hw-pruef-banner__body">{row.begruendung.trim()}</p>
+                  ) : null}
+                </div>
+                {!disabled ? (
+                  <div className="hw-pruef-banner__actions">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() =>
+                          decidePartnerPositionsAnfrageIntern({ anfrageId: row.id })
+                        )
+                      }
+                    >
+                      Annehmen
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() =>
+                          decidePartnerPositionsAnfrageAblehnen({ anfrageId: row.id })
+                        )
+                      }
+                    >
+                      Ablehnen
+                    </Button>
+                  </div>
+                ) : null}
+              </li>
+            )
+          }
 
-      {regie.map((row) => (
-        <div
-          key={row.id}
-          className="rounded-md border border-amber-200 bg-white/70 px-3 py-2.5 space-y-2"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="font-medium">
-              Weitere Arbeit: {row.leistung_name || 'Regie'}
-            </p>
-            {row.created_at ? (
-              <span className="text-[length:var(--fs-meta)] text-amber-900/70">
-                {formatDatumZeit(row.created_at)}
-              </span>
-            ) : null}
-          </div>
-          {row.handwerker_name ? (
-            <p className="text-[length:var(--fs-meta)]">Partner: {row.handwerker_name}</p>
-          ) : null}
-          {row.beschreibung ? (
-            <p className="text-[length:var(--fs-meta)] whitespace-pre-wrap">{row.beschreibung}</p>
-          ) : null}
-          {!disabled ? (
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    decideWeitereArbeitMitNotify({
-                      positionId: row.id,
-                      status: 'anerkannt',
-                    })
-                  )
-                }
-              >
-                Anerkennen
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(() =>
-                    decideWeitereArbeitMitNotify({
-                      positionId: row.id,
-                      status: 'abgelehnt',
-                    })
-                  )
-                }
-              >
-                Ablehnen
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      ))}
+          const row = item.row
+          const sch = schaetzungRegie(row)
+          const begr =
+            (row.beschreibung ?? '')
+              .replace(
+                /\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i,
+                ''
+              )
+              .trim() || null
+          return (
+            <li key={`r-${row.id}`} className="hw-pruef-banner__item">
+              <div className="hw-pruef-banner__item-main">
+                <p className="hw-pruef-banner__title">
+                  {row.leistung_name || 'Weitere Arbeit'}
+                </p>
+                <p className="hw-pruef-banner__meta">
+                  {[
+                    row.handwerker_name ? `Partner: ${row.handwerker_name}` : null,
+                    row.created_at ? formatDatumZeit(row.created_at) : null,
+                    sch,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {begr ? <p className="hw-pruef-banner__body">{begr}</p> : null}
+              </div>
+              {!disabled ? (
+                <div className="hw-pruef-banner__actions">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      run(() =>
+                        decideWeitereArbeitMitNotify({
+                          positionId: row.id,
+                          status: 'anerkannt',
+                        })
+                      )
+                    }
+                  >
+                    Annehmen
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      run(() =>
+                        decideWeitereArbeitMitNotify({
+                          positionId: row.id,
+                          status: 'abgelehnt',
+                        })
+                      )
+                    }
+                  >
+                    Ablehnen
+                  </Button>
+                </div>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

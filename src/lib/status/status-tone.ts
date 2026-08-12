@@ -28,13 +28,18 @@ export const STATUSES: Record<string, StatusEntry> = {
   gesendet: { label: 'Gesendet', tone: 'blau' },
   gesendet_kunde: { label: 'An Kunde gesendet', tone: 'blau' },
   gesendet_handwerker: { label: 'An Partner gesendet', tone: 'blau' },
-  handwerker_akzeptiert: { label: 'Partner akzeptiert', tone: 'blau' },
+  handwerker_akzeptiert: { label: 'Partner akzeptiert', tone: 'gruen' },
   angenommen: { label: 'Angenommen', tone: 'gruen' },
   kunde_akzeptiert: { label: 'Angenommen', tone: 'gruen' },
   abgelehnt: { label: 'Abgelehnt', tone: 'rot' },
   abgelaufen: { label: 'Abgelaufen', tone: 'rot' },
   ersetzt: { label: 'Ersetzt', tone: 'grau' },
   ueberarbeitet: { label: 'Überarbeitet', tone: 'grau' },
+  /** Partner-Zuweisung (angebot_handwerker / auftrag) */
+  angefragt: { label: 'Angefragt', tone: 'blau' },
+  akzeptiert: { label: 'Akzeptiert', tone: 'gruen' },
+  zugewiesen: { label: 'Zugewiesen', tone: 'gruen' },
+  warten: { label: 'Warten', tone: 'blau' },
 
   // Auftrag
   offen: { label: 'Geplant', tone: 'grau' },

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, type ReactNode } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import {
   RechnungAuswahlPanel,
@@ -26,8 +27,18 @@ export function RechnungAuswahlModal({
   onNeueRechnung: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
 }) {
+  const [footer, setFooter] = useState<ReactNode>(null)
+
   return (
-    <Modal open={open} onClose={onClose} title="Rechnungen" size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Rechnungen"
+      subtitle="Bestehende wählen oder neu anlegen"
+      size="lg"
+      footer={footer}
+      footerSpread
+    >
       <RechnungAuswahlPanel
         variant="modal"
         auftragId={auftragId}
@@ -36,6 +47,7 @@ export function RechnungAuswahlModal({
         onClose={onClose}
         onNeueRechnung={onNeueRechnung}
         onWeiterbearbeiten={onWeiterbearbeiten}
+        onFooterChange={setFooter}
       />
     </Modal>
   )

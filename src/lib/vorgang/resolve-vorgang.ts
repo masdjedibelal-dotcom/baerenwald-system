@@ -1,4 +1,3 @@
-import { ANFRAGE_WARTE_AUF_HV_LABEL } from '@/lib/status/status-display'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
@@ -16,7 +15,8 @@ import type {
  * Kanonischer Vorgang-Resolver (final Spec):
  * - Phase nie aus vorgang_phase lesen — immer aus Entity-Kette ableiten
  * - Storno-Regel: neueste nicht-stornierte Entität gewinnt (Rechnung > Auftrag > Angebot > Anfrage)
- * - Actor-Priorität: freigabe > handwerker > kunde > bw
+ * - Actor-Priorität: handwerker > kunde > bw
+ *   (Org-Freigabe ist kein eigener Vorgangs-Status mehr — Angebot „gesendet“ = wartet auf Annehmen/Ablehnen)
  * - Output-Shape: `ResolvedVorgang` in `@/lib/vorgang/types`
  *
  * A7 Parität: Fixtures in `shared/crm-vorgang/resolve-vorgang.fixtures.json`
@@ -154,30 +154,30 @@ function isUeberfaellig(faellig: string | null | undefined, now = new Date()): b
   return due < today
 }
 
-/** Angebot wartet auf Kundenantwort (Fine-Stages + flat). */
+/** Angebot wartet auf Kundenentscheidung (Portal und/oder Mail — beides „gesendet“). */
 function angebotWartetAufKunde(status: string): boolean {
-  return status === 'gesendet' || status === 'gesendet_kunde'
+  return (
+    status === 'gesendet' ||
+    status === 'gesendet_kunde' ||
+    status === 'entwurf' ||
+    status === 'abgelaufen'
+  )
 }
 
 function resolveActor(
-  input: ResolveVorgangInput,
+  _input: ResolveVorgangInput,
   phase: VorgangPhase,
   unterstatus: string,
   angebotAktiv: VorgangAngebotInput | null,
   auftragAktiv: VorgangAuftragInput | null,
   badges: ResolvedVorgangBadges
 ): { actor: VorgangActor | null; needsAction: boolean } {
+  void _input
   if (unterstatus === 'storniert') {
     return { actor: null, needsAction: false }
   }
 
-  const lead = input.lead
   const candidates: { actor: VorgangActor; rank: number }[] = []
-
-  // Actor freigabe / Badge nur bei org_freigabe_status=ausstehend
-  if ((lead.org_freigabe_status ?? '').trim() === 'ausstehend') {
-    candidates.push({ actor: 'freigabe', rank: ACTOR_PRIORITY.freigabe })
-  }
 
   if (phase === 'auftrag' && auftragAktiv?.handwerkerAktionOffen) {
     candidates.push({ actor: 'handwerker', rank: ACTOR_PRIORITY.handwerker })
@@ -340,10 +340,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const badges: ResolvedVorgangBadges = {}
   if (isNotfall(input)) badges.notfall = true
-  const wartetFreigabe = (lead.org_freigabe_status ?? '').trim() === 'ausstehend'
-  if (wartetFreigabe) {
-    badges.wartet_freigabe = true
-  }
+  // org_freigabe_status bleibt Datenfeld; kein eigener Vorgangs-Status / Badge mehr
 
   const { actor, needsAction } = resolveActor(
     input,
@@ -363,10 +360,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
   return {
     phase: pick.phase,
     unterstatus,
-    // Status-Spalte: Freigabe sichtbar, Pipeline-Key (unterstatus) bleibt unverändert
-    unterstatusLabel: wartetFreigabe
-      ? ANFRAGE_WARTE_AUF_HV_LABEL
-      : unterstatusLabel(pick.phase, unterstatus),
+    unterstatusLabel: unterstatusLabel(pick.phase, unterstatus),
     needsAction,
     actor,
     badges,

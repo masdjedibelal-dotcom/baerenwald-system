@@ -77,7 +77,7 @@ export const UI_PHASES: UiPhase[] = [
       'Legacy Positionen-Tab entfernt (v3 aktiv)',
       'RechnungNeuForm entfernt — Wizard ist Create/Edit',
       'Mock = SoT: Modal/MockModal, MockEmpty/EmptyState, DetailShell vereinheitlicht',
-      'Copy: Staff = Du (Login + Kern-UI); Kunde/Partner = Anrede/Sie',
+      'Copy: Staff = Du (Login + Kern-UI); Kunde/Partner = immer Sie',
       'A11y: Focus-Trap in Modal + EditorSheet',
       'Empty/Error/Loading Skeletons (Listen + Detail via CrmPageLoading)',
       'Fachbegriffe-Glossar + Tooltips (Bestand, Regie, Abschlag, …)',

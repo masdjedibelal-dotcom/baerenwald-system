@@ -11,7 +11,6 @@ import type { AuftragDetail } from '@/lib/types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { formatAuftragsNr, auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   buildAbschlussdokumentationMail,
@@ -67,8 +66,7 @@ async function loadAbschlussMailKontext(
   if (!email) return { ok: false, message: 'Keine Kunden-E-Mail' }
 
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde)
-  const anrede: AngebotMailAnrede =
-    anredeOverride ?? (istPrivatKundeTyp(kunde.typ) ? 'du' : 'sie')
+  const anrede: AngebotMailAnrede = 'sie'
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   return {

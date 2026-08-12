@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, type ReactNode } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import {
   AngebotAuswahlPanel,
@@ -26,8 +27,18 @@ export function AngebotAuswahlModal({
   onWeiterbearbeiten: (bootstrap: AngebotWizardBootstrap) => void
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
 }) {
+  const [footer, setFooter] = useState<ReactNode>(null)
+
   return (
-    <Modal open={open} onClose={onClose} title="Angebote" size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Angebote"
+      subtitle="Bestehendes wählen oder neu anlegen"
+      size="lg"
+      footer={footer}
+      footerSpread
+    >
       <AngebotAuswahlPanel
         variant="modal"
         leadId={leadId}
@@ -36,6 +47,7 @@ export function AngebotAuswahlModal({
         onNeuesAngebot={onNeuesAngebot}
         onWeiterbearbeiten={onWeiterbearbeiten}
         onKopie={onKopie}
+        onFooterChange={setFooter}
       />
     </Modal>
   )

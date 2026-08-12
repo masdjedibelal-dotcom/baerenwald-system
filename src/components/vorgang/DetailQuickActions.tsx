@@ -1,10 +1,10 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { ActionIcon } from '@/components/ui/ActionIcon'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { addLeadNotizRow } from '@/app/(dashboard)/anfragen/actions'
 import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
@@ -66,7 +66,7 @@ export function useDetailQuickActions({
 }): { quickBar: QuickBarAction[]; sheets: ReactNode } {
   const [notizOpen, setNotizOpen] = useState(false)
   const [notizText, setNotizText] = useState('')
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -95,151 +95,159 @@ export function useDetailQuickActions({
       toast.error('Bitte Notiz eingeben.')
       return
     }
-    startTransition(async () => {
-      if (notiz.kind === 'lead') {
-        const r = await addLeadNotizRow(notiz.leadId, text)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
+    setPending(true)
+    void actionBusy
+      .run('Notiz wird gespeichert…', async () => {
+        if (notiz.kind === 'lead') {
+          const r = await addLeadNotizRow(notiz.leadId, text)
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+        } else if (notiz.kind === 'kunde') {
+          const r = await addKundenNotiz(notiz.kundeId, text)
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+        } else if (notiz.kind === 'handwerker') {
+          const next = notiz.initial?.trim()
+            ? `${notiz.initial.trim()}\n\n${text}`
+            : text
+          const r = await updateHandwerkerNotizen(notiz.handwerkerId, next)
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+        } else {
+          const next = notiz.initial?.trim()
+            ? `${notiz.initial.trim()}\n\n${text}`
+            : text
+          const r = await updateAuftragNotizen(notiz.auftragId, next)
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
         }
-      } else if (notiz.kind === 'kunde') {
-        const r = await addKundenNotiz(notiz.kundeId, text)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-      } else if (notiz.kind === 'handwerker') {
-        const next = notiz.initial?.trim()
-          ? `${notiz.initial.trim()}\n\n${text}`
-          : text
-        const r = await updateHandwerkerNotizen(notiz.handwerkerId, next)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-      } else {
-        const next = notiz.initial?.trim()
-          ? `${notiz.initial.trim()}\n\n${text}`
-          : text
-        const r = await updateAuftragNotizen(notiz.auftragId, next)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-      }
-      toast.success('Notiz gespeichert')
-      setNotizOpen(false)
-      setNotizText('')
-      onSaved?.()
-    })
+        toast.success('Notiz gespeichert')
+        setNotizOpen(false)
+        setNotizText('')
+        onSaved?.()
+      })
+      .finally(() => setPending(false))
   }, [notiz, notizText, onSaved, pending])
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      if (!dokument) return
+      if (!dokument || uploading) return
       const list = Array.from(files).slice(0, 5)
       if (!list.length) return
       setUploading(true)
       try {
-        if (dokument.kind === 'lead') {
-          for (const file of list) {
-            const fd = new FormData()
-            fd.set('file', file)
-            fd.set('filename', file.name)
-            const res = await fetch(`/api/anfragen/${dokument.leadId}/dokument/upload`, {
-              method: 'POST',
-              body: fd,
-            })
-            const json = (await res.json()) as {
-              url?: string
-              groesse_bytes?: number
-              error?: string
-            }
-            if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
-            const ins = await insertLeadDokument({
-              leadId: dokument.leadId,
-              name: file.name,
-              datei_url: json.url,
-              groesse_bytes: json.groesse_bytes ?? file.size,
-            })
-            if (!ins.ok) throw new Error(ins.message)
-          }
-        } else if (dokument.kind === 'kunde') {
-          for (const file of list) {
-            const fd = new FormData()
-            fd.set('file', file)
-            fd.set('filename', file.name)
-            const res = await fetch(`/api/kunden/${dokument.kundeId}/dokument/upload`, {
-              method: 'POST',
-              body: fd,
-            })
-            const json = (await res.json()) as {
-              url?: string
-              groesse_bytes?: number
-              error?: string
-            }
-            if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
-            const ins = await insertKundeDokument({
-              kundeId: dokument.kundeId,
-              name: file.name,
-              datei_url: json.url,
-              groesse_bytes: json.groesse_bytes ?? file.size,
-            })
-            if (!ins.ok) throw new Error(ins.message)
-          }
-        } else if (dokument.kind === 'handwerker') {
-          const supabase = createClient()
-          for (const file of list) {
-            const path = `${dokument.handwerkerId}/${INDIVIDUELL_TYP_SLUG}-${Date.now()}-${safeFileName(file.name)}`
-            const { error: upErr } = await supabase.storage
-              .from(PARTNER_DOCS_BUCKET)
-              .upload(path, file, {
-                upsert: false,
-                contentType: file.type || undefined,
+        await actionBusy.run(
+          list.length === 1 ? 'Dokument wird hochgeladen…' : 'Dokumente werden hochgeladen…',
+          async () => {
+            if (dokument.kind === 'lead') {
+              for (const file of list) {
+                const fd = new FormData()
+                fd.set('file', file)
+                fd.set('filename', file.name)
+                const res = await fetch(`/api/anfragen/${dokument.leadId}/dokument/upload`, {
+                  method: 'POST',
+                  body: fd,
+                })
+                const json = (await res.json()) as {
+                  url?: string
+                  groesse_bytes?: number
+                  error?: string
+                }
+                if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
+                const ins = await insertLeadDokument({
+                  leadId: dokument.leadId,
+                  name: file.name,
+                  datei_url: json.url,
+                  groesse_bytes: json.groesse_bytes ?? file.size,
+                })
+                if (!ins.ok) throw new Error(ins.message)
+              }
+            } else if (dokument.kind === 'kunde') {
+              for (const file of list) {
+                const fd = new FormData()
+                fd.set('file', file)
+                fd.set('filename', file.name)
+                const res = await fetch(`/api/kunden/${dokument.kundeId}/dokument/upload`, {
+                  method: 'POST',
+                  body: fd,
+                })
+                const json = (await res.json()) as {
+                  url?: string
+                  groesse_bytes?: number
+                  error?: string
+                }
+                if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
+                const ins = await insertKundeDokument({
+                  kundeId: dokument.kundeId,
+                  name: file.name,
+                  datei_url: json.url,
+                  groesse_bytes: json.groesse_bytes ?? file.size,
+                })
+                if (!ins.ok) throw new Error(ins.message)
+              }
+            } else if (dokument.kind === 'handwerker') {
+              const supabase = createClient()
+              for (const file of list) {
+                const path = `${dokument.handwerkerId}/${INDIVIDUELL_TYP_SLUG}-${Date.now()}-${safeFileName(file.name)}`
+                const { error: upErr } = await supabase.storage
+                  .from(PARTNER_DOCS_BUCKET)
+                  .upload(path, file, {
+                    upsert: false,
+                    contentType: file.type || undefined,
+                  })
+                if (upErr) throw new Error(upErr.message)
+                const ins = await insertPartnerDokument({
+                  handwerker_id: dokument.handwerkerId,
+                  auftrag_id: null,
+                  typ: INDIVIDUELL_TYP_SLUG,
+                  bezeichnung: file.name,
+                  gueltig_bis: null,
+                  datei_url: path,
+                  notizen: null,
+                })
+                if (!ins.ok) {
+                  await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
+                  throw new Error(ins.message)
+                }
+              }
+            } else {
+              const urls: string[] = []
+              for (const file of list) {
+                const fd = new FormData()
+                fd.set('file', file)
+                fd.set('filename', file.name)
+                const res = await fetch(
+                  `/api/auftraege/${dokument.auftragId}/timeline-foto/upload`,
+                  { method: 'POST', body: fd }
+                )
+                const json = (await res.json()) as { url?: string; error?: string }
+                if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
+                urls.push(json.url)
+              }
+              const name = list.length === 1 ? list[0]!.name : `${list.length} Dateien`
+              const r = await createAuftragDokumentEintrag({
+                auftragId: dokument.auftragId,
+                titel: name,
+                beschreibung: null,
+                foto_urls: urls,
+                fuerKunde: false,
               })
-            if (upErr) throw new Error(upErr.message)
-            const ins = await insertPartnerDokument({
-              handwerker_id: dokument.handwerkerId,
-              auftrag_id: null,
-              typ: INDIVIDUELL_TYP_SLUG,
-              bezeichnung: file.name,
-              gueltig_bis: null,
-              datei_url: path,
-              notizen: null,
-            })
-            if (!ins.ok) {
-              await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
-              throw new Error(ins.message)
+              if (!r.ok) throw new Error(r.message)
             }
-          }
-        } else {
-          const urls: string[] = []
-          for (const file of list) {
-            const fd = new FormData()
-            fd.set('file', file)
-            fd.set('filename', file.name)
-            const res = await fetch(
-              `/api/auftraege/${dokument.auftragId}/timeline-foto/upload`,
-              { method: 'POST', body: fd }
+            toast.success(
+              list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`
             )
-            const json = (await res.json()) as { url?: string; error?: string }
-            if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
-            urls.push(json.url)
+            onSaved?.()
           }
-          const name = list.length === 1 ? list[0]!.name : `${list.length} Dateien`
-          const r = await createAuftragDokumentEintrag({
-            auftragId: dokument.auftragId,
-            titel: name,
-            beschreibung: null,
-            foto_urls: urls,
-            fuerKunde: false,
-          })
-          if (!r.ok) throw new Error(r.message)
-        }
-        toast.success(
-          list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`
         )
-        onSaved?.()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
       } finally {
@@ -247,7 +255,7 @@ export function useDetailQuickActions({
         if (fileRef.current) fileRef.current.value = ''
       }
     },
-    [dokument, onSaved]
+    [dokument, onSaved, uploading]
   )
 
   const quickBar: QuickBarAction[] = [
@@ -269,12 +277,12 @@ export function useDetailQuickActions({
       id: 'notiz',
       label: 'Notiz',
       icon: 'messages',
-      disabled: !notiz,
+      disabled: !notiz || pending,
       onClick: () => setNotizOpen(true),
     },
     {
       id: 'dokument',
-      label: 'Dokument',
+      label: uploading ? 'Lädt…' : 'Dokument',
       icon: 'files',
       disabled: !dokument || uploading,
       onClick: () => fileRef.current?.click(),
@@ -306,23 +314,17 @@ export function useDetailQuickActions({
         dirty={notizText.trim().length > 0}
         footer={
           <div className="phase-sheet-footer">
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={pending}
-              onClick={() => setNotizOpen(false)}
-            >
+            <MockBtn kind="ghost" disabled={pending} onClick={() => setNotizOpen(false)}>
               Abbrechen
-            </button>
-            <button
-              type="button"
-              className="btn primary"
+            </MockBtn>
+            <MockBtn
+              kind="primary"
+              icon={pending ? undefined : 'check'}
               disabled={pending || !notizText.trim()}
               onClick={saveNotiz}
             >
-              <ActionIcon n="check" size={14} />
-              Speichern
-            </button>
+              {pending ? 'Speichern…' : 'Speichern'}
+            </MockBtn>
           </div>
         }
       >

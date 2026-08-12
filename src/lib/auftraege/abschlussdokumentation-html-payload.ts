@@ -1,6 +1,5 @@
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { auftragTitel, auftragWertNum } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -129,7 +128,7 @@ export function buildAbschlussdokuHtmlInput(
     caption: `Dokumentation ${i + 1}`,
   }))
 
-  const mailAnrede = istPrivatKundeTyp(pdf.kunde.typ) ? 'du' : 'sie'
+  const mailAnrede = 'sie' as const
   const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(pdf.kunde)
   const begruessung = angebotPdfBegruessung(
     mailAnrede,

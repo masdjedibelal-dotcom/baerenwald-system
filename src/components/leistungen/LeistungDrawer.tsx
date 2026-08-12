@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
 import type { LeistungDrawerAction, LeistungRow } from '@/components/leistungen/types'
@@ -28,24 +29,30 @@ function Section({
 }
 
 /**
- * Leistungs-Drawer: Position · Zuweisung.
- * Aktionen (z. B. Zuweisung ändern) als Icon rechts oben — kein Footer-CTA.
+ * Leistungs-Drawer: Position · Zuweisung · optional Nachtrag-Freigabe.
+ * Freigabe: Footer Bestätigen / Ablehnen (kein Header-Icon).
  */
 export function LeistungDrawer({
   open,
   onClose,
   row,
   actions = [],
+  pruefungPending = false,
+  onNachtragEntscheiden,
 }: {
   open: boolean
   onClose: () => void
   row: LeistungRow | null
   actions?: LeistungDrawerAction[]
+  pruefungPending?: boolean
+  onNachtragEntscheiden?: (status: 'anerkannt' | 'abgelehnt') => void
   /** @deprecated */
   secondaryHint?: string | null
 }) {
+  const brauchtFreigabe = Boolean(row?.brauchtFreigabe && onNachtragEntscheiden)
+
   const headerEnd =
-    actions.length > 0 ? (
+    !brauchtFreigabe && actions.length > 0 ? (
       <div className="flex items-center gap-0.5">
         {actions.map((a) => (
           <button
@@ -74,6 +81,27 @@ export function LeistungDrawer({
     )
   }
 
+  const footer = brauchtFreigabe ? (
+    <div className="ldr-cta">
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={pruefungPending}
+        onClick={() => onNachtragEntscheiden?.('abgelehnt')}
+      >
+        Ablehnen
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        disabled={pruefungPending}
+        onClick={() => onNachtragEntscheiden?.('anerkannt')}
+      >
+        {pruefungPending ? '…' : 'Annehmen'}
+      </Button>
+    </div>
+  ) : undefined
+
   return (
     <EditorSheet
       open={open}
@@ -82,14 +110,43 @@ export function LeistungDrawer({
       crumb={row.gewerkName ? `${row.gewerkName} >` : null}
       size="lg"
       headerEnd={headerEnd}
+      footer={footer}
     >
+      {brauchtFreigabe ? (
+        <Section title="Nachtrag zur Freigabe" icon="clipboard-list">
+          <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+            Der Handwerker hat weitere Arbeit eingereicht — bitte prüfen und freigeben oder
+            ablehnen. Das Ergebnis erscheint im Hausmeister-Portal.
+          </p>
+          <div className="props">
+            <DetailProp label="Status">
+              <StatusBadge status="offen" label="Offen" />
+            </DetailProp>
+            {row.handwerkerName ? (
+              <DetailProp label="Handwerker">{row.handwerkerName}</DetailProp>
+            ) : null}
+            <DetailProp label="Begründung">
+              <span className="whitespace-pre-wrap">
+                {row.nachtragBegruendung?.trim() || row.beschreibung?.trim() || '—'}
+              </span>
+            </DetailProp>
+            <DetailProp label="Preis">
+              <span className="ldr-gesamt">{row.nachtragPreisLabel ?? row.preisLabel}</span>
+            </DetailProp>
+            <DetailProp label="Zeit">
+              {row.nachtragZeitLabel ?? row.mengeLabel}
+            </DetailProp>
+          </div>
+        </Section>
+      ) : null}
+
       <Section title="Position" icon="file-text">
         <div className="props">
           {row.gewerkName ? <DetailProp label="Gewerk">{row.gewerkName}</DetailProp> : null}
           {row.istRegie ? <DetailProp label="Vergütung">nach Aufwand</DetailProp> : null}
           <DetailProp label={row.istRegie ? 'Schätzung' : 'Menge'}>{row.mengeLabel}</DetailProp>
-          <DetailProp label={row.istRegie ? 'Stundensatz' : 'Einzelpreis'}>
-            {row.einzelpreisLabel ?? row.preisLabel}
+          <DetailProp label={row.istRegie ? 'Partner-Preis' : 'Einzelpreis'}>
+            {row.nachtragPreisLabel ?? row.einzelpreisLabel ?? row.preisLabel}
           </DetailProp>
           <DetailProp label="Gesamt">
             <span className="ldr-gesamt">{row.preisLabel}</span>
@@ -102,7 +159,18 @@ export function LeistungDrawer({
           <DetailProp label="Ausführung">{row.handwerkerName ?? '—'}</DetailProp>
           {row.anfrageStatusLabel ? (
             <DetailProp label="Anfrage">
-              <StatusBadge status="gesendet" label={row.anfrageStatusLabel} />
+              <StatusBadge
+                status={
+                  row.brauchtFreigabe
+                    ? 'offen'
+                    : row.anerkennungStatus === 'abgelehnt'
+                      ? 'storniert'
+                      : row.anerkennungStatus === 'anerkannt'
+                        ? 'abgenommen'
+                        : 'gesendet'
+                }
+                label={row.anfrageStatusLabel}
+              />
             </DetailProp>
           ) : null}
           {row.zeitraumLabel ? (
@@ -111,7 +179,7 @@ export function LeistungDrawer({
         </div>
       </Section>
 
-      {row.istRegie || (row.handwerkerUpdates && row.handwerkerUpdates.length > 0) ? (
+      {!brauchtFreigabe && (row.istRegie || (row.handwerkerUpdates && row.handwerkerUpdates.length > 0)) ? (
         <Section title="Handwerker-Updates" icon="camera">
           {row.regieSollIstLabel ? (
             <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">

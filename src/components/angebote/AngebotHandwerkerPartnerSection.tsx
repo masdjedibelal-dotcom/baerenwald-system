@@ -32,10 +32,22 @@ import type { ProjektVertragWizardBootstrap } from '@/lib/vertraege/types'
 function zuweisungStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
   if (v === 'angefragt') return 'Angefragt'
-  if (v === 'akzeptiert') return 'Akzeptiert'
+  if (v === 'akzeptiert' || v === 'angenommen') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'ersetzt') return 'Ersetzt'
+  if (v === 'zugewiesen') return 'Zugewiesen'
   return 'Ausstehend'
+}
+
+function zuweisungStatusBadgeClass(s: string | null | undefined): string {
+  const v = (s ?? '').toLowerCase()
+  if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
+    return 'bg-emerald-100 text-emerald-900'
+  }
+  if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
+  if (v === 'angefragt' || v === 'warten') return 'bg-blue-100 text-blue-900'
+  if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
+  return 'bg-bw-bg-soft text-bw-text-muted'
 }
 
 function ZuweisungCard({
@@ -81,6 +93,20 @@ function ZuweisungCard({
     hwSt !== 'bestaetigt' &&
     hwSt !== 'uebernommen' &&
     !(statusLc === 'akzeptiert' && hwSt && hwSt !== 'offen')
+  const kannPartnerWechseln =
+    !eingereicht &&
+    !uebernommen &&
+    hwSt !== 'bestaetigt' &&
+    hwSt !== 'eingereicht' &&
+    statusLc !== 'ersetzt'
+
+  function openReplacePicker() {
+    setReplaceOpen(true)
+    void listHandwerkerFuerGewerk(z.gewerk_id).then((r) => {
+      if (!r.ok) toast.error(r.message)
+      else setHwListe(r.handwerker.filter((h) => h.id !== z.handwerker_id))
+    })
+  }
 
   return (
     <>
@@ -93,12 +119,17 @@ function ZuweisungCard({
             <p className="text-bw-text">{z.handwerker?.name ?? '—'}</p>
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">{z.handwerker?.email ?? '—'}</p>
           </div>
-          <span className="inline-block rounded-md bg-bw-bg-soft px-2 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+          <span
+            className={cn(
+              'inline-block rounded-md px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+              zuweisungStatusBadgeClass(z.status)
+            )}
+          >
             {zuweisungStatusLabel(z.status)}
           </span>
         </div>
 
-        {(kannBestaetigen || kannLoeschen) && (
+        {(kannBestaetigen || kannLoeschen || kannPartnerWechseln) && (
           <div className="flex flex-wrap gap-2">
             {kannBestaetigen ? (
               <Button
@@ -129,6 +160,18 @@ function ZuweisungCard({
               >
                 <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
                 Anfrage bestätigen
+              </Button>
+            ) : null}
+            {kannPartnerWechseln ? (
+              <Button
+                type="button"
+                variant={abgelehnt ? 'primary' : 'secondary'}
+                size="sm"
+                loading={replacePending}
+                onClick={openReplacePicker}
+              >
+                <UserPlus className="mr-1 h-3.5 w-3.5" aria-hidden />
+                {abgelehnt ? 'Anderen Partner zuweisen' : 'Handwerker bearbeiten'}
               </Button>
             ) : null}
             {kannLoeschen ? (
@@ -174,28 +217,10 @@ function ZuweisungCard({
         ) : null}
 
         {abgelehnt ? (
-          <div className="space-y-2">
-            <p className="text-[length:var(--fs-meta)] font-medium text-danger">
-              Ablehnung: {labelHandwerkerAblehnung(z.ablehnung_grund ?? null)}
-              {z.antwort_notiz?.trim() ? ` — ${z.antwort_notiz.trim()}` : ''}
-            </p>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              loading={replacePending}
-              onClick={() => {
-                setReplaceOpen(true)
-                void listHandwerkerFuerGewerk(z.gewerk_id).then((r) => {
-                  if (!r.ok) toast.error(r.message)
-                  else setHwListe(r.handwerker.filter((h) => h.id !== z.handwerker_id))
-                })
-              }}
-            >
-              <UserPlus className="mr-1 h-3.5 w-3.5" aria-hidden />
-              Anderen Partner zuweisen
-            </Button>
-          </div>
+          <p className="text-[length:var(--fs-meta)] font-medium text-danger">
+            Ablehnung: {labelHandwerkerAblehnung(z.ablehnung_grund ?? null)}
+            {z.antwort_notiz?.trim() ? ` — ${z.antwort_notiz.trim()}` : ''}
+          </p>
         ) : null}
 
         <HandwerkerEinreichungPruefung
@@ -251,9 +276,18 @@ function ZuweisungCard({
         <Modal
           open={replaceOpen}
           onClose={() => setReplaceOpen(false)}
-          title={`Anderen Partner — ${z.gewerke?.name ?? 'Gewerk'}`}
+          title={
+            abgelehnt
+              ? `Anderen Partner — ${z.gewerke?.name ?? 'Gewerk'}`
+              : `Handwerker bearbeiten — ${z.gewerke?.name ?? 'Gewerk'}`
+          }
           size="md"
         >
+          <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
+            {abgelehnt
+              ? 'Neuen Partner wählen — er erhält die Anfrage und muss annehmen.'
+              : `Bisheriger Partner (${z.handwerker?.name ?? '—'}) wird ersetzt. Der neue Partner muss das Angebot neu annehmen.`}
+          </p>
           <ul className="max-h-64 space-y-2 overflow-y-auto">
             {hwListe.map((h) => (
               <li key={h.id}>
@@ -264,6 +298,14 @@ function ZuweisungCard({
                   className="w-full justify-start"
                   disabled={replacePending}
                   onClick={() => {
+                    if (
+                      !abgelehnt &&
+                      !window.confirm(
+                        `Partner wechseln zu ${h.name}? Die bisherige Anfrage endet — ${h.name} muss neu annehmen.`
+                      )
+                    ) {
+                      return
+                    }
                     startReplace(async () => {
                       const r = await replaceAngebotHandwerkerUndSenden({
                         angebotId,
@@ -272,7 +314,7 @@ function ZuweisungCard({
                       })
                       if (!r.ok) toast.error(r.message)
                       else {
-                        toast.success(`Anfrage an ${h.name} gesendet.`)
+                        toast.success(`Anfrage an ${h.name} gesendet — muss neu annehmen.`)
                         setReplaceOpen(false)
                         onRefresh()
                       }
@@ -285,6 +327,11 @@ function ZuweisungCard({
               </li>
             ))}
           </ul>
+          {hwListe.length === 0 ? (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              Keine weiteren Partner für dieses Gewerk.
+            </p>
+          ) : null}
         </Modal>
       </Card>
     </>

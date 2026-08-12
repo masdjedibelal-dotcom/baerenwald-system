@@ -1,19 +1,27 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import {
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   deleteRechnungEntwurf,
   loadRechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
+  rechnungDarfGeloeschtWerden,
   rechnungDarfImWizardBearbeitetWerden,
   type RechnungAuswahlZeile,
 } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -41,6 +49,7 @@ export function RechnungAuswahlPanel({
   onNeueRechnung,
   onWeiterbearbeiten,
   variant = 'modal',
+  onFooterChange,
 }: {
   auftragId: string
   rechnungen: RechnungAuswahlZeile[]
@@ -49,6 +58,7 @@ export function RechnungAuswahlPanel({
   onNeueRechnung: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
   variant?: 'modal' | 'page'
+  onFooterChange?: (footer: ReactNode | null) => void
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -82,8 +92,15 @@ export function RechnungAuswahlPanel({
     })
   }
 
-  function handleLoeschen(rechnungId: string) {
-    if (!window.confirm('Rechnungs-Entwurf wirklich löschen?')) return
+  function handleLoeschen(rechnungId: string, status: string) {
+    const st = String(status ?? '').toLowerCase()
+    const msg =
+      st === 'entwurf'
+        ? 'Rechnungs-Entwurf wirklich löschen?'
+        : st === 'bezahlt' || st === 'storniert'
+          ? 'Erledigte Rechnung wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.'
+          : 'Rechnung wirklich endgültig löschen?'
+    if (!window.confirm(msg)) return
     setLoadingId(rechnungId)
     startTransition(async () => {
       const r = await deleteRechnungEntwurf(rechnungId)
@@ -112,10 +129,11 @@ export function RechnungAuswahlPanel({
 
   function menuItems(r: RechnungAuswahlZeile): ActionsMenuItem[] {
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
+    const loeschbar = rechnungDarfGeloeschtWerden(r.status)
     const items: ActionsMenuItem[] = [
       {
         label: 'Öffnen',
-        icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
+        icon: <MockIcon ctx="btn" n="eye" size={15} />,
         onClick: () => {
           onClose?.()
           router.push(`/rechnungen/${r.id}`)
@@ -126,14 +144,17 @@ export function RechnungAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: 'Weiterbearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
+        icon: <MockIcon ctx="btn" n="pencil" size={15} />,
         onClick: () => openBearbeiten(r.id),
       })
+    }
+
+    if (loeschbar) {
       items.push('sep', {
         label: 'Löschen',
-        icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+        icon: <MockIcon ctx="btn" n="trash" size={15} />,
         danger: true,
-        onClick: () => handleLoeschen(r.id),
+        onClick: () => handleLoeschen(r.id, r.status),
       })
     }
 
@@ -146,49 +167,37 @@ export function RechnungAuswahlPanel({
     : false
 
   const footer = (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-bw-border pt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {variant === 'modal' && onClose ? (
-          <button type="button" className="btn ghost sm" onClick={onClose} disabled={pending}>
-            Schließen
-          </button>
-        ) : (
-          <Link href={`/auftraege/${auftragId}`} className="btn ghost sm">
-            Zum Auftrag
-          </Link>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn ghost sm inline-flex gap-1.5"
-          onClick={onNeueRechnung}
-          disabled={pending}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Neu erstellen
-        </button>
-        <button
-          type="button"
-          className="btn primary sm inline-flex gap-1.5"
-          onClick={handleAuswahlBestaetigen}
-          disabled={pending || !selectedId}
-        >
-          {selectedBearbeitbar ? (
-            <>
-              <Pencil className="h-3.5 w-3.5" aria-hidden />
-              Ausgewählt bearbeiten
-            </>
-          ) : (
-            <>
-              <Eye className="h-3.5 w-3.5" aria-hidden />
-              Ausgewählt öffnen
-            </>
-          )}
-        </button>
-      </div>
-    </div>
+    <>
+      {variant === 'modal' && onClose ? (
+        <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
+          Schließen
+        </MockBtn>
+      ) : (
+        <Link href={`/auftraege/${auftragId}`} className="btn ghost">
+          Zum Auftrag
+        </Link>
+      )}
+      <div style={{ flex: 1 }} />
+      <MockBtn kind="ghost" icon="plus" onClick={onNeueRechnung} disabled={pending}>
+        Neu
+      </MockBtn>
+      <MockBtn
+        kind="primary"
+        icon={selectedBearbeitbar ? 'pencil' : 'eye'}
+        onClick={handleAuswahlBestaetigen}
+        disabled={pending || !selectedId}
+      >
+        {selectedBearbeitbar ? 'Bearbeiten' : 'Öffnen'}
+      </MockBtn>
+    </>
   )
+
+  useLayoutEffect(() => {
+    if (!onFooterChange) return
+    onFooterChange(footer)
+    return () => onFooterChange(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync footer into Modal
+  }, [onFooterChange, pending, selectedId, selectedBearbeitbar, variant, auftragId])
 
   return (
     <div className="space-y-4">
@@ -201,8 +210,8 @@ export function RechnungAuswahlPanel({
         </div>
       ) : null}
 
-      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-        Bestehende Rechnungen auswählen und bearbeiten — oder unten eine neue anlegen.
+      <p className="text-[length:var(--fs-meta)]" style={{ color: 'var(--text-3)', margin: 0 }}>
+        Bestehende Rechnung wählen — oder neu anlegen.
       </p>
 
       {rows.length === 0 ? (
@@ -238,10 +247,7 @@ export function RechnungAuswahlPanel({
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
+                        <MockBtn sm kind="ghost" icon="dots" disabled={pending} title="Aktionen" />
                       }
                       items={menuItems(r)}
                     />
@@ -252,7 +258,7 @@ export function RechnungAuswahlPanel({
           })}
         </ul>
       ) : (
-        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-lg border border-bw-border p-0">
+        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-[10px] border border-bw-border p-0">
           {rows.map((r) => {
             const loading = pending && loadingId === r.id
             const label = RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status
@@ -265,12 +271,16 @@ export function RechnungAuswahlPanel({
                 <div
                   className={cn(
                     'flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap',
-                    isSelected && 'bg-bw-green-bg/35'
+                    isSelected && 'bg-[var(--green-50)]'
                   )}
                 >
                   <button
                     type="button"
-                    className="min-w-0 flex-1 text-left"
+                    className={cn(
+                      'doctype-radio-opt min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none',
+                      isSelected && 'on'
+                    )}
+                    style={{ border: 'none', background: 'transparent', padding: 0 }}
                     disabled={pending}
                     onClick={() => setSelectedId(r.id)}
                     onDoubleClick={() => {
@@ -281,52 +291,34 @@ export function RechnungAuswahlPanel({
                       }
                     }}
                   >
-                    <div className="flex flex-wrap items-center gap-2">
+                    <span className="dot" />
+                    <span className="doctype-radio-opt__copy">
                       <span
-                        className={cn(
-                          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                          isSelected
-                            ? 'border-bw-primary bg-bw-primary text-white'
-                            : 'border-bw-border bg-white'
-                        )}
-                        aria-hidden
+                        className="lbl"
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}
                       >
-                        {isSelected ? (
-                          <span className="block h-1.5 w-1.5 rounded-full bg-white" />
-                        ) : null}
+                        {titel}
+                        <MockBadge kind="plain">{label}</MockBadge>
                       </span>
-                      <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{titel}</span>
-                      <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
-                        {label}
+                      <span className="hint">
+                        {r.rechnungsnummer?.trim() ? `${r.rechnungsnummer} · ` : ''}
+                        {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
+                        {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
+                        {' · '}
+                        {formatEurBetrag(r.brutto ?? 0)}
                       </span>
-                    </div>
-                    <p className="mt-0.5 pl-6 text-[length:var(--fs-text)] text-bw-text-muted">
-                      {r.rechnungsnummer?.trim() ? `${r.rechnungsnummer} · ` : ''}
-                      {r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : '—'}
-                      {r.faellig_am ? ` · fällig ${formatDatum(r.faellig_am)}` : ''}
-                    </p>
+                    </span>
                   </button>
-                  <span className="text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
-                    {formatEurBetrag(r.brutto ?? 0)}
-                  </span>
                   <div className="flex shrink-0 items-center">
                     {loading ? (
                       <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        Bitte warten…
                       </span>
                     ) : (
                       <ActionsMenu
                         align="right"
                         trigger={
-                          <button
-                            type="button"
-                            className="btn ghost sm inline-flex gap-1.5"
-                            disabled={pending}
-                            aria-label="Aktionen"
-                          >
-                            <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          </button>
+                          <MockBtn sm kind="ghost" icon="dots" disabled={pending} title="Aktionen" />
                         }
                         items={menuItems(r)}
                       />
@@ -339,7 +331,19 @@ export function RechnungAuswahlPanel({
         </ul>
       )}
 
-      {footer}
+      {variant === 'page' || !onFooterChange ? (
+        <div
+          className="modal-f"
+          style={{
+            margin: '0 -4px',
+            paddingLeft: 0,
+            paddingRight: 0,
+            borderTop: '0.5px solid var(--border)',
+          }}
+        >
+          {footer}
+        </div>
+      ) : null}
     </div>
   )
 }

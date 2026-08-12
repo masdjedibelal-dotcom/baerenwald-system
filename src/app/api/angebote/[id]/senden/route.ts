@@ -86,10 +86,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         { status: 400 }
       )
     }
-    const allowed: AngebotStatus[] = ['entwurf', 'handwerker_akzeptiert']
-    if (!allowed.includes(detail.status)) {
+    const allowed: AngebotStatus[] = [
+      'entwurf',
+      'handwerker_akzeptiert',
+      'gesendet_kunde',
+    ]
+    const einfachOk = String(detail.status_einfach ?? '')
+      .trim()
+      .toLowerCase() === 'gesendet'
+    if (!allowed.includes(detail.status) && !einfachOk) {
       return NextResponse.json(
-        { error: 'Versand an Kundin nur bei Entwurf oder nach Handwerker-Freigabe möglich.' },
+        {
+          error:
+            'E-Mail an Kundin nur bei gespeichertem oder bereits vorgelegtem Angebot möglich.',
+        },
         { status: 400 }
       )
     }

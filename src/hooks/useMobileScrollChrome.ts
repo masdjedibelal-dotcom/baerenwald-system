@@ -9,10 +9,39 @@ type ScrollChrome = {
   hideChrome: boolean
 }
 
-/** App-Shell scrollt in `main.page`, nicht auf `window`. */
-function resolvePageScroller(): HTMLElement | null {
-  if (typeof document === 'undefined') return null
-  return document.querySelector<HTMLElement>('main.page')
+/** Desktop: App-Shell scrollt in `main.page`. Mobil: oft Dokument-Scroll (window). */
+function pageIsScrollContainer(page: HTMLElement): boolean {
+  const style = window.getComputedStyle(page)
+  const oy = style.overflowY
+  return (
+    (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+    page.scrollHeight > page.clientHeight + 1
+  )
+}
+
+/**
+ * Scroll-Ziel: nur `main.page`, wenn es wirklich scrollt — sonst window
+ * (Mobil: `.page { overflow: visible }` → Dokument-Scroll).
+ */
+function resolveScrollTarget(): { getY: () => number; target: EventTarget } {
+  const page =
+    typeof document !== 'undefined'
+      ? document.querySelector<HTMLElement>('main.page')
+      : null
+  if (page && pageIsScrollContainer(page)) {
+    return {
+      getY: () => page.scrollTop,
+      target: page,
+    }
+  }
+  return {
+    getY: () =>
+      window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0,
+    target: window,
+  }
 }
 
 /**
@@ -32,8 +61,7 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
       return
     }
 
-    const page = resolvePageScroller()
-    const getY = () => (page ? page.scrollTop : window.scrollY || 0)
+    const { getY, target } = resolveScrollTarget()
 
     lastY.current = getY()
 
@@ -63,9 +91,13 @@ export function useMobileScrollChrome(enabled: boolean): ScrollChrome {
     }
 
     update()
-    const target: EventTarget = page ?? window
     target.addEventListener('scroll', onScroll, { passive: true })
-    return () => target.removeEventListener('scroll', onScroll)
+    /* Nach Overlay/Scroll-Lock: Position neu lesen (body-scroll-lock feuert das). */
+    window.addEventListener('bw:scroll-chrome-sync', onScroll)
+    return () => {
+      target.removeEventListener('scroll', onScroll)
+      window.removeEventListener('bw:scroll-chrome-sync', onScroll)
+    }
   }, [enabled])
 
   return { scrolled, hideChrome }

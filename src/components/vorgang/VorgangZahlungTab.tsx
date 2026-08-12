@@ -750,7 +750,7 @@ export function VorgangZahlungTab({
         <MockCard
           title="Zahlung"
           icon="calculator"
-          className="zahlplan-shell"
+          className="zahlplan-shell dshell-framed"
           actions={
             canEditPlan ? (
               <MockBtn
@@ -809,7 +809,7 @@ export function VorgangZahlungTab({
       <MockCard
         title="Zahlung"
         icon="calculator"
-        className="zahlplan-shell"
+        className="zahlplan-shell dshell-framed"
         actions={
           canEditPlan ? (
             <MockBtn

@@ -228,7 +228,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
 
   let posQuery = supabase
     .from('auftrag_positionen')
-    .select('id, preis_partner, lohn_fix, material_fix')
+    .select('id, preis_partner, lohn_fix, material_fix, leistung_name')
     .eq('auftrag_id', input.auftragId)
 
   if (input.positionIds?.length) {
@@ -242,15 +242,12 @@ export async function assignAuftragHandwerkerGewerk(input: {
   const { data: posRows } = await posQuery
   if (posRows?.length) {
     for (const p of posRows) {
-      const ekFallback = (Number(p.lohn_fix) || 0) + (Number(p.material_fix) || 0)
       const patch: Record<string, unknown> = {
         handwerker_id: input.handwerkerId,
         handwerker_status: status,
         handwerker_angefragt_at: status === 'angefragt' ? now : null,
       }
-      if ((p.preis_partner == null || Number(p.preis_partner) <= 0) && ekFallback > 0) {
-        patch.preis_partner = ekFallback
-      }
+      // preis_partner nur aus EK/Kondition — nie lohn_fix+material_fix (Kunden-VK)
       const { error: posErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
       if (posErr) return { ok: false, message: posErr.message }
     }
@@ -269,6 +266,35 @@ export async function assignAuftragHandwerkerGewerk(input: {
     gewerkSlug: gw.slug as string | null,
     gewerkName: gw.name as string,
   })
+
+  {
+    const { data: auf } = await supabase
+      .from('auftraege')
+      .select('titel')
+      .eq('id', input.auftragId)
+      .maybeSingle()
+    const projektName =
+      String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
+    const posIds = (posRows ?? []).map((p) => String(p.id))
+    const notify = await notifyPartnerUnified({
+      handwerkerId: input.handwerkerId,
+      typ: 'neu',
+      projektName,
+      link: partnerVorgangLink(input.auftragId),
+      leistungName:
+        posRows?.length === 1
+          ? String((posRows[0] as { leistung_name?: string | null }).leistung_name ?? gw.name)
+          : posRows?.length
+            ? `${posRows.length} Leistungen`
+            : String(gw.name ?? 'Leistung'),
+      auftragId: input.auftragId,
+      positionIds: posIds.length ? posIds : undefined,
+      aenderungTyp: 'neu',
+    })
+    if (!notify.ok) {
+      console.warn('[assignAuftragHandwerkerGewerk] Partner-Notify:', notify.error)
+    }
+  }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   revalidatePath('/auftraege')
@@ -311,10 +337,6 @@ export async function assignAuftragHandwerkerPosition(input: {
     handwerker_id: input.handwerkerId,
     handwerker_status: status,
     handwerker_angefragt_at: status === 'angefragt' ? now : null,
-  }
-  const ekFallback = (Number(pos.lohn_fix) || 0) + (Number(pos.material_fix) || 0)
-  if ((pos.preis_partner == null || Number(pos.preis_partner) <= 0) && ekFallback > 0) {
-    posPatch.preis_partner = ekFallback
   }
 
   const { error } = await supabase
@@ -366,6 +388,29 @@ export async function assignAuftragHandwerkerPosition(input: {
     gewerkName: String(pos.gewerk_name ?? ''),
   })
 
+  {
+    const { data: auf } = await supabase
+      .from('auftraege')
+      .select('titel')
+      .eq('id', input.auftragId)
+      .maybeSingle()
+    const projektName =
+      String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
+    const notify = await notifyPartnerUnified({
+      handwerkerId: input.handwerkerId,
+      typ: 'neu',
+      projektName,
+      link: partnerVorgangLink(input.auftragId),
+      leistungName: String(pos.leistung_name ?? pos.gewerk_name ?? 'Leistung'),
+      auftragId: input.auftragId,
+      positionIds: [input.positionId],
+      aenderungTyp: 'neu',
+    })
+    if (!notify.ok) {
+      console.warn('[assignAuftragHandwerkerPosition] Partner-Notify:', notify.error)
+    }
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
 }
@@ -376,6 +421,15 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   alteZuweisungId: string
   neuerHandwerkerId: string
   projektName?: string
+  /**
+   * Optionaler Split: Leistungen beim Alten lassen (Betrag editierbar) oder an den Neuen.
+   * Ohne Angabe: alle Positionen des Alten gehen an den Neuen (bisheriges Verhalten).
+   */
+  positionMoves?: Array<{
+    positionId: string
+    ziel: 'alt' | 'neu'
+    preisPartner?: number | null
+  }>
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
@@ -400,8 +454,17 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   if (zErr || !zuAlt) return { ok: false, message: 'Zuweisung nicht gefunden.' }
 
   const altStatus = String(zuAlt.status ?? '').toLowerCase()
-  if (altStatus !== 'abgelehnt') {
-    return { ok: false, message: 'Nur abgelehnte Zuweisungen können neu disponiert werden.' }
+  const replaceable = new Set([
+    'ausstehend',
+    'angefragt',
+    'akzeptiert',
+    'angenommen',
+    'abgelehnt',
+    'zugewiesen',
+    'warten',
+  ])
+  if (!replaceable.has(altStatus)) {
+    return { ok: false, message: 'Diese Zuweisung kann nicht mehr neu disponiert werden.' }
   }
 
   const alterHandwerkerId = String(zuAlt.handwerker_id)
@@ -438,41 +501,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   const hwAlt = (Array.isArray(hwAltRaw) ? hwAltRaw[0] : hwAltRaw) as { name?: string } | null
   const alterName = hwAlt?.name?.trim() || 'Partner'
   const neuName = String(hwNeu.name ?? 'Partner')
-  const now = new Date().toISOString()
   const projektName = input.projektName?.trim() || String(auftrag.titel ?? 'Projekt')
-
-  const { error: markAltErr } = await supabase
-    .from('auftrag_handwerker')
-    .update({ status: 'ersetzt' })
-    .eq('id', alteZuweisungId)
-  if (markAltErr) return { ok: false, message: markAltErr.message }
-
-  const insertPayload: Record<string, unknown> = {
-    auftrag_id: auftragId,
-    handwerker_id: neuerHandwerkerId,
-    status: 'angefragt',
-  }
-  if (gewerkId) insertPayload.gewerk_id = gewerkId
-
-  let neueZuweisungId: string | null = null
-  const { data: inserted, error: insErr } = await supabase
-    .from('auftrag_handwerker')
-    .insert(insertPayload)
-    .select('id')
-    .single()
-
-  if (insErr || !inserted?.id) {
-    const { error: fallbackErr } = await supabase
-      .from('auftrag_handwerker')
-      .update({ handwerker_id: neuerHandwerkerId, status: 'angefragt' })
-      .eq('id', alteZuweisungId)
-    if (fallbackErr) {
-      return { ok: false, message: insErr?.message ?? fallbackErr.message ?? 'Neue Zuweisung fehlgeschlagen.' }
-    }
-    neueZuweisungId = alteZuweisungId
-  } else {
-    neueZuweisungId = String(inserted.id)
-  }
 
   let posQuery = supabase
     .from('auftrag_positionen')
@@ -489,9 +518,85 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   const { data: posRows, error: posErr } = await posQuery
   if (posErr) return { ok: false, message: posErr.message }
 
+  const allPos = posRows ?? []
+  const moveMap = input.positionMoves?.length
+    ? new Map(
+        input.positionMoves.map((m) => [
+          m.positionId.trim(),
+          { ziel: m.ziel, preisPartner: m.preisPartner },
+        ] as const)
+      )
+    : null
+
+  if (moveMap) {
+    const known = new Set(allPos.map((p) => String(p.id)))
+    for (const id of moveMap.keys()) {
+      if (!known.has(id)) {
+        return { ok: false, message: 'Position gehört nicht zu dieser Zuweisung.' }
+      }
+    }
+  }
+
+  const toNeu = allPos.filter((p) => !moveMap || moveMap.get(String(p.id))?.ziel !== 'alt')
+  const toAlt = allPos.filter((p) => moveMap?.get(String(p.id))?.ziel === 'alt')
+
+  if (moveMap && toNeu.length === 0) {
+    return { ok: false, message: 'Mindestens eine Leistung dem neuen Partner zuweisen.' }
+  }
+
+  for (const p of toAlt) {
+    const m = moveMap?.get(String(p.id))
+    if (m?.preisPartner == null || !Number.isFinite(Number(m.preisPartner))) continue
+    const { error: betragErr } = await supabase
+      .from('auftrag_positionen')
+      .update({ preis_partner: Number(m.preisPartner) })
+      .eq('id', p.id as string)
+    if (betragErr) return { ok: false, message: betragErr.message }
+  }
+
+  if (toAlt.length === 0) {
+    const { error: markAltErr } = await supabase
+      .from('auftrag_handwerker')
+      .update({ status: 'ersetzt' })
+      .eq('id', alteZuweisungId)
+    if (markAltErr) return { ok: false, message: markAltErr.message }
+  }
+
+  const insertPayload: Record<string, unknown> = {
+    auftrag_id: auftragId,
+    handwerker_id: neuerHandwerkerId,
+    status: 'angefragt',
+  }
+  if (gewerkId) insertPayload.gewerk_id = gewerkId
+
+  let neueZuweisungId: string | null = null
+  const { data: inserted, error: insErr } = await supabase
+    .from('auftrag_handwerker')
+    .insert(insertPayload)
+    .select('id')
+    .single()
+
+  if (insErr || !inserted?.id) {
+    if (toAlt.length > 0) {
+      return {
+        ok: false,
+        message: insErr?.message ?? 'Neue Zuweisung fehlgeschlagen — Alter bleibt unverändert.',
+      }
+    }
+    const { error: fallbackErr } = await supabase
+      .from('auftrag_handwerker')
+      .update({ handwerker_id: neuerHandwerkerId, status: 'angefragt' })
+      .eq('id', alteZuweisungId)
+    if (fallbackErr) {
+      return { ok: false, message: insErr?.message ?? fallbackErr.message ?? 'Neue Zuweisung fehlgeschlagen.' }
+    }
+    neueZuweisungId = alteZuweisungId
+  } else {
+    neueZuweisungId = String(inserted.id)
+  }
+
   const posIds: string[] = []
-  for (const p of posRows ?? []) {
-    const ekFallback = (Number(p.lohn_fix) || 0) + (Number(p.material_fix) || 0)
+  for (const p of toNeu) {
     const sendPatch = metaBeimSendenAnHandwerker({
       aenderung_typ: (p as { aenderung_typ?: string | null }).aenderung_typ,
     })
@@ -501,9 +606,6 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       preis_alt: null,
       ...sendPatch,
     }
-    if ((p.preis_partner == null || Number(p.preis_partner) <= 0) && ekFallback > 0) {
-      patch.preis_partner = ekFallback
-    }
     const { error: upPosErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
     if (upPosErr) return { ok: false, message: upPosErr.message }
     posIds.push(String(p.id))
@@ -512,7 +614,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   const angebotId = auftrag.angebot_id ? String(auftrag.angebot_id).trim() : ''
   let partnerBenachrichtigt = false
 
-  if (angebotId && gewerkId) {
+  if (angebotId && gewerkId && toAlt.length === 0) {
     const { data: ahAlt } = await supabase
       .from('angebot_handwerker')
       .select('id')
@@ -540,10 +642,10 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       projektName,
       link: partnerVorgangLink(auftragId),
       leistungName:
-        posRows?.length === 1
-          ? String(posRows[0]!.leistung_name ?? '')
-          : posRows?.length
-            ? `${posRows.length} Leistungen`
+        toNeu.length === 1
+          ? String(toNeu[0]!.leistung_name ?? '')
+          : toNeu.length
+            ? `${toNeu.length} Leistungen`
             : gewerkName,
       auftragId,
       positionIds: posIds.length ? posIds : undefined,
@@ -560,11 +662,15 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   })
 
   const uid = await getAuthUserId()
+  const splitTxt =
+    toAlt.length > 0
+      ? ` · ${toAlt.length} bleiben bei ${alterName}, ${toNeu.length} an ${neuName}`
+      : ` · alle an ${neuName}`
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
     typ: 'handwerker_zuweisung',
     titel: 'Partner neu disponiert',
-    beschreibung: `${gewerkName}: ${alterName} (abgelehnt) → ${neuName} (angefragt)`,
+    beschreibung: `${gewerkName}: ${alterName} → ${neuName} (angefragt)${splitTxt}`,
     handwerker_id: neuerHandwerkerId,
     erstellt_von: uid,
   })
@@ -583,6 +689,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       neuer_handwerker_id: neuerHandwerkerId,
       gewerk_id: gewerkId,
       position_ids: posIds,
+      positionen_beim_alten: toAlt.map((p) => String(p.id)),
     },
   })
 

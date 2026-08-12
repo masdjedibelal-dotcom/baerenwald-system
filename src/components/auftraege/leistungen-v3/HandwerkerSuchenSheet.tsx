@@ -135,8 +135,11 @@ export function HandwerkerSuchenSheet({
       context="detail"
       size="lg"
       overlayClassName="editor-sheet-overlay--stack"
+      /* Eigenes History nur wenn offen — sonst Back schließt die Zuweisung darunter */
+      manageHistory={open}
       onConfirm={confirm}
       confirmDisabled={draft.size === 0}
+      bodyClassName="hw-suchen-body"
     >
       <div className="space-y-3">
         {chipGewerke.length > 0 ? (
@@ -166,7 +169,7 @@ export function HandwerkerSuchenSheet({
           placeholder="Handwerker suchen…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          autoFocus
+          /* Kein autoFocus — sonst Keyboard + Sheet-Höhe springen beim erneuten Öffnen */
         />
 
         {loading ? (

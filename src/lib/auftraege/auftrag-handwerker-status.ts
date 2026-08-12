@@ -24,7 +24,9 @@ export function auftragHwStatusLabel(status: string | null | undefined): string 
 
 export function auftragHwStatusBadgeClass(status: string | null | undefined): string {
   const v = (status ?? '').toLowerCase()
-  if (v === 'akzeptiert' || v === 'zugewiesen') return 'bg-emerald-100 text-emerald-900'
+  if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
+    return 'bg-emerald-100 text-emerald-900'
+  }
   if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
   if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
   if (v === 'angefragt') return 'bg-blue-100 text-blue-900'

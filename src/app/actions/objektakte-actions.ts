@@ -10,6 +10,7 @@ import type {
   ObjektKontakt,
   ObjektKontaktInput,
   ObjektKontaktRolle,
+  ObjektMieterInput,
 } from '@/lib/objektakte/types'
 
 async function assertObjektGehoertKunde(kundeId: string, objektId: string): Promise<boolean> {
@@ -173,6 +174,95 @@ export async function createEinheitBewohner(
 
   revalidateObjektAkte(kundeId, objektId)
   return { ok: true, bewohner: data as EinheitBewohner }
+}
+
+/**
+ * Mieter anlegen inkl. Einheit (wie HV-Portal `/api/org/einheit-bewohner`).
+ * Gleiche Wohnungs-Bezeichnung wird wiederverwendet.
+ */
+export async function createObjektMieter(
+  kundeId: string,
+  objektId: string,
+  input: ObjektMieterInput
+): Promise<
+  | { ok: true; bewohner: EinheitBewohner; einheitId: string }
+  | { ok: false; message: string }
+> {
+  const name = input.name?.trim()
+  if (!name) return { ok: false, message: 'Name ist erforderlich.' }
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
+    return { ok: false, message: 'Objekt nicht gefunden.' }
+  }
+
+  const bezeichnung = input.wohnung?.trim() || 'Allgemein'
+  const flaeche =
+    input.wohnflaeche_m2 != null && Number.isFinite(input.wohnflaeche_m2) && input.wohnflaeche_m2 > 0
+      ? input.wohnflaeche_m2
+      : null
+
+  const supabase = createClient()
+
+  const { data: existing } = await supabase
+    .from('objekt_einheiten')
+    .select('id')
+    .eq('kunde_objekt_id', objektId)
+    .eq('aktiv', true)
+    .ilike('bezeichnung', bezeichnung)
+    .maybeSingle()
+
+  let einheitId = existing?.id ?? ''
+  if (!einheitId) {
+    const { data: maxRow } = await supabase
+      .from('objekt_einheiten')
+      .select('sort_order')
+      .eq('kunde_objekt_id', objektId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const { data: created, error: einheitErr } = await supabase
+      .from('objekt_einheiten')
+      .insert({
+        kunde_objekt_id: objektId,
+        bezeichnung,
+        wohnflaeche_m2: flaeche,
+        sort_order: (maxRow?.sort_order ?? -1) + 1,
+      })
+      .select('id')
+      .single()
+
+    if (einheitErr || !created?.id) {
+      return {
+        ok: false,
+        message: einheitErr?.message ?? 'Einheit konnte nicht angelegt werden.',
+      }
+    }
+    einheitId = created.id
+  } else if (flaeche != null) {
+    await supabase
+      .from('objekt_einheiten')
+      .update({ wohnflaeche_m2: flaeche, updated_at: new Date().toISOString() })
+      .eq('id', einheitId)
+  }
+
+  const { data, error } = await supabase
+    .from('einheit_bewohner')
+    .insert({
+      kunde_id: kundeId,
+      objekt_einheit_id: einheitId,
+      name,
+      telefon: input.telefon?.trim() || null,
+      email: input.email?.trim() || null,
+    })
+    .select('*, objekt_einheiten(bezeichnung)')
+    .single()
+
+  if (error || !data) {
+    return { ok: false, message: error?.message ?? 'Mieter konnte nicht angelegt werden.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, bewohner: data as EinheitBewohner, einheitId }
 }
 
 export async function updateEinheitBewohner(

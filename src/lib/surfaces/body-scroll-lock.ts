@@ -22,7 +22,27 @@ let pageWasScrollContainer = false
 let touchMoveBound = false
 
 const SCROLL_ALLOW =
-  '[data-scroll-lock-allow], .mobile-filter-sheet__body, .mobile-filter-sheet__panel, .editor-sheet__body, .document-canvas__body, .mock-modal__body, .sheet-body, .action-busy'
+  '[data-scroll-lock-allow], .mobile-filter-sheet__body, .mobile-filter-sheet__panel, .editor-sheet__body, .document-canvas__body, .mock-modal__body, .sheet-body, .sheet-b, .action-sheet__body, .action-busy'
+
+/** Touch darf scrollen, wenn Ziel in Allow-Zone liegt oder ein overflow-Container scrollbar ist. */
+function touchMoveAllowed(target: Element): boolean {
+  if (target.closest(SCROLL_ALLOW)) return true
+  let el: Element | null = target
+  while (el && el !== document.documentElement) {
+    if (el instanceof HTMLElement) {
+      const style = window.getComputedStyle(el)
+      const oy = style.overflowY
+      if (
+        (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+        el.scrollHeight > el.clientHeight + 1
+      ) {
+        return true
+      }
+    }
+    el = el.parentElement
+  }
+  return false
+}
 
 function onTouchMove(e: TouchEvent) {
   const t = e.target
@@ -30,7 +50,7 @@ function onTouchMove(e: TouchEvent) {
     e.preventDefault()
     return
   }
-  if (t.closest(SCROLL_ALLOW)) return
+  if (touchMoveAllowed(t)) return
   e.preventDefault()
 }
 

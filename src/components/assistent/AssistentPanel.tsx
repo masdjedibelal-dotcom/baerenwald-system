@@ -6,6 +6,9 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
 import { KiChatComposer } from '@/components/assistent/KiChatComposer'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
+import { useVisualViewportFrame } from '@/hooks/useVisualViewportFrame'
 import { buildAssistentContextHint } from '@/lib/copilot/assistent-context'
 import {
   getKiAssistScope,
@@ -275,6 +278,7 @@ function TextDraftCard({
 
 export function AssistentPanel() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const {
     open,
     setOpen,
@@ -293,6 +297,7 @@ export function AssistentPanel() {
   const [error, setError] = useState<string | null>(null)
   const [pageSnapshot, setPageSnapshot] = useState<string | null>(null)
   const [stuckUp, setStuckUp] = useState(false)
+  const panelRef = useRef<HTMLElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -300,6 +305,10 @@ export function AssistentPanel() {
   const lastAutoId = useRef<string | null>(null)
   const pendingRef = useRef(false)
   const contextHintRef = useRef('')
+
+  /* Bottom-Nav / Floating-CTA dürfen keine Touches stehlen (PWA) */
+  useOverlayChromeLock(open)
+  useVisualViewportFrame(open && isMobile, panelRef)
 
   const chatStarted =
     messages.some((m) => m.role === 'user') || pending || Boolean(autoSession)
@@ -553,6 +562,7 @@ export function AssistentPanel() {
         onClick={closePanel}
       />
       <aside
+        ref={panelRef}
         className={cn('assistent-panel', overSheet && 'assistent-panel--over-sheet')}
         role="dialog"
         aria-label="Assistent"

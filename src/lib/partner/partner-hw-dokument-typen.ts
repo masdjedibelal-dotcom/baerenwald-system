@@ -27,19 +27,22 @@ export const ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT = `
 `.trim()
 
 export const PARTNER_HW_DOKUMENT_CRM_LABEL = {
-  unterlage: 'Handwerker · Unterlage',
+  unterlage: 'Handwerker · Angebot',
   unterlageNr: (nr: number) => `Handwerker · Unterlage ${nr}`,
   rechnung: 'Handwerker · Rechnung',
 } as const
 
 export function partnerHwDokumentListenName(
   art: PartnerHwDokumentArt,
-  opts?: { index?: number; total?: number }
+  opts?: { index?: number; total?: number; storagePath?: string | null }
 ): string {
   if (art === 'rechnung') return PARTNER_HW_DOKUMENT_CRM_LABEL.rechnung
   const total = opts?.total ?? 1
   const index = opts?.index ?? 0
-  if (total <= 1) return PARTNER_HW_DOKUMENT_CRM_LABEL.unterlage
+  const path = String(opts?.storagePath ?? '').toLowerCase()
+  if (total <= 1 || (index === 0 && path.includes('angebot'))) {
+    return PARTNER_HW_DOKUMENT_CRM_LABEL.unterlage
+  }
   return PARTNER_HW_DOKUMENT_CRM_LABEL.unterlageNr(index + 1)
 }
 

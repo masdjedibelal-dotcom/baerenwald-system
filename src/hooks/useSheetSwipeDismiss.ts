@@ -1,6 +1,13 @@
 'use client'
 
-import { useCallback, useRef, useState, type CSSProperties, type PointerEventHandler } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEventHandler,
+} from 'react'
 
 export const SHEET_SWIPE_DISMISS_PX = 80
 
@@ -28,6 +35,11 @@ export function useSheetSwipeDismiss(options: {
     setIsDragging(false)
     setDragY(0)
   }, [])
+
+  /* Beim Schließen/Blocken Transform zurücksetzen — sonst hängt Sheet beim nächsten Open. */
+  useEffect(() => {
+    if (blocked) resetDrag()
+  }, [blocked, resetDrag])
 
 const INTERACTIVE_DRAG_SKIP = 'button, a, input, textarea, select, [role="button"], [contenteditable="true"]'
 

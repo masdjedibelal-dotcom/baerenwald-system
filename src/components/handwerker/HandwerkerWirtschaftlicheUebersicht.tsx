@@ -103,7 +103,7 @@ export function HandwerkerWirtschaftlicheUebersicht({
       </div>
 
       <div className="kw-kpi-row">
-        <div className="card kw-kpi is-accent">
+        <div className="card kw-kpi is-accent dshell-framed">
           <div className="kw-kpi-label">
             Umsatz{zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}
           </div>
@@ -131,13 +131,13 @@ export function HandwerkerWirtschaftlicheUebersicht({
           )}
         </div>
 
-        <div className="card kw-kpi">
+        <div className="card kw-kpi dshell-framed">
           <div className="kw-kpi-label">Offenes Volumen</div>
           <div className="kw-kpi-val">{formatEurGanz(snap.offenesVolumen)}</div>
           <div className="kw-kpi-meta">aus laufenden Einsätzen</div>
         </div>
 
-        <div className="card kw-kpi">
+        <div className="card kw-kpi dshell-framed">
           <div className="kw-kpi-label">Aktive Einsätze</div>
           <div className="kw-kpi-val">{snap.aktiveEinsaetze}</div>
           <div className="kw-kpi-meta">
@@ -146,7 +146,7 @@ export function HandwerkerWirtschaftlicheUebersicht({
         </div>
       </div>
 
-      <div className="card kw-chart">
+      <div className="card kw-chart dshell-framed">
         <div className="card-h">
           <div className="card-title title">
             <MockIcon ctx="emphasis" n="activity" size={16} />
@@ -162,7 +162,7 @@ export function HandwerkerWirtschaftlicheUebersicht({
         </div>
       </div>
 
-      <div className="card pw-gewerk">
+      <div className="card pw-gewerk dshell-framed">
         <div className="card-h">
           <div className="card-title title">
             <MockIcon ctx="emphasis" n="activity" size={16} />

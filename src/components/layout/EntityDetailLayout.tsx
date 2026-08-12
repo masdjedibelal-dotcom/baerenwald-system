@@ -1,9 +1,10 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { DetailHead, type DetailHeadProps } from '@/components/layout/DetailHead'
+import { DetailMobileTopSlotProvider } from '@/components/layout/detail-mobile-top-slot'
 import {
   VorgangResolverBanner,
   vorgangResolverBannerVisible,
@@ -69,6 +70,7 @@ export function EntityDetailLayout({
   className,
 }: EntityDetailLayoutProps) {
   const isMobile = useIsMobile()
+  const [topOverflowHost, setTopOverflowHost] = useState<HTMLElement | null>(null)
   const searchParams = useSearchParams()
   const fromRef = useMemo(
     () => parseAkteFromParam(searchParams.get('from')),
@@ -79,36 +81,42 @@ export function EntityDetailLayout({
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
   return (
-    <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
-      <div className="detail-entity-hero">
-        <div className="detail-entity-toprow">
-          {fromRef ? (
-            <AkteRueckwegChip />
-          ) : crumbBackHref ? (
-            <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
-          ) : (
-            <span className="detail-entity-toprow__spacer" aria-hidden />
-          )}
-          <div className="detail-entity-toprow__actions">
-            <span id="detail-entity-top-overflow" className="detail-entity-top-overflow" />
+    <DetailMobileTopSlotProvider host={topOverflowHost}>
+      <div className={cn('detail-entity-page', 'detail-entity-page--chrome', className ?? 'pb-6')}>
+        <div className="detail-entity-hero">
+          <div className="detail-entity-toprow">
+            {fromRef ? (
+              <AkteRueckwegChip />
+            ) : crumbBackHref ? (
+              <MockDetailBackLink href={crumbBackHref} label={crumbBackLabel} />
+            ) : (
+              <span className="detail-entity-toprow__spacer" aria-hidden />
+            )}
+            <div className="detail-entity-toprow__actions">
+              <span
+                ref={setTopOverflowHost}
+                id="detail-entity-top-overflow"
+                className="detail-entity-top-overflow"
+              />
+            </div>
           </div>
+          {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
+          <DetailHead
+            title={head.title}
+            badges={head.badges}
+            titleBadges={head.titleBadges}
+            titleTrailing={isMobile ? undefined : head.titleTrailing}
+            meta={undefined}
+            sub={undefined}
+            actions={head.actions}
+            variant={head.variant}
+            className={head.className}
+          />
+          {banner ? <div className="detail-entity-banner">{banner}</div> : null}
+          {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
         </div>
-        {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
-        <DetailHead
-          title={head.title}
-          badges={head.badges}
-          titleBadges={head.titleBadges}
-          titleTrailing={isMobile ? undefined : head.titleTrailing}
-          meta={undefined}
-          sub={undefined}
-          actions={head.actions}
-          variant={head.variant}
-          className={head.className}
-        />
-        {banner ? <div className="detail-entity-banner">{banner}</div> : null}
-        {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
+        <div className="detail-entity-body">{children}</div>
       </div>
-      <div className="detail-entity-body">{children}</div>
-    </div>
+    </DetailMobileTopSlotProvider>
   )
 }

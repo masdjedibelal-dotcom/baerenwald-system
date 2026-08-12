@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
@@ -88,6 +88,33 @@ function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
       r.faellig_am === o.faellig_am
     )
   })
+}
+
+/** Footer im Sheet-Context — Abbrechen = Dirty-Confirm wie X/Swipe. */
+function AbschlagsplanEditorFooter({
+  ok,
+  saving,
+  onSave,
+}: {
+  ok: boolean
+  saving: boolean
+  onSave: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="zahlplan-editor-footer">
+      <MockBtn
+        kind="ghost"
+        onClick={() => (requestClose ? requestClose() : undefined)}
+        disabled={saving}
+      >
+        Abbrechen
+      </MockBtn>
+      <MockBtn kind="primary" icon="check" disabled={!ok || saving} onClick={onSave}>
+        {saving ? 'Speichern…' : 'Plan speichern'}
+      </MockBtn>
+    </div>
+  )
 }
 
 /** Abschlagsplan-Editor: bestehenden Plan bearbeiten (IDs bleiben), % oder €. */
@@ -233,19 +260,11 @@ export function AbschlagsplanEditorModal({
       dirty={dirty}
       size="lg"
       footer={
-        <div className="zahlplan-editor-footer">
-          <MockBtn kind="ghost" onClick={onClose} disabled={saving}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="check"
-            disabled={!ok || saving}
-            onClick={() => onSave(ratesToPlan(rates, initial, frozenIds))}
-          >
-            {saving ? 'Speichern…' : 'Plan speichern'}
-          </MockBtn>
-        </div>
+        <AbschlagsplanEditorFooter
+          ok={ok}
+          saving={Boolean(saving)}
+          onSave={() => onSave(ratesToPlan(rates, initial, frozenIds))}
+        />
       }
     >
       <div className="zahlplan-editor-presets">
@@ -265,17 +284,7 @@ export function AbschlagsplanEditorModal({
             {p.name}
           </button>
         ))}
-        <div style={{ flex: 1 }} />
-        <span className="zahlplan-editor-presets__gesamt">
-          Gesamt <b>{formatEurBetrag(anzeigeGesamt)}</b>
-        </span>
       </div>
-
-      <p className="zahlplan-editor-hint">
-        {frozen.size > 0
-          ? 'Gestellte/bezahlte Raten bleiben fest (IDs & Beträge). Offene Raten kannst du als % oder € anpassen.'
-          : 'Abschläge hinzufügen oder entfernen. Pro Zeile % oder Festbetrag (€ netto) — Rest deckt den Restbetrag automatisch.'}
-      </p>
 
       <div className="zahlplan-editor-list">
         {rates.map((r) => {
@@ -284,7 +293,7 @@ export function AbschlagsplanEditorModal({
           return (
             <article
               key={r.id}
-              className={cn('zahlplan-rate-card', isFrozen && 'is-frozen')}
+              className={cn('card zahlplan-rate-card', isFrozen && 'is-frozen')}
             >
               <div className="zahlplan-rate-card__head">
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--grow">
@@ -373,31 +382,34 @@ export function AbschlagsplanEditorModal({
         <div className="zahlplan-editor-foot">
           <button
             type="button"
-            className="pt-add"
-            style={{ border: 'none', padding: 0, width: 'auto' }}
+            className="pt-add zahlplan-editor-add"
             onClick={add}
           >
             <MockIcon ctx="btn" n="plus" size={13} /> Abschlag hinzufügen
           </button>
-          <div style={{ flex: 1 }} />
-          <span
-            className={cn('zahlplan-editor-summe', ok ? 'is-ok' : 'is-bad')}
-            title={!gate.ok ? gate.message : undefined}
-          >
-            {alleProzent
-              ? `Summe ${summeProzent}%${summeProzent !== 100 ? ' · muss 100% sein' : ''}`
-              : hatRest
-                ? ok
-                  ? 'Rest deckt den Restbetrag'
-                  : !gate.ok
-                    ? gate.message
-                    : 'Prüfen…'
-                : ok
-                  ? 'Plan gültig'
-                  : !gate.ok
-                    ? gate.message
-                    : 'Prüfen…'}
-          </span>
+          <div className="zahlplan-editor-foot__totals">
+            <span
+              className={cn('zahlplan-editor-summe', ok ? 'is-ok' : 'is-bad')}
+              title={!gate.ok ? gate.message : undefined}
+            >
+              {alleProzent
+                ? `Summe ${summeProzent}%${summeProzent !== 100 ? ' · muss 100% sein' : ''}`
+                : hatRest
+                  ? ok
+                    ? 'Rest deckt den Restbetrag'
+                    : !gate.ok
+                      ? gate.message
+                      : 'Prüfen…'
+                  : ok
+                    ? 'Plan gültig'
+                    : !gate.ok
+                      ? gate.message
+                      : 'Prüfen…'}
+            </span>
+            <span className="zahlplan-editor-gesamt">
+              Gesamt <b>{formatEurBetrag(anzeigeGesamt)}</b>
+            </span>
+          </div>
         </div>
       </div>
     </EditorSheet>

@@ -11,6 +11,11 @@ import {
   websiteFachdetailQuestionLabel,
   WEBSITE_FACHDETAIL_QUESTION_LABELS,
 } from '@/lib/website-fachdetail-labels'
+import {
+  isMeldeFachdetailKey,
+  meldeOptionDisplayLabel,
+  meldeQuestionDisplayLabel,
+} from '@/lib/anfragen/melde-fachdetail-labels'
 import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
 import { BEREICH_LABELS, FACHDETAIL_TO_LEISTUNG, SITUATION_LABELS } from '@/lib/utils'
 
@@ -254,6 +259,13 @@ const SKIP_FACHDETAIL_KEYS = new Set([
 /** Keine Fachdetail-Zeilen — Top-Level-Funnel / technische Felder (nicht in der Übersicht). */
 const FUNNEL_META_KEYS = new Set([
   'fachdetails',
+  'fachdetailAnswers',
+  'melde_bereich',
+  'melde_kategorie',
+  'notfall',
+  'direktauftrag',
+  'fotos',
+  'vertriebs_kontext',
   'groessen',
   'kundentyp',
   'quelle',
@@ -324,6 +336,7 @@ const FUNNEL_META_KEYS = new Set([
 function isKnownFachdetailConfigKey(key: string): boolean {
   if (SKIP_FACHDETAIL_KEYS.has(key) || FUNNEL_META_KEYS.has(key)) return false
   if (key === 'projekt_gu') return true
+  if (isMeldeFachdetailKey(key)) return true
   if (FACHDETAILS_CONFIG[key]) return true
   if (WEBSITE_FACHDETAIL_QUESTION_LABELS[key]) return true
   if (GEWERK_TO_CONFIG_KEY[key]) return true
@@ -337,10 +350,14 @@ function fachdetailAnswerValues(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw
       .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-      .map((v) => websiteFachdetailOptionLabel(v.trim()))
+      .map((v) => {
+        const t = v.trim()
+        return meldeOptionDisplayLabel(t) || websiteFachdetailOptionLabel(t)
+      })
   }
   if (typeof raw === 'string' && raw.trim()) {
-    return [websiteFachdetailOptionLabel(raw.trim())]
+    const t = raw.trim()
+    return [meldeOptionDisplayLabel(t) || websiteFachdetailOptionLabel(t)]
   }
   return []
 }
@@ -623,6 +640,12 @@ export function normalizeFunnelDaten(
     }
   }
 
+  /* HV-Melder: fachdetailAnswers liegt oft top-level, nicht unter fachdetails. */
+  const topAnswers = fd.fachdetailAnswers
+  if (topAnswers && typeof topAnswers === 'object' && !Array.isArray(topAnswers)) {
+    mergeFachdetailAnswers(fachdetails, topAnswers as Record<string, unknown>)
+  }
+
   mergeTopLevelProjektDetails(fachdetails, fd)
 
   if (breakdown.length > 0) {
@@ -783,6 +806,9 @@ export function fachdetailWerte(raw: unknown): string[] {
 /** Anzeige-Label für einen Fachdetail-Wert (Config-Key z. B. bad, bad_ausstattung). */
 export function fachdetailDisplayLabel(configKey: string, value: string): string {
   if (!value) return ''
+  if (isMeldeFachdetailKey(configKey)) {
+    return meldeOptionDisplayLabel(value)
+  }
   const mapped = fachdetailDisplayValue(configKey, value)
   if (mapped !== value) return mapped
 
@@ -813,6 +839,9 @@ export function bereichLabelForFachdetailKey(configKey: string): string {
 
 /** Prop-Zeile in der Projekt-Übersicht (Frage statt nochmal „Bad“ unter „Bereiche: Bad“). */
 export function fachdetailPropLabel(configKey: string, bereiche?: string[]): string {
+  if (isMeldeFachdetailKey(configKey)) {
+    return meldeQuestionDisplayLabel(configKey)
+  }
   const cfg = FACHDETAILS_CONFIG[configKey]
   if (cfg?.frage) {
     return cfg.frage.replace(/\?+\s*$/, '').trim()

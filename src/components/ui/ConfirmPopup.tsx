@@ -73,19 +73,47 @@ export function ConfirmPopup({
         <div className={cn('confirm-popup__footer', danger && 'confirm-popup__footer--danger')}>
           {danger ? (
             <>
-              <Button type="button" variant="danger" onClick={onConfirm}>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onConfirm()
+                }}
+              >
                 {confirmLabel}
               </Button>
-              <Button type="button" variant="primary" onClick={onClose}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose()
+                }}
+              >
                 {cancelLabel}
               </Button>
             </>
           ) : (
             <>
-              <Button type="button" variant="secondary" onClick={onClose}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose()
+                }}
+              >
                 {cancelLabel}
               </Button>
-              <Button type="button" variant="primary" onClick={onConfirm}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onConfirm()
+                }}
+              >
                 {confirmLabel}
               </Button>
             </>

@@ -34,7 +34,7 @@ export function rechnungZahlungstextFromZahlfrist(seg: ZahlfristSeg, datumYmd: s
   if (seg === 'datum') {
     return `Zahlbar bis ${formatDateDeYmd(datumYmd)} ohne Abzug.`
   }
-  const tage = Math.max(1, Number(seg) || 14)
+  const tage = Math.max(1, Number(seg) || 7)
   return `Zahlbar innerhalb von ${tage} Tagen nach Rechnungserhalt ohne Abzug.`
 }
 
@@ -68,8 +68,8 @@ export function patchZahlungsbedingungenMitZahlfrist(
 
 /** Fälligkeitsdatum aus Segment (bei „Datum“ = freies Datum). */
 export function faelligAmFromZahlfrist(seg: ZahlfristSeg, datumYmd: string, from = new Date()): string {
-  if (seg === 'datum') return datumYmd?.trim() || plusDaysIso(14, from)
-  return plusDaysIso(Number(seg) || 14, from)
+  if (seg === 'datum') return datumYmd?.trim() || plusDaysIso(7, from)
+  return plusDaysIso(Number(seg) || 7, from)
 }
 
 /** Segment aus gespeichertem Fälligkeitsdatum (relativ zu heute) ableiten. */
@@ -77,7 +77,7 @@ export function zahlfristSegFromFaelligAm(
   faelligAm: string | null | undefined,
   from = new Date()
 ): { seg: ZahlfristSeg; datum: string } {
-  const ymd = (faelligAm ?? '').trim() || plusDaysIso(14, from)
+  const ymd = (faelligAm ?? '').trim() || plusDaysIso(7, from)
   for (const days of [7, 14, 30] as const) {
     if (ymd === plusDaysIso(days, from)) return { seg: String(days) as ZahlfristSeg, datum: ymd }
   }

@@ -48,21 +48,16 @@ const RECHNUNG_VARIANT: Record<RechnungStatus, StatusDisplayVariant> = {
   storniert: 'danger',
 }
 
-/** Mieter-Meldung wartet auf HV-Freigabe (kein Notfall / über Schwelle) — bleibt unter Offen. */
-export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Warte auf Hausverwaltung'
-
-const ANFRAGE_GESCHLOSSEN = new Set(['abgebrochen', 'abgeschlossen', 'auftrag'])
+/** @deprecated Kein eigener Vorgangs-Status mehr — Angebot zeigt „Gesendet“. */
+export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Gesendet'
 
 /** Nutzer-sichtbares Label + semantische Farbe für Anfrage (Lead). */
 export function anfrageStatusDisplay(
   status: LeadStatus | string,
-  opts?: { orgFreigabeStatus?: OrgFreigabeStatus | string | null }
+  _opts?: { orgFreigabeStatus?: OrgFreigabeStatus | string | null }
 ): StatusDisplay {
+  void _opts
   const key = status as LeadStatus
-  const freigabe = (opts?.orgFreigabeStatus ?? '').trim()
-  if (freigabe === 'ausstehend' && !ANFRAGE_GESCHLOSSEN.has(key)) {
-    return { label: ANFRAGE_WARTE_AUF_HV_LABEL, variant: 'warning' }
-  }
   const label = key in STATUS_LABELS ? STATUS_LABELS[key] : String(status)
   const variant = key in ANFRAGE_VARIANT ? ANFRAGE_VARIANT[key] : 'neutral'
   return { label, variant }
@@ -70,6 +65,16 @@ export function anfrageStatusDisplay(
 
 /** Nutzer-sichtbares Label + semantische Farbe für Angebot (`status_einfach`). */
 export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDisplay {
+  const db = String(row.status ?? '')
+    .trim()
+    .toLowerCase()
+  /* Fein-Status vor Einfach-Collapse: sonst bleibt Badge bei „Gesendet“/blau */
+  if (db === 'handwerker_akzeptiert') {
+    return { label: 'Partner akzeptiert', variant: 'success' }
+  }
+  if (db === 'gesendet_handwerker') {
+    return { label: 'An Partner gesendet', variant: 'active' }
+  }
   const einfach = resolveStatusEinfach(row)
   return {
     label: ANGEBOT_EINFACH_LABELS[einfach],

@@ -52,7 +52,7 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       kunde_id,
       lead_id,
       abschlussdokumentation_url,
-      leads(
+      leads!lead_id(
         id,
         auftraggeber_kunde_id,
         kunde_id,
@@ -100,6 +100,15 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       titel: 'Abnahmedokument verfügbar',
       body: `Das Abnahmeprotokoll zu „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ liegt in den Unterlagen.`,
       link: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
+    })
+    const { schedulePortalWebPushForOrgKunde } = await import(
+      '@/lib/portal/send-portal-web-push'
+    )
+    schedulePortalWebPushForOrgKunde(hvId, {
+      titel: 'Abnahmedokument verfügbar',
+      body: `Das Abnahmeprotokoll zu „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ liegt in den Unterlagen.`,
+      url: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
+      tag: 'abnahme',
     })
   }
 

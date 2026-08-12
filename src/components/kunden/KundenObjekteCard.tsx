@@ -163,7 +163,7 @@ export function KundenObjekteCard({
 
   if (variant === 'select') {
     return (
-      <MockCard title="Objekt" icon="building" className={className}>
+      <MockCard title="Objekt" icon="building" className={cn('dshell-framed', className)}>
         {selectBlock}
         {modal}
       </MockCard>
@@ -198,19 +198,18 @@ export function KundenObjekteCard({
           {liste.map((o) => {
             const strasse = kundenObjektStrasseZeile(o) || '—'
             const st = statsById[o.id]
-            const einheitenAnzahl =
-              st && st.einheitenTotal > 0
-                ? st.einheitenTotal
-                : (() => {
-                    const m = o.einheiten_hinweis?.match(/\d+/)
-                    return m ? Number(m[0]) : null
-                  })()
+            const mieterAnzahl =
+              st && st.mieterTotal > 0
+                ? st.mieterTotal
+                : st && st.einheitenTotal > 0
+                  ? st.einheitenTotal
+                  : null
 
             return (
               <button
                 key={o.id}
                 type="button"
-                className={cn('card objekte-card', selectedId === o.id && 'is-sel')}
+                className={cn('card objekte-card dshell-framed', selectedId === o.id && 'is-sel')}
                 onClick={() => openAkte(o)}
                 onContextMenu={(e) => {
                   e.preventDefault()
@@ -224,8 +223,8 @@ export function KundenObjekteCard({
                     <div className="objekte-card__sub" title={strasse}>
                       {strasse}
                     </div>
-                    {einheitenAnzahl != null ? (
-                      <div className="objekte-card__meta">{einheitenAnzahl}</div>
+                    {mieterAnzahl != null ? (
+                      <div className="objekte-card__meta">{mieterAnzahl} Mieter</div>
                     ) : null}
                   </div>
                   <MockIcon

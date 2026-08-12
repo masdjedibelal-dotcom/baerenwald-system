@@ -39,7 +39,7 @@ export function AngebotOrgFreigabeBanner({
         <MockBadge kind={hubSpotStatusToMockBadgeKind(badgeStatus)}>{ORG_FREIGABE_LABELS[status]}</MockBadge>
         {status === 'ausstehend' ? (
           <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Partner- und Handwerker-Anfragen sind bis zur Freigabe blockiert.
+            Angebot liegt vor — Kunde/HV kann annehmen oder ablehnen.
           </span>
         ) : null}
       </div>

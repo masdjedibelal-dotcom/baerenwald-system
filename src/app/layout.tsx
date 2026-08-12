@@ -8,9 +8,19 @@ export const metadata: Metadata = {
   title: 'Bärenwald CRM',
   description: 'Bärenwald München',
   manifest: '/manifest.json',
+  applicationName: 'Bärenwald',
+  appleWebApp: {
+    capable: true,
+    title: 'Bärenwald',
+    /* Mit viewport-fit=cover: Statusleiste über Content → Safe-Area-Insets greifen */
+    statusBarStyle: 'black-translucent',
+  },
   icons: {
-    icon: [{ url: '/brand/logo-mark-green.png', type: 'image/png' }],
-    apple: [{ url: '/brand/logo-mark-green.png', type: 'image/png' }],
+    icon: [
+      { url: '/icons/pwa-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/pwa-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
 }
 
@@ -19,6 +29,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: '#1A3D2B',
+  /* Pflicht für env(safe-area-inset-*) in Home-Screen-PWA */
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({

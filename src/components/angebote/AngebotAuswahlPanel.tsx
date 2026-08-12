@@ -1,14 +1,21 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useState } from 'react'
+import {
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Copy, Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { AppEntityListRow } from '@/components/layout/app'
 import { ListAvatar } from '@/components/ui/ListAvatar'
 import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import {
   loadAngebotWizardBootstrap,
@@ -42,6 +49,7 @@ export function AngebotAuswahlPanel({
   onWeiterbearbeiten,
   onKopie,
   variant = 'modal',
+  onFooterChange,
 }: {
   leadId: string
   angebote: AngebotAuswahlZeile[]
@@ -50,6 +58,8 @@ export function AngebotAuswahlPanel({
   onWeiterbearbeiten: (bootstrap: AngebotWizardBootstrap) => void
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
   variant?: 'modal' | 'page'
+  /** Modal: Footer an Parent (`.modal-f`) — nicht im Body. */
+  onFooterChange?: (footer: ReactNode | null) => void
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -143,7 +153,7 @@ export function AngebotAuswahlPanel({
     const items: ActionsMenuItem[] = [
       {
         label: 'Öffnen',
-        icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
+        icon: <MockIcon ctx="btn" n="eye" size={15} />,
         onClick: () => {
           onClose?.()
           router.push(`/angebote/${a.id}`)
@@ -154,20 +164,20 @@ export function AngebotAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: a.status === 'entwurf' ? 'Weiterbearbeiten' : 'Bearbeiten',
-        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
+        icon: <MockIcon ctx="btn" n="pencil" size={15} />,
         onClick: () => openBearbeiten(a.id),
       })
     }
 
     items.push({
       label: 'Kopieren',
-      icon: <Copy className="h-[15px] w-[15px]" aria-hidden />,
+      icon: <MockIcon ctx="btn" n="copy" size={15} />,
       onClick: () => handleKopieren(a.id),
     })
 
     items.push('sep', {
       label: 'Löschen',
-      icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
+      icon: <MockIcon ctx="btn" n="trash" size={15} />,
       danger: true,
       onClick: () => handleLoeschen(a.id),
     })
@@ -181,49 +191,38 @@ export function AngebotAuswahlPanel({
     : false
 
   const footer = (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-bw-border pt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {variant === 'modal' && onClose ? (
-          <button type="button" className="btn ghost sm" onClick={onClose} disabled={pending}>
-            Schließen
-          </button>
-        ) : (
-          <Link href={`/anfragen/${leadId}`} className="btn ghost sm">
-            Zur Anfrage
-          </Link>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn ghost sm inline-flex gap-1.5"
-          onClick={handleNeuesAngebotClick}
-          disabled={pending}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Neu erstellen
-        </button>
-        <button
-          type="button"
-          className="btn primary sm inline-flex gap-1.5"
-          onClick={handleAuswahlBestaetigen}
-          disabled={pending || !selectedId}
-        >
-          {selectedBearbeitbar ? (
-            <>
-              <Pencil className="h-3.5 w-3.5" aria-hidden />
-              Ausgewählt bearbeiten
-            </>
-          ) : (
-            <>
-              <Eye className="h-3.5 w-3.5" aria-hidden />
-              Ausgewählt öffnen
-            </>
-          )}
-        </button>
-      </div>
-    </div>
+    <>
+      {variant === 'modal' && onClose ? (
+        <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
+          Schließen
+        </MockBtn>
+      ) : (
+        <Link href={`/anfragen/${leadId}`} className="btn ghost">
+          Zur Anfrage
+        </Link>
+      )}
+      <div style={{ flex: 1 }} />
+      <MockBtn kind="ghost" icon="plus" onClick={handleNeuesAngebotClick} disabled={pending}>
+        Neu
+      </MockBtn>
+      <MockBtn
+        kind="primary"
+        icon={selectedBearbeitbar ? 'pencil' : 'eye'}
+        onClick={handleAuswahlBestaetigen}
+        disabled={pending || !selectedId}
+      >
+        {selectedBearbeitbar ? 'Bearbeiten' : 'Öffnen'}
+      </MockBtn>
+    </>
   )
+
+  useLayoutEffect(() => {
+    if (!onFooterChange) return
+    onFooterChange(footer)
+    return () => onFooterChange(null)
+    // footer JSX intentionally rebuilt when deps change
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync footer into Modal
+  }, [onFooterChange, pending, selectedId, selectedBearbeitbar, variant, leadId])
 
   return (
     <div className="space-y-4">
@@ -236,8 +235,8 @@ export function AngebotAuswahlPanel({
         </div>
       ) : null}
 
-      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-        Bestehende Angebote auswählen und bearbeiten — oder unten ein neues anlegen.
+      <p className="text-[length:var(--fs-meta)]" style={{ color: 'var(--text-3)', margin: 0 }}>
+        Bestehendes Angebot wählen — oder neu anlegen.
       </p>
 
       {rows.length === 0 ? (
@@ -272,10 +271,7 @@ export function AngebotAuswahlPanel({
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
-                          <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          Aktionen
-                        </button>
+                        <MockBtn sm kind="ghost" icon="dots" disabled={pending} title="Aktionen" />
                       }
                       items={menuItems(a)}
                     />
@@ -286,7 +282,7 @@ export function AngebotAuswahlPanel({
           })}
         </ul>
       ) : (
-        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-lg border border-bw-border p-0">
+        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-[10px] border border-bw-border p-0">
           {rows.map((a) => {
             const loading = pending && loadingId === a.id
             const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
@@ -299,12 +295,16 @@ export function AngebotAuswahlPanel({
                 <div
                   className={cn(
                     'flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap',
-                    selected && 'bg-bw-green-bg/35'
+                    selected && 'bg-[var(--green-50)]'
                   )}
                 >
                   <button
                     type="button"
-                    className="min-w-0 flex-1 text-left"
+                    className={cn(
+                      'doctype-radio-opt min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none',
+                      selected && 'on'
+                    )}
+                    style={{ border: 'none', background: 'transparent', padding: 0 }}
                     disabled={pending}
                     onClick={() => setSelectedId(a.id)}
                     onDoubleClick={() => {
@@ -315,49 +315,32 @@ export function AngebotAuswahlPanel({
                       }
                     }}
                   >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                          selected
-                            ? 'border-bw-primary bg-bw-primary text-white'
-                            : 'border-bw-border bg-white'
-                        )}
-                        aria-hidden
-                      >
-                        {selected ? (
-                          <span className="block h-1.5 w-1.5 rounded-full bg-white" />
-                        ) : null}
+                    <span className="dot" />
+                    <span className="doctype-radio-opt__copy">
+                      <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        <span className="font-mono text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
+                          {nr}
+                        </span>
+                        <AngebotStatusBadge status={a.status} />
                       </span>
-                      <span className="font-mono text-[length:var(--fs-meta)] text-bw-text-muted">{nr}</span>
-                      <AngebotStatusBadge status={a.status} />
-                    </div>
-                    <p className="mt-0.5 pl-6 text-[length:var(--fs-text)] text-bw-text-muted">
-                      {a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                      {label ? ` · ${label}` : ''}
-                    </p>
+                      <span className="hint">
+                        {a.created_at ? formatRelativeDate(a.created_at) : '—'}
+                        {label ? ` · ${label}` : ''}
+                        {' · '}
+                        {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                      </span>
+                    </span>
                   </button>
-                  <span className="text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
-                    {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
-                  </span>
                   <div className="flex shrink-0 items-center">
                     {loading ? (
                       <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        Bitte warten…
                       </span>
                     ) : (
                       <ActionsMenu
                         align="right"
                         trigger={
-                          <button
-                            type="button"
-                            className="btn ghost sm inline-flex gap-1.5"
-                            disabled={pending}
-                            aria-label="Aktionen"
-                          >
-                            <MoreHorizontal className="h-4 w-4" aria-hidden />
-                          </button>
+                          <MockBtn sm kind="ghost" icon="dots" disabled={pending} title="Aktionen" />
                         }
                         items={menuItems(a)}
                       />
@@ -370,7 +353,11 @@ export function AngebotAuswahlPanel({
         </ul>
       )}
 
-      {footer}
+      {variant === 'page' || !onFooterChange ? (
+        <div className="modal-f" style={{ margin: '0 -4px', paddingLeft: 0, paddingRight: 0, borderTop: '0.5px solid var(--border)' }}>
+          {footer}
+        </div>
+      ) : null}
     </div>
   )
 }

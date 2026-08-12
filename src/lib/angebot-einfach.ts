@@ -74,6 +74,25 @@ export function resolveStatusEinfach(row: AngebotStatusEinfachRow): AngebotStatu
   return 'entwurf'
 }
 
+/**
+ * Beim Anlegen eines weiteren Angebots am gleichen Lead:
+ * Geschwister bleiben bestehen (mehrere Angebote pro Anfrage sind erlaubt).
+ * Entwertung passiert erst bei Annahme eines Angebots.
+ */
+export function angebotSollBeiNeuerVersionErsetztWerden(
+  _st: AngebotStatusEinfach
+): boolean {
+  return false
+}
+
+/**
+ * Bei Annahme: konkurrierende Angebote entwerten — nur eines darf „angenommen“ sein.
+ * Mehrere gesendete/Entwürfe vorher sind ok; nach Annahme werden sie ersetzt.
+ */
+export function angebotSollBeiAnnahmeErsetztWerden(st: AngebotStatusEinfach): boolean {
+  return st !== 'ersetzt' && st !== 'abgelehnt'
+}
+
 export function matchesEinfachFilter(
   row: AngebotStatusEinfachRow,
   filter: '' | AngebotStatusEinfach

@@ -19,7 +19,7 @@ import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
-import { runDuplicateHandwerker } from '@/lib/list-actions'
+import { runDuplicateHandwerker, runDeleteHandwerker } from '@/lib/list-actions'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
@@ -603,6 +603,9 @@ export function HandwerkerListeClient({
             const mail = h.email?.trim() || ''
             const copy = () => runDuplicateHandwerker(h.id, router)
             const edit = () => openDetail(h.id)
+            const del = () => {
+              void runDeleteHandwerker(h.id, router, handwerkerDisplayName(h))
+            }
             const row = isMobile ? (
               <div
                 role="button"
@@ -709,6 +712,11 @@ export function HandwerkerListeClient({
               <SwipeRow
                 key={h.id}
                 disabled={!isMobile}
+                leftActions={
+                  isMobile
+                    ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
+                    : undefined
+                }
                 rightActions={
                   isMobile
                     ? [
