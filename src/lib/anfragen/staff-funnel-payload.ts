@@ -101,9 +101,6 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     kunde_objekt_id: state.kundeObjektId?.trim() || null,
     mieter_vorname: state.mieterVorname.trim() || null,
     mieter_nachname: state.mieterNachname.trim() || null,
-    mieter_email: state.mieterEmail.trim() || null,
-    mieter_telefon: state.mieterTelefon.trim() || null,
-    mieter_kunde_id: state.mieterKundeId?.trim() || null,
     melder_name:
       [state.mieterVorname.trim(), state.mieterNachname.trim()].filter(Boolean).join(' ') ||
       null,
@@ -138,11 +135,6 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
 
   const kanal = isHv ? 'hv_manuell' : state.kanal
 
-  const melderName = isHv
-    ? [state.mieterVorname.trim(), state.mieterNachname.trim()].filter(Boolean).join(' ') ||
-      null
-    : null
-
   return {
     kunde_id: state.kundeId,
     name,
@@ -171,9 +163,9 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     auftraggeber_kunde_id:
       isHv && state.kundeId && kundentyp === 'verwaltung' ? state.kundeId : undefined,
     kunde_objekt_id: isHv ? state.kundeObjektId?.trim() || null : null,
-    melder_name: melderName,
-    melder_email: isHv ? state.mieterEmail.trim() || null : null,
-    melder_telefon: isHv ? state.mieterTelefon.trim() || null : null,
-    melder_kunde_id: isHv ? state.mieterKundeId?.trim() || null : null,
+    melder_name: isHv
+      ? [state.mieterVorname.trim(), state.mieterNachname.trim()].filter(Boolean).join(' ') ||
+        null
+      : null,
   }
 }

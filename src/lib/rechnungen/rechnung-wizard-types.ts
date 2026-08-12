@@ -1,6 +1,7 @@
 import type { RechnungArt, RechnungAbschlagLink, Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import { standardRechnungZahlungstext } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
+import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
@@ -98,27 +99,14 @@ export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
   return s === 'entwurf' || s === 'gesendet' || s === 'bezahlt' || s === 'versendet'
 }
 
-/** Entwurf, versendet/gesendet, bezahlt und storniert — harte Löschung erlaubt. */
-export function rechnungDarfGeloeschtWerden(status: string): boolean {
-  const s = (status ?? '').toLowerCase()
-  return (
-    s === 'entwurf' ||
-    s === 'gesendet' ||
-    s === 'versendet' ||
-    s === 'bezahlt' ||
-    s === 'storniert'
-  )
-}
-
 function addDaysYmd(ymd: string, days: number): string {
   const d = new Date(`${ymd}T12:00:00`)
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
 }
 
-/** Standard-Zahlungsziel: immer 7 Tage (unabhängig vom Kundentyp). */
-export function defaultZahlungszielTage(_kundeTyp?: string | null): number {
-  return 7
+export function defaultZahlungszielTage(kundeTyp?: string | null): number {
+  return istPrivatKundeTyp(kundeTyp) ? 14 : 30
 }
 
 export function defaultRechnungWizardMeta(
@@ -135,7 +123,7 @@ export function defaultRechnungWizardMeta(
   const heute = opts?.rechnungsdatum ?? new Date().toISOString().slice(0, 10)
   const von = opts?.leistungszeitraum_von?.trim() || heute
   const bis = opts?.leistungszeitraum_bis?.trim() || heute
-  const anrede: AngebotMailAnrede = 'sie'
+  const anrede: AngebotMailAnrede = istPrivatKundeTyp(opts?.kundeTyp) ? 'du' : 'sie'
   const einleitung = defaultRechnungEinleitung(anrede)
   const mailEinleitung = defaultRechnungMailEinleitung(anrede)
   const hinweise = defaultRechnungHinweise()

@@ -6,29 +6,23 @@ import { CRM_LOGIN_PORTAL_ONLY_MESSAGE } from '@/lib/auth/crm-access'
 import { crmPasswordResetRedirectUrl } from '@/lib/auth/crm-auth-url'
 import { sendMail } from '@/lib/mail-service'
 
-export async function verifyCrmStaffSession(
-  /** Nach Client-Login: User-ID direkt prüfen (Cookie oft noch nicht im Server Action). */
-  userId?: string
-): Promise<{ ok: true } | { ok: false; message: string; reason: 'no_session' | 'portal_only' }> {
-  let uid = userId?.trim() || ''
-  if (!uid) {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    uid = user?.id ?? ''
-  }
-  if (!uid) return { ok: false, message: 'Nicht angemeldet.', reason: 'no_session' }
+export async function verifyCrmStaffSession(): Promise<
+  { ok: true } | { ok: false; message: string }
+> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user?.id) return { ok: false, message: 'Nicht angemeldet.' }
 
-  // Service-Role: unabhängig vom Cookie-Timing der Browser-Session
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await supabase
     .from('user_profiles')
     .select('id')
-    .eq('id', uid)
+    .eq('id', user.id)
     .maybeSingle()
 
   if (!profile) {
-    return { ok: false, message: CRM_LOGIN_PORTAL_ONLY_MESSAGE, reason: 'portal_only' }
+    return { ok: false, message: CRM_LOGIN_PORTAL_ONLY_MESSAGE }
   }
 
   return { ok: true }

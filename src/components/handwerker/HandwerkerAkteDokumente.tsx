@@ -5,17 +5,13 @@ import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Button } from '@/components/ui/Button'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
-import {
-  DokumenteVorgangAccordions,
-  groupByVorgangTitel,
-} from '@/components/ui/DokumenteVorgangAccordions'
 import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
 import {
   INDIVIDUELL_TYP_SLUG,
   istEigeneUnterlageTyp,
+  standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
-import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const AKTE_UPLOAD_TYP: ComplianceDokumentTyp = {
@@ -29,9 +25,6 @@ const AKTE_UPLOAD_TYP: ComplianceDokumentTyp = {
   mehrfach_erlaubt: true,
 }
 
-const ALLGEMEIN_KEY = 'allgemein'
-const ALLGEMEIN_TITLE = 'Allgemein'
-
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
   const s = String(value).slice(0, 10)
@@ -40,75 +33,26 @@ function formatDate(value: string | null | undefined): string {
   return s
 }
 
-type AkteDocRow = PartnerDokument & {
-  groupKey: string
-  groupTitle: string
-}
-
 /**
- * Akte → Dokumente: nach Vorgangstitel gruppiert (Accordions).
- * Freie Stamm-Uploads unter „Allgemein“; projektbezogene eigene Unterlagen
- * unter Angebotstitel → Auftragstitel.
+ * Akte → Dokumente: flache Liste wie Compliance-Unterlagen (keine äußere Card).
+ * Nur freie Stamm-Uploads — Pflichtnachweise bleiben unter Compliance.
  */
 export function HandwerkerAkteDokumente({
   handwerkerId,
   dokumente,
-  auftraege = [],
 }: {
   handwerkerId: string
   dokumente: PartnerDokument[]
-  auftraege?: {
-    id: string
-    titel: string | null
-    angebot_leistungsumfang?: string | null
-    angebot_notizen?: string | null
-  }[]
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
-  const titelByAuftrag = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const a of auftraege) {
-      m.set(
-        a.id,
-        resolveAkteVorgangTitel({
-          angebot: {
-            leistungsumfang: a.angebot_leistungsumfang,
-            notizen: a.angebot_notizen,
-          },
-          auftragTitel: a.titel,
-          fallback: 'Auftrag',
-        })
-      )
-    }
-    return m
-  }, [auftraege])
-
-  const rows = useMemo((): AkteDocRow[] => {
-    return dokumente
-      .filter((d) => d.datei_url?.trim() && istEigeneUnterlageTyp(d.typ))
-      .map((d) => {
-        const aid = d.auftrag_id?.trim()
-        if (aid) {
-          return {
-            ...d,
-            groupKey: `auftrag:${aid}`,
-            groupTitle: titelByAuftrag.get(aid) || 'Auftrag',
-          }
-        }
-        return {
-          ...d,
-          groupKey: ALLGEMEIN_KEY,
-          groupTitle: ALLGEMEIN_TITLE,
-        }
-      })
-      .sort((a, b) => String(b.hochgeladen_am).localeCompare(String(a.hochgeladen_am)))
-  }, [dokumente, titelByAuftrag])
-
-  const groups = useMemo(() => groupByVorgangTitel(rows), [rows])
+  const rows = useMemo(
+    () => standardDokumente(dokumente).filter((d) => istEigeneUnterlageTyp(d.typ)),
+    [dokumente]
+  )
 
   function openAdd() {
     setEditDoc(null)
@@ -137,60 +81,6 @@ export function HandwerkerAkteDokumente({
     return { title, meta }
   }
 
-  function renderItems(items: AkteDocRow[]) {
-    if (isMobile) {
-      return (
-        <div className="dok-cards">
-          {items.map((doc) => {
-            const { title, meta } = rowMeta(doc)
-            return (
-              <DokMobileCard
-                key={doc.id}
-                title={title}
-                meta={meta}
-                onClick={() => openEdit(doc)}
-              />
-            )
-          })}
-        </div>
-      )
-    }
-    return (
-      <div className="dok-list">
-        {items.map((doc) => {
-          const { title, meta } = rowMeta(doc)
-          return (
-            <div
-              key={doc.id}
-              className="list-row dok-list__row--openable"
-              style={{
-                gridTemplateColumns: 'minmax(0, 1fr)',
-                cursor: 'pointer',
-                alignItems: 'center',
-              }}
-              role="button"
-              tabIndex={0}
-              onClick={() => openEdit(doc)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openEdit(doc)
-                }
-              }}
-            >
-              <div className="dok-list__main min-w-0">
-                <div className="dok-list__name">
-                  {title}
-                  {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -217,8 +107,53 @@ export function HandwerkerAkteDokumente({
             Dokument oder Foto hochladen
           </Button>
         </div>
+      ) : isMobile ? (
+        <div className="dok-cards">
+          {rows.map((doc) => {
+            const { title, meta } = rowMeta(doc)
+            return (
+              <DokMobileCard
+                key={doc.id}
+                title={title}
+                meta={meta}
+                onClick={() => openEdit(doc)}
+              />
+            )
+          })}
+        </div>
       ) : (
-        <DokumenteVorgangAccordions groups={groups} renderItems={renderItems} />
+        <div className="dok-list">
+          {rows.map((doc) => {
+            const { title, meta } = rowMeta(doc)
+            return (
+              <div
+                key={doc.id}
+                className="list-row dok-list__row--openable"
+                style={{
+                  gridTemplateColumns: 'minmax(0, 1fr)',
+                  cursor: 'pointer',
+                  alignItems: 'center',
+                }}
+                role="button"
+                tabIndex={0}
+                onClick={() => openEdit(doc)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openEdit(doc)
+                  }
+                }}
+              >
+                <div className="dok-list__main min-w-0">
+                  <div className="dok-list__name">
+                    {title}
+                    {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
 
       <PartnerDokumentEditorSheet

@@ -10,8 +10,8 @@ import {
   duplicateAuftragHref,
   duplicateRechnung,
 } from '@/app/(dashboard)/crm/list-copy-actions'
-import { duplicateKunde, deleteKunde } from '@/app/actions/kunden'
-import { duplicateHandwerker, deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
+import { duplicateKunde } from '@/app/actions/kunden'
+import { duplicateHandwerker } from '@/app/(dashboard)/handwerker/actions'
 
 export async function runDeleteVorgang(
   leadId: string,
@@ -33,11 +33,6 @@ export async function runDeleteStandaloneRechnung(
   router: AppRouterInstance,
   label = 'Rechnung'
 ): Promise<void> {
-  const ok = window.confirm(
-    `„${label}“ wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.`
-  )
-  if (!ok) return
-
   const r = await deleteRechnungEntwurf(rechnungId)
   if (!r.ok) {
     toast.error(r.message)
@@ -102,38 +97,5 @@ export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterIn
       router.push(`/handwerker/${r.id}`)
     }
   })
-}
-
-export async function runDeleteKunde(
-  kundeId: string,
-  router: AppRouterInstance,
-  label = 'Kunde'
-): Promise<void> {
-  const ok = window.confirm(
-    `„${label}“ wirklich löschen?\n\nAlle zugehörigen Vorgänge, Angebote, Aufträge und Rechnungen werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`
-  )
-  if (!ok) return
-
-  const r = await deleteKunde(kundeId)
-  if (!r.ok) {
-    toast.error(r.message)
-    throw new Error(r.message)
-  }
-  toast.success(`${label} gelöscht`)
-  router.refresh()
-}
-
-export async function runDeleteHandwerker(
-  handwerkerId: string,
-  router: AppRouterInstance,
-  label = 'Handwerker'
-): Promise<void> {
-  const r = await deleteHandwerker(handwerkerId)
-  if (!r.ok) {
-    toast.error(r.message)
-    throw new Error(r.message)
-  }
-  toast.success(`${label} gelöscht`)
-  router.refresh()
 }
 

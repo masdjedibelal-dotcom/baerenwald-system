@@ -175,6 +175,31 @@ export function KundeInformierenModal({
           Kunden-Statusseite angezeigt.
         </p>
 
+        <div className="flex gap-3">
+          <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
+            <input
+              type="radio"
+              checked={anrede === 'sie'}
+              onChange={() => {
+                setAnrede('sie')
+                setDirty(true)
+              }}
+            />
+            Sie
+          </label>
+          <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
+            <input
+              type="radio"
+              checked={anrede === 'du'}
+              onChange={() => {
+                setAnrede('du')
+                setDirty(true)
+              }}
+            />
+            Du
+          </label>
+        </div>
+
         <KiAssistFieldLabel
           label="Betreff"
           value={betreff}

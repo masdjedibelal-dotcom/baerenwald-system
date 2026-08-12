@@ -159,17 +159,15 @@ export function FreigabeSettingsCard({
           Number(kundeDefaults.freigabe_schwelle_eur) > 0
             ? ` · Schwelle ${formatEur(snapSchwelle(Number(kundeDefaults.freigabe_schwelle_eur)))}`
             : ' · ohne Schwelle'}
-          {kundeDefaults.notfall_direkt !== false ? ' · Sofortmaßnahmen direkt' : ''}
+          {kundeDefaults.notfall_direkt !== false ? ' · Akut direkt' : ''}
         </p>
       ) : null}
 
       <div className={cn('freigabe-settings-card__body', erben && 'is-muted')}>
         <div className="freigabe-settings-card__row">
           <div className="freigabe-settings-card__row-text">
-            <div className="freigabe-settings-card__label">Direktbeauftragung bei Sofortmaßnahmen</div>
-            <div className="freigabe-settings-card__hint">
-              z. B. Wasser läuft, kein Strom, Heizung komplett aus — ohne Freigabe, nur Info an HV
-            </div>
+            <div className="freigabe-settings-card__label">Akut ohne Freigabe</div>
+            <div className="freigabe-settings-card__hint">Notfall darf direkt beauftragt werden</div>
           </div>
           <button
             type="button"
@@ -185,7 +183,7 @@ export function FreigabeSettingsCard({
           <div className="freigabe-settings-card__row-text">
             <div className="freigabe-settings-card__label">Schwellenwert</div>
             <div className="freigabe-settings-card__hint">
-              Unter der Schwelle: „Direkt Auftrag“ ohne HV-Freigabe
+              Unter der Schwelle: Auto-Auftrag ohne Freigabe
             </div>
           </div>
           <button

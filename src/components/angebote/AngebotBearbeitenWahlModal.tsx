@@ -91,8 +91,8 @@ export function AngebotBearbeitenWahlModal({
           <span>
             <span className="block text-[length:var(--fs-text)] font-semibold text-bw-text">Als neues Angebot erstellen</span>
             <span className="mt-1 block text-[length:var(--fs-text)] leading-relaxed text-bw-text-muted">
-              Inhalt wird übernommen und als weiterer Entwurf zur gleichen Anfrage angelegt.
-              Mehrere Angebote parallel sind möglich — angenommen werden kann später nur eines.
+              Inhalt wird übernommen und als neuer Entwurf angelegt — das bisherige Angebot wird als
+              „Ersetzt“ markiert.
             </span>
           </span>
           {pending && mode === 'kopie' ? (

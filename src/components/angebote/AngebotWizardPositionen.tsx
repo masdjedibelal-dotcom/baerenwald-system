@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/Button'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
-import { SwipeRow } from '@/components/ui/SwipeRow'
 import { Textarea } from '@/components/ui/Textarea'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { richTextToPlain } from '@/lib/rich-text'
@@ -201,7 +200,6 @@ function PositionAccordionItem({
   onClose,
   onPatch,
   onRemove,
-  onCopy,
   onMoveUp,
   onMoveDown,
   canMoveUp = false,
@@ -220,7 +218,6 @@ function PositionAccordionItem({
   onClose: () => void
   onPatch: (patch: Partial<DokumentZeile>) => void
   onRemove: () => void
-  onCopy?: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   canMoveUp?: boolean
@@ -619,7 +616,7 @@ function PositionAccordionItem({
   const browseMode = display === 'browse'
   const inlineOpen = open && display === 'full'
 
-  const card = (
+  return (
     <div
       className={cn(
         'pos-acc',
@@ -741,23 +738,6 @@ function PositionAccordionItem({
       {inlineOpen ? editPanel : null}
     </div>
   )
-
-  if (browseMode && (onCopy || onRemove)) {
-    return (
-      <SwipeRow
-        leftActions={[{ icon: 'trash', label: 'Löschen', onClick: onRemove, tone: 'danger' }]}
-        rightActions={
-          onCopy
-            ? [{ icon: 'copy', label: 'Kopieren', onClick: onCopy, tone: 'accent' }]
-            : undefined
-        }
-      >
-        {card}
-      </SwipeRow>
-    )
-  }
-
-  return card
 }
 
 export function AngebotWizardPositionen({
@@ -847,33 +827,6 @@ export function AngebotWizardPositionen({
       })
     },
     [zeilen, onChange, openId]
-  )
-
-  const copyZeile = useCallback(
-    (id: string) => {
-      const i = zeilen.findIndex((z) => z.id === id)
-      if (i < 0) return
-      const src = zeilen[i]
-      let copy: DokumentZeile | null = null
-      if (src.typ === 'artikel') {
-        const { id: _omit, ...rest } = src
-        copy = neueArtikelZeile({
-          ...rest,
-          bezeichnung: `${src.bezeichnung?.trim() || 'Position'} (Kopie)`,
-        })
-      } else if (src.typ === 'freitext') {
-        const { id: _omit, typ: _t, ...rest } = src
-        copy = neueFreitextZeile({
-          ...rest,
-          titel: `${src.titel?.trim() || 'Freitext'} (Kopie)`,
-        })
-      }
-      if (!copy) return
-      const next = [...zeilen]
-      next.splice(i + 1, 0, copy)
-      onChange(next)
-    },
-    [zeilen, onChange]
   )
 
   const moveZeile = useCallback(
@@ -1040,7 +993,6 @@ export function AngebotWizardPositionen({
               }}
               onPatch={(patch) => patchZeile(z.id, patch)}
               onRemove={() => removeZeile(z.id)}
-              onCopy={() => copyZeile(z.id)}
               canMoveUp={i > 0}
               canMoveDown={i < listenZeilen.length - 1}
               onMoveUp={() => moveZeile(z.id, 'up')}
@@ -1071,7 +1023,6 @@ export function AngebotWizardPositionen({
             onClose={closeOpenZeile}
             onPatch={(patch) => patchZeile(openZeile.id, patch)}
             onRemove={() => removeZeile(openZeile.id)}
-            onCopy={() => copyZeile(openZeile.id)}
             canMoveUp={openIndex > 0}
             canMoveDown={openIndex < listenZeilen.length - 1}
             onMoveUp={() => moveZeile(openZeile.id, 'up')}

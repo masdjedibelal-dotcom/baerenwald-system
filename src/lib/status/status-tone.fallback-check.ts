@@ -14,20 +14,7 @@ if (unknown.tone !== 'blau') {
 }
 
 if (primaryCta('anfrage', 'neu')?.id !== 'angebot_erstellen') throw new Error('anfrage neu')
-if (primaryCta('angebot', 'entwurf')?.id !== 'angebot_annehmen') throw new Error('angebot entwurf')
-if (
-  primaryCta('angebot', 'entwurf', { unterSchwelleDirektAuftrag: true })?.id !== 'direkt_auftrag'
-) {
-  throw new Error('angebot entwurf direkt auftrag')
-}
-if (primaryCta('angebot', 'gesendet')?.id !== 'angebot_annehmen') {
-  throw new Error('angebot gesendet annehmen')
-}
-if (
-  primaryCta('angebot', 'gesendet', { unterSchwelleDirektAuftrag: true })?.id !== 'direkt_auftrag'
-) {
-  throw new Error('angebot gesendet direkt auftrag')
-}
+if (primaryCta('angebot', 'entwurf')?.id !== 'angebot_versenden') throw new Error('angebot entwurf')
 if (primaryCta('auftrag', 'offen')?.id !== 'auftrag_abschliessen') throw new Error('auftrag offen')
 if (
   primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: 'versenden' })?.id !==

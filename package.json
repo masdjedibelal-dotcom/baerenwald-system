@@ -94,8 +94,7 @@
     "resend": "^6.12.0",
     "server-only": "^0.0.1",
     "sonner": "^1.7.4",
-    "unpdf": "^1.8.0",
-    "web-push": "^3.6.7"
+    "unpdf": "^1.8.0"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.11",
@@ -105,7 +104,6 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/web-push": "^3.6.4",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "playwright": "^1.49.1",

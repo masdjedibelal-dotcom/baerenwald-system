@@ -55,13 +55,6 @@ type RechnungKurz = {
   beleg_typ?: string | null
 }
 
-type AngebotKurz = {
-  id: string
-  created_at: string
-  angebotsnr?: string | null
-  pdf_url?: string | null
-}
-
 /**
  * Badge-Zähler für den Dokumente-Tab (Upload + Angebot-PDF + optional Fotos/Rechnungen).
  */
@@ -78,7 +71,7 @@ export function anzahlAngebotAnhaenge(
 }
 
 /**
- * Angebot → Dokumente: gleiche Liste wie Anfrage (Lead-Uploads + alle Angebote + Rechnungen + Protokolle).
+ * Angebot → Dokumente: gleiche Liste wie Anfrage (Lead-Uploads + Angebote + Rechnungen).
  * Fallback ohne Lead: PDF + Projektfotos.
  */
 export function AngebotAnhaengeTab({
@@ -86,49 +79,30 @@ export function AngebotAnhaengeTab({
   leadId: leadIdProp = null,
   dokumente = [],
   rechnungen = [],
-  geschwisterAngebote = [],
-  protokolle = [],
   onReload,
 }: {
   detail: AngebotDetail
   leadId?: string | null
   dokumente?: LeadDokumentRow[]
   rechnungen?: RechnungKurz[]
-  /** Weitere Angebote derselben Vorgangs-Kette (mit pdf_url) */
-  geschwisterAngebote?: AngebotKurz[]
-  protokolle?: import('@/components/anfragen/AnfrageDokumenteTab').AkteProtokollDokument[]
   onReload: () => void
 }) {
   const leadId = leadIdProp?.trim() || detail.lead_id?.trim() || null
-
-  const angebote = useMemo(() => {
-    const byId = new Map<string, AngebotKurz>()
-    byId.set(detail.id, {
-      id: detail.id,
-      created_at: detail.created_at,
-      angebotsnr: detail.angebotsnr,
-      pdf_url: detail.pdf_url,
-    })
-    for (const a of geschwisterAngebote) {
-      if (!a.id) continue
-      byId.set(a.id, {
-        id: a.id,
-        created_at: a.created_at,
-        angebotsnr: a.angebotsnr,
-        pdf_url: a.pdf_url,
-      })
-    }
-    return Array.from(byId.values())
-  }, [detail, geschwisterAngebote])
 
   if (leadId) {
     return (
       <AnfrageDokumenteTab
         leadId={leadId}
         dokumente={dokumente}
-        angebote={angebote}
+        angebote={[
+          {
+            id: detail.id,
+            created_at: detail.created_at,
+            angebotsnr: detail.angebotsnr,
+            pdf_url: detail.pdf_url,
+          },
+        ]}
         rechnungen={rechnungen}
-        protokolle={protokolle}
         onReload={onReload}
       />
     )

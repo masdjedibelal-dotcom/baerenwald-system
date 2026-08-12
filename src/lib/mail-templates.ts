@@ -149,7 +149,7 @@ export function mailHtmlBase(
     options?.skipMeinBaerenwaldPs === true
       ? ''
       : mailMeinBaerenwaldPsFooter({
-          anrede: options?.anrede ?? 'sie',
+          anrede: options?.anrede ?? 'du',
           portalLink,
           audience: options?.portalAudience ?? 'privat',
         })

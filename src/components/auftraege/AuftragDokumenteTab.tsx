@@ -21,15 +21,11 @@ import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   abschlussdokumentZeile,
-  abnahmeDokumentZeile,
   angebotAusAuftragDetail,
   angebotDokumentZeile,
   angebotHandwerkerAusAuftragDetail,
-  dedupeDokumentZeilenByHref,
   dokumentTypLabel,
-  fachdokuDokumentZeilen,
   handwerkerDokumentZeilen,
-  leadDokumentZeilen,
   rechnungDokumentZeilen,
   sortDokumentZeilen,
   timelineDokumentZeilen,
@@ -37,12 +33,9 @@ import {
   type AuftragDokumentZeile,
   type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
-import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku-actions'
-import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { AuftragDetail, AuftragTimelineEvent, LeadDokumentRow } from '@/lib/types'
+import type { AuftragDetail, AuftragTimelineEvent } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 
 export type { AuftragDokumentZeile }
@@ -50,9 +43,7 @@ export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helper
 
 function freigabeLabel(row: AuftragDokumentZeile): string {
   if (row.fuerKunde) return 'Kunde'
-  if (row.quelle === 'vertrag' || row.quelle === 'handwerker' || row.quelle === 'fachdoku') {
-    return 'Partner'
-  }
+  if (row.quelle === 'vertrag' || row.quelle === 'handwerker') return 'Partner'
   return 'intern'
 }
 
@@ -60,16 +51,11 @@ export function AuftragDokumenteTab({
   detail,
   rechnungen = [],
   vertraege = [],
-  leadDokumente = [],
-  leadId = null,
   onChanged,
 }: {
   detail: AuftragDetail
   rechnungen?: RechnungAuswahlZeile[]
   vertraege?: HandwerkerVertragRow[]
-  /** Kanonische Vorgangs-Uploads (lead_dokumente) — sichtbar in jeder Phase */
-  leadDokumente?: LeadDokumentRow[]
-  leadId?: string | null
   onChanged: () => void
 }) {
   const [pending, startTransition] = useLocalTransition()
@@ -79,7 +65,6 @@ export function AuftragDokumenteTab({
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [hwSignedUrls, setHwSignedUrls] = useState<Record<string, string>>({})
-  const [fachdokuSlots, setFachdokuSlots] = useState<FachdokuSlotRow[]>([])
   const [sortKey, setSortKey] = useState<DokumentSortKey>('datum')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -90,28 +75,8 @@ export function AuftragDokumenteTab({
     [detail]
   )
 
-  const fachdokuZeilen = useMemo(
-    () => fachdokuDokumentZeilen(fachdokuSlots),
-    [fachdokuSlots]
-  )
-
   useEffect(() => {
-    let cancelled = false
-    void ensureAndLoadFachdokuSlots(detail.id).then((res) => {
-      if (cancelled) return
-      if (res.ok) setFachdokuSlots(res.slots)
-      else setFachdokuSlots([])
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [detail.id])
-
-  useEffect(() => {
-    const paths = [
-      ...handwerkerZeilen.map((z) => z.storagePath).filter(Boolean),
-      ...fachdokuZeilen.map((z) => z.storagePath).filter(Boolean),
-    ] as string[]
+    const paths = handwerkerZeilen.map((z) => z.storagePath).filter(Boolean) as string[]
     if (!paths.length) {
       setHwSignedUrls({})
       return
@@ -124,26 +89,33 @@ export function AuftragDokumenteTab({
     return () => {
       cancelled = true
     }
-  }, [handwerkerZeilen, fachdokuZeilen])
+  }, [handwerkerZeilen])
 
   const zeilenRaw = useMemo(() => {
     const rows = [
-      ...leadDokumentZeilen(leadDokumente),
       ...timelineDokumentZeilen(detail),
       ...rechnungDokumentZeilen(rechnungen),
       ...vertragDokumentZeilen(vertraege),
       ...handwerkerZeilen,
-      ...fachdokuZeilen,
     ]
     const ang = angebotAusAuftragDetail(detail)
     const angebotZeile = ang ? angebotDokumentZeile(detail, ang) : null
     if (angebotZeile) rows.unshift(angebotZeile)
-    const abnahme = abnahmeDokumentZeile(detail)
-    if (abnahme) rows.push(abnahme)
+    if (detail.abnahme_protokoll_url) {
+      rows.push({
+        id: 'abnahme-pdf',
+        name: 'Abnahmeprotokoll',
+        beschreibung: 'Abnahme',
+        datum: detail.updated_at ?? detail.created_at,
+        fuerKunde: true,
+        href: detail.abnahme_protokoll_url,
+        quelle: 'protokoll',
+      })
+    }
     const abschluss = abschlussdokumentZeile(detail)
     if (abschluss) rows.push(abschluss)
-    return dedupeDokumentZeilenByHref(rows)
-  }, [detail, rechnungen, vertraege, handwerkerZeilen, fachdokuZeilen, leadDokumente])
+    return rows
+  }, [detail, rechnungen, vertraege, handwerkerZeilen])
 
   const zeilen = useMemo(
     () => sortDokumentZeilen(zeilenRaw, sortKey, sortDir),
@@ -163,39 +135,7 @@ export function AuftragDokumenteTab({
     const list = Array.from(files).slice(0, 5)
     if (!list.length) return
     setUploading(true)
-    const kanonLeadId = leadId?.trim() || detail.lead_id?.trim() || null
     try {
-      if (kanonLeadId) {
-        // Mit Lead: in Vorgangs-Akte (lead_dokumente) — erscheint in allen Phasen
-        for (const file of list) {
-          const fd = new FormData()
-          fd.set('file', file)
-          fd.set('filename', file.name)
-          const res = await fetch(`/api/anfragen/${kanonLeadId}/dokument/upload`, {
-            method: 'POST',
-            body: fd,
-          })
-          const json = (await res.json()) as {
-            url?: string
-            groesse_bytes?: number
-            error?: string
-          }
-          if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
-          const ins = await insertLeadDokument({
-            leadId: kanonLeadId,
-            name: file.name,
-            datei_url: json.url,
-            groesse_bytes: json.groesse_bytes ?? file.size,
-          })
-          if (!ins.ok) throw new Error(ins.message)
-        }
-        toast.success(
-          list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`
-        )
-        onChanged()
-        return
-      }
-
       const urls: string[] = []
       for (const file of list) {
         const fd = new FormData()

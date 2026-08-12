@@ -730,20 +730,18 @@ export function PosBoard({
         onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
         onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
         groupActions={groupActions}
-        itemActions={itemActions}
+        itemActions={unifiedAdd ? undefined : itemActions}
         selectable={selectable}
         selected={sel}
         onToggleItem={toggleItem}
         onToggleGroup={toggleGroup}
-        dnd={editable}
+        dnd={editable && !unifiedAdd}
         onReorder={reorder}
         onDropToGroup={dropToGroup}
         onReorderGroup={reorderGroups}
-        onCopyItem={editable ? dup : undefined}
-        onDeleteItem={editable ? remove : undefined}
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
         onMengeChange={
-          editable
+          editable && !unifiedAdd
             ? (id, menge) => update(id, { menge })
             : undefined
         }

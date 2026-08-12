@@ -14,7 +14,6 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  rechnungDarfGeloeschtWerden,
   rechnungDarfImWizardBearbeitetWerden,
   type RechnungAuswahlZeile,
 } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -83,15 +82,8 @@ export function RechnungAuswahlPanel({
     })
   }
 
-  function handleLoeschen(rechnungId: string, status: string) {
-    const st = String(status ?? '').toLowerCase()
-    const msg =
-      st === 'entwurf'
-        ? 'Rechnungs-Entwurf wirklich löschen?'
-        : st === 'bezahlt' || st === 'storniert'
-          ? 'Erledigte Rechnung wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.'
-          : 'Rechnung wirklich endgültig löschen?'
-    if (!window.confirm(msg)) return
+  function handleLoeschen(rechnungId: string) {
+    if (!window.confirm('Rechnungs-Entwurf wirklich löschen?')) return
     setLoadingId(rechnungId)
     startTransition(async () => {
       const r = await deleteRechnungEntwurf(rechnungId)
@@ -120,7 +112,6 @@ export function RechnungAuswahlPanel({
 
   function menuItems(r: RechnungAuswahlZeile): ActionsMenuItem[] {
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
-    const loeschbar = rechnungDarfGeloeschtWerden(r.status)
     const items: ActionsMenuItem[] = [
       {
         label: 'Öffnen',
@@ -138,14 +129,11 @@ export function RechnungAuswahlPanel({
         icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => openBearbeiten(r.id),
       })
-    }
-
-    if (loeschbar) {
       items.push('sep', {
         label: 'Löschen',
         icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
         danger: true,
-        onClick: () => handleLoeschen(r.id, r.status),
+        onClick: () => handleLoeschen(r.id),
       })
     }
 

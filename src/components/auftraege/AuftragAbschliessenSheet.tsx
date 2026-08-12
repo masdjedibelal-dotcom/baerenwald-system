@@ -13,10 +13,8 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import {
-  abschliessenMitHwProtokoll,
-  getAbschliessenKontext,
+  getGesamtabnahmeGate,
   saveAbnahmeAndAbschliessen,
-  type AbschliessenHwProtokollVorschau,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
@@ -26,15 +24,12 @@ import {
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { heuteYmd } from '@/lib/angebot-einfach'
-import { formatDatum } from '@/lib/utils'
 import type { AuftragPosition } from '@/lib/types'
 
-type Step = 'loading' | 'hw' | 'frage' | 'checkliste'
+type Step = 'frage' | 'checkliste'
 
 /**
- * Auftrag abschließen:
- * - Mit HW-Abnahmeprotokoll: Vorschau + Speichern / Speichern und senden
- * - Ohne HW-Protokoll: Frage → optionale manuelle Checkliste
+ * Auftrag abschließen: optionale Abnahme-Checkliste (frei hinzufügbare Leistungen + Mängel).
  */
 export function AuftragAbschliessenSheet({
   open,
@@ -54,52 +49,29 @@ export function AuftragAbschliessenSheet({
 }) {
   const [pending, startTransition] = useLocalTransition()
   const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
-  const [step, setStep] = useState<Step>('loading')
-  const [hwProtokolle, setHwProtokolle] = useState<AbschliessenHwProtokollVorschau[]>([])
+  const [step, setStep] = useState<Step>('frage')
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
   const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>([])
   const [notizen, setNotizen] = useState('')
 
   useEffect(() => {
     if (!open) return
-    setStep('loading')
-    setHwProtokolle([])
+    setStep('frage')
     setPunkte([])
     setMaengelItems([])
     setNotizen('')
     setPendingKind(null)
-    let cancelled = false
-    void getAbschliessenKontext(auftragId).then((ctx) => {
-      if (cancelled) return
-      if (ctx.mode === 'hw' && ctx.protokolle.length) {
-        setHwProtokolle(ctx.protokolle)
-        setStep('hw')
-      } else {
-        setStep('frage')
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [open, auftragId])
+  }, [open])
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
   function abschliessenOhneAbnahme() {
     startTransition(async () => {
-      const ctx = await getAbschliessenKontext(auftragId)
-      if (ctx.mode === 'hw') {
+      const gate = await getGesamtabnahmeGate(auftragId)
+      if (gate.zeilen.length > 0 && !gate.ok) {
         toast.error(
-          'Es liegt ein Handwerker-Abnahmeprotokoll vor — bitte darüber speichern oder senden.'
-        )
-        setHwProtokolle(ctx.protokolle)
-        setStep('hw')
-        return
-      }
-      if (ctx.zeilen.length > 0 && !ctx.gateOk) {
-        toast.error(
-          ctx.gateMessage ||
-            'Eingereichte Teilabnahmen zuerst freigeben, dann abschließen.'
+          gate.message ||
+            'Mit zugewiesenen Partnern: zuerst alle Teilabnahmen freigeben, dann Gesamtabnahme.'
         )
         return
       }
@@ -112,34 +84,6 @@ export function AuftragAbschliessenSheet({
       onClose()
       onDone?.()
       onNachRechnung?.()
-    })
-  }
-
-  function speichernMitHwProtokoll(sendToKunde: boolean) {
-    setPendingKind(sendToKunde ? 'send' : 'save')
-    startTransition(async () => {
-      const r = await abschliessenMitHwProtokoll({
-        auftragId,
-        sendToKunde,
-      })
-      setPendingKind(null)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      if (r.sendWarning) {
-        toast.error(
-          `Abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`
-        )
-      } else {
-        toast.success(
-          r.sentToKunde
-            ? 'Abnahmeprotokoll an den Kunden gesendet — Auftrag abgeschlossen'
-            : 'Auftrag abgeschlossen (Handwerker-Abnahmeprotokoll)'
-        )
-      }
-      onClose()
-      onDone?.()
     })
   }
 
@@ -181,57 +125,6 @@ export function AuftragAbschliessenSheet({
     })
   }
 
-  if (step === 'loading') {
-    return (
-      <EditorSheet open={open} onClose={onClose} title="Auftrag abschließen" size="md">
-        <p className="text-[length:var(--fs-text)] text-[var(--text-2)] m-0">Wird geladen…</p>
-      </EditorSheet>
-    )
-  }
-
-  if (step === 'hw') {
-    return (
-      <EditorSheet
-        open={open}
-        onClose={onClose}
-        title="Auftrag abschließen"
-        size="lg"
-        footer={
-          <div className="sheet-footer-actions zahlplan-editor-footer">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={pending}
-              loading={pending && pendingKind === 'save'}
-              onClick={() => speichernMitHwProtokoll(false)}
-            >
-              Speichern
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              disabled={pending}
-              loading={pending && pendingKind === 'send'}
-              onClick={() => speichernMitHwProtokoll(true)}
-            >
-              Speichern und senden
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-5">
-          <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-            Der Handwerker hat das Abnahmeprotokoll bereits erstellt. Prüfen und Auftrag
-            abschließen — Nacharbeit ohne neue Abnahme braucht keine erneute Bestätigung.
-          </p>
-          {hwProtokolle.map((p) => (
-            <HwProtokollVorschau key={p.id} protokoll={p} />
-          ))}
-        </div>
-      </EditorSheet>
-    )
-  }
-
   if (step === 'frage') {
     return (
       <EditorSheet
@@ -262,9 +155,8 @@ export function AuftragAbschliessenSheet({
         }
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-          Kein Handwerker-Abnahmeprotokoll vorhanden. Soll ein Abnahmeprotokoll mit
-          Leistungs-Checkliste und Mängeln erstellt und in den Dokumenten abgelegt werden?
-          Signatur erfolgt vor Ort / im Portal — nicht hier.
+          Soll ein Abnahmeprotokoll mit Leistungs-Checkliste und Mängeln erstellt und in den
+          Dokumenten abgelegt werden? Signatur erfolgt vor Ort / im Portal — nicht hier.
         </p>
       </EditorSheet>
     )
@@ -329,110 +221,5 @@ export function AuftragAbschliessenSheet({
         </label>
       </div>
     </EditorSheet>
-  )
-}
-
-function HwProtokollVorschau({
-  protokoll: p,
-}: {
-  protokoll: AbschliessenHwProtokollVorschau
-}) {
-  const okCount = p.punkte.filter((x) => String(x.status).toLowerCase() === 'ok').length
-  const offenMaengel = p.maengel.filter((m) => {
-    const st = String(m.status ?? 'offen').toLowerCase()
-    return st !== 'behoben' && st !== 'abgenommen'
-  })
-
-  return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="m-0 text-[length:var(--fs-text)] font-semibold text-[var(--text-1)]">
-          {p.handwerkerName}
-        </h3>
-        <p className="m-0 mt-1 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          {[
-            p.abnahmeDatum ? `Datum ${formatDatum(p.abnahmeDatum)}` : null,
-            p.ort ? `Ort: ${p.ort}` : null,
-            p.ergebnisLabel,
-            p.freigabeStatus === 'zur_freigabe' ? 'Noch zur Freigabe — wird beim Speichern freigegeben' : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
-        {(p.unterzeichnerHw || p.unterzeichnerKunde) && (
-          <p className="m-0 mt-1 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            {[
-              p.unterzeichnerHw ? `HW: ${p.unterzeichnerHw}` : null,
-              p.unterzeichnerKunde ? `Kunde: ${p.unterzeichnerKunde}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        )}
-      </div>
-
-      {p.pdfUrl ? (
-        <div className="overflow-hidden rounded-[var(--radius-md,8px)] border border-[var(--border)] bg-[var(--surface-2,#f6f6f4)]">
-          <iframe
-            title={`Abnahmeprotokoll ${p.handwerkerName}`}
-            src={p.pdfUrl}
-            className="h-[min(52vh,420px)] w-full bg-white"
-          />
-          <div className="border-t border-[var(--border)] px-3 py-2">
-            <a
-              href={p.pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[length:var(--fs-meta)] text-[var(--accent)] underline-offset-2 hover:underline"
-            >
-              PDF in neuem Tab öffnen
-            </a>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3 rounded-[var(--radius-md,8px)] border border-[var(--border)] p-3">
-          <p className="m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            PDF noch nicht erzeugt — Inhalt aus dem Protokoll:
-          </p>
-          <AbnahmeProgressBar done={okCount} total={p.punkte.length} />
-          {p.punkte.length > 0 ? (
-            <ul className="m-0 list-none space-y-1.5 p-0">
-              {p.punkte.map((pkt, i) => (
-                <li
-                  key={pkt.id || pkt.leistung_id || `p-${i}`}
-                  className="text-[length:var(--fs-text)] text-[var(--text-1)]"
-                >
-                  <span className="text-[var(--text-3)]">
-                    {String(pkt.status).toLowerCase() === 'ok' ? '✓' : '○'}{' '}
-                  </span>
-                  {(pkt.leistung_name ?? pkt.beschreibung)?.trim() || 'Leistung'}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {offenMaengel.length > 0 ? (
-            <div>
-              <p className="m-0 mb-1 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
-                Mängel
-              </p>
-              <ul className="m-0 list-disc space-y-1 pl-5">
-                {offenMaengel.map((m, i) => (
-                  <li key={m.punkt_id || `m-${i}`} className="text-[length:var(--fs-text)]">
-                    {m.titel?.trim() || m.beschreibung?.trim() || 'Mangel'}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">Keine offenen Mängel</p>
-          )}
-          {p.notizen?.trim() ? (
-            <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] whitespace-pre-wrap">
-              {p.notizen.trim()}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </section>
   )
 }

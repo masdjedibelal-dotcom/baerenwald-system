@@ -48,12 +48,18 @@ export async function insertKalenderAutoTermin(
   await insertKalenderAutoTermine([input], opts)
 }
 
-/** Mehrere Termine in einem Insert — deaktiviert: Termine nur manuell im Kalender. */
+/** Mehrere Termine in einem Insert (schneller als einzelne Aufrufe). */
 export async function insertKalenderAutoTermine(
-  _inputs: KalenderAutoTerminInput[],
-  _opts?: { skipRevalidate?: boolean }
+  inputs: KalenderAutoTerminInput[],
+  opts?: { skipRevalidate?: boolean }
 ): Promise<void> {
-  return
+  if (!inputs.length) return
+  const { error } = await supabaseAdmin.from('kalender_termine').insert(inputs.map(mapKalenderRow))
+  if (error) {
+    console.warn('[kalender-auto]', error.message)
+    return
+  }
+  if (!opts?.skipRevalidate) revalidatePath('/kalender')
 }
 
 /** CRM-internes To-do — erscheint im Dashboard, nicht in der Anfrage-Terminliste. */

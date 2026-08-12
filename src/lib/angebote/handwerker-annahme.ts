@@ -12,7 +12,6 @@ import {
 } from '@/lib/angebote/ablehnung-labels'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { sendMail } from '@/lib/mail-service'
-import { sendCrmPushToStaff } from '@/lib/push/send'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const HW_ZUWEISUNG_STATUS_AKZEPTIERT = 'akzeptiert' as const
@@ -114,36 +113,7 @@ export async function acceptHandwerkerZuweisung(
   }
 
   const st = normalizeHwZuweisungStatus(raw.status as string)
-  const angebotEarly = one(raw.angebote as { id: string; lead_id: string | null } | null)
-  const hwEarly = one(raw.handwerker as { name: string } | null)
-  const gwEarly = one(raw.gewerke as { name: string } | null)
-
   if (st === antwort || (antwort === 'akzeptiert' && isHwZuweisungAkzeptiertLenient(st))) {
-    // Portal kann Shared-DB schon geschrieben haben — Push trotzdem, sonst bleibt CRM stumm.
-    if (input.notify !== false && input.quelle === 'portal') {
-      const leadId = angebotEarly?.lead_id ?? null
-      const angebotId = String(raw.angebot_id ?? angebotEarly?.id ?? '')
-      const handwerkerName = hwEarly?.name?.trim() || 'Handwerker'
-      const gewerkName = gwEarly?.name?.trim() || 'Gewerk'
-      try {
-        await sendCrmPushToStaff({
-          typ: antwort === 'akzeptiert' ? 'handwerker_angenommen' : 'handwerker_abgelehnt',
-          title:
-            antwort === 'akzeptiert'
-              ? `${handwerkerName} hat zugesagt`
-              : `${handwerkerName} hat abgelehnt`,
-          body: gewerkName,
-          url: angebotId
-            ? `/angebote/${angebotId}`
-            : leadId
-              ? `/anfragen/${leadId}`
-              : '/vorgaenge',
-          tag: `hw-antwort-${zuweisungId}`,
-        })
-      } catch (e) {
-        console.warn('[acceptHandwerkerZuweisung] push already', e)
-      }
-    }
     return { ok: true, status: antwort, already: true }
   }
   if (st === 'abgelehnt' || st === 'ersetzt') {
@@ -270,25 +240,6 @@ export async function acceptHandwerkerZuweisung(
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://crm.baerenwaldmuenchen.de'
     const dashboardUrl = angebotId ? `${baseUrl}/angebote/${angebotId}` : `${baseUrl}/angebote`
-
-    try {
-      await sendCrmPushToStaff({
-        typ: antwort === 'akzeptiert' ? 'handwerker_angenommen' : 'handwerker_abgelehnt',
-        title:
-          antwort === 'akzeptiert'
-            ? `${handwerkerName} hat zugesagt`
-            : `${handwerkerName} hat abgelehnt`,
-        body: [gewerkName, grundLabel].filter(Boolean).join(' · ') || gewerkName,
-        url: angebotId
-          ? `/angebote/${angebotId}`
-          : leadId
-            ? `/anfragen/${leadId}`
-            : '/vorgaenge',
-        tag: `hw-antwort-${zuweisungId}`,
-      })
-    } catch (e) {
-      console.warn('[acceptHandwerkerZuweisung] push', e)
-    }
 
     void sendMail({
       an: internTo,

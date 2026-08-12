@@ -1,15 +1,9 @@
 import { parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
-import {
-  parseProjektWasZeilen,
-  wasZeilenToFunnelPositionen,
-} from '@/lib/lead-projekt-was'
 import { positionVkNettoStueck } from '@/lib/angebot-positionen'
 import {
   leistungStatusLabel,
   normalizeLeistungStatus,
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
-import { auftragHwStatusLabel } from '@/lib/auftraege/auftrag-handwerker-status'
-import { handwerkerAntwortAnzeige } from '@/lib/auftraege/partner-vorgang-display'
 import { formatZeitraumKurz } from '@/components/auftraege/leistungen-v3/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -53,71 +47,9 @@ function angebotPreis(p: AngebotPosition): number {
   return Math.round(stueck * menge * 100) / 100
 }
 
-/** Ampel für Mobile-Cards (rot / gelb / grün). */
-function handwerkerStatusTone(
-  status: string | null | undefined,
-  hasHandwerker: boolean
-): LeistungRow['handwerkerStatusTone'] {
-  if (!hasHandwerker) return null
-  const v = String(status ?? '').toLowerCase()
-  if (v === 'akzeptiert' || v === 'zugewiesen' || v.includes('angenommen') || v === 'accepted') {
-    return 'zugewiesen'
-  }
-  if (
-    v === 'angefragt' ||
-    v === 'warten' ||
-    v.includes('anfrag') ||
-    v === 'pending' ||
-    v === 'wartend'
-  ) {
-    return 'warten'
-  }
-  /* ausstehend / abgelehnt / nicht gesendet / leer */
-  return 'offen'
-}
-
-function anfrageLabelForPosition(
-  p: Pick<AuftragPosition, 'handwerker_id' | 'handwerker_status' | 'anerkennung_status'>
-): string | null {
-  const anerkennung = String(p.anerkennung_status ?? '').toLowerCase()
-  if (anerkennung === 'in_pruefung') return 'Zur Freigabe'
-  if (anerkennung === 'anerkannt') return 'Freigegeben'
-  if (anerkennung === 'abgelehnt') return 'Abgelehnt'
-  if (!p.handwerker_id) return null
-  const antwort = handwerkerAntwortAnzeige(p)
-  if (antwort?.label) return antwort.label
-  const st = String(p.handwerker_status ?? '').toLowerCase()
-  /* Partner-erstellt (Nachtrag) — nicht als „Zugewiesen“ zeigen */
-  if (st === 'bestaetigt') return null
-  return auftragHwStatusLabel(p.handwerker_status)
-}
-
-function parseNachtragBegruendung(beschreibung: string | null | undefined): string | null {
-  const plain = richTextToPlain(beschreibung ?? '') || ''
-  const cleaned = plain
-    .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
-    .trim()
-  return cleaned || null
-}
-
-function normalizeAnerkennung(
-  raw: string | null | undefined
-): LeistungRow['anerkennungStatus'] {
-  const v = String(raw ?? '').toLowerCase()
-  if (v === 'in_pruefung' || v === 'anerkannt' || v === 'abgelehnt' || v === 'nicht_noetig') {
-    return v
-  }
-  return v || null
-}
-
-/** Anfrage: Funnel-Positionen (read-only); Fallback auf was_zeilen (Angebot-Sync). */
+/** Anfrage: Funnel-Positionen (read-only). */
 export function leistungenFromAnfrage(funnelDaten: unknown): LeistungRow[] {
-  let positionen = parseFunnelPositionen(funnelDaten)
-  if (!positionen.length) {
-    const was = parseProjektWasZeilen(funnelDaten)
-    if (was.length) positionen = wasZeilenToFunnelPositionen(was)
-  }
-  return positionen.map((p, i) => {
+  return parseFunnelPositionen(funnelDaten).map((p, i) => {
     const mid =
       p.preis_min > 0 || p.preis_max > 0
         ? Math.round(((p.preis_min + p.preis_max) / 2) * 100) / 100
@@ -211,52 +143,20 @@ export function leistungenFromAuftragPositionen(
         }))
         .filter((n) => n.text)
       const hwName = p.handwerker?.name?.trim() || null
-      const anerkennung = normalizeAnerkennung(p.anerkennung_status)
-      const brauchtFreigabe = anerkennung === 'in_pruefung'
-      const anfrageStatusLabel = anfrageLabelForPosition(p)
-      const hwTone = brauchtFreigabe
-        ? 'warten'
-        : anerkennung === 'abgelehnt'
-          ? 'offen'
-          : anerkennung === 'anerkannt'
-            ? 'zugewiesen'
-            : handwerkerStatusTone(p.handwerker_status, Boolean(p.handwerker_id))
+      const hwStatus = String(p.handwerker_status ?? '').toLowerCase()
+      let anfrageStatusLabel: string | null = null
+      if (hwStatus.includes('anfrag') || hwStatus === 'pending' || hwStatus === 'wartend') {
+        anfrageStatusLabel = 'Angefragt'
+      } else if (hwStatus.includes('angenommen') || hwStatus === 'accepted') {
+        anfrageStatusLabel = 'Angenommen'
+      } else if (hwName) {
+        anfrageStatusLabel = 'Zugewiesen'
+      }
+
+      const statusLabel =
+        st === 'erledigt' ? 'Abgenommen' : leistungStatusLabel(st)
 
       const isRegie = istRegiePosition(p)
-      const nachtragBegruendung = brauchtFreigabe || anerkennung === 'anerkannt' || anerkennung === 'abgelehnt'
-        ? parseNachtragBegruendung(p.beschreibung)
-        : null
-      const ek =
-        p.preis_partner != null && p.preis_partner > 0
-          ? formatEurBetrag(p.preis_partner)
-          : null
-      const nachtragZeitLabel = (() => {
-        if (!brauchtFreigabe && anerkennung !== 'anerkannt' && anerkennung !== 'abgelehnt') {
-          return null
-        }
-        if (p.geschaetzt_std != null && p.geschaetzt_std > 0) {
-          return mengeLabel(p.geschaetzt_std, 'Std')
-        }
-        if (p.menge != null && p.menge > 0) {
-          return mengeLabel(p.menge, p.einheit || 'Std')
-        }
-        return null
-      })()
-
-      const statusLabel = brauchtFreigabe
-        ? 'Offen'
-        : anerkennung === 'abgelehnt'
-          ? 'Abgelehnt'
-          : st === 'erledigt'
-            ? 'Abgenommen'
-            : leistungStatusLabel(st)
-      const statusForBadge = brauchtFreigabe
-        ? 'offen'
-        : anerkennung === 'abgelehnt'
-          ? 'storniert'
-          : st === 'erledigt'
-            ? 'abgenommen'
-            : st
       const posEintraege = eintraegeByPos.get(p.id) ?? []
       const erfasstMin = posEintraege.reduce(
         (s, e) => s + (Number(e.zeit_minuten) || 0),
@@ -298,23 +198,13 @@ export function leistungenFromAuftragPositionen(
 
       // Subline: Regie + Ist wenn vorhanden
       const subParts: string[] = []
-      if (brauchtFreigabe) subParts.push('Nachtrag · zur Freigabe')
-      else if (isRegie) subParts.push(REGIE_BADGE_LABEL)
+      if (isRegie) subParts.push(REGIE_BADGE_LABEL)
       if (sollIst) subParts.push(sollIst)
-      if (!brauchtFreigabe && st === 'in_arbeit' && p.gestartet_am) {
+      if (st === 'in_arbeit' && p.gestartet_am) {
         subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
-      } else if (!brauchtFreigabe && st === 'erledigt') {
+      } else if (st === 'erledigt') {
         subParts.push('dokumentiert · abgenommen')
       }
-
-      const preisLabel =
-        erfasstNetto != null && erfasstNetto > 0
-          ? formatEurBetrag(erfasstNetto)
-          : vk > 0
-            ? formatEurBetrag(vk)
-            : ek
-              ? ek
-              : '—'
 
       return {
         id: p.id,
@@ -325,41 +215,34 @@ export function leistungenFromAuftragPositionen(
             ? `erfasst ${formatStundenColon(erfasstMin)} Std.`
             : `geschätzt ${mengeLabel(p.geschaetzt_std ?? p.menge, p.einheit || 'h')}`
           : mengeLabel(p.menge, p.einheit),
-        preisLabel,
-        preisValue:
+        preisLabel:
           erfasstNetto != null && erfasstNetto > 0
-            ? erfasstNetto
+            ? formatEurBetrag(erfasstNetto)
             : vk > 0
-              ? vk
-              : p.preis_partner != null && p.preis_partner > 0
-                ? p.preis_partner
-                : 0,
+              ? formatEurBetrag(vk)
+              : '—',
+        preisValue: erfasstNetto != null && erfasstNetto > 0 ? erfasstNetto : vk,
         einzelpreisLabel: isRegie
           ? stundensatz > 0
             ? `${formatEurBetrag(stundensatz)}/h`
-            : ek
-              ? ek
-              : einzel > 0
-                ? `${formatEurBetrag(einzel)}/h`
-                : null
+            : einzel > 0
+              ? `${formatEurBetrag(einzel)}/h`
+              : null
           : einzel > 0
             ? formatEurBetrag(einzel)
             : null,
-        status: statusForBadge,
+        status: st === 'erledigt' ? 'abgenommen' : st,
         statusLabel,
         beschreibung: richTextToPlain(p.beschreibung) || null,
         gewerkName: p.gewerk_name?.trim() || null,
         handwerkerName: hwName,
         handwerkerId: p.handwerker_id,
         anfrageStatusLabel,
-        handwerkerStatusTone: hwTone,
-        anerkennungStatus: anerkennung,
-        brauchtFreigabe,
-        nachtragBegruendung,
-        nachtragPreisLabel: ek,
-        nachtragZeitLabel,
         zeitraumLabel: formatZeitraumKurz(p) || null,
-        ekLabel: ek,
+        ekLabel:
+          p.preis_partner != null && p.preis_partner > 0
+            ? formatEurBetrag(p.preis_partner)
+            : null,
         dokumentationEintraege: notizen,
         abnahmeLabel:
           st === 'erledigt'

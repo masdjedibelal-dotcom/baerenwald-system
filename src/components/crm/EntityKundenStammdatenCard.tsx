@@ -1,19 +1,33 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useLocalTransition } from '@/components/ui/action-busy'
+import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { KundeModal } from '@/components/kunden/KundeModal'
-import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { toast } from '@/components/ui/app-toast'
+import { saveKunde } from '@/app/actions/kunden'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
-import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
-import type { Kunde } from '@/lib/types'
+import {
+  istKundeFirmaPflichtTyp,
+  istKundeHausverwaltungTyp,
+  istKundeNurGewerbeTyp,
+  splitStrasseHausnummer,
+} from '@/lib/kunde-stammdaten'
+import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
 }
+
+const TYP_OPTIONS = [
+  { value: 'privat', label: 'Privat' },
+  { value: 'gewerbe', label: 'Gewerbe' },
+  { value: 'hausverwaltung', label: 'Hausverwaltung' },
+  { value: 'sonstiges', label: 'Sonstiges' },
+]
 
 export type EntityKundenStammDraft = {
   name: string
@@ -29,28 +43,78 @@ export type EntityKundenStammDraft = {
   quelleLabel?: string
 }
 
+type EditForm = {
+  typ: string
+  firmaName: string
+  vorname: string
+  nachname: string
+  strasse: string
+  hausnummer: string
+  plz: string
+  ort: string
+  telefon: string
+  email: string
+  ansprechpartner: string
+  webseite: string
+}
+
+function draftToEditForm(initial: EntityKundenStammDraft, kundeTyp?: string | null): EditForm {
+  const typ = (kundeTyp?.trim() || 'privat').toLowerCase()
+  const split = splitStrasseHausnummer(initial.strasse.trim())
+  const firmaPflicht = istKundeFirmaPflichtTyp(typ)
+  return {
+    typ,
+    firmaName: firmaPflicht ? initial.name.trim() : '',
+    vorname: initial.vorname?.trim() || '',
+    nachname: initial.nachname?.trim() || (!firmaPflicht ? initial.name.trim() : ''),
+    strasse: split.strasse,
+    hausnummer: split.hausnummer ?? '',
+    plz: initial.plz.trim(),
+    ort: initial.ort.trim(),
+    telefon: initial.telefon.trim(),
+    email: initial.email.trim(),
+    ansprechpartner: initial.ansprechpartner?.trim() || '',
+    webseite: initial.webseite?.trim() || '',
+  }
+}
+
+function editFormToDraft(f: EditForm): EntityKundenStammDraft {
+  const firmaPflicht = istKundeFirmaPflichtTyp(f.typ)
+  const name = firmaPflicht
+    ? f.firmaName.trim()
+    : [f.vorname.trim(), f.nachname.trim()].filter(Boolean).join(' ') || f.nachname.trim()
+  return {
+    name,
+    telefon: f.telefon,
+    email: f.email,
+    plz: f.plz,
+    ort: f.ort,
+    strasse: [f.strasse.trim(), f.hausnummer.trim()].filter(Boolean).join(' '),
+    vorname: f.vorname,
+    nachname: f.nachname,
+    ansprechpartner: f.ansprechpartner,
+    webseite: f.webseite,
+  }
+}
+
 type Props = {
   kundeId?: string | null
   leadId?: string | null
   kundeTyp?: string | null
   initial: EntityKundenStammDraft
-  /** Volle Kundendaten für EditorSheet (z. B. Kunden-Detail); sonst aus draft gebaut */
-  editKunde?: Kunde | null
   /** @deprecated nicht in Stammdaten-View */
   quelle?: string | null
   /** @deprecated nicht in Stammdaten-View */
   eingegangen?: string | null
-  onSaved?: (saved?: Partial<Kunde>) => void
+  onSaved?: () => void
   disabled?: boolean
   /** Auf Kunden-Detail: kein Link „Kundenakte“ */
   hideKundeLink?: boolean
   /**
-   * @deprecated Internes EditorSheet — nicht mehr nötig.
-   * Wenn gesetzt: Stift ruft das auf statt Sheet (Legacy).
+   * Externes Bearbeiten (Kunden-Detail mit eigenem Formular).
+   * Wenn gesetzt: Stift ruft das auf statt Inline-Edit.
    */
   onEdit?: () => void
-  /** Optionaler Hinweis über dem View-Body (z. B. fehlende Rechnungsfelder) */
-  banner?: ReactNode
 }
 
 function PropRow({ label, value }: { label: string; value: ReactNode }) {
@@ -70,62 +134,32 @@ function PropRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-function draftToEditKunde(
-  kundeId: string,
-  draft: EntityKundenStammDraft,
-  kundeTyp?: string | null
-): Kunde {
-  const split = splitStrasseHausnummer(draft.strasse.trim())
-  return {
-    id: kundeId,
-    name: draft.name.trim() || '—',
-    vorname: draft.vorname?.trim() || null,
-    nachname: draft.nachname?.trim() || null,
-    email: draft.email.trim() || null,
-    telefon: draft.telefon.trim() || null,
-    adresse: draft.strasse.trim() || null,
-    strasse: split.strasse || null,
-    hausnummer: split.hausnummer || null,
-    plz: draft.plz.trim() || null,
-    ort: draft.ort.trim() || null,
-    typ: (kundeTyp?.trim() || 'privat').toLowerCase(),
-    notizen: null,
-    created_at: '',
-    ansprechpartner: draft.ansprechpartner?.trim() || null,
-    webseite: draft.webseite?.trim() || null,
-  }
-}
-
-/** Stammdaten-View + Bearbeiten über EditorSheet (mobil Bottom, Desktop Slide-over). */
+/** Stammdaten als Identitätskarte + vollständige Felder (optional Inline-Edit). */
 export function EntityKundenStammdatenCard({
   kundeId,
   leadId,
   kundeTyp,
   initial,
-  editKunde,
   hideKundeLink = false,
   disabled = false,
   onEdit,
   onSaved,
-  banner,
 }: Props) {
   const [draft, setDraft] = useState(initial)
   const [typ, setTyp] = useState(kundeTyp ?? null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState(() => draftToEditForm(initial, kundeTyp))
+  const [err, setErr] = useState<string | null>(null)
+  const [pending, startTransition] = useLocalTransition()
 
   useEffect(() => {
     setDraft(initial)
     setTyp(kundeTyp ?? null)
-  }, [initial, kundeTyp])
+    if (!editing) setEditForm(draftToEditForm(initial, kundeTyp))
+  }, [initial, kundeTyp, editing])
 
-  const canEdit = Boolean(kundeId?.trim()) && !disabled
-  const showPencil = canEdit || (Boolean(onEdit) && !disabled)
-
-  const modalKunde = useMemo(() => {
-    const id = kundeId?.trim()
-    if (!id) return null
-    return editKunde ?? draftToEditKunde(id, draft, typ)
-  }, [kundeId, editKunde, draft, typ])
+  const canInlineEdit = Boolean(kundeId?.trim()) && !disabled && !onEdit
+  const showExternalEdit = Boolean(onEdit) && !disabled
 
   const typLbl = kundentypLabel(typ)
   const adresse =
@@ -141,12 +175,68 @@ export function EntityKundenStammdatenCard({
       onEdit()
       return
     }
-    setSheetOpen(true)
+    setErr(null)
+    setEditForm(draftToEditForm(draft, typ))
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+    setErr(null)
+    setEditForm(draftToEditForm(draft, typ))
+  }
+
+  function save() {
+    const id = kundeId?.trim()
+    if (!id) return
+    setErr(null)
+    startTransition(async () => {
+      const firmaPflicht = istKundeFirmaPflichtTyp(editForm.typ)
+      const r = await saveKunde(
+        {
+          typ: editForm.typ,
+          name: firmaPflicht ? editForm.firmaName : null,
+          vorname: editForm.vorname || null,
+          nachname: editForm.nachname || null,
+          strasse: editForm.strasse,
+          hausnummer: editForm.hausnummer,
+          telefon: editForm.telefon || null,
+          email: editForm.email || null,
+          plz: editForm.plz || null,
+          ort: editForm.ort || null,
+          webseite: editForm.webseite || null,
+          ansprechpartner: editForm.ansprechpartner || null,
+        },
+        id,
+        leadId?.trim() ? { revalidateAnfrageIds: [leadId.trim()] } : undefined
+      )
+      if (!r.ok) {
+        setErr(r.message)
+        toast.error(r.message)
+        return
+      }
+
+      const nextDraft = editFormToDraft(editForm)
+      if (leadId?.trim()) {
+        await updateLeadKontakt(leadId.trim(), {
+          kontakt_name: nextDraft.name,
+          kontakt_telefon: nextDraft.telefon || null,
+          kontakt_email: nextDraft.email || null,
+          plz: nextDraft.plz || null,
+          kundentyp: editForm.typ,
+        })
+      }
+
+      setDraft(nextDraft)
+      setTyp(editForm.typ)
+      setEditing(false)
+      toast.success('Stammdaten gespeichert')
+      onSaved?.()
+    })
   }
 
   const viewBody = (
     <>
-      {banner}
       <div className="vgid">
         <div className="vgid-name">{draft.name.trim() || '—'}</div>
         {typLbl && typLbl !== '—' ? <div className="vgid-meta">{typLbl}</div> : null}
@@ -215,63 +305,165 @@ export function EntityKundenStammdatenCard({
     </>
   )
 
-  return (
-    <>
+  /* Kunden-Detail: Stift → externes Formular */
+  if (showExternalEdit && !editing) {
+    return (
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Stammdaten</div>
-          {showPencil ? (
-            <MockBtn sm kind="ghost" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
-          ) : null}
+          <MockBtn sm kind="ghost" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
         </div>
         <div className="card-b">{viewBody}</div>
       </div>
+    )
+  }
 
-      {!onEdit && modalKunde ? (
-        <KundeModal
-          open={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          editKunde={modalKunde}
-          stayOnPage
-          revalidateAnfrageId={leadId?.trim() || undefined}
-          onSaved={(_id, saved) => {
-            if (saved) {
-              const nextName =
-                saved.name?.trim() ||
-                [saved.vorname?.trim(), saved.nachname?.trim()].filter(Boolean).join(' ') ||
-                draft.name
-              const nextStrasse = [saved.strasse?.trim(), saved.hausnummer?.trim()]
-                .filter(Boolean)
-                .join(' ')
-              const nextDraft: EntityKundenStammDraft = {
-                ...draft,
-                name: nextName,
-                vorname: saved.vorname ?? draft.vorname,
-                nachname: saved.nachname ?? draft.nachname,
-                telefon: saved.telefon ?? draft.telefon,
-                email: saved.email ?? draft.email,
-                plz: saved.plz ?? draft.plz,
-                ort: saved.ort ?? draft.ort,
-                strasse: nextStrasse || draft.strasse,
+  /* Vorgang-Details: Inline-Edit mit Stift */
+  if (canInlineEdit || editing) {
+    return (
+      <InlineEditSection
+        title="Stammdaten"
+        editing={editing}
+        onStartEdit={beginEdit}
+        onCancel={cancelEdit}
+        onSave={save}
+        saving={pending}
+        disabled={disabled || !kundeId?.trim()}
+      >
+        {err ? (
+          <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{err}</p>
+        ) : null}
+        {editing ? (
+          <div className="props">
+            <InlineEditField label="Typ" editing value={kundentypLabel(editForm.typ)}>
+              <select
+                className="input"
+                value={editForm.typ}
+                onChange={(e) => setEditForm((f) => ({ ...f, typ: e.target.value }))}
+              >
+                {TYP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </InlineEditField>
+            {istKundeFirmaPflichtTyp(editForm.typ) ? (
+              <InlineEditField
+                label={istKundeHausverwaltungTyp(editForm.typ) ? 'Firma' : 'Firma / Name'}
+                editing
+                value={editForm.firmaName || '—'}
+              >
+                <input
+                  className="input"
+                  value={editForm.firmaName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firmaName: e.target.value }))}
+                  autoFocus
+                />
+              </InlineEditField>
+            ) : null}
+            <InlineEditField label="Vorname" editing value={editForm.vorname || '—'}>
+              <input
+                className="input"
+                value={editForm.vorname}
+                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
+                autoFocus={!istKundeFirmaPflichtTyp(editForm.typ)}
+              />
+            </InlineEditField>
+            <InlineEditField
+              label={
+                istKundeFirmaPflichtTyp(editForm.typ) ? 'Nachname (Ansprechpartner)' : 'Nachname'
               }
-              setDraft(nextDraft)
-              if (saved.typ) setTyp(saved.typ)
+              editing
+              value={editForm.nachname || '—'}
+            >
+              <input
+                className="input"
+                value={editForm.nachname}
+                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Straße" editing value={editForm.strasse || '—'}>
+              <input
+                className="input"
+                value={editForm.strasse}
+                onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Hausnummer" editing value={editForm.hausnummer || '—'}>
+              <input
+                className="input"
+                value={editForm.hausnummer}
+                onChange={(e) => setEditForm((f) => ({ ...f, hausnummer: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="PLZ" editing value={editForm.plz || '—'}>
+              <input
+                className="input"
+                value={editForm.plz}
+                onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Ort" editing value={editForm.ort || '—'}>
+              <input
+                className="input"
+                value={editForm.ort}
+                onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Telefon" editing value={editForm.telefon || '—'}>
+              <input
+                className="input"
+                type="tel"
+                value={editForm.telefon}
+                onChange={(e) => setEditForm((f) => ({ ...f, telefon: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="E-Mail" editing value={editForm.email || '—'}>
+              <input
+                className="input"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </InlineEditField>
+            {istKundeNurGewerbeTyp(editForm.typ) ? (
+              <InlineEditField
+                label="Ansprechpartner"
+                editing
+                value={editForm.ansprechpartner || '—'}
+              >
+                <input
+                  className="input"
+                  value={editForm.ansprechpartner}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))
+                  }
+                />
+              </InlineEditField>
+            ) : null}
+            <InlineEditField label="Webseite" editing value={editForm.webseite || '—'}>
+              <input
+                className="input"
+                value={editForm.webseite}
+                onChange={(e) => setEditForm((f) => ({ ...f, webseite: e.target.value }))}
+              />
+            </InlineEditField>
+          </div>
+        ) : (
+          viewBody
+        )}
+      </InlineEditSection>
+    )
+  }
 
-              const lid = leadId?.trim()
-              if (lid) {
-                void updateLeadKontakt(lid, {
-                  kontakt_name: nextDraft.name,
-                  kontakt_telefon: nextDraft.telefon || null,
-                  kontakt_email: nextDraft.email || null,
-                  plz: nextDraft.plz || null,
-                  kundentyp: saved.typ ?? typ ?? undefined,
-                })
-              }
-            }
-            onSaved?.(saved)
-          }}
-        />
-      ) : null}
-    </>
+  /* Kein Kunde verknüpft → nur Ansicht */
+  return (
+    <div className="card">
+      <div className="card-h">
+        <div className="card-title title">Stammdaten</div>
+      </div>
+      <div className="card-b">{viewBody}</div>
+    </div>
   )
 }

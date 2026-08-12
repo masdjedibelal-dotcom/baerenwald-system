@@ -1080,6 +1080,6 @@ export function zahlungsplanLabelFuerAngebot(plan: Zahlungsplan | null): string 
     .join(' · ')
 }
 
-export function resolveAnredeKey(_anrede?: AngebotMailAnrede | null): AngebotMailAnrede {
-  return 'sie'
+export function resolveAnredeKey(anrede?: AngebotMailAnrede | null): AngebotMailAnrede {
+  return anrede === 'du' ? 'du' : 'sie'
 }

@@ -8,7 +8,7 @@ import { Toggle } from '@/components/ui/Toggle'
 import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
-import { createAnfrage, searchMieterFuerHv, type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
+import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
@@ -191,9 +191,6 @@ function MeldeadresseFields({
 const MIETER_OBJEKT_CLEAR = {
   mieterVorname: '',
   mieterNachname: '',
-  mieterEmail: '',
-  mieterTelefon: '',
-  mieterKundeId: null as string | null,
   kundeObjektId: null as string | null,
   objektPlz: '',
   objektOrt: '',
@@ -201,7 +198,7 @@ const MIETER_OBJEKT_CLEAR = {
   objektHausnummer: '',
 }
 
-/** Optional: Mieter-Suche + Felder + Leistungsort bei HV. */
+/** Optional: Mieter + Leistungsort (Objekt-Dropdown oder Freitext) bei HV. */
 function HvMieterObjektFields({
   state,
   patch,
@@ -213,27 +210,6 @@ function HvMieterObjektFields({
   objekte: KundenObjekt[]
   objekteLaden: boolean
 }) {
-  const [suche, setSuche] = useState('')
-  const [treffer, setTreffer] = useState<MieterSuchTreffer[]>([])
-  const [suchen, setSuchen] = useState(false)
-
-  useEffect(() => {
-    const q = suche.trim()
-    const hvId = state.kundeId?.trim()
-    if (!hvId || q.length < 2 || state.mieterKundeId) {
-      setTreffer([])
-      setSuchen(false)
-      return
-    }
-    setSuchen(true)
-    const t = setTimeout(() => {
-      void searchMieterFuerHv(hvId, q)
-        .then(setTreffer)
-        .finally(() => setSuchen(false))
-    }, 280)
-    return () => clearTimeout(t)
-  }, [suche, state.kundeId, state.mieterKundeId])
-
   function selectObjekt(id: string) {
     if (!id) {
       patch({
@@ -259,118 +235,17 @@ function HvMieterObjektFields({
     })
   }
 
-  function waehleMieter(t: MieterSuchTreffer) {
-    patch({
-      mieterKundeId: t.quelle === 'kunde' ? t.id : null,
-      mieterVorname: t.vorname ?? '',
-      mieterNachname: t.nachname ?? '',
-      mieterEmail: t.email ?? '',
-      mieterTelefon: t.telefon ?? '',
-    })
-    setSuche('')
-    setTreffer([])
-  }
-
-  function clearMieterAuswahl() {
-    patch({
-      mieterKundeId: null,
-      mieterVorname: '',
-      mieterNachname: '',
-      mieterEmail: '',
-      mieterTelefon: '',
-    })
-    setSuche('')
-    setTreffer([])
-  }
-
-  const mieterPicked = Boolean(state.mieterKundeId)
-  const mieterLabel = [state.mieterVorname.trim(), state.mieterNachname.trim()]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div className="full min-w-0 space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] p-3">
       <p className="m-0 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
         Mieter (optional)
       </p>
-
-      {mieterPicked ? (
-        <div className="flex min-w-0 items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
-          <div className="min-w-0 flex-1 text-sm">
-            <p className="m-0 font-medium text-bw-text">{mieterLabel || 'Mieter'}</p>
-            {[state.mieterEmail.trim(), state.mieterTelefon.trim()]
-              .filter(Boolean)
-              .map((line) => (
-                <p key={line} className="m-0 mt-0.5 text-xs text-bw-text-muted">
-                  {line}
-                </p>
-              ))}
-            <p className="m-0 mt-0.5 text-xs text-bw-text-muted">Im System registriert</p>
-          </div>
-          <button
-            type="button"
-            className="btn ghost sm shrink-0"
-            onClick={clearMieterAuswahl}
-          >
-            Ändern
-          </button>
-        </div>
-      ) : (
-        <MockField
-          label="Mieter suchen"
-          full
-          className="min-w-0"
-          hint={
-            state.kundeId
-              ? 'Name eingeben — Treffer wählen oder neu ausfüllen (wird beim Speichern angelegt).'
-              : 'Zuerst Hausverwaltung wählen, dann Mieter suchen.'
-          }
-        >
-          <input
-            className="input"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Name oder E-Mail …"
-            autoComplete="off"
-            disabled={!state.kundeId}
-          />
-          {suchen ? (
-            <p className="m-0 mt-1 text-xs text-bw-text-muted">Suche …</p>
-          ) : null}
-          {treffer.length > 0 ? (
-            <ul className="m-0 mt-1 max-h-48 list-none overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] p-0">
-              {treffer.map((t) => (
-                <li key={t.id} className="border-b border-[var(--border)] last:border-0">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-soft)]"
-                    onClick={() => waehleMieter(t)}
-                  >
-                    <span className="font-medium">{t.name}</span>
-                    {[t.email, t.telefon].filter(Boolean).length ? (
-                      <span className="mt-0.5 block text-xs text-bw-text-muted">
-                        {[t.email, t.telefon].filter(Boolean).join(' · ')}
-                      </span>
-                    ) : null}
-                    <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                      {t.quelle === 'kunde' ? 'Kunde' : 'Mieter am Objekt'}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </MockField>
-      )}
-
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="Vorname Mieter" className="min-w-0">
           <input
             className="input"
             value={state.mieterVorname}
-            onChange={(e) =>
-              patch({ mieterVorname: e.target.value, mieterKundeId: null })
-            }
+            onChange={(e) => patch({ mieterVorname: e.target.value })}
             placeholder="Max"
             autoComplete="off"
           />
@@ -379,34 +254,8 @@ function HvMieterObjektFields({
           <input
             className="input"
             value={state.mieterNachname}
-            onChange={(e) =>
-              patch({ mieterNachname: e.target.value, mieterKundeId: null })
-            }
+            onChange={(e) => patch({ mieterNachname: e.target.value })}
             placeholder="Mustermann"
-            autoComplete="off"
-          />
-        </MockField>
-        <MockField label="Telefon Mieter" className="min-w-0">
-          <input
-            className="input"
-            type="tel"
-            value={state.mieterTelefon}
-            onChange={(e) =>
-              patch({ mieterTelefon: e.target.value, mieterKundeId: state.mieterKundeId })
-            }
-            placeholder="+49 …"
-            autoComplete="off"
-          />
-        </MockField>
-        <MockField label="E-Mail Mieter" className="min-w-0">
-          <input
-            className="input"
-            type="email"
-            value={state.mieterEmail}
-            onChange={(e) =>
-              patch({ mieterEmail: e.target.value, mieterKundeId: state.mieterKundeId })
-            }
-            placeholder="max@example.de"
             autoComplete="off"
           />
         </MockField>

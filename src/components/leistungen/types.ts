@@ -28,21 +28,10 @@ export type LeistungRow = {
   handwerkerId?: string | null
   /** Anfrage-Status beim Partner (z. B. Angefragt) */
   anfrageStatusLabel?: string | null
-  /** Ampel für Mobile-Card: offen | warten | zugewiesen */
-  handwerkerStatusTone?: 'offen' | 'warten' | 'zugewiesen' | null
   zeitraumLabel?: string | null
   ekLabel?: string | null
   dokumentationEintraege?: { at?: string | null; text: string }[]
   abnahmeLabel?: string | null
-  /** Handwerker-Nachtrag / Regie: Freigabe-Status */
-  anerkennungStatus?: 'nicht_noetig' | 'in_pruefung' | 'anerkannt' | 'abgelehnt' | string | null
-  /** True wenn CRM Bestätigen/Ablehnen im Sheet zeigen soll */
-  brauchtFreigabe?: boolean
-  /** Begründungstext aus Partner-Nachtrag (ohne System-Hinweis) */
-  nachtragBegruendung?: string | null
-  /** Schätzpreis / Zeit für Freigabe-Sheet */
-  nachtragPreisLabel?: string | null
-  nachtragZeitLabel?: string | null
   /** True wenn offener Mangel zu dieser Leistung/Gewerk */
   hatMangel?: boolean
   /** True wenn Regie / nach Aufwand */

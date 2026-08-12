@@ -15,7 +15,6 @@ import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragAbschliessenSheet } from '@/components/auftraege/AuftragAbschliessenSheet'
 import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenCard'
-import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
@@ -29,12 +28,13 @@ import {
   type RechnungErstellenOpts,
 } from '@/components/vorgang/VorgangZahlungTab'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
+import { AuftragTimelineTab } from '@/components/auftraege/AuftragTimelineTab'
+import { AuftragNotfallBanner } from '@/components/auftraege/AuftragNotfallBanner'
 import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
-import { AuftragFachdokuCard } from '@/components/auftraege/AuftragFachdokuCard'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -47,6 +47,7 @@ import type {
   Gewerk,
   Lead,
   LeadDetail,
+  LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
@@ -224,13 +225,14 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
+  'aktivitaet',
 ])
 
 const AUFTRAG_DETAIL_DEFAULT_TAB: AuftragDetailTab = 'uebersicht'
@@ -341,7 +343,7 @@ function resolveAuftragDetailTabFromQuery(
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'uebersicht'
+    return 'aktivitaet'
   }
   if (tab === 'todos' || tab === 'todo' || tab === 'aufgaben') return 'uebersicht'
   if (AUFTRAG_DETAIL_TAB_IDS.has(tab as AuftragDetailTab)) return tab as AuftragDetailTab
@@ -373,6 +375,7 @@ export function AuftragDetailClient({
   angebotDetail = null,
   gewerke = [],
   preislisten = [],
+  leadTimeline = [],
   team = [],
   rechnungenListe = [],
   vertraegeListe = [],
@@ -383,12 +386,13 @@ export function AuftragDetailClient({
   projektKontext,
 }: {
   detail: AuftragDetail
-  lead?: AuftragLeadSnapshot | LeadDetail | null
-  /** Voller Lead für Melder/Leistungsort + Anfrage-Details */
+  lead?: AuftragLeadSnapshot | null
+  /** Voller Lead für Anfrage-Details-Tab */
   leadDetail?: LeadDetail | null
   angebotDetail?: AngebotDetail | null
   gewerke?: GewerkOpt[]
   preislisten?: Preisliste[]
+  leadTimeline?: LeadTimelineRow[]
   team?: CrmTeamMitglied[]
   rechnungenListe?: RechnungAuswahlZeile[]
   vertraegeListe?: HandwerkerVertragRow[]
@@ -417,10 +421,7 @@ export function AuftragDetailClient({
       auftragId: detail.id,
       initial: detail.notizen ?? '',
     },
-    dokument:
-      detail.lead_id || _leadDetail?.id
-        ? { kind: 'lead', leadId: (detail.lead_id ?? _leadDetail?.id)! }
-        : { kind: 'auftrag', auftragId: detail.id },
+    dokument: { kind: 'auftrag', auftragId: detail.id },
     onSaved: () => refresh(),
   })
 
@@ -482,7 +483,6 @@ export function AuftragDetailClient({
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
-      toast.info('Nachtrag-Angebot — der laufende Auftrag bleibt bis zur Annahme unverändert.')
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
@@ -515,17 +515,6 @@ export function AuftragDetailClient({
   const openAuftragAbschliessen = useCallback(() => {
     setAbschliessenOpen(true)
   }, [])
-
-  useEffect(() => {
-    const onOpen = (e: Event) => {
-      const id = (e as CustomEvent<{ auftragId?: string }>).detail?.auftragId
-      if (!id || id !== detail.id) return
-      void refresh()
-      setAbschliessenOpen(true)
-    }
-    window.addEventListener('crm-open-auftrag-abschliessen', onOpen)
-    return () => window.removeEventListener('crm-open-auftrag-abschliessen', onOpen)
-  }, [detail.id, refresh])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
@@ -810,26 +799,24 @@ export function AuftragDetailClient({
 
   const istStorniert = detail.status === 'storniert'
 
+
+  const timelineCount = useMemo(() => {
+    const lead = leadTimeline.length
+    const auftrag = detail.auftrag_timeline?.length ?? 0
+    return (lead + auftrag) || 1
+  }, [leadTimeline.length, detail.auftrag_timeline])
+
   const dokumenteCount = useMemo(
-    () =>
-      zaehleAuftragDokumente(
-        detail,
-        rechnungenListe,
-        vertraegeListe,
-        _leadDetail?.lead_dokumente ?? []
-      ),
-    [detail, rechnungenListe, vertraegeListe, _leadDetail?.lead_dokumente]
+    () => zaehleAuftragDokumente(detail, rechnungenListe, vertraegeListe),
+    [detail, rechnungenListe, vertraegeListe]
   )
 
   const stammdatenInhalt = (
-    <>
-      <AuftragStammdatenCard
-        detail={detail}
-        lead={_leadDetail ?? null}
-        onSaved={() => refresh()}
-      />
-      {_leadDetail ? <HvMeldungKontextCards lead={_leadDetail} /> : null}
-    </>
+    <AuftragStammdatenCard
+      detail={detail}
+      lead={_leadDetail ?? null}
+      onSaved={() => refresh()}
+    />
   )
 
   const leistungInhalt = (
@@ -1048,12 +1035,6 @@ export function AuftragDetailClient({
             detail={detail}
             rechnungen={rechnungenListe}
             vertraege={vertraegeListe}
-            leadDokumente={_leadDetail?.lead_dokumente ?? []}
-            leadId={detail.lead_id ?? _leadDetail?.id ?? null}
-            onChanged={() => refresh()}
-          />
-          <AuftragFachdokuCard
-            auftragId={detail.id}
             onChanged={() => refresh()}
           />
           {istBauprojekt ? (
@@ -1071,7 +1052,7 @@ export function AuftragDetailClient({
     />
   )
 
-  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte */
+  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte · Aktivität */
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -1099,6 +1080,13 @@ export function AuftragDetailClient({
       count: dokumenteCount || undefined,
       render: () => akteInhalt,
     },
+    {
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
+      icon: 'history',
+      count: timelineCount || undefined,
+      render: () => <AuftragTimelineTab detail={detail} leadTimeline={leadTimeline} />,
+    },
   ]
 
   return (
@@ -1115,6 +1103,12 @@ export function AuftragDetailClient({
       wiedervorlageEntity="auftrag"
       wiedervorlageEntityId={detail.id}
       onWiedervorlageSaved={() => refresh()}
+      banner={
+        <AuftragNotfallBanner
+          istNotfall={Boolean(detail.ist_notfall)}
+          verguetung={detail.notfall_verguetung}
+        />
+      }
       quickBar={quickBar}
       head={{
         title: name,
@@ -1199,17 +1193,7 @@ export function AuftragDetailClient({
                   }
                 : null
             }
-            menuItems={
-              !istStorniert && detail.angebot_id && detail.lead_id
-                ? [
-                    {
-                      label: 'Nachtrag-Angebot erstellen',
-                      hint: 'Neues Angebot — Auftrag bleibt bis zur Annahme unverändert.',
-                      onClick: openNachtragAngebot,
-                    },
-                  ]
-                : []
-            }
+            menuItems={[]}
           />
         ),
       }}

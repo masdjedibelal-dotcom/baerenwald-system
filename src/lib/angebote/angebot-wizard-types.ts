@@ -133,16 +133,16 @@ export function resolveAngebotKundeTyp(
   return leadKundentyp?.trim() || null
 }
 
+/** Privat (und unbekannt) → 14 Tage; Gewerbe/Hausverwaltung → 30 Tage. */
 export function istPrivatKundeTyp(typ?: string | null): boolean {
   const t = (typ ?? 'privat').trim().toLowerCase()
   return t === 'privat' || t === '' || t === 'sonstiges'
 }
 
-/** Standard-Zahlfrist: immer 7 Tage (unabhängig vom Kundentyp). */
 export function defaultAngebotZahlungsbedingungen(
-  _kundeTyp?: string | null | undefined
+  kundeTyp?: string | null | undefined
 ): AngebotWizardZahlungsbedingung {
-  return '7_tage'
+  return istPrivatKundeTyp(kundeTyp) ? '14_tage' : '30_tage'
 }
 
 /** Vorbefüllung beim Weiterbearbeiten eines Entwurfs im Wizard. */
@@ -305,7 +305,9 @@ export function parseAngebotWizardMetaFromNotizen(
           kundeTyp
         )
 
-  const anrede: 'du' | 'sie' = 'sie'
+  const anredeRaw = wm?.anrede
+  const anrede: 'du' | 'sie' | undefined =
+    anredeRaw === 'sie' ? 'sie' : anredeRaw === 'du' ? 'du' : fallback.anrede
 
   return {
     ...fallback,

@@ -104,8 +104,6 @@ export function buildStaffFunnelSummaryRows(state: StaffFunnelState): StaffFunne
       .filter(Boolean)
       .join(' ')
     push('Mieter', mieter)
-    if (state.mieterTelefon.trim()) push('Mieter Telefon', state.mieterTelefon)
-    if (state.mieterEmail.trim()) push('Mieter E-Mail', state.mieterEmail)
     const leistung = [
       [state.objektStrasse.trim(), state.objektHausnummer.trim()].filter(Boolean).join(' '),
       [state.objektPlz.trim(), state.objektOrt.trim()].filter(Boolean).join(' '),

@@ -1,4 +1,4 @@
-import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { resolveAngebotKundeTyp, istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import {
   kundeAngebotBegruessung,
   type KundeAnredeKontext,
@@ -6,28 +6,27 @@ import {
 
 export type MailAnrede = 'du' | 'sie'
 
-/**
- * Kundenkommunikation: immer Sie (unabhängig vom Kundentyp).
- * Typ `du` bleibt für Alttexte / mailText-Zweige, wird aber nicht mehr gewählt.
- */
-export function mailAnredeFromKundeTyp(_kundeTyp?: string | null): MailAnrede {
-  return 'sie'
+/** Privat → Du; Gewerbe / Hausverwaltung → Sie. */
+export function mailAnredeFromKundeTyp(kundeTyp?: string | null): MailAnrede {
+  return istPrivatKundeTyp(kundeTyp) ? 'du' : 'sie'
 }
 
 export function mailAnredeFromKundenUndLead(
   kundenTyp?: string | null,
   leadKundentyp?: string | null
 ): MailAnrede {
-  void resolveAngebotKundeTyp(kundenTyp, leadKundentyp)
-  return 'sie'
+  return mailAnredeFromKundeTyp(resolveAngebotKundeTyp(kundenTyp, leadKundentyp))
 }
 
-/** Explizite Anrede wird ignoriert — Kundenmails immer Sie. */
 export function resolveMailAnrede(
-  _explicit?: MailAnrede | null,
-  _kundeTyp?: string | null
+  explicit?: MailAnrede | null,
+  kundeTyp?: string | null
 ): MailAnrede {
-  return 'sie'
+  if (explicit === 'du' || explicit === 'sie') return explicit
+  if (kundeTyp != null && String(kundeTyp).trim() !== '') {
+    return mailAnredeFromKundeTyp(kundeTyp)
+  }
+  return 'du'
 }
 
 /** Kurztext je nach Anrede (z. B. „Sie erhalten …“ / „Du erhältst …“). */

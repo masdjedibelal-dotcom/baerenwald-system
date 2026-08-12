@@ -36,16 +36,17 @@
         "angebote": [
           {
             "id": "AN-F1",
-            "status_einfach": "gesendet",
+            "status_einfach": "entwurf",
             "created_at": "2026-07-09T11:00:00Z"
           }
         ]
       },
       "expect": {
         "phase": "angebot",
-        "unterstatus": "gesendet",
+        "unterstatus": "entwurf",
         "needsAction": true,
-        "actor": "kunde"
+        "actor": "freigabe",
+        "wartet_freigabe": true
       }
     },
     {

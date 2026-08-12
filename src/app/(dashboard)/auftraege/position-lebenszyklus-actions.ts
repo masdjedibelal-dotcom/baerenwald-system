@@ -403,18 +403,9 @@ export async function setWeitereArbeitAnerkennung(input: {
   }
   if (!pos) return { ok: false, message: 'Position nicht gefunden.' }
 
-  const patch: Record<string, unknown> = {
-    anerkennung_status: input.status,
-  }
-  // HW-Nacharbeit anerkannt: keine offene Portal-Nachreichung hinterlassen
-  if (input.status === 'anerkannt') {
-    patch.aenderung_typ = null
-    patch.handwerker_status = 'bestaetigt'
-  }
-
   const { error } = await supabaseAdmin
     .from('auftrag_positionen')
-    .update(patch)
+    .update({ anerkennung_status: input.status })
     .eq('id', input.positionId)
 
   if (error) return { ok: false, message: migrationHint(error.message) }

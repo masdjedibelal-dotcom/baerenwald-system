@@ -1,8 +1,6 @@
 'use client'
 
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
-import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
-import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail, Rechnung } from '@/lib/types'
 
 export function RechnungStammdatenCard({
@@ -14,43 +12,31 @@ export function RechnungStammdatenCard({
   lead?: LeadDetail | null
   onSaved?: () => void
 }) {
-  const isHv = lead ? resolvePipelineKontext(lead) === 'hv_meldung' : false
-  const hvKunde = lead?.auftraggeber ?? (isHv ? detail.kunden : null)
-  const k = isHv ? hvKunde : detail.kunden
+  const name = detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || ''
 
-  const name = isHv
-    ? lead?.auftraggeber?.org_anzeigename?.trim() ||
-      hvKunde?.name?.trim() ||
-      (lead ? leadKontaktAnzeigeName(lead, '') : '') ||
-      ''
-    : detail.kunden?.name?.trim() || lead?.kontakt_name?.trim() || ''
-
-  const kundeId = isHv
-    ? lead?.auftraggeber_kunde_id ?? hvKunde?.id ?? detail.kunde_id ?? detail.kunden?.id
-    : detail.kunde_id ?? detail.kunden?.id
-
-  const strasse =
-    [k?.strasse, k?.hausnummer].filter(Boolean).join(' ').trim() ||
-    k?.adresse?.trim() ||
-    ''
+  const k = detail.kunden
 
   return (
     <EntityKundenStammdatenCard
-      kundeId={kundeId}
-      leadId={isHv ? null : lead?.id}
+      kundeId={detail.kunde_id ?? detail.kunden?.id}
+      leadId={lead?.id}
       initial={{
         name,
-        telefon: (k?.telefon ?? (!isHv ? lead?.kontakt_telefon : null) ?? '').trim(),
-        email: (k?.email ?? (!isHv ? lead?.kontakt_email : null) ?? '').trim(),
-        plz: (k?.plz ?? (!isHv ? lead?.plz : null) ?? '').trim(),
-        ort: (k?.ort ?? '').trim(),
-        strasse,
+        telefon:
+          detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || '',
+        email: detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || '',
+        plz: detail.kunden?.plz?.trim() || lead?.plz?.trim() || '',
+        ort: detail.kunden?.ort?.trim() || '',
+        strasse:
+          [detail.kunden?.strasse, detail.kunden?.hausnummer].filter(Boolean).join(' ').trim() ||
+          detail.kunden?.adresse?.trim() ||
+          '',
         vorname: k?.vorname ?? '',
         nachname: k?.nachname ?? '',
         ansprechpartner: k?.ansprechpartner ?? '',
         webseite: k?.webseite ?? '',
       }}
-      kundeTyp={isHv ? k?.typ ?? 'hausverwaltung' : detail.kunden?.typ}
+      kundeTyp={detail.kunden?.typ}
       onSaved={onSaved}
     />
   )

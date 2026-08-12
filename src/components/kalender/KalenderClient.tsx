@@ -5,12 +5,18 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
+import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
+import { deleteKalenderTermin } from '@/app/(dashboard)/kalender/actions'
 import { TodosPanel } from '@/components/todos/TodosPanel'
+import { kalenderTypLabel } from '@/lib/kalender-styles'
+import {
+  kalenderTerminEndeVergangen,
+} from '@/lib/kalender/termin-no-show-hint'
 import {
   formatHm,
-  KalenderAddButton,
   KalenderTerminEditorSheet,
+  katLabel,
   typToKat,
   type KalenderTerminEditorPrefill,
 } from '@/components/kalender/KalenderTerminEditorSheet'
@@ -87,9 +93,9 @@ export function KalenderClient() {
   const [cursor, setCursor] = useState(() => new Date())
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [editing, setEditing] = useState<KalenderTermin | null>(null)
   const [editorPrefill, setEditorPrefill] = useState<KalenderTerminEditorPrefill | null>(null)
-  const [startInEdit, setStartInEdit] = useState(false)
 
   const todayYmd = ymd(new Date())
 
@@ -140,15 +146,21 @@ export function KalenderClient() {
   function openNeu(prefill?: KalenderTerminEditorPrefill) {
     setEditing(null)
     setEditorPrefill(prefill ?? null)
-    setStartInEdit(false)
+    setDetailOpen(false)
+    setModalOpen(true)
+  }
+
+  function openEdit(t: KalenderTermin) {
+    setEditing(t)
+    setEditorPrefill(null)
+    setDetailOpen(false)
     setModalOpen(true)
   }
 
   function openDetail(t: KalenderTermin) {
     setEditing(t)
-    setEditorPrefill(null)
-    setStartInEdit(false)
-    setModalOpen(true)
+    setDetailOpen(true)
+    setModalOpen(false)
   }
 
   function navPrev() {
@@ -169,6 +181,21 @@ export function KalenderClient() {
 
   function goToday() {
     setCursor(new Date())
+  }
+
+  async function onDelete() {
+    if (!editing) return
+    if (!confirm('Termin wirklich löschen?')) return
+    const res = await deleteKalenderTermin(editing.id)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success('Termin gelöscht')
+    setModalOpen(false)
+    setDetailOpen(false)
+    setEditing(null)
+    await load()
   }
 
   const titleText = view === 'tag' ? dayTitle(cursor) : monthTitle(cursor)
@@ -242,7 +269,17 @@ export function KalenderClient() {
         <MockBtn sm className="cal-toolbar__heute" onClick={goToday}>
           Heute
         </MockBtn>
-        <KalenderAddButton onClick={() => openNeu()} />
+        <MockBtn
+          sm
+          kind="primary"
+          icon="plus"
+          className="cal-toolbar__add"
+          onClick={() => openNeu()}
+          title="Neuer Termin"
+          aria-label="Neuer Termin"
+        >
+          <span className="cal-toolbar__add-lbl">Neuer Termin</span>
+        </MockBtn>
       </div>
     </div>
   )
@@ -372,6 +409,22 @@ export function KalenderClient() {
     </div>
   )
 
+  const detailKat = editing ? typToKat(editing.typ) : 'green'
+  const detailDot =
+    detailKat === 'yellow' ? '#D9A800' : detailKat === 'blue' ? 'var(--blue-tx)' : 'var(--green)'
+  const detailZeit =
+    editing && (editing.uhrzeit_von || editing.uhrzeit_bis)
+      ? `${formatHm(editing.uhrzeit_von)}${editing.uhrzeit_bis ? `–${formatHm(editing.uhrzeit_bis)}` : ''} Uhr`
+      : ''
+  const detailNoShowHinweis =
+    editing &&
+    !editing.erledigt &&
+    kalenderTerminEndeVergangen(editing) &&
+    (editing.typ === 'besichtigung' ||
+      editing.typ === 'vor_ort' ||
+      editing.typ === 'aufmass' ||
+      editing.lead_id)
+
   return (
     <div>
       <div className="kalender-mode-seg" role="tablist" aria-label="Kalender oder To-dos">
@@ -409,21 +462,99 @@ export function KalenderClient() {
 
       {view === 'monat' ? monthView : timeView}
 
+      <Modal
+        open={detailOpen && !!editing}
+        onClose={() => {
+          setDetailOpen(false)
+          setEditing(null)
+        }}
+        title={editing?.titel ?? 'Termin'}
+        size="md"
+        footer={
+          <div className="flex w-full items-center gap-2">
+            <MockBtn
+              sm
+              kind="ghost"
+              icon="pencil"
+              onClick={() => {
+                if (editing) openEdit(editing)
+              }}
+            >
+              Bearbeiten
+            </MockBtn>
+            <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
+              Löschen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              sm
+              kind="primary"
+              icon="x"
+              onClick={() => {
+                setDetailOpen(false)
+                setEditing(null)
+              }}
+            >
+              Schließen
+            </MockBtn>
+          </div>
+        }
+      >
+        {editing ? (
+          <div className="props">
+            <div className="prop">
+              <div className="prop-l">Kategorie</div>
+              <div className="prop-v inline-flex items-center gap-1.5">
+                <span
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: 3,
+                    background: detailDot,
+                    display: 'inline-block',
+                  }}
+                />
+                {katLabel(detailKat)}
+                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                  · {kalenderTypLabel(editing.typ)}
+                </span>
+              </div>
+            </div>
+            {detailZeit ? (
+              <div className="prop">
+                <div className="prop-l">Zeit</div>
+                <div className="prop-v">{detailZeit}</div>
+              </div>
+            ) : null}
+            {editing.adresse?.trim() ? (
+              <div className="prop">
+                <div className="prop-l">Adresse</div>
+                <div className="prop-v">{editing.adresse}</div>
+              </div>
+            ) : null}
+            {editing.beschreibung?.trim() ? (
+              <div className="prop">
+                <div className="prop-l">Notiz</div>
+                <div className="prop-v">{editing.beschreibung}</div>
+              </div>
+            ) : null}
+            {detailNoShowHinweis ? (
+              <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[length:var(--fs-text)] text-muted">
+                Kunde nicht erschienen? In der Anfrage{' '}
+                <strong className="font-medium text-ink">Aktionen → Nicht erreichbar</strong> setzen.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
+
       <KalenderTerminEditorSheet
         open={modalOpen}
         termin={editing}
         prefill={editorPrefill}
-        startInEdit={startInEdit}
-        onClose={() => {
-          setModalOpen(false)
-          setEditing(null)
-          setEditorPrefill(null)
-          setStartInEdit(false)
-        }}
+        onClose={() => setModalOpen(false)}
         onSaved={() => {
           setEditing(null)
-          setEditorPrefill(null)
-          setStartInEdit(false)
           void load()
         }}
       />

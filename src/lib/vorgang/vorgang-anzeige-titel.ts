@@ -38,32 +38,3 @@ export function angebotTitelOderSituationBereich(opts: {
 
   return opts.fallback?.trim() || 'Vorgang'
 }
-
-/**
- * Akte-Accordion: Anfrage-Titel als Basis; sobald vorhanden Angebot → Auftrag → Rechnung.
- * (Anfrage ändert sich danach nicht mehr „zurück“ — spätere Phasen-Titel gewinnen.)
- */
-export function resolveAkteVorgangTitel(opts: {
-  angebot?: VorgangAnzeigeTitelAngebot | null
-  auftragTitel?: string | null
-  rechnungTitel?: string | null
-  situation?: string | null
-  bereiche?: string[] | null
-  fallback?: string | null
-}): string {
-  const wm = opts.angebot ? parseWizardMetaFromNotizen(opts.angebot.notizen) : null
-  const angebotTitel =
-    opts.angebot?.leistungsumfang?.trim() || wm?.leistungsumfang?.trim() || ''
-  if (angebotTitel) return angebotTitel
-
-  const auftragTitel = opts.auftragTitel?.trim()
-  if (auftragTitel) return auftragTitel
-
-  const rechnungTitel = opts.rechnungTitel?.trim()
-  if (rechnungTitel) return rechnungTitel
-
-  const anfrage = situationBereichTitel(opts.situation, opts.bereiche)
-  if (anfrage) return anfrage
-
-  return opts.fallback?.trim() || 'Vorgang'
-}

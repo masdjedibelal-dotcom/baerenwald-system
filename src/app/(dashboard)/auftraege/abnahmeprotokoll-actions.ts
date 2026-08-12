@@ -30,8 +30,6 @@ import {
 } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { syncPunchListFromAbnahmeMaengel } from '@/lib/auftraege/sync-abnahme-punch-list'
 import {
-  abnahmeRelevanteZeilen,
-  hatHwAbnahmeZurAbschlussVorschau,
   kannGesamtabnahmeErzeugen,
   normalizeAbnahmeEbene,
   normalizeAbnahmeFreigabeStatus,
@@ -41,11 +39,6 @@ import {
 } from '@/lib/auftraege/abnahme-freigabe'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { sendMail } from '@/lib/mail-service'
-import { verteileAbnahmeAnUnterlagen } from '@/lib/auftraege/abnahme-unterlagen-verteilung'
-import {
-  notifyPartnerUnified,
-  partnerVorgangLink,
-} from '@/lib/partner/notify-partner-unified'
 
 async function getAuthUserId(): Promise<string | null> {
   const supabase = createClient()
@@ -250,7 +243,7 @@ export async function getAbnahmeprotokollMailDefaults(auftragId: string): Promis
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const kunde = auf.kunden as { name?: string; typ?: string | null } | null
   const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
-  const defaultAnrede: MailAnrede = 'sie'
+  const defaultAnrede: MailAnrede = istPrivatKundeTyp(kunde?.typ) ? 'du' : 'sie'
   return {
     ok: true,
     defaultAnrede,
@@ -450,16 +443,6 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     freigegeben_at: new Date().toISOString(),
     email_log_id: mail.emailLogId ?? null,
   })
-
-  try {
-    await verteileAbnahmeAnUnterlagen({
-      auftragId: input.auftragId,
-      pdfUrl: stored.publicUrl,
-      protokollId: protokollId || null,
-    })
-  } catch (e) {
-    console.warn('[saveAndSendAbnahmeprotokoll] Unterlagen-Verteilung:', e)
-  }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
@@ -756,15 +739,6 @@ export async function saveAbnahmeAndAbschliessen(input: {
             freigegeben_at: new Date().toISOString(),
             email_log_id: mail.emailLogId ?? null,
           })
-          try {
-            await verteileAbnahmeAnUnterlagen({
-              auftragId: input.auftragId,
-              pdfUrl: saved.publicUrl,
-              protokollId: saved.protokollId,
-            })
-          } catch (e) {
-            console.warn('[saveAbnahmeAndAbschliessen] Unterlagen-Verteilung:', e)
-          }
           sentToKunde = true
         }
       }
@@ -1216,14 +1190,12 @@ export async function loadAbnahmeHwFreigabeZeilen(
     abnahme_datum: string | null
     pdf_url: string | null
     maengel: unknown
-    punkte: unknown
-    meta: unknown
     created_at: string
   }
   const { data: protokolle } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .select(
-      'id, handwerker_id, freigabe_status, abnahme_datum, pdf_url, maengel, punkte, meta, created_at'
+      'id, handwerker_id, freigabe_status, abnahme_datum, pdf_url, maengel, created_at'
     )
     .eq('auftrag_id', auftragId)
     .eq('ebene', 'handwerker')
@@ -1248,18 +1220,6 @@ export async function loadAbnahmeHwFreigabeZeilen(
       latestByHw.get(hid) ??
       null
     const maengel = normalizeMaengel((prot?.maengel ?? []) as AbnahmeMangel[])
-    const punkte = Array.isArray(prot?.punkte) ? (prot!.punkte as AbnahmePunkt[]) : []
-    const meta = normalizeAbnahmeProtokollMeta(prot?.meta ?? null)
-    const okCount = punkte.filter((p) => String(p.status).toLowerCase() === 'ok').length
-    const ergebnisRaw = String(meta.abnahme_ergebnis ?? '').toLowerCase()
-    const ergebnisLabel =
-      ergebnisRaw === 'mit_vorbehalt'
-        ? 'Unter Vorbehalt'
-        : ergebnisRaw === 'verweigert'
-          ? 'Abnahme verweigert'
-          : ergebnisRaw === 'abgenommen'
-            ? 'Abgenommen'
-            : null
     return {
       handwerkerId: hid,
       handwerkerName: hwOne?.name?.trim() || 'Partner',
@@ -1271,16 +1231,6 @@ export async function loadAbnahmeHwFreigabeZeilen(
       abnahmeDatum: prot?.abnahme_datum ?? null,
       pdfUrl: prot?.pdf_url ?? null,
       maengelOffen: countOffeneMaengel(maengel),
-      ergebnisLabel,
-      leistungenOk: okCount,
-      leistungenGesamt: punkte.length,
-      maengelTitel: maengel
-        .filter((m) => String(m.status ?? 'offen') !== 'behoben' && String(m.status ?? '') !== 'abgenommen')
-        .map((m) => (m.titel?.trim() || m.beschreibung?.trim() || 'Mangel').slice(0, 80))
-        .slice(0, 5),
-      unterzeichnerHw: meta.hw_unterschrift_name?.trim() || null,
-      unterzeichnerKunde: meta.kunde_unterschrift_name?.trim() || null,
-      ort: meta.uebergabe_ort?.trim() || null,
     }
   })
 }
@@ -1288,10 +1238,7 @@ export async function loadAbnahmeHwFreigabeZeilen(
 export async function freigebenAbnahmeprotokoll(
   protokollId: string,
   auftragId: string
-): Promise<
-  | { ok: true; bereitZumAbschliessen?: boolean }
-  | { ok: false; message: string }
-> {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const uid = await getAuthUserId()
   const now = new Date().toISOString()
 
@@ -1304,13 +1251,7 @@ export async function freigebenAbnahmeprotokoll(
   if (loadErr || !row) return { ok: false, message: 'Protokoll nicht gefunden.' }
 
   const status = normalizeAbnahmeFreigabeStatus(row.freigabe_status)
-  if (status === 'freigegeben') {
-    const gate = await getGesamtabnahmeGate(auftragId)
-    return {
-      ok: true,
-      bereitZumAbschliessen: hatHwAbnahmeZurAbschlussVorschau(gate.zeilen),
-    }
-  }
+  if (status === 'freigegeben') return { ok: true }
   if (status !== 'zur_freigabe' && status !== 'abgelehnt' && status !== 'entwurf') {
     return { ok: false, message: 'Protokoll kann nicht freigegeben werden.' }
   }
@@ -1341,85 +1282,8 @@ export async function freigebenAbnahmeprotokoll(
     sichtbar_fuer_kunde: false,
   })
 
-  const hwId = String(row.handwerker_id ?? '').trim()
-  const gate = await getGesamtabnahmeGate(auftragId)
-
-  if (hwId) {
-    const { data: auftrag } = await supabaseAdmin
-      .from('auftraege')
-      .select('titel, projekt_name, lead_id')
-      .eq('id', auftragId)
-      .maybeSingle()
-    const projekt =
-      String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
-    await notifyPartnerUnified({
-      handwerkerId: hwId,
-      typ: 'erinnerung',
-      projektName: projekt,
-      link: partnerVorgangLink(auftragId),
-      leistungName: 'Abnahme freigegeben',
-      auftragId,
-      sendMail: true,
-    })
-
-    const [{ data: hw }, { data: protoFull }, { data: protokolle }] =
-      await Promise.all([
-        supabaseAdmin.from('handwerker').select('name').eq('id', hwId).maybeSingle(),
-        supabaseAdmin
-          .from('auftrag_abnahmeprotokolle')
-          .select('punkte')
-          .eq('id', protokollId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from('auftrag_abnahmeprotokolle')
-          .select('id, freigabe_status')
-          .eq('auftrag_id', auftragId)
-          .eq('handwerker_id', hwId),
-      ])
-
-    const punkteRaw = Array.isArray(protoFull?.punkte) ? protoFull.punkte : []
-    const leistungen = punkteRaw
-      .map((p: unknown) => {
-        if (!p || typeof p !== 'object') return ''
-        return String((p as { leistung_name?: string }).leistung_name ?? '').trim()
-      })
-      .filter(Boolean)
-    const andereOffen = (protokolle ?? []).some((p) => {
-      if (String(p.id) === protokollId) return false
-      const st = normalizeAbnahmeFreigabeStatus(p.freigabe_status)
-      return st === 'zur_freigabe' || st === 'entwurf' || st === 'abgelehnt'
-    })
-    const { notifyPortalPartnerErledigtFromCrm } = await import(
-      '@/lib/portal/notify-portal-partner-erledigt'
-    )
-    await notifyPortalPartnerErledigtFromCrm({
-      auftragId,
-      leadId: (auftrag as { lead_id?: string | null } | null)?.lead_id,
-      handwerkerName: String(hw?.name ?? 'Partner').trim() || 'Partner',
-      leistungen: leistungen.length ? leistungen : [projekt],
-      vollstaendig: !andereOffen && gate.ok,
-    })
-  }
-
-  const bereitZumAbschliessen = hatHwAbnahmeZurAbschlussVorschau(gate.zeilen)
-  if (gate.ok) {
-    /* Status „abnahme“ → Primary-CTA bleibt grün „Auftrag abschließen“ */
-    const { error: stErr } = await supabaseAdmin
-      .from('auftraege')
-      .update({ status: 'abnahme', updated_at: new Date().toISOString() })
-      .eq('id', auftragId)
-      .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
-    if (stErr && /updated_at/i.test(stErr.message)) {
-      await supabaseAdmin
-        .from('auftraege')
-        .update({ status: 'abnahme' })
-        .eq('id', auftragId)
-        .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
-    }
-  }
-
   revalidatePath(`/auftraege/${auftragId}`)
-  return { ok: true, bereitZumAbschliessen }
+  return { ok: true }
 }
 
 export async function ablehnenAbnahmeprotokoll(input: {
@@ -1433,7 +1297,7 @@ export async function ablehnenAbnahmeprotokoll(input: {
 
   const { data: row, error: loadErr } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
-    .select('id, freigabe_status, maengel, punkte, handwerker_id, ebene')
+    .select('id, freigabe_status, maengel, punkte')
     .eq('id', input.protokollId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
@@ -1453,18 +1317,6 @@ export async function ablehnenAbnahmeprotokoll(input: {
     .eq('id', input.protokollId)
   if (error) return { ok: false, message: error.message }
 
-  const hwId = String(row.handwerker_id ?? '').trim()
-  /* Signatur zurücksetzen — Partner kann erneut „Auftrag abschließen“ */
-  if (hwId) {
-    await supabaseAdmin
-      .from('auftrag_handwerker')
-      .update({
-        abnahme_signiert_am: null,
-      })
-      .eq('auftrag_id', input.auftragId)
-      .eq('handwerker_id', hwId)
-  }
-
   try {
     await syncPunchListFromAbnahmeMaengel({
       auftragId: input.auftragId,
@@ -1480,392 +1332,20 @@ export async function ablehnenAbnahmeprotokoll(input: {
     auftrag_id: input.auftragId,
     typ: 'mangel_neu',
     titel: 'Teilabnahme abgelehnt',
-    beschreibung: notiz || 'CRM hat die Teilabnahme abgelehnt — Nacharbeit / erneut abschließen.',
+    beschreibung: notiz || 'CRM hat die Teilabnahme abgelehnt — Nacharbeit / Punch-List.',
     erstellt_von: uid,
     sichtbar_fuer_kunde: false,
   })
-
-  if (hwId) {
-    const { data: auftrag } = await supabaseAdmin
-      .from('auftraege')
-      .select('titel, projekt_name')
-      .eq('id', input.auftragId)
-      .maybeSingle()
-    const projekt =
-      String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
-    await notifyPartnerUnified({
-      handwerkerId: hwId,
-      typ: 'entfernt',
-      projektName: projekt,
-      link: partnerVorgangLink(input.auftragId),
-      leistungName: 'Abnahme abgelehnt — bitte erneut abschließen',
-      auftragId: input.auftragId,
-      sendMail: true,
-    })
-  }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
 }
 
-/** Ob Gesamtabnahme-Button aktiv sein darf (eingereichte Teilabnahmen freigegeben). */
+/** Ob Gesamtabnahme-Button aktiv sein darf (alle zugewiesenen HW freigegeben). */
 export async function getGesamtabnahmeGate(
   auftragId: string
 ): Promise<{ ok: boolean; message?: string; zeilen: AbnahmeHwFreigabeZeile[] }> {
   const zeilen = await loadAbnahmeHwFreigabeZeilen(auftragId)
   const gate = kannGesamtabnahmeErzeugen(zeilen)
   return { ...gate, zeilen }
-}
-
-export type AbschliessenHwProtokollVorschau = {
-  id: string
-  handwerkerName: string
-  abnahmeDatum: string
-  notizen: string | null
-  punkte: AbnahmePunkt[]
-  maengel: AbnahmeMangel[]
-  pdfUrl: string | null
-  freigabeStatus: AbnahmeFreigabeStatus
-  ergebnisLabel: string | null
-  unterzeichnerHw: string | null
-  unterzeichnerKunde: string | null
-  ort: string | null
-}
-
-/** Abschluss-UI: HW-Vorschau wenn Partner-Protokoll vorliegt, sonst manuelle Checkliste. */
-export async function getAbschliessenKontext(auftragId: string): Promise<{
-  mode: 'hw' | 'manual'
-  zeilen: AbnahmeHwFreigabeZeile[]
-  protokolle: AbschliessenHwProtokollVorschau[]
-  gateOk: boolean
-  gateMessage?: string
-}> {
-  const zeilen = await loadAbnahmeHwFreigabeZeilen(auftragId)
-  const gate = kannGesamtabnahmeErzeugen(zeilen)
-  if (!hatHwAbnahmeZurAbschlussVorschau(zeilen)) {
-    return {
-      mode: 'manual',
-      zeilen,
-      protokolle: [],
-      gateOk: gate.ok,
-      gateMessage: gate.message,
-    }
-  }
-
-  const relevant = abnahmeRelevanteZeilen(zeilen).filter(
-    (z) =>
-      Boolean(z.protokollId) &&
-      (z.freigabeStatus === 'zur_freigabe' || z.freigabeStatus === 'freigegeben')
-  )
-
-  const protokolle: AbschliessenHwProtokollVorschau[] = []
-  for (const z of relevant) {
-    const s = await loadAbnahmeprotokollSummary(auftragId, z.protokollId)
-    if (!s) continue
-    protokolle.push({
-      id: s.id,
-      handwerkerName: z.handwerkerName,
-      abnahmeDatum: s.abnahme_datum,
-      notizen: s.notizen,
-      punkte: s.punkte,
-      maengel: s.maengel,
-      pdfUrl: s.pdf_url,
-      freigabeStatus: s.freigabe_status,
-      ergebnisLabel: z.ergebnisLabel ?? null,
-      unterzeichnerHw: z.unterzeichnerHw ?? null,
-      unterzeichnerKunde: z.unterzeichnerKunde ?? null,
-      ort: z.ort ?? null,
-    })
-  }
-
-  return {
-    mode: protokolle.length ? 'hw' : 'manual',
-    zeilen,
-    protokolle,
-    gateOk: gate.ok,
-    gateMessage: gate.message,
-  }
-}
-
-/**
- * Auftrag abschließen mit bestehendem HW-Abnahmeprotokoll (Vorschau → Speichern / Senden).
- * Freigibt noch offene Teilabnahmen implizit — kein zweites manuelles Freigabe-Gate nötig.
- */
-export async function abschliessenMitHwProtokoll(input: {
-  auftragId: string
-  sendToKunde?: boolean
-}): Promise<
-  | {
-      ok: true
-      sentToKunde: boolean
-      sendWarning?: string
-      publicUrl: string | null
-    }
-  | { ok: false; message: string }
-> {
-  const detail = await loadAuftragDetail(input.auftragId)
-  if (!detail) return { ok: false, message: 'Auftrag nicht gefunden' }
-  const previousStatus = String(detail.status ?? 'in_arbeit')
-  if (previousStatus === 'abgeschlossen') {
-    return { ok: false, message: 'Auftrag ist bereits abgeschlossen.' }
-  }
-
-  const zeilen = await loadAbnahmeHwFreigabeZeilen(input.auftragId)
-  if (!hatHwAbnahmeZurAbschlussVorschau(zeilen)) {
-    return {
-      ok: false,
-      message: 'Kein Handwerker-Abnahmeprotokoll vorhanden — bitte manuell erstellen.',
-    }
-  }
-
-  const relevant = abnahmeRelevanteZeilen(zeilen)
-  const abgelehnt = relevant.filter((z) => z.freigabeStatus === 'abgelehnt')
-  if (abgelehnt.length) {
-    return {
-      ok: false,
-      message:
-        'Es gibt abgelehnte Teilabnahmen — Handwerker muss erneut abschließen, bevor der Auftrag beendet werden kann.',
-    }
-  }
-
-  const uid = await getAuthUserId()
-  const now = new Date().toISOString()
-
-  const toFreigeben = relevant.filter(
-    (z) => z.protokollId && z.freigabeStatus === 'zur_freigabe'
-  )
-  for (const z of toFreigeben) {
-    const { error } = await supabaseAdmin
-      .from('auftrag_abnahmeprotokolle')
-      .update({
-        freigabe_status: 'freigegeben',
-        freigegeben_at: now,
-        freigegeben_von: uid,
-        abgelehnt_at: null,
-        abgelehnt_von: null,
-        ablehnung_notiz: null,
-        updated_at: now,
-      })
-      .eq('id', z.protokollId!)
-    if (error) return { ok: false, message: error.message }
-  }
-
-  if (toFreigeben.length) {
-    await insertAuftragTimelineEvent({
-      auftrag_id: input.auftragId,
-      typ: 'notiz',
-      titel:
-        toFreigeben.length === 1
-          ? 'Teilabnahme freigegeben'
-          : 'Teilabnahmen freigegeben',
-      beschreibung: 'Freigabe beim Auftrag abschließen (Handwerker-Protokoll).',
-      erstellt_von: uid,
-      sichtbar_fuer_kunde: false,
-    })
-  }
-
-  const primaryZeile =
-    toFreigeben[0] ??
-    relevant.find(
-      (z) =>
-        Boolean(z.protokollId) &&
-        (z.freigabeStatus === 'freigegeben' || z.freigabeStatus === 'zur_freigabe')
-    ) ??
-    relevant.find((z) => Boolean(z.protokollId)) ??
-    null
-  if (!primaryZeile?.protokollId) {
-    return { ok: false, message: 'Kein Abnahmeprotokoll zum Abschließen gefunden.' }
-  }
-
-  let summary = await loadAbnahmeprotokollSummary(
-    input.auftragId,
-    primaryZeile.protokollId
-  )
-  if (!summary) return { ok: false, message: 'Protokoll nicht gefunden.' }
-
-  let publicUrl = summary.pdf_url
-  let pdfBase64: string | null = null
-
-  if (!publicUrl) {
-    const regenerated = await regenerateAbnahmeprotokollPdfForId(
-      input.auftragId,
-      summary.id
-    )
-    if (!regenerated.ok) return regenerated
-    publicUrl = regenerated.publicUrl
-    pdfBase64 = regenerated.pdfBase64
-    summary = (await loadAbnahmeprotokollSummary(input.auftragId, summary.id)) ?? summary
-  }
-
-  await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({
-      freigabe_status: 'freigegeben',
-      freigegeben_at: now,
-      freigegeben_von: uid,
-      ebene: 'gesamt',
-      updated_at: now,
-    })
-    .eq('id', summary.id)
-
-  await syncAuftragAbnahmeDenorm(input.auftragId)
-
-  const { finalizeAbschlussdokumentationOhneMail } = await import(
-    '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
-  )
-  const closed = await finalizeAbschlussdokumentationOhneMail(input.auftragId)
-  if (!closed.ok) return closed
-
-  let sentToKunde = false
-  let sendWarning: string | undefined
-
-  if (input.sendToKunde) {
-    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId)
-    if (!mailDefaults.ok) {
-      sendWarning = mailDefaults.message
-    } else {
-      const mailBuilt = await buildAbnahmeMail({
-        auftragId: input.auftragId,
-        betreff: mailDefaults.defaultBetreff,
-        nachricht: mailDefaults.defaultNachricht,
-        anrede: mailDefaults.defaultAnrede,
-      })
-      if (!mailBuilt.ok) {
-        sendWarning = mailBuilt.message
-      } else {
-        if (!pdfBase64 && publicUrl) {
-          try {
-            const res = await fetch(publicUrl)
-            if (res.ok) {
-              const buf = Buffer.from(await res.arrayBuffer())
-              pdfBase64 = buf.toString('base64')
-            }
-          } catch {
-            /* fallback regenerate below */
-          }
-        }
-        if (!pdfBase64) {
-          const regenerated = await regenerateAbnahmeprotokollPdfForId(
-            input.auftragId,
-            summary.id
-          )
-          if (!regenerated.ok) {
-            sendWarning = regenerated.message
-          } else {
-            pdfBase64 = regenerated.pdfBase64
-            publicUrl = regenerated.publicUrl
-          }
-        }
-        if (pdfBase64) {
-          const hatMaengel = countOffeneMaengel(summary.maengel) > 0
-          const mail = await sendMail({
-            typ: 'abnahmeprotokoll',
-            an: mailBuilt.kundeEmail,
-            anName: mailBuilt.kundeName,
-            betreff: mailBuilt.betreff,
-            html: mailBuilt.html,
-            pdfBuffer: Buffer.from(pdfBase64, 'base64'),
-            pdfName: `Abnahmeprotokoll-${formatAuftragsNr(detail)}.pdf`,
-            kundeId: detail.kunde_id ?? null,
-            leadId: detail.lead_id ?? null,
-            auftragId: input.auftragId,
-            kontextTyp: 'auftrag',
-          })
-          if (!mail.success) {
-            sendWarning = mail.error ?? 'E-Mail fehlgeschlagen'
-          } else {
-            await supabaseAdmin
-              .from('auftrag_abnahmeprotokolle')
-              .update({ an_kunde_gesendet_at: new Date().toISOString() })
-              .eq('id', summary.id)
-
-            await insertAuftragTimelineEvent({
-              auftrag_id: input.auftragId,
-              typ: 'abnahmeprotokoll_erstellt',
-              titel: 'Abnahmeprotokoll erstellt',
-              beschreibung: hatMaengel
-                ? 'Abnahmeprotokoll mit Mängeln an den Kunden gesendet.'
-                : 'Abnahmeprotokoll ohne Mängel an den Kunden gesendet.',
-              erstellt_von: uid,
-              sichtbar_fuer_kunde: true,
-              fuer_kunde_freigegeben: true,
-              freigegeben_at: new Date().toISOString(),
-              email_log_id: mail.emailLogId ?? null,
-            })
-            if (publicUrl) {
-              try {
-                await verteileAbnahmeAnUnterlagen({
-                  auftragId: input.auftragId,
-                  pdfUrl: publicUrl,
-                  protokollId: summary.id,
-                })
-              } catch (e) {
-                console.warn('[abschliessenMitHwProtokoll] Unterlagen:', e)
-              }
-            }
-            sentToKunde = true
-          }
-        }
-      }
-    }
-  }
-
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
-
-  return { ok: true, sentToKunde, sendWarning, publicUrl }
-}
-
-async function regenerateAbnahmeprotokollPdfForId(
-  auftragId: string,
-  protokollId: string
-): Promise<
-  | { ok: true; publicUrl: string; pdfBase64: string }
-  | { ok: false; message: string }
-> {
-  const summary = await loadAbnahmeprotokollSummary(auftragId, protokollId)
-  if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll vorhanden.' }
-
-  const prepared = prepareAbnahmePayload({
-    punkte: summary.punkte,
-    maengel: summary.maengel,
-  })
-
-  const built = await buildPdfBuffer({
-    auftragId,
-    abnahmeDatum: summary.abnahme_datum,
-    punkte: prepared.punkte,
-    maengel: prepared.maengel,
-    notizen: summary.notizen,
-    meta: summary.meta,
-  })
-  if (!built.ok) return built
-
-  const stored = await persistPdf(auftragId, built.buffer)
-  if (!stored.ok) return stored
-
-  const { error } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({
-      pdf_url: stored.publicUrl,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', protokollId)
-  if (error) return { ok: false, message: error.message }
-
-  await supabaseAdmin
-    .from('auftraege')
-    .update({
-      abnahme_protokoll_url: stored.publicUrl,
-      abnahme_datum: summary.abnahme_datum.slice(0, 10),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', auftragId)
-
-  return {
-    ok: true,
-    publicUrl: stored.publicUrl,
-    pdfBase64: built.buffer.toString('base64'),
-  }
 }

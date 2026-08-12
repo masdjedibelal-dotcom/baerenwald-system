@@ -33,20 +33,14 @@ export function AngebotWizardRechtlicheHinweiseCard({
       <div className="rw-tax__list">
         <button
           type="button"
-          className={cn(
-            'rw-tax__opt',
-            meta.hinweis_35a && hinweis35aErlaubt && 'on',
-            !hinweis35aErlaubt && 'is-disabled'
-          )}
+          className={meta.hinweis_35a ? 'rw-tax__opt on' : 'rw-tax__opt'}
           disabled={!hinweis35aErlaubt}
           onClick={() =>
             hinweis35aErlaubt && onMetaChange({ hinweis_35a: !meta.hinweis_35a })
           }
         >
           <span className="rw-tax__check" aria-hidden>
-            {meta.hinweis_35a && hinweis35aErlaubt ? (
-              <MockIcon ctx="btn" n="check" size={12} />
-            ) : null}
+            {meta.hinweis_35a ? <MockIcon ctx="btn" n="check" size={12} /> : null}
           </span>
           <span className="rw-tax__txt">
             <span className="rw-tax__lab">§35a EStG-Hinweis ausweisen</span>
@@ -60,20 +54,14 @@ export function AngebotWizardRechtlicheHinweiseCard({
         </button>
         <button
           type="button"
-          className={cn(
-            'rw-tax__opt',
-            meta.hinweis_13b && hinweis13bErlaubt && 'on',
-            !hinweis13bErlaubt && 'is-disabled'
-          )}
+          className={meta.hinweis_13b ? 'rw-tax__opt on' : 'rw-tax__opt'}
           disabled={!hinweis13bErlaubt}
           onClick={() =>
             hinweis13bErlaubt && onMetaChange({ hinweis_13b: !meta.hinweis_13b })
           }
         >
           <span className="rw-tax__check" aria-hidden>
-            {meta.hinweis_13b && hinweis13bErlaubt ? (
-              <MockIcon ctx="btn" n="check" size={12} />
-            ) : null}
+            {meta.hinweis_13b ? <MockIcon ctx="btn" n="check" size={12} /> : null}
           </span>
           <span className="rw-tax__txt">
             <span className="rw-tax__lab">Reverse-Charge (§13b UStG)</span>

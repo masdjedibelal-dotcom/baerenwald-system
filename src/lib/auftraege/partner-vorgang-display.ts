@@ -49,7 +49,7 @@ export function handwerkerAntwortAnzeige(
 
   const st = (pos.handwerker_status ?? '').toLowerCase()
 
-  if (st === 'akzeptiert' || st === 'angenommen') {
+  if (st === 'akzeptiert') {
     return { label: 'Angenommen', variant: 'angenommen' }
   }
   if (st === 'abgelehnt') {

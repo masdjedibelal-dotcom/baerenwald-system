@@ -40,63 +40,27 @@ export type AbnahmeHwFreigabeZeile = {
   abnahmeDatum: string | null
   pdfUrl: string | null
   maengelOffen: number
-  /** Kurz für Banner */
-  ergebnisLabel?: string | null
-  leistungenOk?: number
-  leistungenGesamt?: number
-  maengelTitel?: string[]
-  unterzeichnerHw?: string | null
-  unterzeichnerKunde?: string | null
-  ort?: string | null
 }
 
-/**
- * Nur Partner, die eine Teilabnahme eingereicht/signiert haben.
- * Bloße Zuweisung oder Nacharbeit ohne neue Abnahme zählen nicht — kein zweites Freigabe-Gate.
- */
-export function abnahmeRelevanteZeilen(
-  zeilen: AbnahmeHwFreigabeZeile[]
-): AbnahmeHwFreigabeZeile[] {
-  return zeilen.filter(
-    (z) =>
-      Boolean(z.protokollId?.trim()) ||
-      Boolean(z.abnahmeSigniertAm?.trim()) ||
-      z.freigabeStatus != null
-  )
-}
-
-/** Alle eingereichten Teilabnahmen sind freigegeben. */
+/** Alle zugewiesenen Partner haben ein freigegebenes Teilabnahme-Protokoll. */
 export function alleZugewiesenenHwFreigegeben(zeilen: AbnahmeHwFreigabeZeile[]): boolean {
-  const relevant = abnahmeRelevanteZeilen(zeilen)
-  if (!relevant.length) return true
-  return relevant.every((z) => z.freigabeStatus === 'freigegeben')
+  if (!zeilen.length) return true
+  return zeilen.every((z) => z.freigabeStatus === 'freigegeben')
 }
 
 export function kannGesamtabnahmeErzeugen(zeilen: AbnahmeHwFreigabeZeile[]): {
   ok: boolean
   message?: string
 } {
-  const relevant = abnahmeRelevanteZeilen(zeilen)
-  if (!relevant.length) {
+  if (!zeilen.length) {
     return { ok: true }
   }
-  if (!relevant.every((z) => z.freigabeStatus === 'freigegeben')) {
-    const offen = relevant.filter((z) => z.freigabeStatus !== 'freigegeben')
+  if (!alleZugewiesenenHwFreigegeben(zeilen)) {
+    const offen = zeilen.filter((z) => z.freigabeStatus !== 'freigegeben')
     return {
       ok: false,
-      message: `Zuerst eingereichte Teilabnahmen freigeben (${offen.length} offen) — oder über „Auftrag abschließen“ das Protokoll prüfen und speichern.`,
+      message: `Gesamtabnahme erst möglich, wenn alle zugewiesenen Partner freigegeben sind (${offen.length} offen).`,
     }
   }
   return { ok: true }
-}
-
-/** HW hat Abnahme eingereicht → CRM-Abschluss zeigt Vorschau statt manueller Checkliste. */
-export function hatHwAbnahmeZurAbschlussVorschau(
-  zeilen: AbnahmeHwFreigabeZeile[]
-): boolean {
-  return abnahmeRelevanteZeilen(zeilen).some(
-    (z) =>
-      Boolean(z.protokollId) &&
-      (z.freigabeStatus === 'zur_freigabe' || z.freigabeStatus === 'freigegeben')
-  )
 }

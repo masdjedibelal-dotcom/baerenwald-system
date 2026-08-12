@@ -84,7 +84,7 @@ export function CrmPositionEintragModal({
     startTransition(async () => {
       const r = await createCrmPositionEintrag({
         positionId: targetPos,
-        typ: 'fortschritt',
+        typ: 'weitere_arbeit',
         beschreibung: text || (fotoPath ? 'Foto-Update' : null),
         quelle: 'vor_ort',
         rueckdatiertGrund: null,

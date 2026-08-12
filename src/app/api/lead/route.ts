@@ -220,17 +220,6 @@ export async function POST(req: Request) {
   }
 
   void notifyNewLeadAlert(leadId).catch(() => undefined)
-  void import('@/lib/push/send')
-    .then(({ sendCrmPushToStaff }) =>
-      sendCrmPushToStaff({
-        typ: 'neue_anfrage',
-        title: 'Neue Anfrage',
-        body: 'Im CRM ist eine neue Anfrage eingegangen.',
-        url: `/anfragen/${leadId}`,
-        tag: `neue_anfrage:${leadId}`,
-      })
-    )
-    .catch(() => undefined)
 
   return NextResponse.json({ ok: true, id: leadId })
 }

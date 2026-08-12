@@ -58,13 +58,11 @@ function LoginPageContent() {
         if (userErr || !data.user) return
         const crm = await verifyCrmStaffSession()
         if (!crm.ok) {
-          if (crm.reason === 'portal_only') {
-            await supabase.auth.signOut({ scope: 'local' })
-            setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
-          }
+          await supabase.auth.signOut({ scope: 'local' })
+          setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
           return
         }
-        window.location.assign('/')
+        router.replace('/')
       } catch {
         /* offline → Login bleibt */
       }
@@ -80,30 +78,28 @@ function LoginPageContent() {
     setInfo(null)
 
     const normalizedEmail = email.trim().toLowerCase()
-    const { data: signData, error: signError } = await supabase.auth.signInWithPassword({
+    const { error: signError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     })
 
-    if (signError || !signData.user?.id) {
+    if (signError) {
       setError(CRM_LOGIN_INVALID_MESSAGE)
       setLoading(false)
       return
     }
 
-    // Cookie kann Server Actions/Middleware einen Tick hinterherhinken —
-    // Staff-Check über User-ID (Service-Role), dann harter Reload mit Session-Cookie.
-    const crm = await verifyCrmStaffSession(signData.user.id)
+    const crm = await verifyCrmStaffSession()
     if (!crm.ok) {
       await supabase.auth.signOut({ scope: 'local' })
-      setError(crm.reason === 'portal_only' ? CRM_LOGIN_PORTAL_ONLY_MESSAGE : crm.message)
+      setError(CRM_LOGIN_PORTAL_ONLY_MESSAGE)
       setLoading(false)
       return
     }
 
     void remember
-    await supabase.auth.getSession()
-    window.location.assign('/')
+    router.replace('/')
+    router.refresh()
   }
 
   async function handleForgot() {

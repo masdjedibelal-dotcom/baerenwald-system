@@ -12,19 +12,14 @@ export type CrmNotificationTyp =
   | 'handwerker_angenommen'
   | 'handwerker_abgelehnt'
   | 'handwerker_einreichung'
-  | 'hw_rechnung_eingegangen'
   | 'vorgang_angenommen'
   | 'vorgang_abgelehnt'
-  | 'angebot_entscheidung'
   | 'projektvertrag_bestaetigt'
   | 'abnahme_bestaetigt'
   | 'abnahme_freigabe_ausstehend'
   | 'auftrag_abgeschlossen'
   | 'partner_positions_meldung'
   | 'partner_weitere_arbeit'
-  | 'partner_compliance_pruefung'
-  | 'partner_unterlage'
-  | 'partner_fachdoku'
 
 export type CrmNotificationItem = {
   sourceKey: string
@@ -58,14 +53,10 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Handwerker hat abgelehnt'
     case 'handwerker_einreichung':
       return 'Handwerker-Angebot eingereicht'
-    case 'hw_rechnung_eingegangen':
-      return 'HW-Rechnung eingegangen'
     case 'vorgang_angenommen':
       return 'Vorgang angenommen'
     case 'vorgang_abgelehnt':
       return 'Vorgang abgelehnt'
-    case 'angebot_entscheidung':
-      return 'Angebot entschieden'
     case 'projektvertrag_bestaetigt':
       return 'Projektvertrag bestätigt'
     case 'abnahme_bestaetigt':
@@ -78,12 +69,6 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Nachtrag / neue Position gemeldet'
     case 'partner_weitere_arbeit':
       return 'Weitere Arbeit zur Prüfung'
-    case 'partner_compliance_pruefung':
-      return 'Partner-Dokument zur Freigabe'
-    case 'partner_unterlage':
-      return 'Partner-Unterlage hochgeladen'
-    case 'partner_fachdoku':
-      return 'Fachnachweis hochgeladen'
   }
 }
 
@@ -97,7 +82,6 @@ function typIcon(typ: CrmNotificationTyp): string {
       return 'tool'
     case 'handwerker_angenommen':
     case 'vorgang_angenommen':
-    case 'angebot_entscheidung':
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'auftrag_abgeschlossen':
@@ -108,10 +92,6 @@ function typIcon(typ: CrmNotificationTyp): string {
     case 'vorgang_abgelehnt':
       return 'x'
     case 'handwerker_einreichung':
-    case 'hw_rechnung_eingegangen':
-    case 'partner_compliance_pruefung':
-    case 'partner_unterlage':
-    case 'partner_fachdoku':
       return 'upload'
   }
 }
@@ -126,22 +106,14 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
       return 'Angebot öffnen'
-    case 'hw_rechnung_eingegangen':
-      return 'Rechnung öffnen'
     case 'vorgang_angenommen':
     case 'vorgang_abgelehnt':
-      return 'Auftrag öffnen'
-    case 'angebot_entscheidung':
-      return 'Vorgang öffnen'
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'abnahme_freigabe_ausstehend':
     case 'auftrag_abgeschlossen':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
-    case 'partner_compliance_pruefung':
-    case 'partner_unterlage':
-    case 'partner_fachdoku':
       return 'Auftrag öffnen'
   }
 }
@@ -158,14 +130,10 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Der Partner hat die Angebots-Anfrage im Portal abgelehnt.'
     case 'handwerker_einreichung':
       return 'Der Partner hat ein Angebot / Konditionen im Portal eingereicht — bitte prüfen.'
-    case 'hw_rechnung_eingegangen':
-      return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Rechnungen eingehend prüfen.'
     case 'vorgang_angenommen':
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
       return 'Der Partner hat die Leistungsanfrage im Portal abgelehnt.'
-    case 'angebot_entscheidung':
-      return 'Kunde oder Auftraggeber hat das Angebot im Portal angenommen oder abgelehnt.'
     case 'projektvertrag_bestaetigt':
       return 'Der Partner hat den Projektvertrag im Portal bestätigt.'
     case 'abnahme_bestaetigt':
@@ -178,12 +146,6 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Partner meldet Mehrbedarf. Unter Leistungen: intern zuweisen, Kunden-Nachtrag oder ablehnen.'
     case 'partner_weitere_arbeit':
       return 'Partner hat weitere Regie-Arbeit gemeldet. Unter Leistungen anerkennen oder ablehnen.'
-    case 'partner_compliance_pruefung':
-      return 'Compliance-Dokument (z. B. Handwerkskarte) wartet auf Freigabe in Akte/Handwerker-Profil.'
-    case 'partner_unterlage':
-      return 'Partner hat Unterlagen am Auftrag hochgeladen — unter Akte → Dokumente prüfen.'
-    case 'partner_fachdoku':
-      return 'Partner hat einen Fachnachweis/Protokoll hochgeladen — unter Akte → Dokumente / Fachnachweise.'
   }
 }
 
@@ -196,63 +158,17 @@ function one<T>(x: T | T[] | null | undefined): T | null {
 
 function pushLead(
   items: CrmNotificationItem[],
-  row: {
-    id: string
-    kontakt_name?: string | null
-    situation?: string | null
-    plz?: string | null
-    created_at: string
-    updated_at?: string | null
-    anlass?: string | null
-    erfassung_von?: string | null
-    hv_meldung_status?: string | null
-    freigabe_bypass_grund?: string | null
-    funnel_daten?: unknown
-  }
+  row: { id: string; kontakt_name?: string | null; situation?: string | null; plz?: string | null; created_at: string }
 ) {
-  const erfassung = (row.erfassung_von ?? '').trim().toLowerCase()
-  const anlass = (row.anlass ?? '').trim().toLowerCase()
-  const isMieterMeldung =
-    erfassung === 'melder' && (!anlass || anlass === 'meldung')
-  const bypass = (row.freigabe_bypass_grund ?? '').trim().toLowerCase()
-  const funnelDirekt =
-    row.funnel_daten &&
-    typeof row.funnel_daten === 'object' &&
-    !Array.isArray(row.funnel_daten) &&
-    (row.funnel_daten as { direktauftrag?: unknown }).direktauftrag === true
-  const istAkut = bypass === 'akut' || funnelDirekt === true
-  const hvStatus = (row.hv_meldung_status ?? 'neu').trim().toLowerCase()
-
-  // Mieter-Meldung: CRM-Glocke erst nach HV-Freigabe (oder sofort bei Akut)
-  if (isMieterMeldung && !istAkut && (hvStatus === 'neu' || hvStatus === '')) {
-    return
-  }
-
   const name = row.kontakt_name?.trim() || null
   const meta = [row.situation?.trim(), row.plz?.trim()].filter(Boolean).join(' · ')
-  const createdAt =
-    isMieterMeldung && !istAkut && row.updated_at
-      ? String(row.updated_at)
-      : row.created_at
-  const title =
-    isMieterMeldung && istAkut
-      ? name
-        ? `Akut — Direkt beauftragen (${name})`
-        : 'Akut — Direkt beauftragen'
-      : isMieterMeldung
-        ? name
-          ? `Angebot erstellen — ${name}`
-          : 'Angebot erstellen'
-        : name
-          ? `Neue Anfrage von ${name}`
-          : 'Neue Anfrage'
   items.push({
     sourceKey: `neue_anfrage:${row.id}`,
     typ: 'neue_anfrage',
-    title,
+    title: name ? `Neue Anfrage von ${name}` : 'Neue Anfrage',
     subtitle: meta || null,
     href: `/anfragen/${row.id}`,
-    createdAt,
+    createdAt: row.created_at,
     gelesen: false,
   })
 }
@@ -324,17 +240,10 @@ async function collectCrmNotificationItems(opts?: {
     auftraegeRes,
     posMelRes,
     waRes,
-    angebotEntscheidungTlRes,
-    complianceRes,
-    fachdokuRes,
-    unterlageTlRes,
-    hwRechnungRes,
   ] = await Promise.all([
     supabase
       .from('leads')
-      .select(
-        'id, kontakt_name, situation, plz, created_at, updated_at, anlass, erfassung_von, hv_meldung_status, freigabe_bypass_grund, funnel_daten'
-      )
+      .select('id, kontakt_name, situation, plz, created_at')
       .is('geloescht_am', null)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
@@ -417,55 +326,6 @@ async function collectCrmNotificationItems(opts?: {
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(40),
-    supabase
-      .from('lead_timeline')
-      .select('id, lead_id, angebot_id, typ, titel, beschreibung, created_at')
-      .or(
-        'and(typ.eq.angebot,or(titel.ilike.Angebot angenommen%,titel.eq.Angebot abgelehnt)),typ.eq.org_freigabe'
-      )
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(40),
-    supabase
-      .from('partner_dokumente')
-      .select(
-        'id, typ, bezeichnung, hochgeladen_am, auftrag_id, handwerker_id, handwerker:handwerker_id(name)'
-      )
-      .eq('status', 'in_pruefung')
-      .gte('hochgeladen_am', since)
-      .order('hochgeladen_am', { ascending: false })
-      .limit(40),
-    supabase
-      .from('auftrag_fachdoku_slots')
-      .select(
-        'id, auftrag_id, label, slot_code, erledigt_am, uploaded_by_handwerker_id, handwerker:uploaded_by_handwerker_id(name), auftraege:auftrag_id(titel)'
-      )
-      .eq('status', 'erledigt')
-      .eq('uploaded_by_role', 'hw')
-      .gte('erledigt_am', since)
-      .order('erledigt_am', { ascending: false })
-      .limit(40),
-    supabase
-      .from('auftrag_timeline')
-      .select(
-        'id, auftrag_id, titel, beschreibung, created_at, handwerker_id, typ, handwerker:handwerker_id(name)'
-      )
-      .in('typ', ['partner_unterlage', 'partner_angebot', 'partner_rechnung'])
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(40),
-    supabase
-      .from('angebot_handwerker')
-      .select(
-        `id, hw_rechnung_eingereicht_at, angebot_id,
-         handwerker:handwerker_id(name, firma),
-         gewerke:gewerk_id(name),
-         angebote:angebot_id(id, lead_id, angebotsnr)`
-      )
-      .not('hw_rechnung_eingereicht_at', 'is', null)
-      .gte('hw_rechnung_eingereicht_at', since)
-      .order('hw_rechnung_eingereicht_at', { ascending: false })
-      .limit(40),
   ])
 
   // ── Neue Anfrage ─────────────────────────────────────────────
@@ -473,9 +333,7 @@ async function collectCrmNotificationItems(opts?: {
   if (leadsRes.error && /geloescht_am/i.test(leadsRes.error.message)) {
     const retry = await supabase
       .from('leads')
-      .select(
-        'id, kontakt_name, situation, plz, created_at, updated_at, anlass, erfassung_von, hv_meldung_status, freigabe_bypass_grund, funnel_daten'
-      )
+      .select('id, kontakt_name, situation, plz, created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(40)
@@ -484,44 +342,6 @@ async function collectCrmNotificationItems(opts?: {
     leadRows = []
   }
   for (const row of leadRows) pushLead(items, row)
-
-  // ── HW-Eingangsrechnung ──────────────────────────────────────
-  if (!hwRechnungRes.error) {
-    for (const row of hwRechnungRes.data ?? []) {
-      const hw = one(
-        row.handwerker as
-          | { name?: string | null; firma?: string | null }
-          | { name?: string | null; firma?: string | null }[]
-          | null
-      )
-      const gw = one(
-        row.gewerke as { name?: string | null } | { name?: string | null }[] | null
-      )
-      const ang = one(
-        row.angebote as
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
-          | null
-      )
-      const hwName =
-        hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
-      const nr = ang?.angebotsnr?.trim()
-      const subtitle = [gw?.name?.trim(), nr ? `Angebot ${nr}` : null]
-        .filter(Boolean)
-        .join(' · ')
-      items.push({
-        sourceKey: `hw_rechnung_eingegangen:${row.id}`,
-        typ: 'hw_rechnung_eingegangen',
-        title: `${hwName}: Rechnung eingegangen`,
-        subtitle: subtitle || null,
-        href: ang?.id
-          ? `/angebote/${ang.id}?tab=handwerker`
-          : '/vorgaenge?phase=rechnung&richtung=eingehend',
-        createdAt: String(row.hw_rechnung_eingereicht_at),
-        gelesen: false,
-      })
-    }
-  }
 
   // ── Bautagebuch (Partner-App) ────────────────────────────────
   if (!peRes.error) {
@@ -714,65 +534,10 @@ async function collectCrmNotificationItems(opts?: {
       typ: 'abnahme_bestaetigt',
       title: 'Abnahme bestätigt',
       subtitle: (row.beschreibung as string)?.trim() || null,
-      href: `/auftraege/${auftragId}?tab=leistungen`,
+      href: `/auftraege/${auftragId}?tab=abnahme`,
       createdAt: row.created_at as string,
       gelesen: false,
     })
-  }
-
-  // ── Angebot / HV-Freigabe im Portal ──────────────────────────
-  if (!angebotEntscheidungTlRes.error) {
-    const tlRows = angebotEntscheidungTlRes.data ?? []
-    const angebotIds = [
-      ...new Set(
-        tlRows
-          .map((r) => (r.angebot_id as string | null)?.trim())
-          .filter((id): id is string => Boolean(id))
-      ),
-    ]
-    const auftragByAngebot = new Map<string, string>()
-    if (angebotIds.length) {
-      const { data: aufRows } = await supabase
-        .from('auftraege')
-        .select('id, angebot_id')
-        .in('angebot_id', angebotIds)
-      for (const a of aufRows ?? []) {
-        const aid = (a.angebot_id as string | null)?.trim()
-        const id = (a.id as string | null)?.trim()
-        if (aid && id) auftragByAngebot.set(aid, id)
-      }
-    }
-    for (const row of tlRows) {
-      const leadId = (row.lead_id as string | null)?.trim()
-      const angebotId = (row.angebot_id as string | null)?.trim()
-      const titel = (row.titel as string | null)?.trim() || ''
-      const rowTyp = String((row as { typ?: string }).typ ?? '').trim()
-      const isOrgFreigabe = rowTyp === 'org_freigabe' || titel.startsWith('HV-Freigabe')
-      const abgelehnt =
-        titel === 'Angebot abgelehnt' || titel === 'HV-Freigabe abgelehnt'
-      const auftragId = angebotId ? auftragByAngebot.get(angebotId) ?? null : null
-      items.push({
-        sourceKey: isOrgFreigabe
-          ? `org_freigabe:${row.id}`
-          : `angebot_entscheidung:${row.id}`,
-        typ: 'angebot_entscheidung',
-        title: isOrgFreigabe
-          ? abgelehnt
-            ? 'HV-Freigabe abgelehnt'
-            : 'HV-Freigabe erteilt'
-          : abgelehnt
-            ? 'Angebot abgelehnt'
-            : 'Angebot angenommen',
-        subtitle: (row.beschreibung as string)?.trim() || null,
-        href: hrefVorgang({
-          auftragId,
-          angebotId,
-          leadId,
-        }),
-        createdAt: row.created_at as string,
-        gelesen: false,
-      })
-    }
   }
 
   // ── Teilabnahme zur Freigabe (pro HW-Protokoll) ───────────────
@@ -787,8 +552,8 @@ async function collectCrmNotificationItems(opts?: {
       sourceKey: `abnahme_freigabe_ausstehend:${row.id}`,
       typ: 'abnahme_freigabe_ausstehend',
       title: hwName ? `Abnahme wartet — ${hwName}` : 'Abnahme wartet auf Freigabe',
-      subtitle: aufTitel || 'Unter Leistungen prüfen',
-      href: `/auftraege/${auftragId}?tab=leistungen`,
+      subtitle: aufTitel || 'Teilabnahme prüfen',
+      href: `/auftraege/${auftragId}?tab=abnahme`,
       createdAt: (row.updated_at as string) || (row.created_at as string) || since,
       gelesen: false,
     })
@@ -851,83 +616,6 @@ async function collectCrmNotificationItems(opts?: {
         title: `${hwName}: weitere Arbeit gemeldet`,
         subtitle: leistung || null,
         href: `/auftraege/${auftragId}?tab=leistungen`,
-        createdAt: (row.created_at as string) || since,
-        gelesen: false,
-      })
-    }
-  }
-
-  // ── Partner: Compliance zur Freigabe (Handwerkskarte etc.) ───
-  if (!complianceRes.error) {
-    for (const row of complianceRes.data ?? []) {
-      const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
-      const auftragId = (row.auftrag_id as string | null)?.trim() || null
-      const hwId = (row.handwerker_id as string | null)?.trim() || null
-      const bez = String(row.bezeichnung ?? row.typ ?? 'Dokument').trim()
-      items.push({
-        sourceKey: `partner_compliance_pruefung:${row.id}`,
-        typ: 'partner_compliance_pruefung',
-        title: `${hwName}: Dokument zur Freigabe`,
-        subtitle: bez || null,
-        href: auftragId
-          ? `/auftraege/${auftragId}?tab=akte`
-          : hwId
-            ? `/handwerker/${hwId}?tab=compliance`
-            : '/handwerker',
-        createdAt: (row.hochgeladen_am as string) || since,
-        gelesen: false,
-      })
-    }
-  }
-
-  // ── Partner: Fachnachweise / Protokolle ──────────────────────
-  if (!fachdokuRes.error) {
-    for (const row of fachdokuRes.data ?? []) {
-      const auftragId = (row.auftrag_id as string | null)?.trim()
-      if (!auftragId) continue
-      const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
-      const label = String(row.label ?? row.slot_code ?? 'Fachnachweis').trim()
-      items.push({
-        sourceKey: `partner_fachdoku:${row.id}`,
-        typ: 'partner_fachdoku',
-        title: `${hwName}: Fachnachweis hochgeladen`,
-        subtitle: [label, auf?.titel?.trim()].filter(Boolean).join(' · ') || null,
-        href: `/auftraege/${auftragId}?tab=akte`,
-        createdAt: (row.erledigt_am as string) || since,
-        gelesen: false,
-      })
-    }
-  }
-
-  // ── Partner: Unterlagen / Auto-Angebot / Rechnung (Timeline-Ping) ─
-  if (!unterlageTlRes.error) {
-    for (const row of unterlageTlRes.data ?? []) {
-      const auftragId = (row.auftrag_id as string | null)?.trim()
-      if (!auftragId) continue
-      const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
-      const tlTyp = String(row.typ ?? '').toLowerCase()
-      const notifTyp =
-        tlTyp === 'partner_rechnung'
-          ? ('hw_rechnung_eingegangen' as const)
-          : tlTyp === 'partner_angebot'
-            ? ('handwerker_einreichung' as const)
-            : ('partner_unterlage' as const)
-      const title =
-        tlTyp === 'partner_rechnung'
-          ? `${hwName}: Rechnung eingereicht`
-          : tlTyp === 'partner_angebot'
-            ? `${hwName}: Angebot eingereicht`
-            : `${hwName}: Unterlage hochgeladen`
-      items.push({
-        sourceKey: `${notifTyp}:tl:${row.id}`,
-        typ: notifTyp,
-        title,
-        subtitle: (row.beschreibung as string)?.trim() || (row.titel as string)?.trim() || null,
-        href: `/auftraege/${auftragId}?tab=akte`,
         createdAt: (row.created_at as string) || since,
         gelesen: false,
       })

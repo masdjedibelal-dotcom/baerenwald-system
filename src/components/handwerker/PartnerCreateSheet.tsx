@@ -1,7 +1,7 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
+import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -26,7 +26,7 @@ export function PartnerCreateSheet({
   onSaved?: (id: string) => void
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, startTransition] = useTransition()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')
   const [vorname, setVorname] = useState('')
@@ -40,13 +40,9 @@ export function PartnerCreateSheet({
   const [notizen, setNotizen] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
-  const wasOpenRef = useRef(false)
 
-  /* Nur bei false→true leeren — nicht bei Remount/Re-Render solange offen. */
   useEffect(() => {
-    const justOpened = open && !wasOpenRef.current
-    wasOpenRef.current = open
-    if (!justOpened) return
+    if (!open) return
     setFirma('')
     setGewerkSlug('')
     setVorname('')

@@ -45,18 +45,10 @@ type DocRow = {
   href: string;
   created_at: string;
   groesse_bytes: number | null;
-  quelle: "upload" | "angebot" | "rechnung" | "protokoll";
+  quelle: "upload" | "angebot" | "rechnung";
   dokumentId?: string;
   beschreibung: string;
   freigabe: boolean;
-};
-
-export type AkteProtokollDokument = {
-  id?: string;
-  name: string;
-  href: string;
-  created_at?: string | null;
-  beschreibung?: string | null;
 };
 
 const COLS = "minmax(0, 1fr) auto auto";
@@ -92,7 +84,6 @@ export function AnfrageDokumenteTab({
   angebote,
   rechnungen = [],
   immerRechnungIds = [],
-  protokolle = [],
   onReload,
 }: {
   leadId: string
@@ -101,8 +92,6 @@ export function AnfrageDokumenteTab({
   rechnungen?: RechnungKurz[]
   /** Auch Entwürfe / sonst ausgefilterte Rechnungen (z. B. aktuelle RE in der Akte). */
   immerRechnungIds?: string[]
-  /** Abnahme / Abschluss aus verknüpftem Auftrag */
-  protokolle?: AkteProtokollDokument[]
   onReload: () => void
 }) {
   const [meta, setMeta] = useState<
@@ -180,27 +169,10 @@ export function AnfrageDokumenteTab({
       })
     }
 
-    for (const p of protokolle) {
-      const href = p.href?.trim()
-      if (!href) continue
-      const id = p.id?.trim() || `protokoll-${p.name}`
-      const m = meta[id]
-      rows.push({
-        id,
-        name: m?.name?.trim() || p.name.trim() || "Protokoll",
-        href,
-        created_at: m?.created_at || p.created_at || new Date().toISOString(),
-        groesse_bytes: null,
-        quelle: "protokoll",
-        beschreibung: m?.beschreibung?.trim() || p.beschreibung?.trim() || "Protokoll",
-        freigabe: m?.freigabe ?? true,
-      })
-    }
-
     return rows.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )
-  }, [dokumente, angebote, rechnungen, immerRechnungIds, protokolle, meta])
+  }, [dokumente, angebote, rechnungen, immerRechnungIds, meta])
 
   const upd = (id: string, patch: Partial<{ name: string; beschreibung: string; freigabe: boolean; created_at: string }>) => {
     setMeta((prev) => {
