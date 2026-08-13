@@ -1,8 +1,8 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import {
@@ -161,8 +161,7 @@ export function AuftragLeistungenTab({
   /** Deep-Link z. B. ?tab=bautagebuch */
   initialLeistungenView?: 'leistungen' | 'bautagebuch'
 }) {
-  const [pendingNachtrag, startNachtragTransition] = useTransition()
-  const [, startTransition] = useTransition()
+  const [pendingNachtrag, setPendingNachtrag] = useState(false)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
@@ -250,7 +249,7 @@ export function AuftragLeistungenTab({
 
   function markErledigt(ids: string[]) {
     if (disabled || !ids.length) return
-    startTransition(async () => {
+    void actionBusy.run('Leistungen werden aktualisiert…', async () => {
       for (const positionId of ids) {
         const r = await updateAuftragPositionLeistungStatus({
           auftragId: detail.id,
@@ -259,7 +258,7 @@ export function AuftragLeistungenTab({
         })
         if (!r.ok) {
           toast.error(r.message)
-          return
+          throw new Error(r.message)
         }
       }
       toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
@@ -268,16 +267,22 @@ export function AuftragLeistungenTab({
   }
 
   function decideNachtrag(positionId: string, status: 'anerkannt' | 'abgelehnt') {
-    if (disabled) return
-    startNachtragTransition(async () => {
-      const r = await decideWeitereArbeitMitNotify({ positionId, status })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success(r.message ?? (status === 'anerkannt' ? 'Bestätigt.' : 'Abgelehnt.'))
-      onSaved?.()
-    })
+    if (disabled || pendingNachtrag) return
+    setPendingNachtrag(true)
+    void actionBusy
+      .run(
+        status === 'anerkannt' ? 'Nachtrag wird angenommen…' : 'Nachtrag wird abgelehnt…',
+        async () => {
+          const r = await decideWeitereArbeitMitNotify({ positionId, status })
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+          toast.success(r.message ?? (status === 'anerkannt' ? 'Bestätigt.' : 'Abgelehnt.'))
+          onSaved?.()
+        }
+      )
+      .finally(() => setPendingNachtrag(false))
   }
 
   return (

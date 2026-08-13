@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { anfrageHandwerkerBautagebuchEintrag } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -55,7 +56,7 @@ export function TagebuchAnfordernSheet({
   angebotHandwerker?: AngebotHandwerkerRow[] | null
   onSent?: () => void
 }) {
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
   const [handwerkerId, setHandwerkerId] = useState('')
   const [selectedPos, setSelectedPos] = useState<Set<string>>(() => new Set())
   const [notiz, setNotiz] = useState('')
@@ -138,25 +139,28 @@ export function TagebuchAnfordernSheet({
   }
 
   function send() {
-    if (!handwerkerId) {
-      toast.error('Bitte Handwerker wählen.')
+    if (!handwerkerId || pending) {
+      if (!handwerkerId) toast.error('Bitte Handwerker wählen.')
       return
     }
-    startTransition(async () => {
-      const res = await anfrageHandwerkerBautagebuchEintrag({
-        auftragId,
-        handwerkerId,
-        notiz: notiz.trim() || null,
-        positionIds: Array.from(selectedPos),
+    setPending(true)
+    void actionBusy
+      .run('Tagebuch wird angefordert…', async () => {
+        const res = await anfrageHandwerkerBautagebuchEintrag({
+          auftragId,
+          handwerkerId,
+          notiz: notiz.trim() || null,
+          positionIds: Array.from(selectedPos),
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          throw new Error(res.message)
+        }
+        toast.success('Tagebuch-Update angefordert — Partner wird benachrichtigt.')
+        onClose()
+        onSent?.()
       })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
-      }
-      toast.success('Tagebuch-Update angefordert — Partner wird benachrichtigt.')
-      onClose()
-      onSent?.()
-    })
+      .finally(() => setPending(false))
   }
 
   return (

@@ -60,7 +60,14 @@ function handwerkerStatusTone(
 ): LeistungRow['handwerkerStatusTone'] {
   if (!hasHandwerker) return null
   const v = String(status ?? '').toLowerCase()
-  if (v === 'akzeptiert' || v === 'zugewiesen' || v.includes('angenommen') || v === 'accepted') {
+  if (
+    v === 'akzeptiert' ||
+    v === 'zugewiesen' ||
+    v === 'bestaetigt' ||
+    v === 'erledigt' ||
+    v.includes('angenommen') ||
+    v === 'accepted'
+  ) {
     return 'zugewiesen'
   }
   if (
@@ -86,9 +93,6 @@ function anfrageLabelForPosition(
   if (!p.handwerker_id) return null
   const antwort = handwerkerAntwortAnzeige(p)
   if (antwort?.label) return antwort.label
-  const st = String(p.handwerker_status ?? '').toLowerCase()
-  /* Partner-erstellt (Nachtrag) — nicht als „Zugewiesen“ zeigen */
-  if (st === 'bestaetigt') return null
   return auftragHwStatusLabel(p.handwerker_status)
 }
 

@@ -1,5 +1,4 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -12,6 +11,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import {
   abschliessenMitHwProtokoll,
   getAbschliessenKontext,
@@ -52,7 +52,7 @@ export function AuftragAbschliessenSheet({
   /** Nach Abschluss ohne Abnahme — z. B. Rechnung öffnen */
   onNachRechnung?: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, setPending] = useState(false)
   const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
   const [step, setStep] = useState<Step>('loading')
   const [hwProtokolle, setHwProtokolle] = useState<AbschliessenHwProtokollVorschau[]>([])
@@ -86,99 +86,119 @@ export function AuftragAbschliessenSheet({
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
   function abschliessenOhneAbnahme() {
-    startTransition(async () => {
-      const ctx = await getAbschliessenKontext(auftragId)
-      if (ctx.mode === 'hw') {
-        toast.error(
-          'Es liegt ein Handwerker-Abnahmeprotokoll vor — bitte darüber speichern oder senden.'
-        )
-        setHwProtokolle(ctx.protokolle)
-        setStep('hw')
-        return
-      }
-      if (ctx.zeilen.length > 0 && !ctx.gateOk) {
-        toast.error(
-          ctx.gateMessage ||
-            'Eingereichte Teilabnahmen zuerst freigeben, dann abschließen.'
-        )
-        return
-      }
-      const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Auftrag abgeschlossen')
-      onClose()
-      onDone?.()
-      onNachRechnung?.()
-    })
+    if (pending) return
+    setPending(true)
+    void actionBusy
+      .run('Auftrag wird abgeschlossen…', async () => {
+        const ctx = await getAbschliessenKontext(auftragId)
+        if (ctx.mode === 'hw') {
+          toast.error(
+            'Es liegt ein Handwerker-Abnahmeprotokoll vor — bitte darüber speichern oder senden.'
+          )
+          setHwProtokolle(ctx.protokolle)
+          setStep('hw')
+          return
+        }
+        if (ctx.zeilen.length > 0 && !ctx.gateOk) {
+          toast.error(
+            ctx.gateMessage ||
+              'Eingereichte Teilabnahmen zuerst freigeben, dann abschließen.'
+          )
+          return
+        }
+        const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Auftrag abgeschlossen')
+        onClose()
+        onDone?.()
+        onNachRechnung?.()
+      })
+      .finally(() => setPending(false))
   }
 
   function speichernMitHwProtokoll(sendToKunde: boolean) {
+    if (pending) return
     setPendingKind(sendToKunde ? 'send' : 'save')
-    startTransition(async () => {
-      const r = await abschliessenMitHwProtokoll({
-        auftragId,
-        sendToKunde,
+    setPending(true)
+    void actionBusy
+      .run(
+        sendToKunde ? 'Wird gespeichert und gesendet…' : 'Auftrag wird abgeschlossen…',
+        async () => {
+          const r = await abschliessenMitHwProtokoll({
+            auftragId,
+            sendToKunde,
+          })
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+          if (r.sendWarning) {
+            toast.error(`Abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`)
+          } else {
+            toast.success(
+              r.sentToKunde
+                ? 'Abnahmeprotokoll an den Kunden gesendet — Auftrag abgeschlossen'
+                : 'Auftrag abgeschlossen (Handwerker-Abnahmeprotokoll)'
+            )
+          }
+          onClose()
+          onDone?.()
+        }
+      )
+      .finally(() => {
+        setPending(false)
+        setPendingKind(null)
       })
-      setPendingKind(null)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      if (r.sendWarning) {
-        toast.error(
-          `Abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`
-        )
-      } else {
-        toast.success(
-          r.sentToKunde
-            ? 'Abnahmeprotokoll an den Kunden gesendet — Auftrag abgeschlossen'
-            : 'Auftrag abgeschlossen (Handwerker-Abnahmeprotokoll)'
-        )
-      }
-      onClose()
-      onDone?.()
-    })
   }
 
   function speichernMitAbnahme(sendToKunde: boolean) {
+    if (pending) return
     setPendingKind(sendToKunde ? 'send' : 'save')
-    startTransition(async () => {
-      const maengel = maengelFromCheckItems(maengelItems)
-      const hatMaengel = maengel.length > 0
-      const meta = emptyAbnahmeProtokollMeta({
-        abnahme_ergebnis: hatMaengel ? 'mit_vorbehalt' : 'abgenommen',
+    setPending(true)
+    void actionBusy
+      .run(
+        sendToKunde ? 'Wird gespeichert und gesendet…' : 'Abnahme wird gespeichert…',
+        async () => {
+          const maengel = maengelFromCheckItems(maengelItems)
+          const hatMaengel = maengel.length > 0
+          const meta = emptyAbnahmeProtokollMeta({
+            abnahme_ergebnis: hatMaengel ? 'mit_vorbehalt' : 'abgenommen',
+          })
+          const r = await saveAbnahmeAndAbschliessen({
+            auftragId,
+            abnahmeDatum: heuteYmd(),
+            punkte,
+            maengel,
+            notizen: notizen.trim() || null,
+            meta,
+            sendToKunde,
+          })
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+          if (r.sendWarning) {
+            toast.error(
+              `Gespeichert und abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`
+            )
+          } else {
+            toast.success(
+              r.sentToKunde
+                ? 'Abnahmeprotokoll gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
+                : 'Gesamtabnahme gespeichert — Auftrag abgeschlossen'
+            )
+          }
+          onClose()
+          onDone?.()
+        }
+      )
+      .finally(() => {
+        setPending(false)
+        setPendingKind(null)
       })
-      const r = await saveAbnahmeAndAbschliessen({
-        auftragId,
-        abnahmeDatum: heuteYmd(),
-        punkte,
-        maengel,
-        notizen: notizen.trim() || null,
-        meta,
-        sendToKunde,
-      })
-      setPendingKind(null)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      if (r.sendWarning) {
-        toast.error(
-          `Gespeichert und abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`
-        )
-      } else {
-        toast.success(
-          r.sentToKunde
-            ? 'Abnahmeprotokoll gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
-            : 'Gesamtabnahme gespeichert — Auftrag abgeschlossen'
-        )
-      }
-      onClose()
-      onDone?.()
-    })
   }
 
   if (step === 'loading') {
@@ -220,10 +240,6 @@ export function AuftragAbschliessenSheet({
         }
       >
         <div className="space-y-5">
-          <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-            Der Handwerker hat das Abnahmeprotokoll bereits erstellt. Prüfen und Auftrag
-            abschließen — Nacharbeit ohne neue Abnahme braucht keine erneute Bestätigung.
-          </p>
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}

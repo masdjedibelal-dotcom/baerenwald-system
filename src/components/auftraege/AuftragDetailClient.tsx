@@ -520,12 +520,12 @@ export function AuftragDetailClient({
     const onOpen = (e: Event) => {
       const id = (e as CustomEvent<{ auftragId?: string }>).detail?.auftragId
       if (!id || id !== detail.id) return
-      void refresh()
+      // Kein refresh hier — sonst Banner-Flash / Remount beim bloßen Öffnen.
       setAbschliessenOpen(true)
     }
     window.addEventListener('crm-open-auftrag-abschliessen', onOpen)
     return () => window.removeEventListener('crm-open-auftrag-abschliessen', onOpen)
-  }, [detail.id, refresh])
+  }, [detail.id])
 
   const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
     setVertragWizardBootstrap(bootstrap)
@@ -565,18 +565,6 @@ export function AuftragDetailClient({
 
   const openRechnungErstellen = useCallback(
     (opts?: RechnungErstellenOpts) => {
-      if (isMobile) {
-        const q = new URLSearchParams()
-        if (opts?.zeileId) q.set('abschlag', opts.zeileId)
-        if (opts?.voll) q.set('voll', '1')
-        if (opts?.naechsterAbschlag) q.set('naechster', '1')
-        const qs = q.toString()
-        router.push(
-          `/auftraege/${detail.id}/rechnungen-auswahl${qs ? `?${qs}` : ''}`
-        )
-        return
-      }
-
       const startWizard = async () => {
         const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, {
           abschlagZeileId: opts?.zeileId,
@@ -598,15 +586,18 @@ export function AuftragDetailClient({
         openRechnungWizard(res.bootstrap)
       }
 
-      if (rechnungenListe.length === 0 || opts?.zeileId || opts?.voll || opts?.naechsterAbschlag) {
+      // Spezifische Rate / Voll → direkt Wizard
+      if (opts?.zeileId || opts?.voll || opts?.naechsterAbschlag) {
         startTransition(() => {
           void startWizard()
         })
         return
       }
+
+      // Zwischenschritt: Bottom Card (Liste oder Leer + Neu)
       setRechnungAuswahlOpen(true)
     },
-    [detail.id, isMobile, openRechnungWizard, rechnungenListe.length, router]
+    [detail.id, openRechnungWizard]
   )
 
   useEffect(() => {

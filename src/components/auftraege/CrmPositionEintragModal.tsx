@@ -1,5 +1,4 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Camera } from 'lucide-react'
@@ -7,6 +6,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
 import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -26,7 +26,7 @@ export function CrmPositionEintragModal({
   initialPositionId?: string | null
   onSaved?: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
+  const [pending, setPending] = useState(false)
   const [positionId, setPositionId] = useState('')
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -81,26 +81,29 @@ export function CrmPositionEintragModal({
     }
     const text = [titel.trim(), beschreibung.trim()].filter(Boolean).join('\n\n')
 
-    startTransition(async () => {
-      const r = await createCrmPositionEintrag({
-        positionId: targetPos,
-        typ: 'fortschritt',
-        beschreibung: text || (fotoPath ? 'Foto-Update' : null),
-        quelle: 'vor_ort',
-        rueckdatiertGrund: null,
-        ereignisZeit: null,
-        zeitStd: null,
-        zeitMin: null,
-        fotoStoragePath: fotoPath.trim() || null,
+    setPending(true)
+    void actionBusy
+      .run('Tagebuch-Eintrag wird gespeichert…', async () => {
+        const r = await createCrmPositionEintrag({
+          positionId: targetPos,
+          typ: 'fortschritt',
+          beschreibung: text || (fotoPath ? 'Foto-Update' : null),
+          quelle: 'vor_ort',
+          rueckdatiertGrund: null,
+          ereignisZeit: null,
+          zeitStd: null,
+          zeitMin: null,
+          fotoStoragePath: fotoPath.trim() || null,
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Eintrag gespeichert')
+        onSaved?.()
+        onClose()
       })
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Eintrag gespeichert')
-      onSaved?.()
-      onClose()
-    })
+      .finally(() => setPending(false))
   }
 
   const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath)

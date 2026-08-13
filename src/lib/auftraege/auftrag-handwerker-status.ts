@@ -19,12 +19,20 @@ export const AUFTRAG_HW_STATUS_OPTIONS: { value: AuftragHandwerkerZuweisungStatu
 
 export function auftragHwStatusLabel(status: string | null | undefined): string {
   const v = (status ?? 'ausstehend').toLowerCase()
+  if (v === 'bestaetigt' || v === 'angenommen') return 'Akzeptiert'
+  if (v === 'erledigt') return 'Erledigt'
   return AUFTRAG_HW_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? status ?? 'Ausstehend'
 }
 
 export function auftragHwStatusBadgeClass(status: string | null | undefined): string {
   const v = (status ?? '').toLowerCase()
-  if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
+  if (
+    v === 'akzeptiert' ||
+    v === 'angenommen' ||
+    v === 'zugewiesen' ||
+    v === 'bestaetigt' ||
+    v === 'erledigt'
+  ) {
     return 'bg-emerald-100 text-emerald-900'
   }
   if (v === 'abgelehnt') return 'bg-red-100 text-red-900'

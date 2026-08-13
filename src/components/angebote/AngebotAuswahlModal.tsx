@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   AngebotAuswahlPanel,
   type AngebotAuswahlZeile,
@@ -27,28 +26,16 @@ export function AngebotAuswahlModal({
   onWeiterbearbeiten: (bootstrap: AngebotWizardBootstrap) => void
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
 }) {
-  const [footer, setFooter] = useState<ReactNode>(null)
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Angebote"
-      subtitle="Bestehendes wählen oder neu anlegen"
-      size="lg"
-      footer={footer}
-      footerSpread
-    >
+    <EditorSheet open={open} onClose={onClose} title="Angebote" context="detail" size="md">
       <AngebotAuswahlPanel
-        variant="modal"
         leadId={leadId}
         angebote={angebote}
         onClose={onClose}
         onNeuesAngebot={onNeuesAngebot}
         onWeiterbearbeiten={onWeiterbearbeiten}
         onKopie={onKopie}
-        onFooterChange={setFooter}
       />
-    </Modal>
+    </EditorSheet>
   )
 }

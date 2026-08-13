@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   RechnungAuswahlPanel,
   type RechnungAuswahlZeile,
@@ -15,7 +14,6 @@ export function RechnungAuswahlModal({
   onClose,
   auftragId,
   rechnungen,
-  auftragsReferenz,
   onNeueRechnung,
   onWeiterbearbeiten,
 }: {
@@ -23,32 +21,20 @@ export function RechnungAuswahlModal({
   onClose: () => void
   auftragId: string
   rechnungen: RechnungAuswahlZeile[]
+  /** @deprecated ungenutzt — Titel bleibt „Rechnungen“ */
   auftragsReferenz?: string | null
   onNeueRechnung: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
 }) {
-  const [footer, setFooter] = useState<ReactNode>(null)
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Rechnungen"
-      subtitle="Bestehende wählen oder neu anlegen"
-      size="lg"
-      footer={footer}
-      footerSpread
-    >
+    <EditorSheet open={open} onClose={onClose} title="Rechnungen" context="detail" size="md">
       <RechnungAuswahlPanel
-        variant="modal"
         auftragId={auftragId}
         rechnungen={rechnungen}
-        auftragsReferenz={auftragsReferenz}
         onClose={onClose}
         onNeueRechnung={onNeueRechnung}
         onWeiterbearbeiten={onWeiterbearbeiten}
-        onFooterChange={setFooter}
       />
-    </Modal>
+    </EditorSheet>
   )
 }
