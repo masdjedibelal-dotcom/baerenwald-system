@@ -2,7 +2,6 @@
  * CRM → Portal Impersonation Token (HMAC, kompatibel mit Portal /auth/crm-enter).
  */
 import { createHmac, randomUUID } from 'crypto'
-import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export type ImpersonationTargetType = 'kunde' | 'handwerker' | 'organisation'
@@ -23,7 +22,11 @@ function partnerSecret(): string | null {
 }
 
 function siteBase(): string {
-  return publicWebsiteBaseUrl()
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.FRONTEND_URL?.trim() ||
+    'https://baerenwaldmuenchen.de'
+  ).replace(/\/$/, '')
 }
 
 function signBody(body: string, key: string): string {
@@ -41,11 +44,7 @@ export async function createPortalImpersonationUrl(input: {
 }): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   const key = partnerSecret()
   if (!key) {
-    return {
-      ok: false,
-      message:
-        'PARTNER_INTERNAL_API_SECRET fehlt (CRM .env.local) — gleicher Wert wie im Portal nötig.',
-    }
+    return { ok: false, message: 'PARTNER_INTERNAL_API_SECRET fehlt (CRM-Umgebung).' }
   }
   const email = input.targetEmail.trim().toLowerCase()
   if (!email.includes('@')) {

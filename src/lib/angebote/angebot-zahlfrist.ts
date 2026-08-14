@@ -10,7 +10,7 @@ export function zahlfristSegFromAngebotMeta(meta: {
   zahlungsbedingungen: AngebotWizardZahlungsbedingung
   zahlfrist_datum?: string
 }): { seg: ZahlfristSeg; datum: string } {
-  const datum = meta.zahlfrist_datum?.trim() || plusDaysIso(7)
+  const datum = meta.zahlfrist_datum?.trim() || plusDaysIso(14)
   switch (meta.zahlungsbedingungen) {
     case '7_tage':
       return { seg: '7', datum }
@@ -23,7 +23,7 @@ export function zahlfristSegFromAngebotMeta(meta: {
     case 'sofort_netto':
       return { seg: '7', datum }
     default:
-      return { seg: '7', datum }
+      return { seg: '14', datum }
   }
 }
 
@@ -34,7 +34,7 @@ export function angebotMetaPatchFromZahlfrist(
   if (seg === 'datum') {
     return {
       zahlungsbedingungen: 'individuell',
-      zahlfrist_datum: datumYmd.trim() || plusDaysIso(7),
+      zahlfrist_datum: datumYmd.trim() || plusDaysIso(14),
     }
   }
   const key = `${seg}_tage` as AngebotWizardZahlungsbedingung

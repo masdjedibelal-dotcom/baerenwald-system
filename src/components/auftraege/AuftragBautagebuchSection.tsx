@@ -1,15 +1,15 @@
 'use client'
 
-import { Camera } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Camera, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { eintragTypLabel, type PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { formatDatum } from '@/lib/utils'
-import { cn } from '@/lib/utils'
 
 export type BautagebuchListenEintrag = PositionEintrag & {
   leistungName?: string | null
-  handwerkerName?: string | null
 }
 
 function eintragZeit(e: BautagebuchListenEintrag): string {
@@ -37,21 +37,13 @@ function eintragText(e: BautagebuchListenEintrag): string {
   if (!body) return ''
   const lines = body.split(/\n+/).map((l) => l.trim()).filter(Boolean)
   if (lines.length <= 1) return ''
-  return lines.slice(1).join(' ').slice(0, 220)
+  return lines.slice(1).join(' ').slice(0, 160)
 }
 
-function typChipClass(typ: string): string {
-  const t = typ.toLowerCase()
-  if (t === 'start') return 'bt-inserat__typ--start'
-  if (t === 'ergebnis') return 'bt-inserat__typ--ende'
-  if (t === 'fortschritt') return 'bt-inserat__typ--fort'
-  if (t === 'weitere_arbeit') return 'bt-inserat__typ--nachtrag'
-  return 'bt-inserat__typ--notiz'
-}
+type LightboxState = { urls: string[]; index: number }
 
 /**
  * Bautagebuch = Portal-Updates als Inserat-Cards.
- * Start / Fortschritt / Ergebnis sind getrennte Einträge — Typ-Badge macht das klar.
  */
 export function AuftragBautagebuchSection({
   eintraege,
@@ -64,13 +56,35 @@ export function AuftragBautagebuchSection({
   onAdd: () => void
   onAnfordern?: () => void
 }) {
-  const sorted = [...eintraege]
-    .filter((e) => String(e.typ).toLowerCase() !== 'weitere_arbeit')
-    .sort((a, b) => {
-      const ta = a.ereignis_zeit || a.created_at || ''
-      const tb = b.ereignis_zeit || b.created_at || ''
-      return tb.localeCompare(ta)
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null)
+
+  const closeLightbox = useCallback(() => setLightbox(null), [])
+
+  const stepLightbox = useCallback((delta: number) => {
+    setLightbox((prev) => {
+      if (!prev || prev.urls.length <= 1) return prev
+      const next = (prev.index + delta + prev.urls.length) % prev.urls.length
+      return { ...prev, index: next }
     })
+  }, [])
+
+  useEffect(() => {
+    if (!lightbox) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') stepLightbox(-1)
+      if (e.key === 'ArrowRight') stepLightbox(1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightbox, stepLightbox])
+
+  const sorted = [...eintraege].sort((a, b) => {
+    const ta = a.ereignis_zeit || a.created_at || ''
+    const tb = b.ereignis_zeit || b.created_at || ''
+    return tb.localeCompare(ta)
+  })
+
+  const activeUrl = lightbox ? lightbox.urls[lightbox.index] : null
 
   return (
     <section className="bt-feed" aria-label="Bautagebuch">
@@ -79,8 +93,8 @@ export function AuftragBautagebuchSection({
           <h2 className="bt-feed-title">Bautagebuch</h2>
           <p className="bt-feed-sub">
             {sorted.length === 0
-              ? 'Updates vom Handwerker — Start, Fortschritt, Ergebnis'
-              : `${sorted.length} Eintrag${sorted.length === 1 ? '' : 'e'} (Start · Fortschritt · Ergebnis)`}
+              ? 'Updates fürs Kundenportal — Fotos, Titel, Text'
+              : `${sorted.length} Eintrag${sorted.length === 1 ? '' : 'e'}`}
           </p>
         </div>
         {!disabled ? (
@@ -108,72 +122,59 @@ export function AuftragBautagebuchSection({
           <MockIcon ctx="empty" n="camera" size={28} />
           <p>Noch keine Einträge.</p>
           <p className="bt-feed-empty__hint">
-            Start, Fortschritt und Ergebnis erscheinen hier als getrennte Einträge.
+            Einträge erscheinen im Kundenportal.
           </p>
         </div>
       ) : (
         <ul className="bt-inserat-list">
           {sorted.map((e) => {
-            const fotos = e.eintrag_fotos ?? []
-            const visibleFotos = fotos.filter((f) => f.display_url)
-            const cover = visibleFotos[0]?.display_url
-            const hasFotoSlot = fotos.length > 0
+            const fotos = (e.eintrag_fotos ?? [])
+              .map((f) => f.display_url)
+              .filter((u): u is string => Boolean(u))
+            const cover = fotos[0]
             const desc = eintragText(e)
             const stunden =
               e.zeit_minuten != null && e.zeit_minuten > 0
                 ? `${Math.floor(e.zeit_minuten / 60)}:${String(e.zeit_minuten % 60).padStart(2, '0')} Std.`
                 : null
-            const vonPartner =
-              String(e.erfasst_von ?? '').includes('partner') ||
-              String(e.erfasst_von ?? '').includes('eigenbetrieb')
             return (
-              <li
-                key={e.id}
-                className={cn('bt-inserat', !hasFotoSlot && 'bt-inserat--text-only')}
-              >
-                {hasFotoSlot ? (
-                  <div className="bt-inserat__media" aria-hidden>
-                    {cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cover} alt="" />
-                    ) : (
-                      <div className="bt-inserat__media-empty">
-                        <Camera className="h-7 w-7 opacity-35" />
-                        <span className="bt-inserat__media-hint">Foto nicht ladbar</span>
-                      </div>
-                    )}
-                    {visibleFotos.length > 1 ? (
-                      <span className="bt-inserat__count">+{visibleFotos.length - 1}</span>
+              <li key={e.id} className="bt-inserat">
+                {cover ? (
+                  <button
+                    type="button"
+                    className="bt-inserat__media bt-inserat__media--clickable"
+                    onClick={() => setLightbox({ urls: fotos, index: 0 })}
+                    aria-label={
+                      fotos.length > 1
+                        ? `Foto vergrößern (${fotos.length} Fotos)`
+                        : 'Foto vergrößern'
+                    }
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={cover} alt="" />
+                    {fotos.length > 1 ? (
+                      <span className="bt-inserat__count">+{fotos.length - 1}</span>
                     ) : null}
+                  </button>
+                ) : (
+                  <div className="bt-inserat__media" aria-hidden>
+                    <div className="bt-inserat__media-empty">
+                      <Camera className="h-7 w-7 opacity-35" />
+                    </div>
                   </div>
-                ) : null}
+                )}
                 <div className="bt-inserat__body">
-                  <div className="bt-inserat__head">
-                    <span className={cn('bt-inserat__typ', typChipClass(e.typ))}>
-                      {eintragTypLabel(e.typ)}
-                    </span>
-                    {vonPartner ? (
-                      <span className="bt-inserat__src">Handwerker</span>
-                    ) : (
-                      <span className="bt-inserat__src">CRM</span>
-                    )}
-                  </div>
                   <div className="bt-inserat__title">{eintragTitel(e)}</div>
                   {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
                   <div className="bt-inserat__meta">
                     <span>{eintragZeit(e)}</span>
-                    {e.handwerkerName?.trim() ? (
-                      <span className="bt-inserat__chip">{e.handwerkerName.trim()}</span>
-                    ) : null}
                     {e.leistungName?.trim() ? (
-                      <span className="bt-inserat__chip bt-inserat__chip--muted">
-                        {e.leistungName.trim()}
-                      </span>
+                      <span className="bt-inserat__chip">{e.leistungName.trim()}</span>
                     ) : (
                       <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
                     )}
                     {stunden ? (
-                      <span className="bt-inserat__zeit" title="Erfasste Zeit">
+                      <span className="bt-inserat__intern" title="Nur intern">
                         {stunden}
                       </span>
                     ) : null}
@@ -184,6 +185,51 @@ export function AuftragBautagebuchSection({
           })}
         </ul>
       )}
+
+      <Modal
+        open={Boolean(lightbox && activeUrl)}
+        onClose={closeLightbox}
+        title="Foto"
+        subtitle={
+          lightbox && lightbox.urls.length > 1
+            ? `${lightbox.index + 1} / ${lightbox.urls.length}`
+            : undefined
+        }
+        size="xl"
+        footer={
+          <button type="button" className="btn primary sm" onClick={closeLightbox}>
+            <X className="h-4 w-4" aria-hidden />
+            Schließen
+          </button>
+        }
+      >
+        {activeUrl ? (
+          <div className="bt-foto-lightbox">
+            {lightbox && lightbox.urls.length > 1 ? (
+              <button
+                type="button"
+                className="bt-foto-lightbox__nav bt-foto-lightbox__nav--prev"
+                onClick={() => stepLightbox(-1)}
+                aria-label="Vorheriges Foto"
+              >
+                <ChevronLeft className="h-5 w-5" aria-hidden />
+              </button>
+            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={activeUrl} alt="Bautagebuch-Foto" className="bt-foto-lightbox__img" />
+            {lightbox && lightbox.urls.length > 1 ? (
+              <button
+                type="button"
+                className="bt-foto-lightbox__nav bt-foto-lightbox__nav--next"
+                onClick={() => stepLightbox(1)}
+                aria-label="Nächstes Foto"
+              >
+                <ChevronRight className="h-5 w-5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </section>
   )
 }

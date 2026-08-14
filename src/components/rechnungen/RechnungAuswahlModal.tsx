@@ -1,6 +1,6 @@
 'use client'
 
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
 import {
   RechnungAuswahlPanel,
   type RechnungAuswahlZeile,
@@ -14,6 +14,7 @@ export function RechnungAuswahlModal({
   onClose,
   auftragId,
   rechnungen,
+  auftragsReferenz,
   onNeueRechnung,
   onWeiterbearbeiten,
 }: {
@@ -21,20 +22,21 @@ export function RechnungAuswahlModal({
   onClose: () => void
   auftragId: string
   rechnungen: RechnungAuswahlZeile[]
-  /** @deprecated ungenutzt — Titel bleibt „Rechnungen“ */
   auftragsReferenz?: string | null
   onNeueRechnung: () => void
   onWeiterbearbeiten: (bootstrap: RechnungWizardBootstrap) => void
 }) {
   return (
-    <EditorSheet open={open} onClose={onClose} title="Rechnungen" context="detail" size="md">
+    <Modal open={open} onClose={onClose} title="Rechnungen" size="lg">
       <RechnungAuswahlPanel
+        variant="modal"
         auftragId={auftragId}
         rechnungen={rechnungen}
+        auftragsReferenz={auftragsReferenz}
         onClose={onClose}
         onNeueRechnung={onNeueRechnung}
         onWeiterbearbeiten={onWeiterbearbeiten}
       />
-    </EditorSheet>
+    </Modal>
   )
 }

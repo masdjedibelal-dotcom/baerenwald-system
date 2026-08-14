@@ -4,8 +4,7 @@
  *
  * Einfache Regel (kein Kleinreparatur-Pfad):
  * - Immer Angebot (außer Akut-Direkt ohne Angebot).
- * - Freigabe-System aktiv (freigabe|direkt) + unter Schwelle → keine HV-Freigabe (Info),
- *   Primary „Direkt Auftrag“ im CRM (kein stiller Auto-Accept).
+ * - Freigabe-System aktiv (freigabe|direkt) + unter Schwelle → Info + Auto-Auftrag ohne Annahme.
  * - Über Schwelle → Freigabe/Annahme abwarten.
  * - System nicht aktiv → nur Angebot, auf Annahme warten.
  */
@@ -274,8 +273,8 @@ export async function syncOrgFreigabeNachAngebot(input: {
       return { ok: true, status: 'nicht_noetig', erforderlich: false }
     }
 
-    // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe, nur Info.
-    // Auftrag legt der Nutzer per Primary „Direkt Auftrag“ an (kein stiller Auto-Accept).
+    // Aktiv + unter Schwelle (oder Modus „direkt“): Info an HV + Auftrag ohne manuelle Annahme.
+    // Immer zuvor Angebot (außer Akut-Direktpfad ohne Angebot).
     await sendOrgAngebotInfoOnce({
       leadId,
       angebotId,
@@ -286,10 +285,12 @@ export async function syncOrgFreigabeNachAngebot(input: {
       betrag,
     })
 
+    const auto = await maybeAutoAuftragUnterSchwelle(angebotId, leadId, orgKundeId, betrag)
     return {
       ok: true,
       status: 'nicht_noetig',
       erforderlich: false,
+      autoAuftragId: auto.auftragId,
     }
   }
 
@@ -390,6 +391,65 @@ async function sendOrgAngebotInfoOnce(input: {
     leadId: input.leadId,
     kundeId: input.orgKundeId,
   })
+}
+
+/** Unter Schwelle / Notfall: Auftrag ohne Kundenannahme (idempotent). */
+async function maybeAutoAuftragUnterSchwelle(
+  angebotId: string,
+  leadId: string,
+  orgKundeId: string,
+  betrag: number
+): Promise<{ auftragId?: string }> {
+  const { data: existing } = await supabaseAdmin
+    .from('auftraege')
+    .select('id')
+    .eq('angebot_id', angebotId)
+    .limit(1)
+    .maybeSingle()
+  if (existing?.id) return { auftragId: String(existing.id) }
+
+  const { data: ang } = await supabaseAdmin
+    .from('angebote')
+    .select('id, positionen, gesamt_max, gesamt_min, status')
+    .eq('id', angebotId)
+    .maybeSingle()
+  if (!ang) return {}
+
+  const pos = Array.isArray(ang.positionen) ? ang.positionen : []
+  if (!pos.length) return {}
+  const betragOk =
+    betrag > 0 ||
+    (ang.gesamt_max != null && Number(ang.gesamt_max) > 0) ||
+    (ang.gesamt_min != null && Number(ang.gesamt_min) > 0)
+  if (!betragOk) return {}
+
+  try {
+    const { acceptAngebotAndCreateAuftrag } = await import(
+      '@/app/(dashboard)/angebote/angebot-flow-actions'
+    )
+    const res = await acceptAngebotAndCreateAuftrag(angebotId, {
+      asSystem: true,
+      send_kunden_email: false,
+    })
+    if (!res.ok) {
+      console.warn('maybeAutoAuftragUnterSchwelle:', res.message)
+      return {}
+    }
+
+    await supabaseAdmin.from('org_freigabe_log').insert({
+      lead_id: leadId,
+      angebot_id: angebotId,
+      auftraggeber_kunde_id: orgKundeId,
+      aktion: 'auto_auftrag',
+      betrag_eur: betrag > 0 ? betrag : null,
+      erstellt_von: 'crm',
+    })
+
+    return { auftragId: res.auftragId }
+  } catch (e) {
+    console.warn('maybeAutoAuftragUnterSchwelle:', e)
+    return {}
+  }
 }
 
 /** Org-Freigabe nach Partner-Nachtrag wenn Summe Schwelle überschreitet. */

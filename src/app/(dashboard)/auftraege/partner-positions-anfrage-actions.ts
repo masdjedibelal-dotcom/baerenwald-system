@@ -4,9 +4,10 @@ import { revalidatePath } from 'next/cache'
 
 import { createNachtragManuell } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { setWeitereArbeitAnerkennung } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-import { neuePositionsId, normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { neuePositionsId } from '@/lib/angebot-positionen'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { metaNeueLeistungMitPartner } from '@/lib/auftraege/partner-vorgang-meta'
 import {
   notifyPartnerUnified,
   partnerVorgangLink,
@@ -37,9 +38,6 @@ export type WeitereArbeitInPruefungRow = {
   handwerker_id: string | null
   handwerker_name: string | null
   created_at: string
-  preis_partner?: number | null
-  menge?: number | null
-  einheit?: string | null
 }
 
 async function crmAuth() {
@@ -91,7 +89,7 @@ export async function listWeitereArbeitInPruefung(
   const { data } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
-      'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, preis_partner, menge, einheit, created_at, handwerker:handwerker_id(name)'
+      'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, created_at, handwerker:handwerker_id(name)'
     )
     .eq('auftrag_id', auftragId)
     .eq('anerkennung_status', 'in_pruefung')
@@ -107,9 +105,6 @@ export async function listWeitereArbeitInPruefung(
       handwerker_id: (r.handwerker_id as string | null) ?? null,
       handwerker_name: name ?? null,
       created_at: String(r.created_at ?? ''),
-      preis_partner: r.preis_partner != null ? Number(r.preis_partner) : null,
-      menge: r.menge != null ? Number(r.menge) : null,
-      einheit: (r.einheit as string | null) ?? null,
     }
   })
 }
@@ -135,97 +130,7 @@ async function auftragTitel(auftragId: string): Promise<string> {
 }
 
 /**
- * Angenommene Partner-Nacharbeit auch ins verknüpfte Angebot schreiben,
- * damit „Angebot bearbeiten“ / Wizard die Position zum Kundenversand hat.
- */
-async function appendLeistungZuAngebot(opts: {
-  auftragId: string
-  titel: string
-  beschreibung?: string | null
-  gewerkName: string
-  gewerkSlug: string
-  handwerkerId?: string | null
-  preisNetto?: number | null
-  menge?: number | null
-  einheit?: string | null
-}): Promise<boolean> {
-  const { data: auftrag } = await supabaseAdmin
-    .from('auftraege')
-    .select('angebot_id')
-    .eq('id', opts.auftragId)
-    .maybeSingle()
-  const angebotId = String(auftrag?.angebot_id ?? '').trim()
-  if (!angebotId) return false
-
-  const { data: ang } = await supabaseAdmin
-    .from('angebote')
-    .select('positionen')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (!ang) return false
-
-  const existing = normalizeAngebotPositionen(ang.positionen)
-  const titleKey = opts.titel.trim().toLowerCase()
-  if (
-    existing.some(
-      (p) =>
-        String(p.leistung_name ?? p.leistung ?? '')
-          .trim()
-          .toLowerCase() === titleKey
-    )
-  ) {
-    return true
-  }
-
-  const preis =
-    opts.preisNetto != null && Number.isFinite(opts.preisNetto) && opts.preisNetto > 0
-      ? Math.round(opts.preisNetto * 100) / 100
-      : 0
-  const menge =
-    opts.menge != null && Number.isFinite(opts.menge) && opts.menge > 0 ? opts.menge : 1
-  const einheit = opts.einheit?.trim() || (opts.menge && opts.menge > 1 ? 'Min' : 'pauschal')
-
-  const neu: AngebotPosition = {
-    id: neuePositionsId(),
-    gewerk_id: '',
-    gewerk_name: opts.gewerkName,
-    gewerk_slug: opts.gewerkSlug,
-    leistung: opts.titel,
-    leistung_name: opts.titel,
-    beschreibung: opts.beschreibung?.trim() || opts.titel,
-    lohn_netto: preis,
-    material_netto: 0,
-    vk_netto: preis,
-    gesamt_min: Math.round(preis * menge * 100) / 100,
-    gesamt_max: Math.round(preis * menge * 100) / 100,
-    menge,
-    einheit,
-    preis_typ: 'fix',
-    position_quelle: 'frei',
-    handwerker_id: opts.handwerkerId?.trim() || undefined,
-    notiz_intern: 'Aus Handwerker-Nacharbeit übernommen',
-  }
-
-  const { error } = await supabaseAdmin
-    .from('angebote')
-    .update({
-      positionen: [...existing, neu],
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', angebotId)
-
-  if (error) {
-    console.error('[appendLeistungZuAngebot]', error.message)
-    return false
-  }
-  revalidatePath(`/angebote/${angebotId}`)
-  return true
-}
-
-/**
- * Pfad A: Nacharbeit vom Partner annehmen → Position am Auftrag.
- * Keine klassische Nachreichung: der Handwerker hat selbst gemeldet und muss
- * nicht erneut im Portal „Änderungen bestätigen“.
+ * Pfad A: Interne Position am Auftrag anlegen, Partner zur Annahme (Nachreichung).
  */
 export async function decidePartnerPositionsAnfrageIntern(input: {
   anfrageId: string
@@ -272,18 +177,11 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
     .limit(1)
     .maybeSingle()
 
-  const schaetzungEur =
+  const partnerMeta = metaNeueLeistungMitPartner(
     input.preisPartner ??
-    (anfrage.schaetzung_eur != null ? Number(anfrage.schaetzung_eur) : null)
-  // HW hat die Nacharbeit selbst eingereicht → bereits „angenommen“, keine Portal-Nachreichung
-  const partnerMeta = {
-    aenderung_typ: null,
-    preis_alt: null,
-    handwerker_status: 'bestaetigt',
-    ...(schaetzungEur != null && Number.isFinite(schaetzungEur) && schaetzungEur > 0
-      ? { preis_partner: Math.round(schaetzungEur * 100) / 100 }
-      : {}),
-  }
+      (anfrage.schaetzung_eur != null ? Number(anfrage.schaetzung_eur) : null),
+    'angefragt'
+  )
 
   const { data: pos, error } = await supabaseAdmin
     .from('auftrag_positionen')
@@ -296,6 +194,7 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
       beschreibung: [
         anfrage.begruendung ? String(anfrage.begruendung) : null,
         input.notiz?.trim() || null,
+        'Aus Partner-Meldung (interne Freigabe).',
       ]
         .filter(Boolean)
         .join('\n\n'),
@@ -305,12 +204,9 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
       verguetung: anfrage.schaetzung_eur ? 'festpreis' : 'aufwand',
       leistung_status: 'offen',
       anerkennung_status: 'anerkannt',
-      preis_kunde:
-        schaetzungEur != null && Number.isFinite(schaetzungEur) && schaetzungEur > 0
-          ? Math.round(schaetzungEur * 100) / 100
-          : null,
       sort_order: Number(last?.sort_order ?? 0) + 10,
       ...partnerMeta,
+      handwerker_angefragt_at: new Date().toISOString(),
     })
     .select('id')
     .single()
@@ -331,34 +227,23 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
     })
     .eq('id', input.anfrageId)
 
-  await appendLeistungZuAngebot({
-    auftragId,
-    titel,
-    beschreibung: anfrage.begruendung ? String(anfrage.begruendung) : null,
-    gewerkName,
-    gewerkSlug,
-    handwerkerId,
-    preisNetto: schaetzungEur,
-    menge: anfrage.schaetzung_minuten ? Number(anfrage.schaetzung_minuten) : 1,
-    einheit: anfrage.schaetzung_minuten ? 'Min' : 'pauschal',
-  })
-
   const projekt = await auftragTitel(auftragId)
   await notifyPartnerUnified({
     handwerkerId,
-    typ: 'erinnerung',
+    typ: 'neu',
     projektName: projekt,
     link: partnerVorgangLink(auftragId),
     leistungName: titel,
     auftragId,
     positionIds: [String(pos.id)],
+    aenderungTyp: 'neu',
     sendMail: true,
   })
 
   await writeAuditEvent({
     entityType: 'auftrag',
     entityId: auftragId,
-    aktion: 'partner_positions_anfrage_angenommen',
+    aktion: 'partner_positions_anfrage_intern',
     actorId: auth.userId,
     actorRolle: 'crm',
     payload: { anfrage_id: input.anfrageId, position_id: pos.id },
@@ -366,20 +251,17 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
-    typ: 'nachtrag_akzeptiert',
-    titel: `Nacharbeit angenommen: ${titel}`,
-    beschreibung: anfrage.begruendung ? String(anfrage.begruendung) : null,
+    typ: 'notiz_intern',
+    titel: 'Partner-Meldung intern freigegeben',
+    beschreibung: titel,
     erstellt_von: auth.userId,
     handwerker_id: handwerkerId,
-    sichtbar_fuer_kunde: true,
-    fuer_kunde_freigegeben: true,
   })
 
   revalidatePath(`/auftraege/${auftragId}`)
   return {
     ok: true,
-    message:
-      'Nacharbeit angenommen — unter Leistungen. Partner muss nicht erneut bestätigen.',
+    message: 'Position angelegt — Partner muss im Portal annehmen.',
   }
 }
 
@@ -544,9 +426,7 @@ export async function decideWeitereArbeitMitNotify(input: {
 
   const { data: pos } = await supabaseAdmin
     .from('auftrag_positionen')
-    .select(
-      'id, auftrag_id, handwerker_id, leistung_name, beschreibung, preis_partner, preis_kunde, menge, einheit, gewerk_name, gewerk_slug'
-    )
+    .select('id, auftrag_id, handwerker_id, leistung_name')
     .eq('id', input.positionId)
     .maybeSingle()
 
@@ -564,63 +444,7 @@ export async function decideWeitereArbeitMitNotify(input: {
     })
   }
 
-  /* Hausmeister-/Kunden-Portal: Entscheidung sichtbar in Timeline */
   if (pos?.auftrag_id) {
-    const name = String(pos.leistung_name ?? 'Nachtrag').trim() || 'Nachtrag'
-    const preisNum =
-      pos.preis_partner != null && Number(pos.preis_partner) > 0
-        ? Number(pos.preis_partner)
-        : null
-    const preis =
-      preisNum != null
-        ? preisNum.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
-        : null
-    const zeit =
-      pos.menge != null && Number(pos.menge) > 0
-        ? `${Number(pos.menge)} ${String(pos.einheit ?? 'Std').trim() || 'Std'}`
-        : null
-    const meta = [preis, zeit].filter(Boolean).join(' · ')
-    const begruendung = String(pos.beschreibung ?? '')
-      .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
-      .trim()
-
-    if (input.status === 'anerkannt') {
-      if (
-        (pos.preis_kunde == null || Number(pos.preis_kunde) <= 0) &&
-        preisNum != null
-      ) {
-        await supabaseAdmin
-          .from('auftrag_positionen')
-          .update({ preis_kunde: preisNum })
-          .eq('id', pos.id)
-      }
-      await appendLeistungZuAngebot({
-        auftragId: String(pos.auftrag_id),
-        titel: name,
-        beschreibung: begruendung || null,
-        gewerkName: String(pos.gewerk_name ?? 'Regie').trim() || 'Regie',
-        gewerkSlug: String(pos.gewerk_slug ?? 'regie').trim() || 'regie',
-        handwerkerId: pos.handwerker_id ? String(pos.handwerker_id) : null,
-        preisNetto: preisNum,
-        menge: pos.menge != null ? Number(pos.menge) : 1,
-        einheit: String(pos.einheit ?? 'Std'),
-      })
-    }
-
-    await insertAuftragTimelineEvent({
-      auftrag_id: String(pos.auftrag_id),
-      typ: input.status === 'anerkannt' ? 'nachtrag_akzeptiert' : 'nachtrag_abgelehnt',
-      titel:
-        input.status === 'anerkannt'
-          ? `Nacharbeit angenommen: ${name}`
-          : `Nacharbeit abgelehnt: ${name}`,
-      beschreibung: [meta || null, begruendung || null, input.notiz?.trim() || null]
-        .filter(Boolean)
-        .join('\n\n'),
-      sichtbar_fuer_kunde: true,
-      fuer_kunde_freigegeben: true,
-      handwerker_id: pos.handwerker_id ? String(pos.handwerker_id) : null,
-    })
     revalidatePath(`/auftraege/${pos.auftrag_id}`)
   }
 
@@ -628,7 +452,7 @@ export async function decideWeitereArbeitMitNotify(input: {
     ok: true,
     message:
       input.status === 'anerkannt'
-        ? 'Angenommen — unter Leistungen. Angebot enthält die Position (bearbeiten & an Kunden senden).'
-        : 'Abgelehnt — Partner informiert.',
+        ? 'Weitere Arbeit anerkannt.'
+        : 'Weitere Arbeit abgelehnt.',
   }
 }

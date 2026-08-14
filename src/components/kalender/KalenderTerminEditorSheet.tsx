@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useId, useMemo, useState, useTransition } from 'react'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
 import { DateInput } from '@/components/ui/DateInput'
@@ -18,7 +18,6 @@ import {
 } from '@/app/(dashboard)/kalender/actions'
 import { searchVorgaengeFuerTodo } from '@/app/(dashboard)/kalender/todo-actions'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
-import { kalenderTypLabel } from '@/lib/kalender-styles'
 import {
   formatTerminAdresse,
   parseTerminAdresse,
@@ -31,10 +30,6 @@ import {
 } from '@/lib/kalender/termin-kategorien'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { KalenderTermin, Kunde } from '@/lib/types'
-import { cn } from '@/lib/utils'
-import {
-  kalenderTerminEndeVergangen,
-} from '@/lib/kalender/termin-no-show-hint'
 
 export type MockKat = TerminKatFarbe
 
@@ -81,45 +76,18 @@ function applyAdresseParts(
   setPlz(parts.plz)
 }
 
-function formatDatumLabel(iso: string): string {
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
-  return d.toLocaleDateString('de-DE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function Prop({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="prop">
-      <span className="prop-l">{label}</span>
-      <span className="prop-v">{children}</span>
-    </div>
-  )
-}
-
-function katDotColor(kat: MockKat): string {
-  if (kat === 'yellow') return '#D9A800'
-  if (kat === 'blue') return 'var(--blue-tx)'
-  return 'var(--green)'
-}
-
 export type KalenderTerminEditorPrefill = {
   day?: Date
   startHour?: number
 }
 
 /**
- * Slideover / Bottom-Sheet: Termin ansehen → Bearbeiten, oder neu anlegen.
+ * Slideover / Bottom-Sheet: neuen Kalender-Termin anlegen oder bestehenden bearbeiten.
  */
 export function KalenderTerminEditorSheet({
   open,
   termin,
   prefill,
-  startInEdit = false,
   onClose,
   onSaved,
 }: {
@@ -127,13 +95,10 @@ export function KalenderTerminEditorSheet({
   /** `null` = neu */
   termin: KalenderTermin | null
   prefill?: KalenderTerminEditorPrefill | null
-  /** Bestehenden Termin direkt im Bearbeiten-Modus öffnen */
-  startInEdit?: boolean
   onClose: () => void
   onSaved: () => void
 }) {
   const formId = useId()
-  const [mode, setMode] = useState<'view' | 'edit'>('edit')
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
   const [kategorie, setKategorie] = useState<TerminKategorie>('vor_ort')
@@ -154,12 +119,8 @@ export function KalenderTerminEditorSheet({
     []
   )
 
-  const isNew = !termin
-  const isView = !isNew && mode === 'view'
-
   useEffect(() => {
     if (!open) return
-    setMode(termin ? (startInEdit ? 'edit' : 'view') : 'edit')
     if (termin) {
       setTitel(termin.titel)
       setKategorie(terminTypToKategorie(termin.typ))
@@ -216,40 +177,14 @@ export function KalenderTerminEditorSheet({
     void searchVorgaengeFuerTodo().then((r) => {
       if (r.ok) setVorgangOpts(r.options)
     })
-  }, [open, termin, prefill, startInEdit])
+  }, [open, termin, prefill])
+
+  const isNew = !termin
 
   const kategorieOptions = useMemo(
     () => TERMIN_KATEGORIE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
     []
   )
-
-  const detailKat = typToKat(termin?.typ ?? kategorie)
-  const detailZeit =
-    von || bis
-      ? `${formatHm(von)}${bis ? `–${formatHm(bis)}` : ''} Uhr`
-      : '—'
-  const adresseLabel = formatTerminAdresse({ strasse, hausnummer, plz }) || '—'
-  const kundeLabel =
-    kundenById.get(kundeId)
-      ? kundeDisplayName(kundenById.get(kundeId)!)
-      : termin?.auftraege?.kunden?.name?.trim() ||
-        termin?.leads?.kontakt_name?.trim() ||
-        (kundeId ? '—' : '—')
-  const vorgangLabel =
-    termin?.auftraege?.titel?.trim() ||
-    (termin?.leads?.kontakt_name?.trim()
-      ? `Anfrage · ${termin.leads.kontakt_name.trim()}`
-      : null) ||
-    vorgangOpts.find((o) => o.value === vorgangKey)?.label ||
-    '—'
-  const noShowHinweis =
-    termin &&
-    !termin.erledigt &&
-    kalenderTerminEndeVergangen(termin) &&
-    (termin.typ === 'besichtigung' ||
-      termin.typ === 'vor_ort' ||
-      termin.typ === 'aufmass' ||
-      termin.lead_id)
 
   async function fillAdresseFromLink(opts: {
     kundeId?: string | null
@@ -353,209 +288,129 @@ export function KalenderTerminEditorSheet({
     save()
   }
 
-  const sheetTitle = isNew ? 'Neuer Termin' : isView ? 'Termin' : 'Termin bearbeiten'
-
   return (
     <EditorSheet
       open={open}
       onClose={onClose}
-      title={sheetTitle}
+      title={isNew ? 'Neuer Termin' : 'Termin bearbeiten'}
       context="detail"
       size="md"
       confirmBusy={pending}
-      onConfirm={
-        isView
-          ? undefined
-          : () => {
-              const form = document.getElementById(formId) as HTMLFormElement | null
-              if (form?.reportValidity()) save()
-            }
-      }
-      headerEnd={
-        isView ? (
-          <div className="cal-termin-detail__header-actions">
-            <button
-              type="button"
-              className="btn ghost sm danger"
-              disabled={pending}
-              onClick={() => void onDelete()}
-            >
-              Löschen
-            </button>
-            <button type="button" className="btn ghost sm" onClick={() => setMode('edit')}>
-              Bearbeiten
-            </button>
-          </div>
-        ) : undefined
-      }
+      onConfirm={() => {
+        const form = document.getElementById(formId) as HTMLFormElement | null
+        if (form?.reportValidity()) save()
+      }}
     >
-      {isView ? (
-        <div className="cal-termin-detail">
-          <div className="cal-termin-detail__card">
-            <h3 className="cal-termin-detail__title">
-              <span
-                className="cal-termin-detail__kat-dot"
-                style={{ background: katDotColor(detailKat) }}
-                aria-hidden
-              />
-              <span>{titel.trim() || 'Ohne Titel'}</span>
-            </h3>
-            <div className="props">
-              <Prop label="Kategorie">
-                {terminKategorieLabel(kategorie)}
-                <span className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                  {' '}
-                  · {kalenderTypLabel(termin?.typ ?? kategorie)}
-                </span>
-              </Prop>
-              <Prop label="Datum">{datum ? formatDatumLabel(datum) : '—'}</Prop>
-              <Prop label="Zeit">{detailZeit}</Prop>
-              <Prop label="Adresse">{adresseLabel}</Prop>
-              <Prop label="Kunde">{kundeLabel}</Prop>
-              <Prop label="Vorgang">{vorgangLabel}</Prop>
-              <Prop label="Status">{termin?.erledigt ? 'Erledigt' : 'Offen'}</Prop>
-              {desc.trim() ? (
-                <Prop label="Notiz">
-                  <span className="cal-termin-detail__notiz">{desc.trim()}</span>
-                </Prop>
-              ) : null}
-            </div>
-            {noShowHinweis ? (
-              <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
-                Kunde nicht erschienen? In der Anfrage{' '}
-                <strong className="font-medium text-[var(--text)]">Aktionen → Nicht erreichbar</strong>{' '}
-                setzen.
-              </p>
-            ) : null}
-          </div>
+      <form id={formId} onSubmit={submitForm} className="form-grid">
+        <div className="full">
+          <Input
+            label="Titel"
+            value={titel}
+            onChange={(e) => setTitel(e.target.value)}
+            placeholder="z.B. Vor-Ort Termin Koch"
+            required
+          />
         </div>
-      ) : (
-        <form id={formId} onSubmit={submitForm} className="form-grid">
-          <div className="full">
-            <Input
-              label="Titel"
-              value={titel}
-              onChange={(e) => setTitel(e.target.value)}
-              placeholder="z.B. Vor-Ort Termin Koch"
-              required
-              autoFocus
-            />
-          </div>
-          <div className="full">
-            <Select
-              label="Kategorie"
-              value={kategorie}
-              options={kategorieOptions}
-              onChange={(e) => setKategorie(e.target.value as TerminKategorie)}
-              required
-            />
-          </div>
-          <div className="full">
-            <span className="input-label">
-              Datum
-              <span className="ml-0.5 text-bw-accent" aria-hidden>
-                *
-              </span>
+        <div className="full">
+          <Select
+            label="Kategorie"
+            value={kategorie}
+            options={kategorieOptions}
+            onChange={(e) => setKategorie(e.target.value as TerminKategorie)}
+            required
+          />
+        </div>
+        <div className="full">
+          <span className="input-label">
+            Datum
+            <span className="ml-0.5 text-bw-accent" aria-hidden>
+              *
             </span>
-            <DateInput
-              size="sm"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-              required
-            />
-          </div>
-          <div className="full">
-            <FilterRangeRow
-              title="Uhrzeit"
-              className="!mb-0"
-              von={
-                <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
-              }
-              bis={
-                <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
-              }
-            />
-          </div>
+          </span>
+          <DateInput
+            size="sm"
+            value={datum}
+            onChange={(e) => setDatum(e.target.value)}
+            required
+          />
+        </div>
+        <div className="full">
+          <FilterRangeRow
+            title="Uhrzeit"
+            className="!mb-0"
+            von={
+              <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
+            }
+            bis={
+              <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
+            }
+          />
+        </div>
 
-          <div className="full">
-            <Combobox
-              label="Kunde (optional)"
-              value={kundeId}
-              options={[{ value: '', label: 'Kein Kunde' }, ...kundeOpts]}
-              onChange={onKundeChange}
-              placeholder="Kunde suchen…"
-              emptyLabel="Kein Kunde"
-            />
-          </div>
-          <div className="full">
-            <Combobox
-              label="Vorgang (optional)"
-              value={vorgangKey}
-              options={[{ value: '', label: 'Kein Vorgang' }, ...vorgangOpts]}
-              onChange={onVorgangChange}
-              placeholder="Anfrage oder Auftrag…"
-              emptyLabel="Kein Vorgang"
-            />
-          </div>
+        <div className="full">
+          <Combobox
+            label="Kunde (optional)"
+            value={kundeId}
+            options={[{ value: '', label: 'Kein Kunde' }, ...kundeOpts]}
+            onChange={onKundeChange}
+            placeholder="Kunde suchen…"
+            emptyLabel="Kein Kunde"
+          />
+        </div>
+        <div className="full">
+          <Combobox
+            label="Vorgang (optional)"
+            value={vorgangKey}
+            options={[{ value: '', label: 'Kein Vorgang' }, ...vorgangOpts]}
+            onChange={onVorgangChange}
+            placeholder="Anfrage oder Auftrag…"
+            emptyLabel="Kein Vorgang"
+          />
+        </div>
 
-          <div className="full form-grid" style={{ margin: 0 }}>
-            <div className="full">
-              <Input
-                label="Anschrift"
-                value={strasse}
-                onChange={(e) => setStrasse(e.target.value)}
-                placeholder="Musterstraße"
-                autoComplete="street-address"
-              />
-            </div>
+        <div className="full form-grid" style={{ margin: 0 }}>
+          <div className="full">
             <Input
-              label="Hausnummer"
-              value={hausnummer}
-              onChange={(e) => setHausnummer(e.target.value)}
-              placeholder="12"
-            />
-            <Input
-              label="PLZ"
-              value={plz}
-              onChange={(e) => setPlz(e.target.value)}
-              placeholder="80331"
-              inputMode="numeric"
-              autoComplete="postal-code"
+              label="Anschrift"
+              value={strasse}
+              onChange={(e) => setStrasse(e.target.value)}
+              placeholder="Musterstraße"
+              autoComplete="street-address"
             />
           </div>
+          <Input
+            label="Hausnummer"
+            value={hausnummer}
+            onChange={(e) => setHausnummer(e.target.value)}
+            placeholder="12"
+          />
+          <Input
+            label="PLZ"
+            value={plz}
+            onChange={(e) => setPlz(e.target.value)}
+            placeholder="80331"
+            inputMode="numeric"
+            autoComplete="postal-code"
+          />
+        </div>
 
-          <div className="full">
-            <Textarea
-              label="Beschreibung"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={2}
-            />
+        <div className="full">
+          <Textarea
+            label="Beschreibung"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={2}
+          />
+        </div>
+        {!isNew ? (
+          <div className="full pt-2">
+            <MockBtn sm kind="danger" icon="trash" onClick={() => void onDelete()}>
+              Termin löschen
+            </MockBtn>
           </div>
-        </form>
-      )}
+        ) : null}
+      </form>
     </EditorSheet>
-  )
-}
-
-/** Runder + wie To-dos — für Kalender-Toolbar. */
-export function KalenderAddButton({
-  onClick,
-  label = 'Neuer Termin',
-}: {
-  onClick: () => void
-  label?: string
-}) {
-  return (
-    <button
-      type="button"
-      className="cal-toolbar__add"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-    >
-      <Plus className="h-5 w-5" aria-hidden />
-    </button>
   )
 }
 

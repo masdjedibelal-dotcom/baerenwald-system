@@ -1,13 +1,14 @@
 'use client'
-
 import { useTransition } from '@/components/ui/action-busy'
+
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Copy, Eye, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AppEntityListRow } from '@/components/layout/app'
+import { ListAvatar } from '@/components/ui/ListAvatar'
 import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import {
   loadAngebotWizardBootstrap,
@@ -20,6 +21,7 @@ import { betragAnzeige } from '@/lib/angebot-einfach'
 import { findeNeuestenEntwurf } from '@/lib/angebote/angebot-lebenszyklus'
 import { ANGEBOT_STATUS_LABELS, formatRelativeDate } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
+import { cn } from '@/lib/utils'
 
 export type AngebotAuswahlZeile = {
   id: string
@@ -32,9 +34,6 @@ export type AngebotAuswahlZeile = {
   angebotsnr?: string | null
 }
 
-/**
- * Zwischenschritt Angebot: Liste/Leer oben, darunter nur „Neu“.
- */
 export function AngebotAuswahlPanel({
   leadId,
   angebote,
@@ -42,6 +41,7 @@ export function AngebotAuswahlPanel({
   onNeuesAngebot,
   onWeiterbearbeiten,
   onKopie,
+  variant = 'modal',
 }: {
   leadId: string
   angebote: AngebotAuswahlZeile[]
@@ -49,10 +49,12 @@ export function AngebotAuswahlPanel({
   onNeuesAngebot: () => void
   onWeiterbearbeiten: (bootstrap: AngebotWizardBootstrap) => void
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
+  variant?: 'modal' | 'page'
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const rows = useMemo(
     () =>
@@ -94,15 +96,6 @@ export function AngebotAuswahlPanel({
     })
   }
 
-  function openRow(a: AngebotAuswahlZeile) {
-    if (angebotDarfImWizardBearbeitetWerden(a.status)) {
-      openBearbeiten(a.id)
-      return
-    }
-    onClose?.()
-    router.push(`/angebote/${a.id}`)
-  }
-
   function handleLoeschen(angebotId: string) {
     if (!window.confirm('Angebot wirklich löschen?')) return
     setLoadingId(angebotId)
@@ -114,6 +107,7 @@ export function AngebotAuswahlPanel({
         return
       }
       toast.success('Angebot gelöscht')
+      if (selectedId === angebotId) setSelectedId(null)
       router.refresh()
     })
   }
@@ -132,12 +126,24 @@ export function AngebotAuswahlPanel({
     })
   }
 
+  function handleAuswahlBestaetigen() {
+    if (!selectedId) return
+    const row = rows.find((r) => r.id === selectedId)
+    if (!row) return
+    if (angebotDarfImWizardBearbeitetWerden(row.status)) {
+      openBearbeiten(row.id)
+      return
+    }
+    onClose?.()
+    router.push(`/angebote/${row.id}`)
+  }
+
   function menuItems(a: AngebotAuswahlZeile): ActionsMenuItem[] {
     const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
     const items: ActionsMenuItem[] = [
       {
         label: 'Öffnen',
-        icon: <MockIcon ctx="btn" n="eye" size={15} />,
+        icon: <Eye className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => {
           onClose?.()
           router.push(`/angebote/${a.id}`)
@@ -148,20 +154,20 @@ export function AngebotAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: a.status === 'entwurf' ? 'Weiterbearbeiten' : 'Bearbeiten',
-        icon: <MockIcon ctx="btn" n="pencil" size={15} />,
+        icon: <Pencil className="h-[15px] w-[15px]" aria-hidden />,
         onClick: () => openBearbeiten(a.id),
       })
     }
 
     items.push({
       label: 'Kopieren',
-      icon: <MockIcon ctx="btn" n="copy" size={15} />,
+      icon: <Copy className="h-[15px] w-[15px]" aria-hidden />,
       onClick: () => handleKopieren(a.id),
     })
 
     items.push('sep', {
       label: 'Löschen',
-      icon: <MockIcon ctx="btn" n="trash" size={15} />,
+      icon: <Trash2 className="h-[15px] w-[15px]" aria-hidden />,
       danger: true,
       onClick: () => handleLoeschen(a.id),
     })
@@ -169,57 +175,106 @@ export function AngebotAuswahlPanel({
     return items
   }
 
+  const selected = selectedId ? rows.find((r) => r.id === selectedId) : null
+  const selectedBearbeitbar = selected
+    ? angebotDarfImWizardBearbeitetWerden(selected.status)
+    : false
+
+  const footer = (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-bw-border pt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {variant === 'modal' && onClose ? (
+          <button type="button" className="btn ghost sm" onClick={onClose} disabled={pending}>
+            Schließen
+          </button>
+        ) : (
+          <Link href={`/anfragen/${leadId}`} className="btn ghost sm">
+            Zur Anfrage
+          </Link>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="btn ghost sm inline-flex gap-1.5"
+          onClick={handleNeuesAngebotClick}
+          disabled={pending}
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+          Neu erstellen
+        </button>
+        <button
+          type="button"
+          className="btn primary sm inline-flex gap-1.5"
+          onClick={handleAuswahlBestaetigen}
+          disabled={pending || !selectedId}
+        >
+          {selectedBearbeitbar ? (
+            <>
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Ausgewählt bearbeiten
+            </>
+          ) : (
+            <>
+              <Eye className="h-3.5 w-3.5" aria-hidden />
+              Ausgewählt öffnen
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
+      {variant === 'page' ? (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Anfrage</p>
+            <h1 className="text-[length:var(--fs-head)] font-semibold text-bw-text">Angebote</h1>
+          </div>
+        </div>
+      ) : null}
+
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        Bestehende Angebote auswählen und bearbeiten — oder unten ein neues anlegen.
+      </p>
+
       {rows.length === 0 ? (
-        <p className="m-0 rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
           Noch keine Angebote zu dieser Anfrage.
         </p>
-      ) : (
-        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-[10px] border border-bw-border p-0">
+      ) : variant === 'page' ? (
+        <ul className="m-0 list-none space-y-3 p-0">
           {rows.map((a) => {
             const loading = pending && loadingId === a.id
             const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
             const nr = a.angebotsnr?.trim() || `AN-${a.id.slice(0, 8).toUpperCase()}`
 
             return (
-              <li key={a.id} className="flex items-center gap-2 px-3 py-2.5">
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none"
-                  disabled={pending}
-                  onClick={() => openRow(a)}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
-                      {nr}
-                    </span>
-                    <AngebotStatusBadge status={a.status} />
-                  </span>
-                  <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                    {label ? ` · ${label}` : ''}
-                    {' · '}
-                    {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
-                  </span>
-                </button>
-                <div className="shrink-0">
+              <li key={a.id} className="space-y-2">
+                <AppEntityListRow
+                  href={`/angebote/${a.id}`}
+                  avatar={<ListAvatar name={nr} tone="soft" />}
+                  eyebrow={nr}
+                  title={label}
+                  line2={a.created_at ? formatRelativeDate(a.created_at) : '—'}
+                  line4={betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  badge={<AngebotStatusBadge status={a.status} />}
+                />
+                <div className="flex justify-end px-1">
                   {loading ? (
-                    <span className="inline-flex p-2" aria-busy="true">
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Bitte warten…
                     </span>
                   ) : (
                     <ActionsMenu
                       align="right"
                       trigger={
-                        <button
-                          type="button"
-                          className="editor-sheet__icon-btn"
-                          disabled={pending}
-                          aria-label="Aktionen"
-                          title="Aktionen"
-                        >
-                          <MockIcon ctx="default" n="dots" size={18} />
+                        <button type="button" className="btn ghost sm inline-flex gap-1.5" disabled={pending}>
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                          Aktionen
                         </button>
                       }
                       items={menuItems(a)}
@@ -230,17 +285,92 @@ export function AngebotAuswahlPanel({
             )
           })}
         </ul>
+      ) : (
+        <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-lg border border-bw-border p-0">
+          {rows.map((a) => {
+            const loading = pending && loadingId === a.id
+            const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
+            const nr = a.angebotsnr?.trim() || `AN-${a.id.slice(0, 8).toUpperCase()}`
+            const selected = selectedId === a.id
+            const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
+
+            return (
+              <li key={a.id}>
+                <div
+                  className={cn(
+                    'flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap',
+                    selected && 'bg-bw-green-bg/35'
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    disabled={pending}
+                    onClick={() => setSelectedId(a.id)}
+                    onDoubleClick={() => {
+                      if (bearbeitbar) openBearbeiten(a.id)
+                      else {
+                        onClose?.()
+                        router.push(`/angebote/${a.id}`)
+                      }
+                    }}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                          selected
+                            ? 'border-bw-primary bg-bw-primary text-white'
+                            : 'border-bw-border bg-white'
+                        )}
+                        aria-hidden
+                      >
+                        {selected ? (
+                          <span className="block h-1.5 w-1.5 rounded-full bg-white" />
+                        ) : null}
+                      </span>
+                      <span className="font-mono text-[length:var(--fs-meta)] text-bw-text-muted">{nr}</span>
+                      <AngebotStatusBadge status={a.status} />
+                    </div>
+                    <p className="mt-0.5 pl-6 text-[length:var(--fs-text)] text-bw-text-muted">
+                      {a.created_at ? formatRelativeDate(a.created_at) : '—'}
+                      {label ? ` · ${label}` : ''}
+                    </p>
+                  </button>
+                  <span className="text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
+                    {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  </span>
+                  <div className="flex shrink-0 items-center">
+                    {loading ? (
+                      <span className="btn ghost sm inline-flex gap-1.5" aria-busy="true">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        Bitte warten…
+                      </span>
+                    ) : (
+                      <ActionsMenu
+                        align="right"
+                        trigger={
+                          <button
+                            type="button"
+                            className="btn ghost sm inline-flex gap-1.5"
+                            disabled={pending}
+                            aria-label="Aktionen"
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden />
+                          </button>
+                        }
+                        items={menuItems(a)}
+                      />
+                    )}
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
 
-      <MockBtn
-        kind="primary"
-        icon="plus"
-        onClick={handleNeuesAngebotClick}
-        disabled={pending}
-        className="w-full"
-      >
-        Neu
-      </MockBtn>
+      {footer}
     </div>
   )
 }

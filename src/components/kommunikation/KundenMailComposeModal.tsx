@@ -40,7 +40,7 @@ export function KundenMailComposeModal({
   const [cc, setCc] = useState<string[]>([])
   const [betreff, setBetreff] = useState('')
   const [bodyHtml, setBodyHtml] = useState('')
-  const [anrede] = useState<MailAnrede>('sie')
+  const [anrede, setAnrede] = useState<MailAnrede>('du')
   const [previewHtml, setPreviewHtml] = useState('')
   const [vorlagen, setVorlagen] = useState<KommunikationMailVorlage[]>([])
   const [vorlageId, setVorlageId] = useState('')
@@ -64,6 +64,7 @@ export function KundenMailComposeModal({
       setCc(draft.cc)
       setBetreff(draft.betreff)
       setBodyHtml(draft.bodyHtml)
+      setAnrede(draft.anrede)
       setPreviewHtml('')
     })
   }, [open, ctx])
@@ -174,11 +175,21 @@ export function KundenMailComposeModal({
                 Vorlage
               </Button>
             </div>
+            <Select
+              label="Anrede"
+              name="mail-anrede"
+              value={anrede}
+              onChange={(e) => setAnrede(e.target.value === 'sie' ? 'sie' : 'du')}
+              options={[
+                { value: 'du', label: 'Du' },
+                { value: 'sie', label: 'Sie' },
+              ]}
+            />
             <KiAssistFieldLabel
               label="Betreff"
               value={betreff}
               onApply={setBetreff}
-              extraHint="Kunden-Mail Betreff (Sie-Anrede)."
+              extraHint={`Kunden-Mail Betreff. Anrede: ${anrede}.`}
               multiline={false}
             >
               <Input value={betreff} onChange={(e) => setBetreff(e.target.value)} />
@@ -187,7 +198,7 @@ export function KundenMailComposeModal({
               label="Nachricht"
               value={bodyHtml}
               onApply={setBodyHtml}
-              extraHint="Kunden-Mail Text (Sie-Anrede)."
+              extraHint={`Kunden-Mail Text. Anrede: ${anrede}.`}
             >
               <Textarea rows={8} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} />
             </KiAssistFieldLabel>

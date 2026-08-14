@@ -6,18 +6,17 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
-import { createObjektMieter } from '@/app/actions/objektakte-actions'
+import { createObjektEinheit } from '@/app/actions/objektakte-actions'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
 
-type DraftMieter = {
+type DraftEinheit = {
   key: string
-  name: string
   bezeichnung: string
   flaeche: string
 }
 
-/** Objekt anlegen — Objektdaten + optionale Mieter (mit Einheit). */
+/** Mock-Parität: Objekt anlegen — Objektdaten + Wohneinheiten. */
 export function KundenObjektModal({
   open,
   onClose,
@@ -42,7 +41,7 @@ export function KundenObjektModal({
   const [ort, setOrt] = useState('')
   const [baujahr, setBaujahr] = useState('')
   const [gesamtflaeche, setGesamtflaeche] = useState('')
-  const [mieter, setMieter] = useState<DraftMieter[]>([])
+  const [einheiten, setEinheiten] = useState<DraftEinheit[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
 
@@ -58,7 +57,7 @@ export function KundenObjektModal({
       setOrt(editObjekt.ort ?? '')
       setBaujahr('')
       setGesamtflaeche('')
-      setMieter([])
+      setEinheiten([])
     } else {
       setTitel('')
       setStrasse('')
@@ -67,7 +66,7 @@ export function KundenObjektModal({
       setOrt('')
       setBaujahr('')
       setGesamtflaeche('')
-      setMieter([])
+      setEinheiten([])
     }
     setErr(null)
     setDirty(false)
@@ -80,38 +79,33 @@ export function KundenObjektModal({
 
   const flaecheSumme = useMemo(() => {
     let sum = 0
-    for (const e of mieter) {
+    for (const e of einheiten) {
       const n = Number(String(e.flaeche).replace(',', '.'))
       if (Number.isFinite(n)) sum += n
     }
     const g = Number(String(gesamtflaeche).replace(',', '.'))
     if (Number.isFinite(g) && g > 0) return { min: 0, max: g }
     return { min: 0, max: sum }
-  }, [mieter, gesamtflaeche])
+  }, [einheiten, gesamtflaeche])
 
-  function addMieter() {
-    mark(setMieter, [
-      ...mieter,
-      {
-        key: `m-${Date.now()}-${mieter.length}`,
-        name: '',
-        bezeichnung: '',
-        flaeche: '',
-      },
+  function addEinheit() {
+    mark(setEinheiten, [
+      ...einheiten,
+      { key: `e-${Date.now()}-${einheiten.length}`, bezeichnung: '', flaeche: '' },
     ])
   }
 
-  function patchMieter(key: string, patch: Partial<DraftMieter>) {
+  function patchEinheit(key: string, patch: Partial<DraftEinheit>) {
     mark(
-      setMieter,
-      mieter.map((e) => (e.key === key ? { ...e, ...patch } : e))
+      setEinheiten,
+      einheiten.map((e) => (e.key === key ? { ...e, ...patch } : e))
     )
   }
 
-  function removeMieter(key: string) {
+  function removeEinheit(key: string) {
     mark(
-      setMieter,
-      mieter.filter((e) => e.key !== key)
+      setEinheiten,
+      einheiten.filter((e) => e.key !== key)
     )
   }
 
@@ -171,13 +165,12 @@ export function KundenObjektModal({
         return
       }
 
-      for (const m of mieter) {
-        const name = m.name.trim()
-        if (!name) continue
-        const fl = Number(String(m.flaeche).replace(',', '.'))
-        const cr = await createObjektMieter(kundeId, r.objekt.id, {
-          name,
-          wohnung: m.bezeichnung.trim() || undefined,
+      for (const e of einheiten) {
+        const bez = e.bezeichnung.trim()
+        if (!bez) continue
+        const fl = Number(String(e.flaeche).replace(',', '.'))
+        const cr = await createObjektEinheit(kundeId, r.objekt.id, {
+          bezeichnung: bez,
           wohnflaeche_m2: Number.isFinite(fl) && fl > 0 ? fl : null,
         })
         if (!cr.ok) {
@@ -289,51 +282,41 @@ export function KundenObjektModal({
               className="form-section-h"
               style={{ display: 'flex', alignItems: 'center', gap: 8 }}
             >
-              <MockIcon ctx="default" n="users" size={13} />
-              <span style={{ flex: 1 }}>Mieter</span>
+              <MockIcon ctx="default" n="building" size={13} />
+              <span style={{ flex: 1 }}>Wohneinheiten</span>
               <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                 {flaecheSumme.min} – {Math.round(flaecheSumme.max)} m²
               </span>
             </div>
-            {mieter.length === 0 ? (
+            {einheiten.length === 0 ? (
               <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '4px 0 12px' }}>
-                Noch keine Mieter — unten hinzufügen (Name + Einheit).
+                Noch keine Einheiten — unten hinzufügen.
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                {mieter.map((m) => (
+                {einheiten.map((e) => (
                   <div
-                    key={m.key}
+                    key={e.key}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1.2fr 1fr 80px 36px',
+                      gridTemplateColumns: '1fr 100px 36px',
                       gap: 8,
                       alignItems: 'end',
                     }}
                   >
-                    <MockField label="Mieter">
+                    <MockField label="Bezeichnung">
                       <input
                         className="input"
-                        value={m.name}
-                        onChange={(ev) => patchMieter(m.key, { name: ev.target.value })}
-                        placeholder="Max Mustermann"
-                      />
-                    </MockField>
-                    <MockField label="Einheit">
-                      <input
-                        className="input"
-                        value={m.bezeichnung}
-                        onChange={(ev) =>
-                          patchMieter(m.key, { bezeichnung: ev.target.value })
-                        }
+                        value={e.bezeichnung}
+                        onChange={(ev) => patchEinheit(e.key, { bezeichnung: ev.target.value })}
                         placeholder="WE 01"
                       />
                     </MockField>
                     <MockField label="m²">
                       <input
                         className="input"
-                        value={m.flaeche}
-                        onChange={(ev) => patchMieter(m.key, { flaeche: ev.target.value })}
+                        value={e.flaeche}
+                        onChange={(ev) => patchEinheit(e.key, { flaeche: ev.target.value })}
                         placeholder="72"
                         inputMode="decimal"
                       />
@@ -342,8 +325,8 @@ export function KundenObjektModal({
                       type="button"
                       className="qa-btn"
                       title="Entfernen"
-                      aria-label="Mieter entfernen"
-                      onClick={() => removeMieter(m.key)}
+                      aria-label="Einheit entfernen"
+                      onClick={() => removeEinheit(e.key)}
                     >
                       <MockIcon ctx="default" n="x" size={14} />
                     </button>
@@ -351,8 +334,8 @@ export function KundenObjektModal({
                 ))}
               </div>
             )}
-            <button type="button" className="btn ghost sm" onClick={addMieter}>
-              + Mieter hinzufügen
+            <button type="button" className="btn ghost sm" onClick={addEinheit}>
+              + Wohneinheit hinzufügen
             </button>
           </div>
         ) : null}

@@ -24,7 +24,7 @@ export type AnfragenOrgKanalFilter = (typeof ANFRAGEN_ORG_KANAL_FILTER_OPTS)[num
 
 export const ANFRAGEN_ORG_SPEZIAL_FILTER_OPTS: { value: AnfragenOrgSpezialFilter; label: string }[] = [
   { value: '', label: 'Alle' },
-  { value: 'wartet_freigabe', label: 'Entscheidung ausstehend' },
+  { value: 'wartet_freigabe', label: 'Wartet Freigabe' },
   { value: 'wartet_melder', label: 'Wartet Melder' },
 ]
 

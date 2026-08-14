@@ -17,8 +17,6 @@ export type ProjektAngebotKurz = {
   gesamt_fix: number | null
   gesamt_min: number | null
   gesamt_max: number | null
-  /** Für konsolidierte Vorgangs-Akte */
-  pdf_url?: string | null
 }
 
 export type ProjektRechnungKurz = {
@@ -51,10 +49,6 @@ export type ProjektKontext = {
     titel: string | null
     status: string
     created_at?: string | null
-    /** Für konsolidierte Akte über alle Phasen */
-    abnahme_protokoll_url?: string | null
-    abschlussdokumentation_url?: string | null
-    abschlussdokumentation_gesendet_at?: string | null
   } | null
   rechnungen: ProjektRechnungKurz[]
   activeKind: ProjektKetteKind

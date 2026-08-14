@@ -11,7 +11,6 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailNachtrag } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import type { AngebotPosition, Kunde } from '@/lib/types'
-import { angebotNachtragMarker } from '@/lib/auftraege/nachtrag-utils'
 import { getPublicAppUrl } from '@/lib/utils'
 
 const DEFAULT_MWST = 19
@@ -256,97 +255,7 @@ export async function createNachtragManuell(input: {
   return { ok: true, id: row.id as string }
 }
 
-/** Nachtrags-Zeile zum Angebots-Dokument (Marker in beschreibung). */
-export async function findNachtragRowByAngebotId(angebotId: string): Promise<{
-  id: string
-  auftrag_id: string
-  status: string
-} | null> {
-  const id = angebotId.trim()
-  if (!id) return null
-  const marker = angebotNachtragMarker(id)
-  const { data } = await supabaseAdmin
-    .from('nachtraege')
-    .select('id, auftrag_id, status')
-    .ilike('beschreibung', `%${marker}%`)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (!data?.id || !data.auftrag_id) return null
-  return {
-    id: String(data.id),
-    auftrag_id: String(data.auftrag_id),
-    status: String(data.status ?? ''),
-  }
-}
-
-/**
- * Nachtrags-Angebot angenommen → Positionen in bestehenden Auftrag mergen (kein 2. Auftrag).
- */
-export async function applyNachtragsAngebotAnAuftrag(
-  angebotId: string
-): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
-  const angId = angebotId.trim()
-  if (!angId) return { ok: false, message: 'Angebot fehlt.' }
-
-  const nachtrag = await findNachtragRowByAngebotId(angId)
-  if (!nachtrag) {
-    return { ok: false, message: 'Kein Nachtrag zu diesem Angebot gefunden.' }
-  }
-
-  const { data: ang, error: angErr } = await supabaseAdmin
-    .from('angebote')
-    .select('id, positionen, status')
-    .eq('id', angId)
-    .maybeSingle()
-  if (angErr || !ang) return { ok: false, message: angErr?.message ?? 'Angebot nicht gefunden.' }
-
-  const { syncAngebotPositionenZuAuftrag } = await import(
-    '@/lib/auftraege/sync-angebot-zu-auftrag'
-  )
-  const { data: hwRows } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .select('id, handwerker_id, gewerk_id, status')
-    .eq('angebot_id', angId)
-
-  const sync = await syncAngebotPositionenZuAuftrag({
-    auftragId: nachtrag.auftrag_id,
-    angebotPositionen: (ang.positionen as AngebotPosition[]) ?? [],
-    angebotHandwerker: (hwRows ?? []) as never,
-    appendOnly: true,
-  })
-  if (!sync.ok) return sync
-
-  await mergeNachtragIntoAngebot(nachtrag.auftrag_id, ang.positionen)
-
-  const now = new Date().toISOString()
-  if (nachtrag.status !== 'akzeptiert') {
-    await supabaseAdmin
-      .from('nachtraege')
-      .update({
-        status: 'akzeptiert',
-        akzeptiert_at: now,
-        kunde_bestaetigt_at: now,
-      })
-      .eq('id', nachtrag.id)
-      .eq('auftrag_id', nachtrag.auftrag_id)
-  }
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: nachtrag.auftrag_id,
-    typ: 'nachtrag_akzeptiert',
-    titel: 'Nachtrags-Angebot angenommen',
-    beschreibung: `Positionen in Auftrag übernommen (+${sync.neu} neu, ${sync.aktualisiert} aktualisiert)`,
-    sichtbar_fuer_kunde: true,
-  })
-
-  revalidatePath(`/auftraege/${nachtrag.auftrag_id}`)
-  revalidatePath(`/angebote/${angId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/angebote')
-
-  return { ok: true, auftragId: nachtrag.auftrag_id }
-}
+const ANGEBOT_NACHTRAG_MARKER = (angebotId: string) => `[crm:angebot:${angebotId}]`
 
 /**
  * N3: Nachtrags-Angebot aus dem Wizard → nachtraege[] am Auftrag upserten
@@ -367,7 +276,7 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
 
   const pos = normalizeAngebotPositionen(input.positionen)
   const summen = summenAusPositionen(pos, DEFAULT_MWST)
-  const marker = angebotNachtragMarker(input.angebotId)
+  const marker = ANGEBOT_NACHTRAG_MARKER(input.angebotId.trim())
   const baseDesc = (input.beschreibung ?? '').trim()
   const beschreibung = baseDesc.includes(marker)
     ? baseDesc

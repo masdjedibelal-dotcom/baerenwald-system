@@ -8,7 +8,7 @@ import { ACTIVITY_TAB_LABEL } from '@/lib/crm-labels'
 
 export function MockVerlaufCard({ children, empty }: { children: ReactNode; empty?: boolean }) {
   return (
-    <MockCard title={ACTIVITY_TAB_LABEL} icon="history" className="dshell-framed">
+    <MockCard title={ACTIVITY_TAB_LABEL} icon="history">
       {empty ? (
         <MockEmpty
           icon="history"
@@ -33,7 +33,7 @@ export function MockDokumenteCard({
 }) {
   const title = count != null ? `Dokumente · ${count}` : 'Dokumente'
   return (
-    <MockCard title={title} icon="files" className="dshell-framed">
+    <MockCard title={title} icon="files">
       {empty ? (
         <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien und Fotos erscheinen hier" />
       ) : (
@@ -55,7 +55,7 @@ export function MockNotizenCard({
   emptyHint?: string
 }) {
   return (
-    <MockCard title={`Notizen · ${notes.length}`} icon="messages" className="dshell-framed">
+    <MockCard title={`Notizen · ${notes.length}`} icon="messages">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: notes.length ? 14 : 0 }}>
         {notes.length === 0 ? (
           <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>

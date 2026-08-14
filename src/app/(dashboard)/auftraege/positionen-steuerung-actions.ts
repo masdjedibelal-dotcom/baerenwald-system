@@ -307,7 +307,7 @@ export async function getKundeInformierenMailDefaults(
     .maybeSingle()
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const typ = (auf.kunden as { typ?: string | null } | null)?.typ
-  return { ok: true, defaultAnrede: 'sie' }
+  return { ok: true, defaultAnrede: istPrivatKundeTyp(typ) ? 'du' : 'sie' }
 }
 
 export async function previewKundeInformierenMail(input: {

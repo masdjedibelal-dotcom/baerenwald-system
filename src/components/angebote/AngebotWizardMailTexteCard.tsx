@@ -9,7 +9,7 @@ import {
   parseAngebotMailBodyFromEditor,
 } from '@/lib/templates/angebot-mail'
 
-const MAIL_ANREDE = 'sie' as const
+const MAIL_ANREDE = 'du' as const
 
 export function AngebotWizardMailTexteCard({
   leistungsumfangMail,

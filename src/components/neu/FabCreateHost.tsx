@@ -12,7 +12,7 @@ import { KalenderTerminEditorSheet } from '@/components/kalender/KalenderTerminE
 import { TodoEditorSheet } from '@/components/todos/TodoEditorSheet'
 import { AnfrageWizard } from '@/components/anfragen/AnfrageWizard'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
-import { useLocalTransition, hideOverlayBusy } from '@/components/ui/action-busy'
+import { useTransition, hideOverlayBusy } from '@/components/ui/action-busy'
 
 export type FabOverlayArt =
   | 'kunde'
@@ -57,7 +57,7 @@ export function FabCreateHost() {
   const router = useRouter()
   const [art, setArt] = useState<FabOverlayArt | null>(null)
   const [gewerke, setGewerke] = useState<GewerkOpt[]>([])
-  const [, startTransition] = useLocalTransition()
+  const [, startTransition] = useTransition()
 
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -76,7 +76,6 @@ export function FabCreateHost() {
     return () => clearTimeout(t)
   }, [art])
 
-  /* Lokal laden — kein Vollbild-Busy über dem offenen Create-Sheet. */
   useEffect(() => {
     if (art !== 'handwerker') return
     if (gewerke.length > 0) return

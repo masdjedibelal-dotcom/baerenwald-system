@@ -78,7 +78,7 @@ export function AnfrageNotizenTab({
 
   return (
     <>
-      <MockCard title={`Notizen · ${allgemeineNotizen.length}`} icon="messages" className="dshell-framed">
+      <MockCard title={`Notizen · ${allgemeineNotizen.length}`} icon="messages">
         <div
           style={{
             display: "flex",

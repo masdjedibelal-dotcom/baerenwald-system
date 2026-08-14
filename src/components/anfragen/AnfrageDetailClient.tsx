@@ -20,18 +20,10 @@ import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
 import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
-import { ClientOnly } from '@/components/ui/ClientOnly'
-import {
-  loadRechnungWizardBootstrapFromAuftrag,
-  loadRechnungWizardKunde,
-} from '@/app/(dashboard)/rechnungen/wizard-actions'
-import { buildStandaloneRechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-bootstrap-helpers'
-import {
-  defaultRechnungWizardMeta,
-  type RechnungWizardBootstrap,
-} from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -45,7 +37,9 @@ import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
-import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
+import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
+import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
+import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
@@ -60,17 +54,7 @@ const AngebotWizard = dynamic(
     loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
   }
 )
-
-const RechnungWizard = dynamic(
-  () =>
-    import('@/components/rechnungen/RechnungWizard').then((mod) => ({
-      default: mod.RechnungWizard,
-    })),
-  {
-    ssr: false,
-    loading: () => <CrmInlineLoading label="Rechnung-Assistent wird geladen …" minHeight={120} />,
-  }
-)
+import { ACTIVITY_SECTIONS } from '@/lib/crm-labels'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
@@ -85,17 +69,18 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
-type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
+type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
 
 const ANFRAGE_DETAIL_TAB_IDS = new Set<AnfrageDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
+  'aktivitaet',
 ])
 const ANFRAGE_DETAIL_DEFAULT_TAB: AnfrageDetailTab = 'uebersicht'
 
@@ -143,7 +128,7 @@ function resolveAnfrageDetailTabFromQuery(raw: string | null): AnfrageDetailTab 
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'uebersicht'
+    return 'aktivitaet'
   }
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details') return 'uebersicht'
@@ -232,8 +217,6 @@ export function AnfrageDetailClient({
   const [angebotWizardBootstrap, setAngebotWizardBootstrap] =
     useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
-  const [wizardSavedAngebotId, setWizardSavedAngebotId] = useState<string | null>(null)
-  const angebotWizardFinishLockRef = useRef(false)
   const [liveGewerke, setLiveGewerke] = useState(wizardGewerke)
   const [livePreislisten, setLivePreislisten] = useState(wizardPreislisten)
   const [liveFirm, setLiveFirm] = useState(wizardFirm)
@@ -242,10 +225,6 @@ export function AnfrageDetailClient({
   const [bearbeitenOpen, setBearbeitenOpen] = useState(false)
   const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(angeboteAuswahlInitial)
   const [direktWizardOpen, setDirektWizardOpen] = useState(false)
-  const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
-  const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
-    useState<RechnungWizardBootstrap | null>(null)
-  const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
 
@@ -300,6 +279,49 @@ export function AnfrageDetailClient({
     }
   }, [lead.funnel_daten, lead.status, lead.updated_at, lead.angebote, angeboteListe, dbAuftragId])
 
+  const timelineItems = useMemo(() => {
+    const base = buildLeadVerlaufItems(lead.lead_timeline ?? [], {
+      fallbackCreatedAt: lead.created_at,
+      fallbackCreatedLabel: `Lead eingegangen — ${kanalLabel(lead.kanal)}`,
+    })
+
+    const hasAngebote = angeboteListe.length > 0
+    const anKundeGesendet = Boolean(angebotFlowSnapshot?.angebotAnKundeGesendet)
+    const hatAuftrag = Boolean(leadStatusData.auftrag_id)
+    const openSteps: VerlaufBuiltItem[] = []
+    if (!hatAuftrag) {
+      if (!hasAngebote || !anKundeGesendet) {
+        openSteps.push({
+          id: 'open-angebot',
+          text: 'Angebot erstellen',
+          time: 'offen',
+          state: 'open',
+          inspect: null,
+          ts: Number.MAX_SAFE_INTEGER - 1,
+          source: 'open',
+        })
+      }
+      openSteps.push({
+        id: 'open-auftrag',
+        text: 'Auftragsbestätigung',
+        time: 'offen',
+        state: 'open',
+        inspect: null,
+        ts: Number.MAX_SAFE_INTEGER,
+        source: 'open',
+      })
+    }
+
+    return [...base, ...openSteps]
+  }, [
+    lead.lead_timeline,
+    lead.created_at,
+    lead.kanal,
+    angeboteListe.length,
+    angebotFlowSnapshot?.angebotAnKundeGesendet,
+    leadStatusData.auftrag_id,
+  ])
+
   const notizenRows = useMemo(() => {
     const raw = lead.lead_notizen
     if (!Array.isArray(raw)) return [] as LeadNotizRow[]
@@ -312,45 +334,15 @@ export function AnfrageDetailClient({
     return [...raw].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }, [lead.lead_dokumente])
 
-  const dokumenteCount = useMemo(() => {
-    const rechnungen = projektKontext?.rechnungen ?? []
-    const protokolleN =
-      (projektKontext?.auftrag?.abnahme_protokoll_url ? 1 : 0) +
-      (projektKontext?.auftrag?.abschlussdokumentation_url ? 1 : 0)
-    return (
+  const dokumenteCount = useMemo(
+    () =>
       dokumenteRows.length +
       angeboteListe.length +
-      rechnungen.filter((r) => rechnungIstAlsAkteUnterlage(r)).length +
-      protokolleN
-    )
-  }, [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen, projektKontext?.auftrag])
-
-  const akteProtokolle = useMemo(() => {
-    const auf = projektKontext?.auftrag
-    if (!auf) return [] as { id: string; name: string; href: string; created_at?: string | null; beschreibung?: string | null }[]
-    const out: { id: string; name: string; href: string; created_at?: string | null; beschreibung?: string | null }[] = []
-    const abnahme = auf.abnahme_protokoll_url?.trim()
-    if (abnahme) {
-      out.push({
-        id: 'abnahme-protokoll',
-        name: 'Abnahmeprotokoll',
-        href: abnahme,
-        created_at: auf.created_at ?? null,
-        beschreibung: 'Abnahme',
-      })
-    }
-    const abschluss = auf.abschlussdokumentation_url?.trim()
-    if (abschluss) {
-      out.push({
-        id: 'abschluss-doku',
-        name: 'Abschlussdokumentation',
-        href: abschluss,
-        created_at: auf.abschlussdokumentation_gesendet_at ?? auf.created_at ?? null,
-        beschreibung: 'Abschluss',
-      })
-    }
-    return out
-  }, [projektKontext?.auftrag])
+      (projektKontext?.rechnungen ?? []).filter((r) =>
+        rechnungIstAlsAkteUnterlage(r)
+      ).length,
+    [dokumenteRows.length, angeboteListe.length, projektKontext?.rechnungen]
+  )
 
   const leadEmail =
     lead.auftraggeber?.email?.trim() ||
@@ -390,8 +382,6 @@ export function AnfrageDetailClient({
       void (async () => {
         const ok = await ensureWizardData()
         if (!ok) return
-        angebotWizardFinishLockRef.current = false
-        setWizardSavedAngebotId(bootstrap?.angebotId?.trim() || null)
         setAngebotWizardBootstrap(bootstrap)
         setWizardSessionKey((k) => k + 1)
         setAngebotWizardOpen(true)
@@ -399,57 +389,6 @@ export function AnfrageDetailClient({
     },
     [ensureWizardData]
   )
-
-  const openWeitereRechnung = useCallback(() => {
-    startTransition(async () => {
-      const ok = await ensureWizardData()
-      if (!ok) return
-      const aufId =
-        projektKontext?.auftrag?.id?.trim() ||
-        (typeof auftragId === 'string' ? auftragId.trim() : '') ||
-        ''
-      if (aufId) {
-        const res = await loadRechnungWizardBootstrapFromAuftrag(aufId, { vollOhnePlan: true })
-        if (!res.ok) {
-          toast.error(res.message)
-          return
-        }
-        setRechnungWizardBootstrap(res.bootstrap)
-        setRechnungWizardKey((k) => k + 1)
-        setRechnungWizardOpen(true)
-        return
-      }
-      const kundeId =
-        leadVertragsKundeId(lead) ||
-        lead.kunden?.id?.trim() ||
-        lead.kunde_id?.trim() ||
-        ''
-      if (!kundeId) {
-        toast.error('Kein Kunde verknüpft — Rechnung nicht möglich.')
-        return
-      }
-      const k = await loadRechnungWizardKunde(kundeId)
-      if (!k.ok) {
-        toast.error(k.message)
-        return
-      }
-      if (!liveFirm) {
-        toast.error('Firmeneinstellungen fehlen.')
-        return
-      }
-      setRechnungWizardBootstrap({
-        ...buildStandaloneRechnungWizardBootstrap(liveFirm),
-        kundeId: k.kunde.id,
-        kunde: k.kunde,
-        meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
-          kundeTyp: k.kunde.typ,
-          firm: liveFirm,
-        }),
-      })
-      setRechnungWizardKey((k) => k + 1)
-      setRechnungWizardOpen(true)
-    })
-  }, [ensureWizardData, projektKontext?.auftrag?.id, auftragId, lead, liveFirm])
 
   useEffect(() => {
     const kopieId = angebotKopieVonQuelleId?.trim()
@@ -500,21 +439,7 @@ export function AnfrageDetailClient({
     setAngebotAuswahlOpen(true)
   }, [angeboteListe.length, openAngebotWizard])
 
-  const matrixCta = primaryCta('anfrage', lead.status)
-  const istAkut = leadIstAkut(lead)
-  const wartetAufHvFreigabe = leadWartetAufHvStartFreigabe(lead)
-  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
-
-  const openAngebotErstellen = useCallback(() => {
-    if (wartetAufHvFreigabe) {
-      toast.message('Warte auf HV-Freigabe', {
-        description:
-          'Die Hausverwaltung muss den Vorgang erst freigeben, bevor du ein Angebot erstellst.',
-      })
-      return
-    }
-    openAngebotAuswahl()
-  }, [openAngebotAuswahl, wartetAufHvFreigabe])
+  const openAngebotErstellen = openAngebotAuswahl
 
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -527,6 +452,10 @@ export function AnfrageDetailClient({
     if (href) router.push(`${href}#angebot-versand-kunde`)
   }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
+  const matrixCta = primaryCta('anfrage', lead.status)
+  const istAkut = leadIstAkut(lead)
+  const hatAuftrag = Boolean(leadStatusData.auftrag_id)
+
   const openDirektBeauftragen = useCallback(() => {
     void (async () => {
       const ok = await ensureWizardData()
@@ -538,16 +467,9 @@ export function AnfrageDetailClient({
   const primaryCtaAction = useCallback(() => {
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
-      if (wartetAufHvFreigabe) {
-        toast.message('Warte auf HV-Freigabe', {
-          description:
-            'Die Hausverwaltung muss den Vorgang erst freigeben (Angebot einfordern), bevor du ein Angebot erstellst.',
-        })
-        return
-      }
       openAngebotErstellen()
     }
-  }, [matrixCta, openAngebotErstellen, wartetAufHvFreigabe])
+  }, [matrixCta, openAngebotErstellen])
 
   const detailPrimary = useMemo(() => {
     if (hatAuftrag) return null
@@ -557,19 +479,6 @@ export function AnfrageDetailClient({
         icon: 'alert-triangle',
         onClick: openDirektBeauftragen,
         disabled: pending,
-      }
-    }
-    if (wartetAufHvFreigabe) {
-      return {
-        label: 'Warte auf HV-Freigabe',
-        icon: 'clock',
-        onClick: () => {
-          toast.message('Warte auf HV-Freigabe', {
-            description:
-              'Mieter-Meldung: HV muss „Vorgang freigeben“ — danach erscheint „Angebot erstellen“.',
-          })
-        },
-        disabled: false,
       }
     }
     if (!matrixCta) return null
@@ -582,7 +491,6 @@ export function AnfrageDetailClient({
   }, [
     hatAuftrag,
     istAkut,
-    wartetAufHvFreigabe,
     matrixCta,
     openDirektBeauftragen,
     pending,
@@ -590,7 +498,7 @@ export function AnfrageDetailClient({
   ])
 
   const detailSecondary = useMemo(() => {
-    if (hatAuftrag || istAkut || wartetAufHvFreigabe) return null
+    if (hatAuftrag || istAkut) return null
     if (matrixCta?.id !== 'angebot_erstellen') return null
     return {
       label: 'Direkt beauftragen',
@@ -598,32 +506,16 @@ export function AnfrageDetailClient({
       onClick: openDirektBeauftragen,
       disabled: pending,
     }
-  }, [hatAuftrag, istAkut, wartetAufHvFreigabe, matrixCta, openDirektBeauftragen, pending])
+  }, [hatAuftrag, istAkut, matrixCta, openDirektBeauftragen, pending])
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
     setAngebotWizardBootstrap(null)
-    setWizardSavedAngebotId(null)
   }, [])
-
-  const finishAngebotWizard = useCallback(
-    (angebotId?: string | null) => {
-      const id = (angebotId ?? wizardSavedAngebotId)?.trim() || null
-      /* Immer schließen — Lock nur gegen doppelte Navigation. */
-      closeAngebotWizard()
-      if (angebotWizardFinishLockRef.current) return
-      angebotWizardFinishLockRef.current = true
-      if (id) {
-        router.push(`/angebote/${id}`)
-        return
-      }
-      refresh()
-    },
-    [closeAngebotWizard, wizardSavedAngebotId, router, refresh]
-  )
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
   const kundeTitel = useMemo(() => kundenName(lead), [lead])
+  const portalKundeId = useMemo(() => leadVertragsKundeId(lead), [lead])
 
   const statusActions = useMemo(() => {
     const st = String(lead.status ?? '').trim().toLowerCase()
@@ -662,12 +554,13 @@ export function AnfrageDetailClient({
     const s = anfrageStatusDisplay(lead.status, {
       orgFreigabeStatus: lead.org_freigabe_status,
     })
+    const badge = <StatusBadge status={lead.status} label={s.label} />
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        <StatusBadge status={lead.status} label={s.label} />
+        <StatusBadgeActionPopover badge={badge} actions={statusActions} title="Status" />
       </span>
     )
-  }, [lead.status, lead.org_freigabe_status])
+  }, [lead.status, lead.org_freigabe_status, statusActions])
 
   const statusMenuItems = useMemo((): ActionsMenuItem[] => {
     if (!statusActions.length) return []
@@ -704,10 +597,12 @@ export function AnfrageDetailClient({
     return parts.filter(Boolean).join(' · ')
   }, [vorhabenTitel, lead.created_at])
 
+  const timelineTab = <VerlaufPanel items={timelineItems} />
+
   const stammdatenInhalt = (
     <>
-      <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
       <HvMeldungKontextCards lead={lead} />
+      <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
     </>
   )
 
@@ -715,26 +610,8 @@ export function AnfrageDetailClient({
     <LeistungenTab
       phase="anfrage"
       rows={leistungenFromAnfrage(lead.funnel_daten)}
-      onOpenDokument={
-        istAkut
-          ? openDirektBeauftragen
-          : wartetAufHvFreigabe
-            ? () =>
-                toast.message('Warte auf HV-Freigabe', {
-                  description:
-                    'HV muss den Vorgang erst freigeben — danach kannst du ein Angebot erstellen.',
-                })
-            : !hatAuftrag
-              ? openDirektBeauftragen
-              : openAngebotErstellen
-      }
-      dokumentActionLabel={
-        istAkut
-          ? 'Direkt beauftragen'
-          : wartetAufHvFreigabe
-            ? 'Warte auf HV-Freigabe'
-            : 'Angebot erstellen'
-      }
+      onOpenDokument={istAkut || !hatAuftrag ? openDirektBeauftragen : openAngebotErstellen}
+      dokumentActionLabel={istAkut ? 'Direkt beauftragen' : 'Angebot erstellen'}
       emptyTitle="Noch keine Leistungen"
     />
   )
@@ -771,11 +648,7 @@ export function AnfrageDetailClient({
       label: entityDetailTabLabel('zahlung'),
       icon: 'receipt',
       render: () => (
-        <AnfrageZahlungTab
-          rechnungen={projektKontext?.rechnungen ?? []}
-          onWeitereRechnung={openWeitereRechnung}
-          weitereRechnungDisabled={pending}
-        />
+        <AnfrageZahlungTab rechnungen={projektKontext?.rechnungen ?? []} />
       ),
     },
     {
@@ -791,13 +664,19 @@ export function AnfrageDetailClient({
               dokumente={dokumenteRows}
               angebote={angeboteListe}
               rechnungen={projektKontext?.rechnungen ?? []}
-              protokolle={akteProtokolle}
               onReload={() => refresh()}
             />
           }
           notizen={notizenInhalt}
         />
       ),
+    },
+    {
+      id: 'aktivitaet',
+      label: entityDetailTabLabel('aktivitaet'),
+      icon: 'history',
+      count: timelineItems.length || undefined,
+      render: () => timelineTab,
     },
   ]
 
@@ -819,27 +698,10 @@ export function AnfrageDetailClient({
       quickBar={quickBar}
       head={{
         title: kundeTitel,
-        titleBadges: isMobile ? (
-          <>
-            {istAkut ? (
-              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
-                Direktauftrag
-              </span>
-            ) : null}
-            {statusBadge}
-          </>
-        ) : undefined,
-        badges: isMobile ? undefined : (
-          <>
-            {istAkut ? (
-              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
-                Direktauftrag
-              </span>
-            ) : null}
-            {statusBadge}
-          </>
-        ),
+        titleBadges: isMobile ? statusBadge : undefined,
+        badges: isMobile ? undefined : statusBadge,
         meta: headMeta,
+        titleTrailing: <PortalLoginIconButton kundeId={portalKundeId} label="Kundenportal öffnen" />,
         actions: (
           <DetailActionsBar
             sheetTitle="Anfrage"
@@ -894,40 +756,13 @@ export function AnfrageDetailClient({
           bootstrap={angebotWizardBootstrap}
           initialStep={angebotWizardInitialStep}
           focusField={angebotWizardFocus}
-          onClose={() => finishAngebotWizard(wizardSavedAngebotId)}
-          onSaved={(id) => {
-            setWizardSavedAngebotId(id)
+          onClose={closeAngebotWizard}
+          onSaved={() => refresh()}
+          onDone={() => {
+            closeAngebotWizard()
             refresh()
           }}
-          onDone={(id) => {
-            finishAngebotWizard(id)
-          }}
         />
-      ) : null}
-
-      {rechnungWizardOpen && rechnungWizardBootstrap && liveFirm ? (
-        <ClientOnly>
-          <RechnungWizard
-            key={rechnungWizardKey}
-            bootstrap={rechnungWizardBootstrap}
-            gewerke={liveGewerke}
-            preislisten={livePreislisten}
-            firm={liveFirm}
-            zahlungszielTage={Math.max(
-              1,
-              parseInt(liveFirm.zahlungsziel_tage ?? '', 10) || 14
-            )}
-            onClose={() => {
-              setRechnungWizardOpen(false)
-              setRechnungWizardBootstrap(null)
-            }}
-            onDone={() => {
-              setRechnungWizardOpen(false)
-              setRechnungWizardBootstrap(null)
-              refresh()
-            }}
-          />
-        </ClientOnly>
       ) : null}
 
       <AngebotAuswahlModal

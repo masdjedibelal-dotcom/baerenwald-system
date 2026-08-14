@@ -192,8 +192,6 @@ export type HandwerkerDetailPayload = {
     gewerk_name: string | null
     kunde_name: string | null
     vereinbarter_preis: number
-    angebot_leistungsumfang?: string | null
-    angebot_notizen?: string | null
   }[]
   /** Angebot-Zuweisungen (für Zeitraum-Filter in der Übersicht) */
   angebotZuweisungen: { id: string; created_at: string }[]
@@ -306,7 +304,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         `
         id, status, created_at, vereinbarter_preis,
         gewerke ( name ),
-        auftraege ( id, titel, status, created_at, kunden ( name ), angebote ( leistungsumfang, notizen ) )
+        auftraege ( id, titel, status, created_at, kunden ( name ) )
       `
       )
       .eq('handwerker_id', id)
@@ -361,22 +359,12 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         status: string
         created_at: string
         kunden: { name: string } | { name: string }[] | null
-        angebote?:
-          | { leistungsumfang?: string | null; notizen?: string | null }
-          | { leistungsumfang?: string | null; notizen?: string | null }[]
-          | null
       } | null
       if (!a?.id) return null
       const gRaw = r.gewerke as unknown
       const g = (Array.isArray(gRaw) ? gRaw[0] : gRaw) as { name: string } | null | undefined
       const kRaw = a.kunden
       const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { name: string } | null | undefined
-      const angRaw = a.angebote
-      const angList = Array.isArray(angRaw) ? angRaw : angRaw ? [angRaw] : []
-      const ang =
-        angList.find((x) => Boolean(x.leistungsumfang?.trim() || x.notizen?.trim())) ??
-        angList[0] ??
-        null
       return {
         id: a.id,
         titel: a.titel,
@@ -386,8 +374,6 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
         gewerk_name: g?.name ?? null,
         kunde_name: k?.name ?? null,
         vereinbarter_preis: Number((r as { vereinbarter_preis?: number | null }).vereinbarter_preis) || 0,
-        angebot_leistungsumfang: ang?.leistungsumfang ?? null,
-        angebot_notizen: ang?.notizen ?? null,
       }
     })
     .filter(Boolean) as (HandwerkerDetailPayload['auftraege'][number] & { vereinbarter_preis: number })[]
@@ -870,104 +856,6 @@ export async function setHandwerkerPortalGesperrt(
       } catch (e) {
         console.error('[setHandwerkerPortalGesperrt] Sign-out fehlgeschlagen:', e)
       }
-    }
-  }
-
-  revalidatePath('/handwerker')
-  revalidatePath(`/handwerker/${id}`)
-  return { ok: true }
-}
-
-
-/**
- * Handwerker löschen — blockiert bei Verträgen/Einbehalten oder aktiven Zuweisungen.
- */
-export async function deleteHandwerker(
-  handwerkerId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const id = handwerkerId.trim()
-  if (!id) return { ok: false, message: 'Handwerker-ID fehlt.' }
-
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
-
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('handwerker').select('id, auth_user_id').eq('id', id).maybeSingle()
-  )
-  if (loadErr || !row) {
-    return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
-  }
-
-  const [{ count: ahCount }, { count: posCount }, { count: vertragCount }] = await Promise.all([
-    supabase
-      .from('angebot_handwerker')
-      .select('id', { count: 'exact', head: true })
-      .eq('handwerker_id', id),
-    supabase
-      .from('auftrag_positionen')
-      .select('id', { count: 'exact', head: true })
-      .eq('handwerker_id', id),
-    supabase
-      .from('handwerker_vertraege')
-      .select('id', { count: 'exact', head: true })
-      .eq('handwerker_id', id),
-  ])
-
-  const { count: einbehaltCount, error: einbehaltErr } = await supabase
-    .from('einbehalte')
-    .select('id', { count: 'exact', head: true })
-    .eq('handwerker_id', id)
-  const einbehalte =
-    einbehaltErr && /does not exist|relation|schema cache/i.test(einbehaltErr.message)
-      ? 0
-      : (einbehaltCount ?? 0)
-
-  if ((vertragCount ?? 0) > 0) {
-    return {
-      ok: false,
-      message: 'Handwerker hat Verträge — bitte zuerst Verträge entfernen.',
-    }
-  }
-  if (einbehalte > 0) {
-    return {
-      ok: false,
-      message: 'Handwerker hat Einbehalte — Löschen nicht möglich.',
-    }
-  }
-  if ((ahCount ?? 0) > 0 || (posCount ?? 0) > 0) {
-    return {
-      ok: false,
-      message:
-        'Handwerker ist noch Angeboten oder Auftragspositionen zugeordnet. Zuerst entfernen.',
-    }
-  }
-
-  for (const table of [
-    'partner_dokumente',
-    'handwerker_bewertungen',
-    'partner_bautagebuch_anfragen',
-    'partner_positions_anfragen',
-  ] as const) {
-    const { error } = await supabase.from(table).delete().eq('handwerker_id', id)
-    if (error && !/does not exist|relation|schema cache/i.test(error.message)) {
-      return { ok: false, message: `${table}: ${error.message}` }
-    }
-  }
-
-  const { error: delErr } = await supabase.from('handwerker').delete().eq('id', id)
-  if (delErr) return { ok: false, message: delErr.message }
-
-  const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
-  if (authUserId) {
-    try {
-      await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        ban_duration: AUTH_BAN_DURATION,
-      })
-    } catch (e) {
-      console.warn('[deleteHandwerker] Auth-Ban:', e)
     }
   }
 

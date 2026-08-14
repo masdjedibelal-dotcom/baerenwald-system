@@ -104,13 +104,3 @@ export type EinheitBewohnerInput = {
   telefon?: string | null
   email?: string | null
 }
-
-/** Mieter + Einheit gemeinsam anlegen (wie HV-Portal). */
-export type ObjektMieterInput = {
-  name: string
-  /** Wohnungs-/Einheiten-Bezeichnung, Default „Allgemein“ */
-  wohnung?: string | null
-  telefon?: string | null
-  email?: string | null
-  wohnflaeche_m2?: number | null
-}

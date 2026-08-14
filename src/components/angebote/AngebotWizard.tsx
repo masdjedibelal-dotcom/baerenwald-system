@@ -24,7 +24,6 @@ import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { Check, FileText } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
-import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { DateInput } from '@/components/ui/DateInput'
@@ -408,7 +407,7 @@ export function AngebotWizard({
     }
   }, [sheet, isHv, ag?.id, leadState.auftraggeber_kunde_id])
 
-  const mailAnrede = mailAnredeFromKundeTyp(kundeTyp)
+  const mailAnrede = meta.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
   const mailKundeKontext = useMemo((): KundeAnredeKontext => {
     const k = sheetKunde
     return {
@@ -724,11 +723,9 @@ export function AngebotWizard({
         onSaved?.(res.angebotId)
         if (opts?.notify) {
           toast.success(
-            istNachtrag
-              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
-              : res.angebotsnr?.trim()
-                ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-                : 'Entwurf gespeichert'
+            res.angebotsnr?.trim()
+              ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+              : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
@@ -845,9 +842,6 @@ export function AngebotWizard({
   async function handleFinishSpeichern() {
     const id = await persistDraft({ notify: true })
     if (!id) return
-    setSheet(null)
-    setKundeEditOpen(false)
-    setFotoLightboxUrl(null)
     onDone?.(id, {
       mode: 'saved',
       auftragKorrektur: istAuftragKorrektur || undefined,
@@ -887,15 +881,10 @@ export function AngebotWizard({
         return
       }
       toast.success(
-        istNachtrag
-          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
-          : istAuftragKorrektur
-            ? 'Korrektur gespeichert und an den Kunden versendet'
-            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+        istAuftragKorrektur
+          ? 'Korrektur gespeichert und an den Kunden versendet'
+          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
-      setSheet(null)
-      setKundeEditOpen(false)
-      setFotoLightboxUrl(null)
       onDone?.(id, {
         mode: 'sent',
         auftragKorrektur: istAuftragKorrektur || undefined,
@@ -920,7 +909,7 @@ export function AngebotWizard({
         titel: lu ? `Angebot ${lu} — ${name}` : m.titel,
       }
       if (isDefaultAngebotEinleitung(m.einleitung, altLu)) {
-        const effAnrede = mailAnredeFromKundeTyp(kundeTyp)
+        const effAnrede = m.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
         patch.einleitung = defaultAngebotEinleitungText(effAnrede, lu || projekt)
       }
       return { ...m, ...patch }
@@ -951,13 +940,7 @@ export function AngebotWizard({
 
   const versandCrowValue = mailTo[0]?.trim() || sheetEmail?.trim() || 'Empfänger ergänzen'
 
-  const wizardSubtitle = istNachtrag
-    ? [name?.trim() && name !== '—' ? name.trim() : null, 'Auftrag bleibt bis zur Annahme unverändert']
-        .filter(Boolean)
-        .join(' · ') || 'Auftrag bleibt bis zur Annahme unverändert'
-    : name?.trim() && name !== '—'
-      ? name.trim()
-      : undefined
+  const wizardSubtitle = name?.trim() && name !== '—' ? name.trim() : undefined
 
   const headerEnd = (
     <>
@@ -987,14 +970,16 @@ export function AngebotWizard({
           {
             label: saving ? 'Speichern…' : 'Speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
+            hint: 'Speichert und schließt',
             onClick: () => {
               if (saving) return
               void handleFinishSpeichern()
             },
           },
           {
-            label: saving ? 'E-Mail…' : 'E-Mail senden',
+            label: saving ? 'Senden…' : 'Senden',
             icon: <MockIcon ctx="btn" n="send" size={16} />,
+            hint: 'Versendet und schließt',
             onClick: () => {
               if (saving) return
               void handleFinishVersenden()
@@ -1291,26 +1276,35 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <MockField label="Gültig bis" full>
-            <DateInput
-              size="sm"
-              value={meta.gueltig_bis}
-              onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
-            />
-          </MockField>
-          <div className="full">
-            <LeistungszeitraumFields
-              von={meta.leistungszeitraum_von ?? ''}
-              bis={meta.leistungszeitraum_bis ?? ''}
+          <div className="full wizard-zahlung-dates">
+            <MockField label="Gültig bis">
+              <DateInput
+                size="sm"
+                value={meta.gueltig_bis}
+                onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
+              />
+            </MockField>
+            <MockField
+              label="Leistungszeitraum von"
               hint={istAuftragKorrektur ? 'Ausführungszeitraum am Auftrag' : undefined}
-              onChange={({ von, bis }) =>
-                setMeta((m) => ({
-                  ...m,
-                  leistungszeitraum_von: von,
-                  leistungszeitraum_bis: bis,
-                }))
-              }
-            />
+            >
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_von ?? ''}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
+                }
+              />
+            </MockField>
+            <MockField label="Leistungszeitraum bis">
+              <DateInput
+                size="sm"
+                value={meta.leistungszeitraum_bis ?? ''}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
+                }
+              />
+            </MockField>
           </div>
           <MockField label="Zahlfrist" full>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

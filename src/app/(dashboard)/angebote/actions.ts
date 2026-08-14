@@ -73,7 +73,7 @@ import {
 } from '@/lib/kunde-rechnungsempfaenger'
 import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
-import { supersedeLeadAngebote } from '@/lib/angebote/supersede-lead-angebote'
+import { resolveStatusEinfach } from '@/lib/angebot-einfach'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { auftragsbestaetigungMailFromEmpfaenger } from '@/lib/mail/auftragsbestaetigung-mail'
 import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
@@ -316,7 +316,25 @@ async function markLeadAngeboteErsetzt(
   leadId: string,
   activeAngebotId: string
 ): Promise<void> {
-  await supersedeLeadAngebote(supabase, leadId, activeAngebotId, 'neue_version')
+  const { data: others } = await supabase
+    .from('angebote')
+    .select('id, status, status_einfach, gueltig_bis')
+    .eq('lead_id', leadId)
+    .neq('id', activeAngebotId)
+
+  const now = new Date().toISOString()
+  for (const row of others ?? []) {
+    const st = resolveStatusEinfach(row as { status: string; status_einfach?: string | null; gueltig_bis?: string | null })
+    if (st !== 'entwurf' && st !== 'gesendet') continue
+    await supabase
+      .from('angebote')
+      .update({
+        status_einfach: 'ersetzt',
+        status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', row.id as string)
+  }
 }
 
 export async function markLeadAngeboteAbgelehnt(
@@ -324,8 +342,25 @@ export async function markLeadAngeboteAbgelehnt(
   leadId: string,
   activeAngebotId: string
 ): Promise<void> {
-  // Name historisch „abgelehnt“ — fachlich: Geschwister → ersetzt (inkl. frühere Annahmen).
-  await supersedeLeadAngebote(supabase, leadId, activeAngebotId, 'annahme')
+  const { data: others } = await supabase
+    .from('angebote')
+    .select('id, status, status_einfach, gueltig_bis')
+    .eq('lead_id', leadId)
+    .neq('id', activeAngebotId)
+
+  const now = new Date().toISOString()
+  for (const row of others ?? []) {
+    const st = resolveStatusEinfach(row as { status: string; status_einfach?: string | null; gueltig_bis?: string | null })
+    if (st === 'abgelehnt' || st === 'ersetzt' || st === 'angenommen') continue
+    await supabase
+      .from('angebote')
+      .update({
+        status_einfach: 'abgelehnt',
+        status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', row.id as string)
+  }
 }
 
 /**
@@ -827,12 +862,7 @@ export async function setAngebotStatus(
 
 export async function persistPdfForAngebot(
   angebotId: string,
-  opts?: {
-    detail?: AngebotDetail | null
-    skipRevalidate?: boolean
-    /** Wenn true: kein Portal-Sync hier (Caller macht Sync nach finalem Status). */
-    skipPortalSync?: boolean
-  }
+  opts?: { detail?: AngebotDetail | null; skipRevalidate?: boolean }
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
   const detail = opts?.detail ?? (await loadAngebotDetailAdmin(angebotId))
   if (!detail?.kunden) return { ok: false, message: 'Angebot/Kunde nicht gefunden' }
@@ -872,57 +902,12 @@ export async function persistPdfForAngebot(
   const { data: pub } = supabaseAdmin.storage.from('angebote-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl
 
-  // PDF speichern = fürs Portal „vorgelegt“ (wie Versand). E-Mail bleibt optional über „Senden“.
-  const st = String(detail.status_einfach ?? detail.status ?? '')
-    .trim()
-    .toLowerCase()
-  const terminal = [
-    'angenommen',
-    'kunde_akzeptiert',
-    'abgelehnt',
-    'ersetzt',
-    'abgelaufen',
-    'beauftragt',
-  ].includes(st)
-  const hadTimestamps = Boolean(
-    String(detail.gesendet_am ?? detail.gesendet_kunde_at ?? '').trim()
-  )
-  const wasEntwurf = st === 'entwurf' || !st
-  const shouldPromote = !terminal && (wasEntwurf || !hadTimestamps)
-  const now = new Date().toISOString()
-
   const { error: dbErr } = await supabaseAdmin
     .from('angebote')
-    .update({
-      pdf_url: publicUrl,
-      updated_at: now,
-      ...(shouldPromote
-        ? {
-            status_einfach: 'gesendet' as const,
-            status: 'gesendet_kunde' as const,
-            ...(!hadTimestamps
-              ? { gesendet_am: now, gesendet_kunde_at: now }
-              : {}),
-          }
-        : {}),
-    })
+    .update({ pdf_url: publicUrl, updated_at: new Date().toISOString() })
     .eq('id', angebotId)
 
   if (dbErr) return { ok: false, message: dbErr.message }
-
-  if (shouldPromote && detail.lead_id && !opts?.skipPortalSync) {
-    try {
-      const { syncPortalLeadStatusAfterAngebotGesendet } = await import(
-        '@/lib/portal/sync-portal-lead-status'
-      )
-      await syncPortalLeadStatusAfterAngebotGesendet({
-        leadId: detail.lead_id,
-        skipMieterMail: true,
-      })
-    } catch (e) {
-      console.warn('[persistPdfForAngebot] portal sync', e)
-    }
-  }
 
   if (!opts?.skipRevalidate) revalidatePath(`/angebote/${angebotId}`)
   return { ok: true, buffer, publicUrl }
@@ -1705,12 +1690,7 @@ export async function sendAngebotToKunde(
     return { ok: false as const, message: 'Keine Empfänger-Adresse (An)' }
   }
 
-  const pdf = await persistPdfForAngebot(angebotId, {
-    detail,
-    skipRevalidate: true,
-    // Sync erst nach Status/Timestamps + Mail — sonst doppelte Notify / Race.
-    skipPortalSync: true,
-  })
+  const pdf = await persistPdfForAngebot(angebotId, { detail, skipRevalidate: true })
   if (!pdf.ok) return pdf
 
   if (!options?.statusBeibehalten) {
@@ -1863,18 +1843,12 @@ export async function sendAngebotToKunde(
     revalidatePath(`/anfragen/${detail.lead_id}`)
   }
 
-  // Nach Versand: Portal-Glocke + Dokumente (pdf_url bereits gesetzt).
-  // Auch bei Korrektur (statusBeibehalten), damit HV/Kunde die neue PDF sieht.
-  if (detail.lead_id) {
+  if (detail.lead_id && !options?.statusBeibehalten) {
     try {
       const { syncPortalLeadStatusAfterAngebotGesendet } = await import(
         '@/lib/portal/sync-portal-lead-status'
       )
-      await syncPortalLeadStatusAfterAngebotGesendet({
-        leadId: detail.lead_id,
-        // Kunden-Mail geht bereits über sendMail — Mieter-Status-Mail überspringen.
-        skipMieterMail: true,
-      })
+      await syncPortalLeadStatusAfterAngebotGesendet({ leadId: detail.lead_id })
     } catch (e) {
       console.warn('[sendAngebotToKunde] portal sync', e)
     }
@@ -2210,33 +2184,14 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
   const supabase = createClient()
   const { data: zuAlt, error: zErr } = await supabase
     .from('angebot_handwerker')
-    .select('id, gewerk_id, handwerker_id, status, hw_status, hw_eingereicht_at')
+    .select('id, gewerk_id, handwerker_id, status')
     .eq('id', input.alteZuweisungId)
     .eq('angebot_id', input.angebotId)
     .maybeSingle()
 
   if (zErr || !zuAlt) return { ok: false, message: 'Zuweisung nicht gefunden' }
-
-  const st = String(zuAlt.status ?? '').toLowerCase()
-  const hwSt = String(zuAlt.hw_status ?? '').toLowerCase()
-  if (zuAlt.hw_eingereicht_at?.trim() || hwSt === 'eingereicht' || hwSt === 'bestaetigt' || hwSt === 'uebernommen') {
-    return {
-      ok: false,
-      message:
-        'Partner mit Einreichung/Übernahme kann nicht gewechselt werden — zuerst ablehnen oder Konditionen klären.',
-    }
-  }
-  const replaceable = new Set([
-    'ausstehend',
-    'angefragt',
-    'akzeptiert',
-    'angenommen',
-    'abgelehnt',
-    'zugewiesen',
-    'warten',
-  ])
-  if (!replaceable.has(st)) {
-    return { ok: false, message: 'Diese Zuweisung kann nicht mehr ersetzt werden.' }
+  if (zuAlt.status !== 'abgelehnt') {
+    return { ok: false, message: 'Nur abgelehnte Zuweisungen können ersetzt werden.' }
   }
   if (zuAlt.handwerker_id === input.neuerHandwerkerId) {
     return { ok: false, message: 'Bitte eine andere Handwerkerin auswählen.' }
@@ -2304,13 +2259,6 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
     return { ok: false, message: send.message }
   }
 
-  /* Prozess neu: nach HW-Zusage wieder „an Partner gesendet“ */
-  await supabase
-    .from('angebote')
-    .update({ status: 'gesendet_handwerker' })
-    .eq('id', input.angebotId)
-    .in('status', ['handwerker_akzeptiert', 'gesendet_handwerker'])
-
   revalidatePath(`/angebote/${input.angebotId}`)
   revalidatePath('/angebote')
   revalidatePath('/')
@@ -2343,52 +2291,9 @@ export async function createAuftragFromAngebot(
   opts?: Partial<CreateAuftragFromAngebotOptions>
 ): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
   const angebot = await loadAngebotDetailAdmin(angebotId)
-  if (!angebot) return { ok: false, message: 'Angebot nicht gefunden.' }
-  if (!angebot.kunden) {
-    return {
-      ok: false,
-      message:
-        'Angebot hat keinen verknüpften Kunden — bitte Kunde prüfen und speichern, dann erneut annehmen.',
-    }
-  }
+  if (!angebot?.kunden) return { ok: false, message: 'Angebot nicht gefunden' }
   if (angebot.status !== 'kunde_akzeptiert') {
     return { ok: false, message: 'Auftrag nur nach Kundenakzept möglich.' }
-  }
-
-  const { data: existingForAngebot } = await supabaseAdmin
-    .from('auftraege')
-    .select('id')
-    .eq('angebot_id', angebotId)
-    .maybeSingle()
-  if (existingForAngebot?.id) {
-    return { ok: true, auftragId: String(existingForAngebot.id) }
-  }
-
-  const { findNachtragRowByAngebotId, applyNachtragsAngebotAnAuftrag } = await import(
-    '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
-  )
-  const nachtragLink = await findNachtragRowByAngebotId(angebotId)
-  if (nachtragLink) {
-    return applyNachtragsAngebotAnAuftrag(angebotId)
-  }
-
-  if (angebot.lead_id) {
-    const { data: leadAuftraege } = await supabaseAdmin
-      .from('auftraege')
-      .select('id, angebot_id, status')
-      .eq('lead_id', angebot.lead_id)
-      .neq('status', 'storniert')
-      .limit(10)
-    const anderer = (leadAuftraege ?? []).find(
-      (a) => String(a.angebot_id ?? '') !== angebotId
-    )
-    if (anderer?.id) {
-      return {
-        ok: false,
-        message:
-          'Zu dieser Anfrage existiert bereits ein Auftrag. Für Änderungen bitte Nachtrag-Angebot am bestehenden Auftrag nutzen — nicht ein zweites Angebot annehmen.',
-      }
-    }
   }
 
   const start = opts?.start_datum?.trim() || defaultStartDatum()
@@ -2828,8 +2733,6 @@ export async function markKundeAkzeptiert(
 
   const leadId = row.lead_id as string | null
   if (leadId) {
-    await markLeadAngeboteAbgelehnt(supabase, leadId, angebotId)
-
     const kunde = row.kunden as { name?: string } | null
     const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
 

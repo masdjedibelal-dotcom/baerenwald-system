@@ -56,7 +56,7 @@ export function ActionSheet({
       />
 
       <div
-        className="z-modal fixed bottom-0 left-0 right-0 flex max-h-[min(85vh,640px)] animate-slide-up flex-col overflow-hidden rounded-t-2xl border-x border-t border-bw-border bg-white shadow-2xl md:hidden"
+        className="z-modal fixed bottom-0 left-0 right-0 max-h-[min(85vh,640px)] animate-slide-up overflow-hidden rounded-t-2xl border-x border-t border-bw-border bg-white shadow-2xl md:hidden"
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -65,14 +65,11 @@ export function ActionSheet({
           ...sheetMotionStyle,
         }}
       >
-        <div className="flex shrink-0 justify-center pb-1 pt-3" {...dragZoneProps} aria-hidden>
+        <div className="flex justify-center pb-1 pt-3" {...dragZoneProps} aria-hidden>
           <div className="h-1 w-10 rounded-full bg-bw-border" />
         </div>
 
-        <div
-          className="flex shrink-0 items-center gap-2 border-b border-bw-border px-3 py-2"
-          {...dragZoneProps}
-        >
+        <div className="flex items-center gap-2 border-b border-bw-border px-3 py-2" {...dragZoneProps}>
           <button
             type="button"
             onClick={onClose}
@@ -87,11 +84,7 @@ export function ActionSheet({
           </span>
         </div>
 
-        <div
-          className="action-sheet__body min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 pb-3"
-          data-scroll-lock-allow
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        >
+        <div className="overflow-y-auto overscroll-contain px-3 py-2 pb-3">
           {regular.length === 0 && danger.length === 0 ? (
             <p className="px-3 py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
               Keine Aktionen

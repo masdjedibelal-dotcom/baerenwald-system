@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import type { ProjektRechnungKurz } from '@/lib/crm/projekt-kontext-types'
+import type { StatusTone } from '@/lib/status/status-tone'
 
 /**
  * Anfrage · Zahlung-Tab — drei Zustände Spec §9 / N4:
@@ -14,56 +15,23 @@ import type { ProjektRechnungKurz } from '@/lib/crm/projekt-kontext-types'
  */
 export function AnfrageZahlungTab({
   rechnungen,
-  onWeitereRechnung,
-  weitereRechnungDisabled,
 }: {
   rechnungen: ProjektRechnungKurz[]
-  /** Weitere Rechnung am Vorgang (Auftrag oder Kunde). */
-  onWeitereRechnung?: () => void
-  weitereRechnungDisabled?: boolean
 }) {
   const aktiv = rechnungen.filter((r) => String(r.status).toLowerCase() !== 'storniert')
   const geplant = aktiv.filter((r) => String(r.status).toLowerCase() === 'entwurf')
   const vorhanden = aktiv.filter((r) => String(r.status).toLowerCase() !== 'entwurf')
 
-  const cta =
-    onWeitereRechnung != null ? (
-      <button
-        type="button"
-        className="btn ghost sm"
-        disabled={weitereRechnungDisabled}
-        onClick={onWeitereRechnung}
-      >
-        Weitere Rechnung
-      </button>
-    ) : null
-
   if (aktiv.length === 0) {
     return (
-      <MockCard
-        title="Zahlung"
-        icon="calculator"
-        className="zahlplan-shell dshell-framed"
-        actions={cta}
-      >
+      <MockCard title="Zahlung" icon="calculator" className="zahlplan-shell">
         <div className="zahlplan-empty">
           <MockIcon ctx="empty" n="calculator" size={26} />
           <div className="zahlplan-empty__title">Noch keine Zahlung</div>
           <div className="zahlplan-empty__text">
-            {onWeitereRechnung
-              ? 'Weitere Rechnung legt eine neue Rechnung am Vorgang an — ohne Umweg über den Auftrag.'
-              : 'Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten Schritt fest.'}
+            Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten
+            Schritt fest.
           </div>
-          {onWeitereRechnung ? (
-            <button
-              type="button"
-              className="btn primary mt-3"
-              disabled={weitereRechnungDisabled}
-              onClick={onWeitereRechnung}
-            >
-              Weitere Rechnung
-            </button>
-          ) : null}
         </div>
       </MockCard>
     )
@@ -82,12 +50,9 @@ export function AnfrageZahlungTab({
     <MockCard
       title="Zahlung"
       icon="calculator"
-      className="zahlplan-shell dshell-framed"
+      className="zahlplan-shell"
       actions={
-        <div className="flex items-center gap-2">
-          <span className="text-[length:var(--fs-meta)] text-bw-text-muted">{zustandLabel}</span>
-          {cta}
-        </div>
+        <span className="text-[length:var(--fs-meta)] text-bw-text-muted">{zustandLabel}</span>
       }
     >
       <ul className="m-0 list-none space-y-2 p-0">
@@ -133,11 +98,11 @@ export function AnfrageZahlungTab({
   )
 }
 
-function badgeForStatus(st: string): { status: string; label: string } {
-  if (st === 'bezahlt' || st === 'teilbezahlt') return { status: 'bezahlt', label: 'Bezahlt' }
-  if (st === 'gesendet' || st === 'gestellt') return { status: 'gesendet', label: 'Gestellt' }
-  if (st === 'ueberfaellig') return { status: 'ueberfaellig', label: 'Überfällig' }
-  if (st === 'entwurf') return { status: 'entwurf', label: 'Entwurf' }
-  if (st === 'storniert') return { status: 'storniert', label: 'Storniert' }
-  return { status: st || 'entwurf', label: st || '—' }
+function badgeForStatus(st: string): { label: string; tone: StatusTone; status: string } {
+  if (st === 'bezahlt') return { label: 'Bezahlt', tone: 'gruen', status: 'bezahlt' }
+  if (st === 'entwurf') return { label: 'Geplant', tone: 'grau', status: 'geplant' }
+  if (st === 'gesendet' || st === 'gestellt' || st === 'teilbezahlt') {
+    return { label: 'Gestellt', tone: 'blau', status: 'gesendet' }
+  }
+  return { label: st || 'Offen', tone: 'grau', status: st || 'offen' }
 }

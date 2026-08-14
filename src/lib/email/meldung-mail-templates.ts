@@ -78,11 +78,11 @@ export function buildMelderBestaetigungHtml(input: {
   return `<!DOCTYPE html>
 <html lang="de">
 <body style="font-family:system-ui,sans-serif;color:#1a2420;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
-  <p>Guten Tag ${esc(input.melderName)},</p>
-  <p>wir haben Ihre <strong>${esc(kat)}</strong>-Meldung für <strong>${esc(input.objektTitel)}</strong> erhalten.</p>
+  <p>Hallo ${esc(input.melderName)},</p>
+  <p>wir haben deine <strong>${esc(kat)}</strong>-Meldung für <strong>${esc(input.objektTitel)}</strong> erhalten.</p>
   <p>${esc(input.orgName)} und Bärenwald koordinieren den nächsten Schritt.</p>
   ${input.referenz ? `<p style="color:#6b7f74;font-size:14px">Referenz: ${esc(input.referenz)}</p>` : ''}
-  <p style="margin-top:24px">Mit freundlichen Grüßen<br/>Bärenwald München</p>
+  <p style="margin-top:24px">Herzliche Grüße<br/>Bärenwald München</p>
 </body>
 </html>`
 }
@@ -231,7 +231,7 @@ export function mailOrgAngebotZurInfo(
     <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
       data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
     )}</strong> vor.</p>
-    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Bärenwald kann den Auftrag direkt anlegen — diese Mail dient nur der Information.</p>
+    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Der Auftrag wird automatisch angelegt — diese Mail dient nur der Information.</p>
   `
   return {
     betreff,
@@ -328,32 +328,6 @@ export function mailOrgFreigabeErgebnis(
   return {
     betreff,
     html: mailHtmlBase(body, `Freigabe ${aktionLabel}`, b, undefined, {
-      skipMeinBaerenwaldPs: true,
-    }),
-  }
-}
-
-/** Portal: Kunde/HV hat Angebot angenommen oder abgelehnt. */
-export function mailAngebotEntscheidung(
-  data: {
-    entscheidenderName: string
-    objektTitel: string
-    aktion: 'angenommen' | 'abgelehnt'
-    notiz?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const aktionLabel = data.aktion === 'angenommen' ? 'angenommen' : 'abgelehnt'
-  const betreff = `Angebot ${aktionLabel} — ${data.objektTitel.trim() || 'Objekt'}`
-  const body = `
-    <p>Guten Tag,</p>
-    <p><strong>${esc(data.entscheidenderName)}</strong> hat das Angebot für <strong>${esc(data.objektTitel)}</strong> im Portal <strong>${aktionLabel}</strong>.</p>
-    ${data.notiz?.trim() ? `<p><strong>Notiz:</strong> ${esc(data.notiz.trim())}</p>` : ''}
-    <p>${data.aktion === 'angenommen' ? 'Der Auftrag wurde angelegt bzw. wird im CRM fortgeführt.' : 'Bitte Vorgang im CRM prüfen.'}</p>
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, `Angebot ${aktionLabel}`, b, undefined, {
       skipMeinBaerenwaldPs: true,
     }),
   }

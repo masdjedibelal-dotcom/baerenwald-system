@@ -112,16 +112,6 @@ export async function syncPortalLeadStatusAfterAngebotGesendet(input: {
       console.error('[syncPortalLeadStatus] Angebot Lead-Update:', upErr.message)
     }
 
-    // Shared-DB zuerst: HV-/Kunden-Glocke unabhängig vom Portal-HTTP.
-    try {
-      const { notifyPortalAngebotGesendetFromCrm } = await import(
-        '@/lib/portal/notify-portal-angebot-gesendet'
-      )
-      await notifyPortalAngebotGesendetFromCrm(leadId)
-    } catch (e) {
-      console.warn('[syncPortalLeadStatus] CRM-Portal-Notify', e)
-    }
-
     await notifyPortalSyncLeadPhase({ leadId, event, skipMieterMail })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

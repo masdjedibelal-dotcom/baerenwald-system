@@ -4,29 +4,25 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Button } from '@/components/ui/Button'
+import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
+  complianceDokumentStatus,
+  complianceDokumentStatusLabel,
+  complianceDokumentStatusTone,
   istEigeneUnterlageTyp,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
-import {
-  partnerDokumentIstFreigegeben,
-} from '@/lib/handwerker/partner-dokument-status'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
-function listStatus(doc: PartnerDokument): {
-  label: string
-  tone: 'ok' | 'warn' | 'bad' | 'neutral'
-} {
-  const s = (doc.status ?? '').toLowerCase()
-  if (partnerDokumentIstFreigegeben(doc.status)) {
-    return { label: 'Angenommen', tone: 'ok' }
-  }
-  if (s === 'abgelehnt') {
-    return { label: 'Abgelehnt', tone: 'bad' }
-  }
-  return { label: 'Offen', tone: 'warn' }
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const s = String(value).slice(0, 10)
+  const [y, m, d] = s.split('-')
+  if (y && m && d) return `${d}.${m}.${y}`
+  return s
 }
 
 export function HandwerkerComplianceUnterlagenTable({
@@ -39,6 +35,7 @@ export function HandwerkerComplianceUnterlagenTable({
   typen: ComplianceDokumentTyp[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
@@ -68,6 +65,34 @@ export function HandwerkerComplianceUnterlagenTable({
         }
       : null
 
+  function rowMeta(doc: PartnerDokument) {
+    const typMeta = typen.find((t) => t.slug === doc.typ)
+    const st = complianceDokumentStatus(
+      typMeta ?? {
+        id: doc.typ,
+        slug: doc.typ,
+        bezeichnung: doc.bezeichnung || doc.typ,
+        beschreibung: null,
+        pflicht_fuer_fachbetriebe: false,
+        erneuerung_monate: null,
+        sort_order: 0,
+      },
+      doc
+    )
+    const status = {
+      label: complianceDokumentStatusLabel(st),
+      tone: complianceDokumentStatusTone(st),
+    }
+    const title = doc.bezeichnung || typMeta?.bezeichnung || doc.typ
+    const meta = [
+      doc.hochgeladen_am ? `Hochgeladen ${formatDate(doc.hochgeladen_am)}` : null,
+      doc.gueltig_bis ? `gültig bis ${formatDate(doc.gueltig_bis)}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    return { title, meta, status, typMeta }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -94,12 +119,36 @@ export function HandwerkerComplianceUnterlagenTable({
             Dokument oder Foto hochladen
           </Button>
         </div>
+      ) : isMobile ? (
+        <div className="dok-cards">
+          {hochgeladen.map((doc) => {
+            const { title, meta, status } = rowMeta(doc)
+            return (
+              <DokMobileCard
+                key={doc.id}
+                title={title}
+                meta={meta || null}
+                onClick={() => openEdit(doc)}
+                badge={
+                  <span
+                    className={cn(
+                      'dok-card__tag',
+                      status.tone === 'ok' && 'is-kunde',
+                      (status.tone === 'warn' || status.tone === 'neutral') && 'is-warn',
+                      status.tone === 'bad' && 'is-bad'
+                    )}
+                  >
+                    {status.label}
+                  </span>
+                }
+              />
+            )
+          })}
+        </div>
       ) : (
         <div className="dok-list">
           {hochgeladen.map((doc) => {
-            const typMeta = typen.find((t) => t.slug === doc.typ)
-            const title = doc.bezeichnung || typMeta?.bezeichnung || doc.typ
-            const status = listStatus(doc)
+            const { title, meta, status } = rowMeta(doc)
             return (
               <div
                 key={doc.id}
@@ -120,11 +169,14 @@ export function HandwerkerComplianceUnterlagenTable({
                 }}
               >
                 <div className="dok-list__main min-w-0">
-                  <div className="dok-list__name truncate">{title}</div>
+                  <div className="dok-list__name">
+                    {title}
+                    {meta ? <span className="dok-list__name-size"> · {meta}</span> : null}
+                  </div>
                 </div>
                 <span
                   className={cn(
-                    'dok-card__tag shrink-0 self-center text-center',
+                    'dok-card__tag',
                     status.tone === 'ok' && 'is-kunde',
                     (status.tone === 'warn' || status.tone === 'neutral') && 'is-warn',
                     status.tone === 'bad' && 'is-bad'

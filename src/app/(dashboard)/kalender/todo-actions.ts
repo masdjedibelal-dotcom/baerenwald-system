@@ -53,7 +53,7 @@ export async function listTodos(
   filter: TodoListFilter = {}
 ): Promise<{ ok: true; todos: CrmTodo[] } | { ok: false; message: string }> {
   const supabase = createClient()
-  let q = supabase.from('todos').select(TODO_SELECT)
+  let q = supabase.from('todos').select(TODO_SELECT).order('erledigt', { ascending: true })
 
   if (filter.erledigt === true) q = q.eq('erledigt', true)
   else if (filter.erledigt !== 'all') q = q.eq('erledigt', false)
@@ -64,7 +64,6 @@ export async function listTodos(
   if (filter.auftragId) q = q.eq('auftrag_id', filter.auftragId)
   if (filter.handwerkerId) q = q.eq('handwerker_id', filter.handwerkerId)
 
-  // Primär nach Frist (aufsteigend); ohne Datum zuletzt
   q = q
     .order('faellig_am', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })

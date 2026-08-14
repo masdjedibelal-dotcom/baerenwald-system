@@ -17,15 +17,12 @@ export type KundeDetailPayload = Kunde & {
         created_at?: string | null
         pdf_url?: string | null
         auftrag_id?: string | null
-        leistungsumfang?: string | null
-        notizen?: string | null
       }> | null
     }
   > | null
   auftraege?: Array<{
     id: string
     titel: string | null
-    lead_id?: string | null
     status: AuftragStatus
     fortschritt: number | null
     start_datum: string | null
@@ -43,9 +40,6 @@ export type KundeDetailPayload = Kunde & {
           status_einfach?: string | null
           gueltig_bis?: string | null
           created_at?: string | null
-          lead_id?: string | null
-          leistungsumfang?: string | null
-          notizen?: string | null
         }
       | {
           gesamt_fix: number | null
@@ -57,9 +51,6 @@ export type KundeDetailPayload = Kunde & {
           status_einfach?: string | null
           gueltig_bis?: string | null
           created_at?: string | null
-          lead_id?: string | null
-          leistungsumfang?: string | null
-          notizen?: string | null
         }[]
       | null
     einbehalte?: Array<{
@@ -80,7 +71,6 @@ export type KundeDetailPayload = Kunde & {
     faellig_am: string | null
     bezahlt_at: string | null
     auftrag_id?: string | null
-    angebot_id?: string | null
     auftraege?: { titel: string | null } | { titel: string | null }[] | null
   }> | null
   kunden_notizen?: KundenNotizRow[] | null
@@ -107,8 +97,6 @@ type AngebotKurz = {
   gesamt_max: number | null
   created_at: string
   pdf_url: string | null
-  leistungsumfang: string | null
-  notizen: string | null
 }
 
 const LEAD_KURZ_SELECT = 'id, status, situation, bereiche, created_at, budget_ca'
@@ -117,10 +105,10 @@ const KUNDE_DETAIL_RELATIONS = `
       melder_leads:${kundeLeadsEmbed(LEAD_KURZ_SELECT)},
       auftraggeber_leads:${kundeAuftraggeberLeadsEmbed(LEAD_KURZ_SELECT)},
       auftraege(
-        id, titel, lead_id, status, fortschritt, start_datum, end_datum, created_at
+        id, titel, status, fortschritt, start_datum, end_datum, created_at
       ),
       rechnungen(
-        id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, bezahlt_at, pdf_url, auftrag_id, angebot_id
+        id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, bezahlt_at, pdf_url, auftrag_id
       ),
       kunden_notizen(
         id, kunde_id, inhalt, erstellt_von, created_at
@@ -257,7 +245,7 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     const { data: angs, error: eAng } = await supabase
       .from('angebote')
       .select(
-        'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
+        'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url'
       )
       .in('lead_id', leadIds)
     if (!eAng && angs) {
@@ -275,7 +263,7 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
       supabase
         .from('angebote')
         .select(
-          'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
+          'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url'
         )
         .in('auftrag_id', auftragIds),
       supabase
@@ -338,8 +326,6 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
       gesamt_max: x.gesamt_max,
       created_at: x.created_at,
       pdf_url: x.pdf_url ?? null,
-      leistungsumfang: x.leistungsumfang ?? null,
-      notizen: x.notizen ?? null,
     })),
   }))
 
@@ -357,13 +343,9 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
       gesamt_max: x.gesamt_max,
       created_at: x.created_at,
       pdf_url: x.pdf_url ?? null,
-      leistungsumfang: x.leistungsumfang ?? null,
-      notizen: x.notizen ?? null,
     }))
-    const leadFromAng = angebote.find((x) => x.lead_id)?.lead_id ?? null
     return {
       ...a,
-      lead_id: a.lead_id ?? leadFromAng,
       abnahme_protokoll_url: abnahmeUrlByAuftrag.get(a.id) ?? null,
       angebote: angebote.length ? angebote : null,
       einbehalte: einbehalteByAuftrag.get(a.id) ?? [],

@@ -1,8 +1,8 @@
 'use client'
+import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
-import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import {
@@ -18,9 +18,7 @@ import {
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
-import { AuftragAbnahmeFreigabeBanner } from '@/components/auftraege/AuftragAbnahmeFreigabeBanner'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -30,7 +28,7 @@ import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AngebotDetail, AngebotHandwerkerRow, AuftragDetail, Lead } from '@/lib/types'
+import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -161,7 +159,7 @@ export function AuftragLeistungenTab({
   /** Deep-Link z. B. ?tab=bautagebuch */
   initialLeistungenView?: 'leistungen' | 'bautagebuch'
 }) {
-  const [pendingNachtrag, setPendingNachtrag] = useState(false)
+  const [, startTransition] = useTransition()
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
@@ -179,13 +177,10 @@ export function AuftragLeistungenTab({
   const disabled = istAbgeschlossen || !editable
   const angebotTitel = projektTitel(detail, lead)
 
-  const posMetaById = useMemo(() => {
-    const m = new Map<string, { name: string; handwerkerName: string | null }>()
+  const posNameById = useMemo(() => {
+    const m = new Map<string, string>()
     for (const p of detail.auftrag_positionen ?? []) {
-      m.set(p.id, {
-        name: p.leistung_name?.trim() || 'Leistung',
-        handwerkerName: p.handwerker?.name?.trim() || null,
-      })
+      m.set(p.id, p.leistung_name?.trim() || 'Leistung')
     }
     return m
   }, [detail.auftrag_positionen])
@@ -228,19 +223,15 @@ export function AuftragLeistungenTab({
       if (cancelled) return
       const enriched: BautagebuchListenEintrag[] = []
       for (const e of list) {
-        const meta = e.position_id ? posMetaById.get(e.position_id) : null
-        enriched.push({
-          ...e,
-          leistungName: meta?.name ?? null,
-          handwerkerName: meta?.handwerkerName ?? null,
-        })
+        const leistungName = e.position_id ? posNameById.get(e.position_id) ?? null : null
+        enriched.push({ ...e, leistungName })
       }
       setBautagebuchEintraege(enriched)
     })
     return () => {
       cancelled = true
     }
-  }, [detail.id, detail.updated_at, posMetaById])
+  }, [detail.id, detail.updated_at, posNameById])
 
   function openTagebuch(positionId?: string | null) {
     setTagebuchPositionId(positionId ?? null)
@@ -249,7 +240,7 @@ export function AuftragLeistungenTab({
 
   function markErledigt(ids: string[]) {
     if (disabled || !ids.length) return
-    void actionBusy.run('Leistungen werden aktualisiert…', async () => {
+    startTransition(async () => {
       for (const positionId of ids) {
         const r = await updateAuftragPositionLeistungStatus({
           auftragId: detail.id,
@@ -258,31 +249,12 @@ export function AuftragLeistungenTab({
         })
         if (!r.ok) {
           toast.error(r.message)
-          throw new Error(r.message)
+          return
         }
       }
       toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
       onSaved?.()
     })
-  }
-
-  function decideNachtrag(positionId: string, status: 'anerkannt' | 'abgelehnt') {
-    if (disabled || pendingNachtrag) return
-    setPendingNachtrag(true)
-    void actionBusy
-      .run(
-        status === 'anerkannt' ? 'Nachtrag wird angenommen…' : 'Nachtrag wird abgelehnt…',
-        async () => {
-          const r = await decideWeitereArbeitMitNotify({ positionId, status })
-          if (!r.ok) {
-            toast.error(r.message)
-            throw new Error(r.message)
-          }
-          toast.success(r.message ?? (status === 'anerkannt' ? 'Bestätigt.' : 'Abgelehnt.'))
-          onSaved?.()
-        }
-      )
-      .finally(() => setPendingNachtrag(false))
   }
 
   return (
@@ -313,11 +285,6 @@ export function AuftragLeistungenTab({
 
       {leistungenView === 'leistungen' ? (
         <>
-          <AuftragAbnahmeFreigabeBanner
-            auftragId={detail.id}
-            disabled={disabled}
-            onChanged={onSaved}
-          />
           <AuftragPartnerPositionsPruefungPanel
             auftragId={detail.id}
             disabled={disabled}
@@ -341,20 +308,15 @@ export function AuftragLeistungenTab({
             drawerActionsForRow={
               disabled
                 ? undefined
-                : (row) =>
-                    row.brauchtFreigabe
-                      ? []
-                      : [
-                          {
-                            id: 'zuweisen',
-                            label: 'Zuweisung ändern',
-                            icon: 'user',
-                            onClick: () => setZuweisungIds([row.id]),
-                          },
-                        ]
+                : (row) => [
+                    {
+                      id: 'zuweisen',
+                      label: 'Zuweisung ändern',
+                      icon: 'user',
+                      onClick: () => setZuweisungIds([row.id]),
+                    },
+                  ]
             }
-            onNachtragEntscheiden={disabled ? undefined : decideNachtrag}
-            nachtragDecidePending={pendingNachtrag}
           />
         </>
       ) : (
@@ -398,10 +360,6 @@ export function AuftragLeistungenTab({
         auftragId={detail.id}
         auftragHandwerker={detail.auftrag_handwerker ?? []}
         positionen={detail.auftrag_positionen ?? []}
-        angebotHandwerker={
-          (detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null)
-            ?.angebot_handwerker ?? null
-        }
         onSent={() => onSaved?.()}
       />
     </div>

@@ -5,7 +5,6 @@ import {
   createPortalImpersonationUrl,
   type ImpersonationTargetType,
 } from '@/lib/portal/create-impersonation-token'
-import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function resolveKundeTarget(kundeId: string): Promise<
@@ -95,10 +94,12 @@ export async function openMieterStatusPreview(leadId: string): Promise<
       message: 'Kein Status-Token am Lead — Mieter-Ansicht nicht verfügbar.',
     }
   }
-  return {
-    ok: true,
-    url: `${publicWebsiteBaseUrl()}/melden/status/${encodeURIComponent(token)}`,
-  }
+  const base = (
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.FRONTEND_URL?.trim() ||
+    'https://baerenwaldmuenchen.de'
+  ).replace(/\/$/, '')
+  return { ok: true, url: `${base}/melden/status/${encodeURIComponent(token)}` }
 }
 
 export async function openPortalAsKunde(kundeId: string): Promise<

@@ -164,7 +164,7 @@ export function buildPartnerPortalButton(portalLink: string): string {
 /** Einzelner Portal-Button (ohne Zusatzabsatz — Text steht im P.S.-Block der Mail-Hülle). */
 export function buildPortalButton(
   portalLink: string,
-  anrede: 'du' | 'sie' = 'sie',
+  anrede: 'du' | 'sie' = 'du',
   audience: PortalMailAudience = 'privat'
 ): string {
   void anrede

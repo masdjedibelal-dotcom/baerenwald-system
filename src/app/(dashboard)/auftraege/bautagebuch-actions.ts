@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   buildBautagebuchKundenMail as renderBautagebuchKundenMail,
@@ -313,7 +314,8 @@ async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: An
   if (!kundeRaw?.email?.trim()) return { ok: false as const, message: 'Keine Kunden-E-Mail' }
 
   const empfaenger = kundeRechnungsempfaengerAusStammdaten(kundeRaw)
-  const anrede: AngebotMailAnrede = 'sie'
+  const anrede: AngebotMailAnrede =
+    anredeOverride ?? (istPrivatKundeTyp(kundeRaw.typ) ? 'du' : 'sie')
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   const angRaw = auf.angebote

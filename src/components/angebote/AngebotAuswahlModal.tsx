@@ -1,6 +1,6 @@
 'use client'
 
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Modal } from '@/components/ui/Modal'
 import {
   AngebotAuswahlPanel,
   type AngebotAuswahlZeile,
@@ -27,8 +27,9 @@ export function AngebotAuswahlModal({
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
 }) {
   return (
-    <EditorSheet open={open} onClose={onClose} title="Angebote" context="detail" size="md">
+    <Modal open={open} onClose={onClose} title="Angebote" size="lg">
       <AngebotAuswahlPanel
+        variant="modal"
         leadId={leadId}
         angebote={angebote}
         onClose={onClose}
@@ -36,6 +37,6 @@ export function AngebotAuswahlModal({
         onWeiterbearbeiten={onWeiterbearbeiten}
         onKopie={onKopie}
       />
-    </EditorSheet>
+    </Modal>
   )
 }

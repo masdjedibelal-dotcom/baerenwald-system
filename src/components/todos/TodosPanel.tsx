@@ -32,20 +32,6 @@ function isOverdue(iso: string | null, erledigt: boolean): boolean {
   return due.getTime() < today.getTime()
 }
 
-/** Aufsteigend nach Frist; ohne Datum ans Ende. */
-function sortTodosByFrist(todos: CrmTodo[]): CrmTodo[] {
-  return [...todos].sort((a, b) => {
-    const da = a.faellig_am?.slice(0, 10) ?? ''
-    const db = b.faellig_am?.slice(0, 10) ?? ''
-    if (!da && !db) return (b.created_at ?? '').localeCompare(a.created_at ?? '')
-    if (!da) return 1
-    if (!db) return -1
-    const cmp = da.localeCompare(db)
-    if (cmp !== 0) return cmp
-    return (b.created_at ?? '').localeCompare(a.created_at ?? '')
-  })
-}
-
 function linkLabel(t: CrmTodo): string | null {
   const parts: string[] = []
   if (t.kunden?.name) parts.push(t.kunden.name)
@@ -58,11 +44,11 @@ function linkLabel(t: CrmTodo): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
-type ViewMode = 'alle' | 'offen' | 'erledigt'
+type ViewMode = 'offen' | 'erledigt'
 
 /**
  * To-dos im Stil Apple Erinnerungen: Kartenliste, + oben rechts,
- * Filter Alle | Offen | Erledigt, Abhaken → durchgestrichen und aus Offen weg.
+ * Filter Offen | Erledigt, Abhaken → durchgestrichen und aus Offen weg.
  */
 export function TodosPanel({
   filter,
@@ -90,13 +76,13 @@ export function TodosPanel({
     setLoadErr(null)
     const res = await listTodos({
       ...filter,
-      erledigt: view === 'alle' ? 'all' : view === 'erledigt',
+      erledigt: view === 'erledigt',
     })
     if (!res.ok) {
       setLoadErr(res.message)
       return
     }
-    setTodos(sortTodosByFrist(res.todos))
+    setTodos(res.todos)
     setLeavingIds(new Set())
   }, [filter, view])
 
@@ -163,11 +149,7 @@ export function TodosPanel({
   }
 
   const emptyLabel =
-    view === 'erledigt'
-      ? 'Keine erledigten To-dos'
-      : view === 'alle'
-        ? 'Keine To-dos'
-        : 'Keine offenen To-dos'
+    view === 'erledigt' ? 'Keine erledigten To-dos' : 'Keine offenen To-dos'
 
   return (
     <div className={cn('todos-panel', compact && 'todos-panel--compact')}>
@@ -178,24 +160,14 @@ export function TodosPanel({
             <div className="todos-panel__chips" role="group" aria-label="Filter">
               <button
                 type="button"
-                className={cn('chip', view === 'alle' && 'active')}
-                aria-pressed={view === 'alle'}
-                onClick={() => setView('alle')}
-              >
-                Alle
-              </button>
-              <button
-                type="button"
-                className={cn('chip', view === 'offen' && 'active')}
-                aria-pressed={view === 'offen'}
+                className={cn('chip', view === 'offen' && 'on')}
                 onClick={() => setView('offen')}
               >
                 Offen
               </button>
               <button
                 type="button"
-                className={cn('chip', view === 'erledigt' && 'active')}
-                aria-pressed={view === 'erledigt'}
+                className={cn('chip', view === 'erledigt' && 'on')}
                 onClick={() => setView('erledigt')}
               >
                 Erledigt
@@ -217,16 +189,7 @@ export function TodosPanel({
       {loadErr ? <p className="text-[length:var(--fs-meta)] text-[var(--red-tx)]">{loadErr}</p> : null}
 
       <div className="todo-card">
-        <ul
-          className="todo-list"
-          aria-label={
-            view === 'erledigt'
-              ? 'Erledigte To-dos'
-              : view === 'alle'
-                ? 'Alle To-dos'
-                : 'Offene To-dos'
-          }
-        >
+        <ul className="todo-list" aria-label={view === 'erledigt' ? 'Erledigte To-dos' : 'Offene To-dos'}>
           {todos.length === 0 ? (
             <li className="todo-empty">{emptyLabel}</li>
           ) : (
@@ -235,7 +198,6 @@ export function TodosPanel({
               const link = linkLabel(t)
               const leaving = leavingIds.has(t.id)
               const done = t.erledigt
-              const overdue = isOverdue(t.faellig_am, done)
               return (
                 <li
                   key={t.id}
@@ -255,16 +217,11 @@ export function TodosPanel({
                       {(frist || link) && !done ? (
                         <div className="todo-row__meta">
                           {frist ? (
-                            <span
-                              className={cn(
-                                'todo-row__frist',
-                                overdue && 'todo-row__frist--overdue'
-                              )}
-                            >
+                            <span className={cn(isOverdue(t.faellig_am, false) && 'todo-row__overdue')}>
                               {frist}
                             </span>
                           ) : null}
-                          {frist && link ? <span className="todo-row__meta-sep" aria-hidden>·</span> : null}
+                          {frist && link ? <span aria-hidden> · </span> : null}
                           {link ? <span>{link}</span> : null}
                         </div>
                       ) : null}

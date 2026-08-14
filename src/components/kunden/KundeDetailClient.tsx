@@ -13,11 +13,15 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
+import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSection'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
+  initKundeStammEditFelder,
+  istKundeFirmaPflichtTyp,
   istKundeGewerbeTyp,
   istKundeHausverwaltungTyp,
+  istKundeNurGewerbeTyp,
   kundeDisplayName,
 } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
@@ -43,11 +47,9 @@ import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
+import { saveKunde, saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
-import { runDeleteKunde } from '@/lib/list-actions'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   buildPortalLoginLink,
   defaultPortalInviteBetreff,
@@ -55,6 +57,7 @@ import {
 } from '@/lib/portal-utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
+import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
@@ -66,6 +69,32 @@ const QUELLE_LABELS: Record<string, string> = {
   telefon: 'Telefon',
   social: 'Social Media',
   sonstiges: 'Sonstiges',
+}
+
+const TYP_OPTIONS = [
+  { value: 'privat', label: 'Privat' },
+  { value: 'gewerbe', label: 'Gewerbe' },
+  { value: 'hausverwaltung', label: 'Hausverwaltung' },
+  { value: 'sonstiges', label: 'Sonstiges' },
+]
+
+function buildEditFormFromKunde(k: KundeDetailPayload) {
+  const addr = initKundeStammEditFelder(k)
+  return {
+    firmaName: k.typ === 'gewerbe' || k.typ === 'hausverwaltung' ? (k.name ?? '') : '',
+    vorname: k.vorname ?? '',
+    nachname: k.nachname ?? k.name,
+    typ: k.typ,
+    telefon: k.telefon ?? '',
+    email: k.email ?? '',
+    plz: k.plz ?? '',
+    ort: k.ort ?? '',
+    strasse: addr.strasse,
+    hausnummer: addr.hausnummer,
+    webseite: k.webseite ?? '',
+    ansprechpartner: k.ansprechpartner ?? '',
+    quelle: k.quelle ?? '',
+  }
 }
 
 function normalizeAuftragAngebote(
@@ -112,6 +141,8 @@ export function KundeDetailClient({
   const [pending, startTransition] = useLocalTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [editingKontakt, setEditingKontakt] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
   const [portalModalOpen, setPortalModalOpen] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalSending, setPortalSending] = useState(false)
@@ -121,44 +152,15 @@ export function KundeDetailClient({
   const [portalBetreff, setPortalBetreff] = useState('')
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
-  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('sie')
+  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('du')
 
+  const [editForm, setEditForm] = useState(() => buildEditFormFromKunde(initialKunde))
   const [spamPending, setSpamPending] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
   const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
     null
   )
   const istSpam = Boolean(kunde.ist_spam)
-
-  const detailMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: istSpam ? 'Spam aufheben' : 'Als Spam markieren',
-        onClick: () => toggleSpam(),
-      },
-      {
-        label: 'Mit anderem Kunden zusammenführen',
-        onClick: () => setMergePickerOpen(true),
-      },
-      'sep',
-      {
-        label: 'Kunde löschen',
-        danger: true,
-        onClick: () => {
-          void (async () => {
-            try {
-              await runDeleteKunde(kunde.id, router, kundeDisplayName(kunde))
-              showRouteBusy('Kundenliste…')
-              router.push('/kunden')
-            } catch {
-              /* Toast kommt aus runDeleteKunde */
-            }
-          })()
-        },
-      },
-    ]
-    return items
-  }, [istSpam, kunde, router])
 
   useEffect(() => {
     void (async () => {
@@ -173,6 +175,7 @@ export function KundeDetailClient({
 
   useEffect(() => {
     setKunde(initialKunde)
+    setEditForm(buildEditFormFromKunde(initialKunde))
   }, [initialKunde])
 
   function toggleSpam() {
@@ -277,6 +280,70 @@ export function KundeDetailClient({
     return `Kunde seit ${d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}`
   }, [kunde.created_at])
 
+  function beginEditKontakt() {
+    setEditErr(null)
+    setEditForm(buildEditFormFromKunde(kunde))
+    setTab('uebersicht')
+    setEditingKontakt(true)
+  }
+
+  function cancelEditKontakt() {
+    setEditingKontakt(false)
+    setEditErr(null)
+    setEditForm(buildEditFormFromKunde(kunde))
+  }
+
+  function saveKundeStamm() {
+    setEditErr(null)
+    startTransition(async () => {
+      const firmaPflicht = istKundeFirmaPflichtTyp(editForm.typ)
+      const r = await saveKunde(
+        {
+          typ: editForm.typ,
+          name: firmaPflicht ? editForm.firmaName : null,
+          vorname: editForm.vorname || null,
+          nachname: editForm.nachname || null,
+          strasse: editForm.strasse,
+          hausnummer: editForm.hausnummer,
+          telefon: editForm.telefon || null,
+          email: editForm.email || null,
+          plz: editForm.plz || null,
+          ort: editForm.ort || null,
+          webseite: editForm.webseite || null,
+          ansprechpartner: editForm.ansprechpartner || null,
+          quelle: editForm.quelle || null,
+        },
+        kunde.id
+      )
+      if (!r.ok) {
+        setEditErr(r.message)
+        toast.error(r.message)
+        return
+      }
+      const name = firmaPflicht ? editForm.firmaName.trim() : kunde.name
+      setKunde((prev) => ({
+        ...prev,
+        typ: editForm.typ,
+        name,
+        vorname: editForm.vorname || null,
+        nachname: editForm.nachname || null,
+        strasse: editForm.strasse || null,
+        hausnummer: editForm.hausnummer || null,
+        telefon: editForm.telefon || null,
+        email: editForm.email || null,
+        plz: editForm.plz || null,
+        ort: editForm.ort || null,
+        webseite: editForm.webseite || null,
+        ansprechpartner: editForm.ansprechpartner || null,
+        quelle: editForm.quelle || null,
+        adresse: [editForm.strasse, editForm.hausnummer].filter(Boolean).join(' ') || null,
+      }))
+      toast.success('Stammdaten gespeichert')
+      setEditingKontakt(false)
+      refresh()
+    })
+  }
+
   async function openPortalModal() {
     setPortalLoading(true)
     const draft = await getKundenPortalMailDraft(kunde.id)
@@ -288,7 +355,7 @@ export function KundeDetailClient({
     setPortalBetreff(draft.betreff)
     setPortalText(draft.text)
     setPortalHtml(draft.html)
-    setPortalAnrede('sie')
+    setPortalAnrede(draft.anrede)
     setPortalModalOpen(true)
   }
 
@@ -371,52 +438,221 @@ export function KundeDetailClient({
       </Card>
     ) : null
 
+  const adresseAnzeige = [
+    [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') || kunde.adresse,
+    [kunde.plz, kunde.ort].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ') || '—'
+
+  const kontaktCard = (
+    <InlineEditSection
+      title="Stammdaten"
+      editing={editingKontakt}
+      onStartEdit={beginEditKontakt}
+      onCancel={cancelEditKontakt}
+      onSave={saveKundeStamm}
+      saving={pending}
+    >
+      {editErr ? <p className="mb-2 text-[length:var(--fs-text)] text-status-cancel-text">{editErr}</p> : null}
+      {kundenStamm.fehlendeRechnungsfelder.length > 0 && !editingKontakt ? (
+        <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+          Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
+        </p>
+      ) : null}
+      <div className="props">
+        {editingKontakt ? (
+          <>
+            <InlineEditField label="Typ" editing value={kundentypLabel(editForm.typ)}>
+              <select
+                className="input"
+                value={editForm.typ}
+                onChange={(e) => setEditForm((f) => ({ ...f, typ: e.target.value }))}
+              >
+                {TYP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </InlineEditField>
+            {istKundeFirmaPflichtTyp(editForm.typ) ? (
+              <InlineEditField
+                label={istKundeHausverwaltungTyp(editForm.typ) ? 'Firma' : 'Firma / Name'}
+                editing
+                value={editForm.firmaName || '—'}
+              >
+                <input
+                  className="input"
+                  value={editForm.firmaName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firmaName: e.target.value }))}
+                  autoFocus
+                />
+              </InlineEditField>
+            ) : null}
+            <InlineEditField label="Vorname" editing value={editForm.vorname || '—'}>
+              <input
+                className="input"
+                value={editForm.vorname}
+                onChange={(e) => setEditForm((f) => ({ ...f, vorname: e.target.value }))}
+                autoFocus={!istKundeFirmaPflichtTyp(editForm.typ)}
+              />
+            </InlineEditField>
+            <InlineEditField
+              label={istKundeFirmaPflichtTyp(editForm.typ) ? 'Nachname (Ansprechpartner)' : 'Nachname'}
+              editing
+              value={editForm.nachname || '—'}
+            >
+              <input
+                className="input"
+                value={editForm.nachname}
+                onChange={(e) => setEditForm((f) => ({ ...f, nachname: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Straße" editing value={editForm.strasse || '—'}>
+              <input
+                className="input"
+                value={editForm.strasse}
+                onChange={(e) => setEditForm((f) => ({ ...f, strasse: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Hausnummer" editing value={editForm.hausnummer || '—'}>
+              <input
+                className="input"
+                value={editForm.hausnummer}
+                onChange={(e) => setEditForm((f) => ({ ...f, hausnummer: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="PLZ" editing value={editForm.plz || '—'}>
+              <input
+                className="input"
+                value={editForm.plz}
+                onChange={(e) => setEditForm((f) => ({ ...f, plz: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Ort" editing value={editForm.ort || '—'}>
+              <input
+                className="input"
+                value={editForm.ort}
+                onChange={(e) => setEditForm((f) => ({ ...f, ort: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="Telefon" editing value={editForm.telefon || '—'}>
+              <input
+                className="input"
+                type="tel"
+                value={editForm.telefon}
+                onChange={(e) => setEditForm((f) => ({ ...f, telefon: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField label="E-Mail" editing value={editForm.email || '—'}>
+              <input
+                className="input"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </InlineEditField>
+            {istKundeNurGewerbeTyp(editForm.typ) ? (
+              <InlineEditField label="Ansprechpartner" editing value={editForm.ansprechpartner || '—'}>
+                <input
+                  className="input"
+                  value={editForm.ansprechpartner}
+                  onChange={(e) => setEditForm((f) => ({ ...f, ansprechpartner: e.target.value }))}
+                />
+              </InlineEditField>
+            ) : null}
+            <InlineEditField label="Webseite" editing value={editForm.webseite || '—'}>
+              <input
+                className="input"
+                value={editForm.webseite}
+                onChange={(e) => setEditForm((f) => ({ ...f, webseite: e.target.value }))}
+              />
+            </InlineEditField>
+            <InlineEditField
+              label="Quelle"
+              editing
+              value={(QUELLE_LABELS[editForm.quelle] ?? editForm.quelle) || '—'}
+            >
+              <select
+                className="input"
+                value={editForm.quelle}
+                onChange={(e) => setEditForm((f) => ({ ...f, quelle: e.target.value }))}
+              >
+                <option value="">—</option>
+                {Object.entries(QUELLE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </InlineEditField>
+          </>
+        ) : (
+          <>
+            <InlineEditField
+              label="Telefon"
+              editing={false}
+              link={Boolean(kundenStamm.telefon)}
+              value={
+                kundenStamm.telefon ? (
+                  <a href={`tel:${kundenStamm.telefon.replace(/\s/g, '')}`}>{kundenStamm.telefon}</a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <InlineEditField
+              label="E-Mail"
+              editing={false}
+              link={Boolean(kundenStamm.email)}
+              value={
+                kundenStamm.email ? (
+                  <a href={`mailto:${kundenStamm.email}`}>{kundenStamm.email}</a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <InlineEditField label="Adresse" editing={false} value={adresseAnzeige} />
+            <InlineEditField label="Typ" editing={false} value={kundentypLabel(kunde.typ)} />
+          </>
+        )}
+      </div>
+    </InlineEditSection>
+  )
+
   const fixedOverview = (
     <div className="space-y-4">
-      <EntityKundenStammdatenCard
-        kundeId={kunde.id}
-        kundeTyp={kunde.typ}
-        hideKundeLink
-        editKunde={kunde}
-        initial={{
-          name: kundeDisplayName(kunde),
-          telefon: kunde.telefon ?? '',
-          email: kunde.email ?? '',
-          plz: kunde.plz ?? '',
-          ort: kunde.ort ?? '',
-          strasse:
-            [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
-            kunde.adresse ||
-            '',
-          vorname: kunde.vorname ?? '',
-          nachname: kunde.nachname ?? '',
-          ansprechpartner: kunde.ansprechpartner ?? '',
-          webseite: kunde.webseite ?? '',
-          quelleLabel: kunde.quelle
-            ? (QUELLE_LABELS[kunde.quelle] ?? kunde.quelle)
-            : '',
-        }}
-        banner={
-          kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
-              Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
-            </p>
-          ) : null
-        }
-        onSaved={(saved) => {
-          if (saved) {
-            setKunde((prev) => ({
-              ...prev,
-              ...saved,
-              name: saved.name?.trim() || prev.name,
-              adresse:
-                [saved.strasse, saved.hausnummer].filter(Boolean).join(' ') ||
-                prev.adresse,
-            }))
-          }
-          refresh()
-        }}
-      />
+      {editingKontakt ? (
+        kontaktCard
+      ) : (
+        <EntityKundenStammdatenCard
+          kundeId={kunde.id}
+          kundeTyp={kunde.typ}
+          hideKundeLink
+          initial={{
+            name: kundeDisplayName(kunde),
+            telefon: kunde.telefon ?? '',
+            email: kunde.email ?? '',
+            plz: kunde.plz ?? '',
+            ort: kunde.ort ?? '',
+            strasse:
+              [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') ||
+              kunde.adresse ||
+              '',
+            vorname: kunde.vorname ?? '',
+            nachname: kunde.nachname ?? '',
+            ansprechpartner: kunde.ansprechpartner ?? '',
+            webseite: kunde.webseite ?? '',
+            quelleLabel: kunde.quelle
+              ? (QUELLE_LABELS[kunde.quelle] ?? kunde.quelle)
+              : '',
+          }}
+          onSaved={() => refresh()}
+          onEdit={beginEditKontakt}
+        />
+      )}
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
@@ -590,7 +826,7 @@ export function KundeDetailClient({
                 router.push(createRechnungHref(kunde.id))
               },
             }}
-            menuItems={detailMenuItems}
+            menuItems={[]}
           />
         ),
       }}
@@ -639,11 +875,32 @@ export function KundeDetailClient({
             onChange={(e) => setPortalCc(e.target.value)}
             placeholder="intern@baerenwald.de; team@baerenwald.de"
           />
+          <Select
+            label="Anrede"
+            name="portal-anrede"
+            value={portalAnrede}
+            onChange={(e) => {
+              const next = e.target.value === 'du' ? 'du' : 'sie'
+              setPortalAnrede(next)
+              const istOrg = kunde.portal_modus === 'organisation'
+              setPortalBetreff(defaultPortalInviteBetreff(next, { organisation: istOrg }))
+              setPortalText(
+                defaultPortalInviteText(next, {
+                  organisation: istOrg,
+                  orgName: kunde.org_anzeigename ?? kunde.name,
+                })
+              )
+            }}
+            options={[
+              { value: 'du', label: 'Du' },
+              { value: 'sie', label: 'Sie' },
+            ]}
+          />
           <KiAssistFieldLabel
             label="Betreff"
             value={portalBetreff}
             onApply={setPortalBetreff}
-            extraHint="Portal-Einladung Betreff an den Kunden (Sie-Anrede)."
+            extraHint="Portal-Einladung Betreff an den Kunden."
             multiline={false}
           >
             <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />

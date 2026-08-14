@@ -5,10 +5,7 @@ import {
   type SituationValue,
 } from '@/lib/vorab-formular-config'
 import type { StaffFunnelState, StaffFunnelStepId } from '@/lib/anfragen/staff-funnel-types'
-import {
-  STAFF_FUNNEL_STEP_LABELS,
-  anliegenToSituation,
-} from '@/lib/anfragen/staff-funnel-types'
+import { STAFF_FUNNEL_STEP_LABELS } from '@/lib/anfragen/staff-funnel-types'
 
 const BERATUNG_BEREICHE = new Set(['schimmel', 'anbau', 'baum_notfall'])
 
@@ -62,13 +59,6 @@ export function needsDringlichkeit(state: StaffFunnelState): boolean {
   return state.situation === 'kaputt' || state.situation === 'notfall'
 }
 
-/** Umsetzungszeitraum — nicht bei Reparatur/Notfall (dort: Dringlichkeit). */
-export function needsUmsetzungsZeitraum(state: StaffFunnelState): boolean {
-  const sit = state.situation || anliegenToSituation(state.anliegen)
-  if (!sit || sit === 'kaputt' || sit === 'notfall') return false
-  return sit === 'erneuern' || sit === 'betreuung' || sit === 'gewerbe'
-}
-
 /** Welche dynamischen Website-Funnel-Blöcke im Staff-Create sichtbar sind. */
 export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
   umfang: boolean
@@ -78,7 +68,6 @@ export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
   groesse: boolean
   fachdetails: boolean
   dringlichkeit: boolean
-  umsetzungsZeitraum: boolean
   beratung: boolean
   any: boolean
 } {
@@ -89,7 +78,6 @@ export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
   const groesse = needsGroesse(state)
   const fachdetails = needsFachdetails(state)
   const dringlichkeit = needsDringlichkeit(state)
-  const umsetzungsZeitraum = needsUmsetzungsZeitraum(state)
   const beratung = needsBeratungPfad(state)
   return {
     umfang,
@@ -99,7 +87,6 @@ export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
     groesse,
     fachdetails,
     dringlichkeit,
-    umsetzungsZeitraum,
     beratung,
     any:
       umfang ||
@@ -109,7 +96,6 @@ export function staffFunnelDynamicBlocks(state: StaffFunnelState): {
       groesse ||
       fachdetails ||
       dringlichkeit ||
-      umsetzungsZeitraum ||
       beratung,
   }
 }

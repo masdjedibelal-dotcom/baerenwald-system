@@ -65,13 +65,11 @@ function fileBaseName(name: string): string {
 }
 
 function isImagePath(path: string | null | undefined): boolean {
-  const clean = (path ?? '').split('?')[0]
-  return /\.(jpe?g|png|webp|gif)$/i.test(clean)
+  return /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(path ?? '')
 }
 
 function isPdfPath(path: string | null | undefined): boolean {
-  const clean = (path ?? '').split('?')[0]
-  return /\.pdf$/i.test(clean)
+  return /\.pdf$/i.test(path ?? '')
 }
 
 /**
@@ -105,8 +103,6 @@ export function PartnerDokumentEditorSheet({
   const [selectedSlug, setSelectedSlug] = useState('')
   const [dirty, setDirty] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewError, setPreviewError] = useState<string | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [ablehnenOpen, setAblehnenOpen] = useState(false)
@@ -197,24 +193,13 @@ export function PartnerDokumentEditorSheet({
   useEffect(() => {
     if (!open || !existing?.datei_url) {
       setPreviewUrl(null)
-      setPreviewLoading(false)
-      setPreviewError(null)
       return
     }
     let cancelled = false
-    setPreviewLoading(true)
-    setPreviewError(null)
-    setPreviewUrl(null)
     void signPartnerDokumentUrl(existing.datei_url).then((r) => {
       if (cancelled) return
-      setPreviewLoading(false)
-      if (r.ok) {
-        setPreviewUrl(r.url)
-        setPreviewError(null)
-      } else {
-        setPreviewUrl(null)
-        setPreviewError(r.message || 'Vorschau nicht verfügbar.')
-      }
+      if (r.ok) setPreviewUrl(r.url)
+      else setPreviewUrl(null)
     })
     return () => {
       cancelled = true
@@ -278,6 +263,16 @@ export function PartnerDokumentEditorSheet({
   function freigeben() {
     if (!existing) return
     startTransition(async () => {
+      if (dirty && (titel.trim() || gueltigBis)) {
+        const meta = await updatePartnerDokument(existing.id, handwerkerId, {
+          bezeichnung: resolvedTitel(),
+          gueltig_bis: gueltigBis.trim() || null,
+        })
+        if (!meta.ok) {
+          toast.error(meta.message)
+          return
+        }
+      }
       const r = await freigebenPartnerDokument(existing.id, handwerkerId)
       if (!r.ok) {
         toast.error(r.message)
@@ -372,12 +367,8 @@ export function PartnerDokumentEditorSheet({
   if (!open) return null
   if (!allowTypPick && !effectiveTyp && !existing) return null
 
-  const previewIsImage =
-    isImagePath(existing?.datei_url) ||
-    isImagePath(previewUrl) ||
-    (file ? file.type.startsWith('image/') && !/heic|heif/i.test(file.type) : false)
-  const previewIsPdf =
-    isPdfPath(existing?.datei_url) || isPdfPath(previewUrl) || file?.type === 'application/pdf'
+  const previewIsImage = isImagePath(existing?.datei_url) || (file ? file.type.startsWith('image/') : false)
+  const previewIsPdf = isPdfPath(existing?.datei_url) || file?.type === 'application/pdf'
   const showUrl = localPreviewUrl || previewUrl
 
   const reviewFooter = isReview ? (
@@ -457,11 +448,7 @@ export function PartnerDokumentEditorSheet({
                 </p>
               ) : null}
 
-              {previewLoading && !showUrl ? (
-                <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-                  Vorschau wird geladen…
-                </p>
-              ) : showUrl && previewIsImage ? (
+              {showUrl && previewIsImage ? (
                 <button
                   type="button"
                   className="block w-full overflow-hidden rounded-xl border border-bw-border bg-bw-bg p-0 text-left"
@@ -500,31 +487,62 @@ export function PartnerDokumentEditorSheet({
                   Dokument öffnen
                 </a>
               ) : (
-                <div className="space-y-2">
-                  <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {previewError || 'Keine Vorschau verfügbar.'}
-                  </p>
-                  {existing?.datei_url ? (
+                <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+                  Vorschau wird geladen…
+                </p>
+              )}
+
+              <details className="rounded-lg border border-bw-border px-3 py-2">
+                <summary className="cursor-pointer text-[length:var(--fs-meta)] font-medium text-bw-text">
+                  Ersetzen / Metadaten
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <Input
+                    label="Titel"
+                    value={titel}
+                    disabled={pending}
+                    onChange={(e) => {
+                      setTitel(e.target.value)
+                      markDirty()
+                    }}
+                  />
+                  <Input
+                    label="Gültig bis"
+                    type="date"
+                    value={gueltigBis}
+                    disabled={pending}
+                    onChange={(e) => {
+                      setGueltigBis(e.target.value)
+                      markDirty()
+                    }}
+                  />
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="input"
+                    accept={ACCEPT}
+                    disabled={pending}
+                    onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                  />
+                  {file ? (
+                    <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+                      Neu: {file.name}
+                    </p>
+                  ) : null}
+                  {dirty || file ? (
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
                       disabled={pending}
-                      onClick={() => {
-                        void signPartnerDokumentUrl(existing.datei_url).then((r) => {
-                          if (!r.ok) {
-                            toast.error(r.message)
-                            return
-                          }
-                          window.open(r.url, '_blank', 'noopener,noreferrer')
-                        })
-                      }}
+                      loading={pending}
+                      onClick={speichern}
                     >
-                      In neuem Tab öffnen
+                      Änderungen speichern
                     </Button>
                   ) : null}
                 </div>
-              )}
+              </details>
             </>
           ) : (
             <>

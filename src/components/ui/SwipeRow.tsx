@@ -101,9 +101,6 @@ export function SwipeRow({
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (disabled || e.pointerType === 'mouse') return
-    const t = e.target as HTMLElement
-    // Drag-Handles / Inputs nicht als Swipe starten (Konflikt mit Sortieren)
-    if (t.closest('.drag, [data-no-swipe], input, select, textarea, button')) return
     startX.current = e.clientX
     startY.current = e.clientY
     axis.current = null

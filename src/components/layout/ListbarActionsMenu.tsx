@@ -19,8 +19,9 @@ export type ListbarActionItem = {
 }
 
 /**
- * Desktop: optionales `leading` links neben den Action-Icons.
- * Mobil: Filter-Icon (mit `directOpen` direkt, sonst ActionSheet).
+ * Mobil: optional `leading` + Filter-Icon.
+ * Mit `directOpen`: Icon öffnet direkt (z. B. Filter-Sheet), ohne ActionSheet-Zwischenschritt.
+ * Desktop: `desktop` unverändert.
  */
 export function ListbarActionsMenu({
   items,
@@ -34,7 +35,7 @@ export function ListbarActionsMenu({
   /** Badge am Icon (z. B. aktive Filteranzahl) */
   activeHint?: number
   desktop: ReactNode
-  /** Desktop links neben Filter/Export (z. B. kompakter Offen/Erledigt-Toggle) */
+  /** Mobil links neben dem Filter-Icon (z. B. Segment-Toggle) */
   leading?: ReactNode
   title?: string
   /** Mobil: Icon öffnet direkt diese Aktion statt Listen-Aktionen-Sheet */
@@ -75,9 +76,9 @@ export function ListbarActionsMenu({
 
   return (
     <div className="listbar-actions">
-      {leading ? <div className="listbar-actions-leading">{leading}</div> : null}
       <div className="listbar-actions-desktop">{desktop}</div>
       <div className="listbar-actions-mobile">
+        {leading ? <div className="listbar-actions-leading">{leading}</div> : null}
         <button
           ref={anchorRef}
           type="button"

@@ -50,7 +50,7 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
     bic: '',
     bank_name: '',
     logo_url: '',
-    zahlungsziel_tage: '7',
+    zahlungsziel_tage: '14',
     angebot_gueltig_tage: '30',
     mwst_satz: '19',
     kleinunternehmer: '',

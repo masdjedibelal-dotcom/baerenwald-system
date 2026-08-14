@@ -152,8 +152,6 @@ export type LeadListAngebot = {
   gesamt_max: number | null
   created_at?: string | null
   pdf_url?: string | null
-  leistungsumfang?: string | null
-  notizen?: string | null
 }
 
 export type LeadNotizRow = {
@@ -291,7 +289,6 @@ export type LeadAuftraggeberEmbed = Pick<
   | 'nachname'
   | 'email'
   | 'telefon'
-  | 'adresse'
   | 'plz'
   | 'ort'
   | 'strasse'
@@ -300,7 +297,6 @@ export type LeadAuftraggeberEmbed = Pick<
   | 'org_anzeigename'
   | 'org_kennung'
   | 'ansprechpartner'
-  | 'webseite'
   | 'portal_modus'
   | 'freigabe_modus'
   | 'freigabe_schwelle_eur'
@@ -1294,27 +1290,7 @@ export type Rechnung = {
   erstellt_von: string | null
   created_at: string
   updated_at: string
-  kunden?:
-    | Kunde
-    | Pick<
-        Kunde,
-        | 'id'
-        | 'name'
-        | 'email'
-        | 'telefon'
-        | 'adresse'
-        | 'strasse'
-        | 'hausnummer'
-        | 'plz'
-        | 'ort'
-        | 'typ'
-        | 'ust_id'
-        | 'vorname'
-        | 'nachname'
-        | 'ansprechpartner'
-        | 'webseite'
-      >
-    | null
+  kunden?: Kunde | Pick<Kunde, 'id' | 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort' | 'typ' | 'ust_id'> | null
   angebote?: Pick<
     Angebot,
     'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max' | 'leistungsumfang' | 'notizen'
