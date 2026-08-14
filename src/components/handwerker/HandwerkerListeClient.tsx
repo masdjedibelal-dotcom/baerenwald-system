@@ -1,7 +1,5 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -29,6 +27,9 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import { toast } from '@/components/ui/app-toast'
+import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
+import { gewerkPillClass } from '@/lib/gewerk-pill-tone'
 
 export type HandwerkerZeile = {
   id: string
@@ -60,20 +61,15 @@ const EXPORT_FIELDS: ExportField[] = [
 const MOCK_GEWERK_NAMES = ['Sanitär', 'Elektrik', 'Fliesen', 'Maler', 'Boden'] as const
 
 const HW_COLS: ResizableColDef[] = [
+  { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
   { id: 'name', defaultWidth: 200, minWidth: 130, maxWidth: 400 },
   { id: 'gewerk', defaultWidth: 140, minWidth: 100, maxWidth: 260 },
   { id: 'telefon', defaultWidth: 130, minWidth: 100, maxWidth: 200 },
   { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
   { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
-  { id: 'status', defaultWidth: 110, minWidth: 88, maxWidth: 160 },
 ]
 
-const HW_COLS_SELECT: ResizableColDef[] = [
-  { id: 'check', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
-  ...HW_COLS,
-]
-
-type SortCol = 'name' | 'gewerk' | 'telefon' | 'email' | 'bewertung' | 'status'
+type SortCol = 'name' | 'gewerk' | 'telefon' | 'email' | 'bewertung'
 
 function gewerkeStr(h: HandwerkerZeile): string {
   return h.gewerk_namen?.length ? h.gewerk_namen.join(', ') : gewerkeStrRaw(h.gewerke)
@@ -97,11 +93,6 @@ function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
     gewerke: gewerkeStr(h),
     compliance_status: h.compliance_status ?? '',
   }
-}
-
-function handwerkerStatusBadge(h: HandwerkerZeile) {
-  if (h.aktiver_einsatz) return <MockBadge kind={hubSpotStatusToMockBadgeKind('order')}>Aktiv</MockBadge>
-  return <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>Verfügbar</MockBadge>
 }
 
 function resolveGewerkChipValue(name: string, gewerkeOptionen: GewerkOption[]): string {
@@ -136,10 +127,11 @@ export function HandwerkerListeClient({
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') {
@@ -196,7 +188,6 @@ export function HandwerkerListeClient({
       telefon: (h) => (h.telefon ?? '').toLowerCase(),
       email: (h) => (h.email ?? '').toLowerCase(),
       bewertung: () => 0,
-      status: (h) => (h.aktiver_einsatz ? 0 : 1),
     }
     if (!sortCol) return filteredBase
     const fn = sortKeys[sortCol]
@@ -221,7 +212,6 @@ export function HandwerkerListeClient({
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
-  const allSelected = filtered.length > 0 && filtered.every((h) => selected[h.id])
 
   const selectedRows = useMemo(
     () => filtered.filter((h) => selected[h.id]),
@@ -242,12 +232,39 @@ export function HandwerkerListeClient({
     )
   }, [exportToCSV, selectedRows])
 
-  const colDefs = selectMode ? HW_COLS_SELECT : HW_COLS
+  const runBulkDelete = useCallback(async () => {
+    const ids = selectedRows.map((h) => h.id)
+    if (!ids.length) return
+    setBulkDeletePending(true)
+    const loadingId = toast.loading(
+      ids.length === 1 ? 'Handwerker wird gelöscht…' : `${ids.length} Handwerker werden gelöscht…`
+    )
+    let okCount = 0
+    let lastErr: string | null = null
+    for (const id of ids) {
+      const r = await deleteHandwerker(id)
+      if (r.ok) okCount += 1
+      else lastErr = r.message
+    }
+    setBulkDeletePending(false)
+    setBulkDeleteOpen(false)
+    setSelected({})
+    if (okCount > 0) {
+      toast.success(okCount === 1 ? 'Handwerker gelöscht' : `${okCount} Handwerker gelöscht`, {
+        id: loadingId,
+      })
+      router.refresh()
+    } else {
+      toast.error(lastErr ?? 'Löschen fehlgeschlagen', { id: loadingId })
+    }
+    if (okCount > 0 && lastErr) toast.error(lastErr)
+  }, [router, selectedRows])
+
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    selectMode ? 'crm.cols.handwerker.select.v1' : 'crm.cols.handwerker.v1',
-    colDefs
+    'crm.cols.handwerker.select.v2',
+    HW_COLS
   )
-  const resizeOffset = selectMode ? 1 : 0
+  const resizeOffset = 1
 
   const paginationResetKey = `${gewerkChip}|${query}|${fName}|${sortCol}|${sortDir}`
   const {
@@ -270,6 +287,23 @@ export function HandwerkerListeClient({
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
   const isMobile = useIsMobile()
   const displayItems = isMobile ? infiniteItems : pageItems
+
+  const allPageSelected =
+    displayItems.length > 0 && displayItems.every((h) => selected[h.id])
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((h) => selected[h.id])
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelected({})
+      return
+    }
+    const n: Record<string, boolean> = {}
+    filtered.forEach((h) => {
+      n[h.id] = true
+    })
+    setSelected(n)
+  }
 
   const filterFooter = (
     <div className="sheet-footer-actions">
@@ -350,16 +384,6 @@ export function HandwerkerListeClient({
               onSelect: () => setFilterOpen(true),
             },
             {
-              icon: 'checks',
-              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
-              hint: selectMode ? `${selectedCount} gewählt` : undefined,
-              active: selectMode,
-              onSelect: () => {
-                setSelectMode((m) => !m)
-                setSelected({})
-              },
-            },
-            {
               icon: 'download',
               label: 'CSV exportieren',
               onSelect: () =>
@@ -383,16 +407,6 @@ export function HandwerkerListeClient({
                     : 'Filter & Suchen'
                 }
                 onClick={() => setFilterOpen(true)}
-              />
-              <MockBtn
-                icon="checks"
-                kind={selectMode ? 'primary' : 'ghost'}
-                sm
-                title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
-                onClick={() => {
-                  setSelectMode((m) => !m)
-                  setSelected({})
-                }}
               />
               <MockBtn
                 icon="download"
@@ -465,6 +479,15 @@ export function HandwerkerListeClient({
             Export
           </MockBtn>
           <MockBtn
+            kind="danger"
+            sm
+            icon="trash"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={bulkDeletePending}
+          >
+            Löschen
+          </MockBtn>
+          <MockBtn
             kind="ghost"
             sm
             className="qa-btn"
@@ -475,35 +498,63 @@ export function HandwerkerListeClient({
         </div>
       ) : null}
 
+      <MockModal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!bulkDeletePending) setBulkDeleteOpen(false)
+        }}
+        icon="trash"
+        title={
+          selectedCount === 1 ? 'Handwerker löschen?' : `${selectedCount} Handwerker löschen?`
+        }
+        sub="Dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={bulkDeletePending ? undefined : 'trash'}
+              disabled={bulkDeletePending}
+              onClick={() => void runBulkDelete()}
+            >
+              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {bulkDeletePending
+            ? 'Bitte warten…'
+            : selectedCount === 1
+              ? 'Der ausgewählte Handwerker wird unwiderruflich gelöscht.'
+              : `${selectedCount} ausgewählte Handwerker werden unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
+
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className={cn(
-          'listcard listcard--scroll listcard--cols',
-          (isMobile || selectMode) && 'vg-selectmode'
-        )}
+        className="listcard listcard--scroll listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
-          {selectMode ? (
-            <div
-              className="vg-check"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (allSelected) setSelected({})
-                else {
-                  const n: Record<string, boolean> = {}
-                  filtered.forEach((h) => {
-                    n[h.id] = true
-                  })
-                  setSelected(n)
-                }
-              }}
-            >
-              <span className={cn('vg-box', allSelected && 'on')}>
-                {allSelected ? <MockIcon ctx="default" n="check" size={12} /> : null}
-              </span>
-            </div>
-          ) : null}
+          <div
+            className="vg-check"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleSelectAll()
+            }}
+            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
+              {allFilteredSelected || allPageSelected ? (
+                <MockIcon ctx="default" n="check" size={12} />
+              ) : null}
+            </span>
+          </div>
           <MockSortHead
             col="name"
             sortCol={sortCol}
@@ -554,16 +605,6 @@ export function HandwerkerListeClient({
             onResizePointerDown={(e) => startResize(resizeOffset + 4, e)}
           >
             Bewertung
-          </MockSortHead>
-          <MockSortHead
-            col="status"
-            sortCol={sortCol}
-            sortDir={sortDirNum}
-            onSort={(c) => toggleSort(c as SortCol)}
-            resizable
-            onResizePointerDown={(e) => startResize(resizeOffset + 5, e)}
-          >
-            Status
           </MockSortHead>
         </div>
 
@@ -636,7 +677,10 @@ export function HandwerkerListeClient({
                   </div>
                 </div>
                 <div className="vg-status">
-                  <span className="pill-tag" title={pills.join(' · ') || undefined}>
+                  <span
+                    className={gewerkPillClass(primaryGewerk)}
+                    title={pills.join(' · ') || undefined}
+                  >
                     {primaryGewerk}
                   </span>
                 </div>
@@ -650,34 +694,32 @@ export function HandwerkerListeClient({
                 role="button"
                 tabIndex={0}
                 className={cn('list-row', selected[h.id] && 'sel')}
-                onClick={() => (selectMode ? toggleSel(h.id) : openDetail(h.id))}
+                onClick={() => openDetail(h.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    selectMode ? toggleSel(h.id) : openDetail(h.id)
+                    openDetail(h.id)
                   }
                 }}
               >
-                {selectMode ? (
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(h.id)
-                    }}
-                  >
-                    <span className={cn('vg-box', selected[h.id] && 'on')}>
-                      {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
-                ) : null}
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(h.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[h.id] && 'on')}>
+                    {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
                 <div className="lc-title" style={{ fontWeight: 600 }}>
                   {handwerkerDisplayName(h)}
                 </div>
                 <div className="lc-pills" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {pills.length > 0 ? (
                     pills.map((g) => (
-                      <span key={g} className="pill-tag">
+                      <span key={g} className={gewerkPillClass(g)}>
                         {g}
                       </span>
                     ))
@@ -705,7 +747,6 @@ export function HandwerkerListeClient({
                     —
                   </span>
                 </div>
-                <div className="lc-status">{handwerkerStatusBadge(h)}</div>
               </div>
             )
             return (

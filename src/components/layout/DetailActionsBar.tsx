@@ -114,8 +114,7 @@ function hasMenuContent(items: ActionsMenuItem[]): boolean {
 }
 
 /**
- * Desktop: Primary (+ optional Secondary / ⋯ nur wenn Items).
- * Mobil Hybrid: oben nur Bottom-Nav; nach Scroll Nav weg + floating CTA.
+ * Desktop: von rechts ⋯ · Primary · Secondary. Mobil: ⋯ oben, CTAs floating.
  */
 export function DetailActionsBar({
   primary,
@@ -193,8 +192,8 @@ export function DetailActionsBar({
           {secondary.label}
         </button>
       ) : null}
-      {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
       {primary ? <ActionControl action={primary} /> : null}
+      {showOverflow ? menuTrigger(false, cleanMenuItems) : null}
     </div>
   )
 

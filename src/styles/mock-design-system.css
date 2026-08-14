@@ -1088,11 +1088,9 @@ div.input input::placeholder {
   background: color-mix(in srgb, var(--border) 80%, transparent);
   align-self: center;
 }
-/* Offen/Erledigt: eigene Zeile unter Phasen (Alle + Rechnung), Desktop + Mobil */
+/* Offen/Erledigt: Mobil eigene Zeile; Desktop kompakt links neben Filter */
 .listbar-lifecycle {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
+  display: none;
 }
 .listbar-lifecycle .segment-toggle--listbar {
   width: 100%;
@@ -1136,6 +1134,7 @@ div.input input::placeholder {
   display: flex;
   align-items: center;
   min-width: 0;
+  margin-right: 2px;
 }
 .listbar-actions-badge {
   position: absolute;
@@ -1192,6 +1191,8 @@ div.input input::placeholder {
     overflow-x: auto;
   }
   .listbar-lifecycle {
+    display: block;
+    width: 100%;
     margin-top: 0;
   }
   .listbar-lifecycle .segment-toggle--listbar {
@@ -1467,6 +1468,41 @@ div.input input::placeholder {
   cursor: pointer;
   transition: background 120ms ease;
 }
+.pill-tag.gw-blue {
+  background: var(--blue-bg); color: var(--blue-tx);
+  border-color: color-mix(in srgb, var(--blue-tx) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-green {
+  background: var(--grn-bg); color: var(--grn-tx);
+  border-color: color-mix(in srgb, var(--grn-tx) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-yellow {
+  background: var(--yel-bg); color: var(--yel-tx);
+  border-color: color-mix(in srgb, var(--yel-tx) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-orange {
+  background: var(--status-offer-bg); color: var(--status-offer-text);
+  border-color: color-mix(in srgb, var(--status-offer-text) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-red {
+  background: var(--red-bg); color: var(--red-tx);
+  border-color: color-mix(in srgb, var(--red-tx) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-gray {
+  background: var(--gray-bg); color: var(--gray-tx);
+  border-color: color-mix(in srgb, var(--gray-tx) 16%, var(--border));
+  cursor: default;
+}
+.pill-tag.gw-gold {
+  background: var(--bw-accent-bg); color: var(--bw-accent);
+  border-color: color-mix(in srgb, var(--bw-accent) 16%, var(--border));
+  cursor: default;
+}
 .list-row:last-child { border-bottom: none; }
 .list-row:hover { background: var(--bg-soft); }
 .list-row.active { background: var(--green-10); }
@@ -1673,6 +1709,18 @@ button.wv-chip:hover {
 }
 .vgid-chip.ghost {
   background: var(--bg-soft);
+}
+.portal-login-chip {
+  gap: 6px;
+}
+.portal-login-chip svg {
+  width: 22px;
+  height: 22px;
+}
+@media (max-width: 767px) {
+  .portal-login-chip {
+    display: none !important;
+  }
 }
 .vgid-portal {
   display: flex;
@@ -7787,12 +7835,14 @@ textarea.wizard-dok-beschreibung {
 .list-row.sel .text-bw-text-muted {
   color: var(--text-3);
 }
-.vg-row.sel .vg-box {
+.vg-row.sel .vg-box,
+.list-row.sel .vg-box {
   border-color: var(--green);
   background: var(--card);
   color: var(--green);
 }
-.vg-row.sel .vg-box.on {
+.vg-row.sel .vg-box.on,
+.list-row.sel .vg-box.on {
   background: var(--green);
   border-color: var(--green);
   color: #fff;
@@ -14199,6 +14249,23 @@ textarea.input:focus {
 .segment-toggle--listbar .segment-toggle-btn--active .segment-toggle-count {
   color: rgba(255, 255, 255, 0.65);
   opacity: 1;
+}
+
+.segment-toggle--compact {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 2px;
+  width: auto;
+}
+.segment-toggle--listbar.segment-toggle--compact .segment-toggle-btn {
+  padding: 0 8px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 22px;
+}
+.segment-toggle--listbar.segment-toggle--compact .segment-toggle-count {
+  font-size: 10px;
+  margin-left: 3px;
 }
 
 @media (max-width: 767px) {

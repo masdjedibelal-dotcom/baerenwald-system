@@ -32,8 +32,6 @@ import {
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
-import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -626,7 +624,6 @@ export function AnfrageDetailClient({
 
   const vorhabenTitel = useMemo(() => leadVorhabenTitel(lead), [lead])
   const kundeTitel = useMemo(() => kundenName(lead), [lead])
-  const portalKundeId = useMemo(() => leadVertragsKundeId(lead), [lead])
 
   const statusActions = useMemo(() => {
     const st = String(lead.status ?? '').trim().toLowerCase()
@@ -665,17 +662,12 @@ export function AnfrageDetailClient({
     const s = anfrageStatusDisplay(lead.status, {
       orgFreigabeStatus: lead.org_freigabe_status,
     })
-    const badge = <StatusBadge status={lead.status} label={s.label} />
-    // Mobil: Status nur Anzeige — Wechsel über die ···-Actions oben rechts
-    if (isMobile) {
-      return <span className="inline-flex flex-wrap items-center gap-1.5">{badge}</span>
-    }
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        <StatusBadgeActionPopover badge={badge} actions={statusActions} title="Status" />
+        <StatusBadge status={lead.status} label={s.label} />
       </span>
     )
-  }, [isMobile, lead.status, lead.org_freigabe_status, statusActions])
+  }, [lead.status, lead.org_freigabe_status])
 
   const statusMenuItems = useMemo((): ActionsMenuItem[] => {
     if (!statusActions.length) return []
@@ -848,7 +840,6 @@ export function AnfrageDetailClient({
           </>
         ),
         meta: headMeta,
-        titleTrailing: <PortalLoginIconButton kundeId={portalKundeId} label="Kundenportal öffnen" />,
         actions: (
           <DetailActionsBar
             sheetTitle="Anfrage"

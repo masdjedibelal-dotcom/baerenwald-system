@@ -933,6 +933,40 @@ export function VorgaengeListeClient({
     </>
   )
 
+  const lifecycleToggle = (variant: 'stack' | 'compact') => (
+    <div
+      className={cn(
+        'segment-toggle segment-toggle--listbar',
+        variant === 'stack' ? 'segment-toggle--stack' : 'segment-toggle--compact'
+      )}
+      role="group"
+      aria-label="Lebenszyklus"
+    >
+      <button
+        type="button"
+        className={cn(
+          'segment-toggle-btn',
+          lifecycle === 'offen' && 'segment-toggle-btn--active'
+        )}
+        onClick={() => setLifecycleFilter('offen')}
+      >
+        Offen{' '}
+        <span className="segment-toggle-count">{effectiveLifecycleCounts.offen}</span>
+      </button>
+      <button
+        type="button"
+        className={cn(
+          'segment-toggle-btn',
+          lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+        )}
+        onClick={() => setLifecycleFilter('erledigt')}
+      >
+        Erledigt{' '}
+        <span className="segment-toggle-count">{effectiveLifecycleCounts.erledigt}</span>
+      </button>
+    </div>
+  )
+
   return (
     <div>
       <div className="listbar">
@@ -984,6 +1018,7 @@ export function VorgaengeListeClient({
             title="Listen-Aktionen"
             activeHint={activeFilterCount}
             directOpen={() => setFilterOpen(true)}
+            leading={showLifecycleToggle ? lifecycleToggle('compact') : undefined}
             items={[
               {
                 icon: 'filter',
@@ -1036,40 +1071,7 @@ export function VorgaengeListeClient({
           />
         </div>
         {showLifecycleToggle ? (
-          <div
-            className="listbar-lifecycle"
-            role="group"
-            aria-label="Lebenszyklus"
-          >
-            <div className="segment-toggle segment-toggle--listbar segment-toggle--stack">
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'offen' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('offen')}
-              >
-                Offen{' '}
-                <span className="segment-toggle-count">
-                  {effectiveLifecycleCounts.offen}
-                </span>
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('erledigt')}
-              >
-                Erledigt{' '}
-                <span className="segment-toggle-count">
-                  {effectiveLifecycleCounts.erledigt}
-                </span>
-              </button>
-            </div>
-          </div>
+          <div className="listbar-lifecycle">{lifecycleToggle('stack')}</div>
         ) : null}
       </div>
 

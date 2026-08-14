@@ -9,7 +9,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
@@ -1116,12 +1115,6 @@ export function AuftragDetailClient({
           <StatusBadge status={detail.status} label={auftragStatus.label} />
         ),
         meta: headMeta,
-        titleTrailing: (
-          <PortalLoginIconButton
-            kundeId={detail.kunde_id ?? detail.kunden?.id}
-            label="Kundenportal öffnen"
-          />
-        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Auftrag"

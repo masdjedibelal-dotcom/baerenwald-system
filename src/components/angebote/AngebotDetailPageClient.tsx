@@ -27,7 +27,6 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
@@ -702,9 +701,6 @@ export function AngebotDetailPageClient({
           />
         ),
         meta: headMeta,
-        titleTrailing: (
-          <PortalLoginIconButton kundeId={detail.kunde_id} label="Kundenportal öffnen" />
-        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Angebot"

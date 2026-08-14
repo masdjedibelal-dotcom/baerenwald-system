@@ -6,6 +6,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
@@ -199,10 +200,17 @@ export function EntityKundenStammdatenCard({
       {(showKundeLink || kundeId) && (
         <div className="vgid-chips mt-3">
           {showKundeLink ? (
-            <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
-              <MockIcon ctx="default" n="user" size={14} />
-              Kundenakte
-            </Link>
+            <>
+              <Link className="vgid-chip ghost" href={`/kunden/${kundeId!.trim()}`}>
+                <MockIcon ctx="default" n="user" size={14} />
+                Kundenakte
+              </Link>
+              <PortalLoginIconButton
+                kundeId={kundeId}
+                label="Kundenportal öffnen"
+                withLabel
+              />
+            </>
           ) : null}
         </div>
       )}

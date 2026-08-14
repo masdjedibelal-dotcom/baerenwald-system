@@ -10,7 +10,6 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
@@ -610,9 +609,6 @@ export function RechnungDetailClient({
           />
         ),
         meta: headMeta,
-        titleTrailing: (
-          <PortalLoginIconButton kundeId={detail.kunde_id} label="Kundenportal öffnen" />
-        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Rechnung"
