@@ -1773,10 +1773,6 @@ button.wv-chip:hover {
   flex: 1;
   min-width: 0;
 }
-  color: var(--text-2);
-  font-weight: 500;
-  min-width: 0;
-}
 .vgid-portal .a {
   margin-left: auto;
   display: inline-flex;
