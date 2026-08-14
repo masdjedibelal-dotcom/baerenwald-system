@@ -20,7 +20,7 @@ import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
-type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'vorgaenge' | 'akte'
+type ObjektAkteTab = 'uebersicht' | 'mieter' | 'vorgaenge' | 'akte'
 
 function objektErbtFreigabe(o: KundenObjekt): boolean {
   return o.freigabe_schwelle_eur == null && o.notfall_direkt == null
@@ -78,18 +78,12 @@ export function ObjektAkteDetailClient({
     [akte.einheiten]
   )
 
-  const einheitenAnzahl = useMemo(() => {
-    if (einheiten.length > 0) return einheiten.length
-    const m = objekt.einheiten_hinweis?.match(/\d+/)
-    return m ? Number(m[0]) : 0
-  }, [einheiten.length, objekt.einheiten_hinweis])
+  const mieter = useMemo(
+    () => akte.bewohner.filter((b) => b.aktiv !== false),
+    [akte.bewohner]
+  )
 
-  const vermietet = useMemo(() => {
-    const occupied = new Set(
-      akte.bewohner.filter((b) => b.aktiv !== false).map((b) => b.objekt_einheit_id)
-    )
-    return einheiten.filter((e) => occupied.has(e.id)).length
-  }, [akte.bewohner, einheiten])
+  const mieterAnzahl = mieter.length
 
   const flaecheGesamt = useMemo(
     () =>
@@ -116,12 +110,8 @@ export function ObjektAkteDetailClient({
             {adresse ? <div className="vgid-meta">{adresse}</div> : null}
             <div className="vgid-chips" style={{ marginTop: 10 }}>
               <span className="vgid-chip ghost">
-                <MockIcon ctx="default" n="building" size={14} />
-                {einheitenAnzahl} Einheiten
-              </span>
-              <span className="vgid-chip ghost">
                 <MockIcon ctx="default" n="users" size={14} />
-                {vermietet} vermietet
+                {mieterAnzahl} Mieter
               </span>
               {flaecheGesamt > 0 ? (
                 <span className="vgid-chip ghost">
@@ -195,10 +185,10 @@ export function ObjektAkteDetailClient({
       render: () => overview,
     },
     {
-      id: 'einheiten',
-      label: 'Einheiten',
-      icon: 'building',
-      count: einheiten.length || undefined,
+      id: 'mieter',
+      label: 'Mieter',
+      icon: 'users',
+      count: mieterAnzahl || undefined,
       render: () => (
         <ObjektEinheitenSection
           kundeId={kunde.id}
@@ -240,7 +230,7 @@ export function ObjektAkteDetailClient({
       head={{
         title: objekt.titel,
         titleBadges:
-          vermietet > 0 ? <MockBadge kind="aktiv">Vermietet</MockBadge> : null,
+          mieterAnzahl > 0 ? <MockBadge kind="aktiv">{mieterAnzahl} Mieter</MockBadge> : null,
         badges: adresse ? <span>{adresse}</span> : null,
       }}
     >

@@ -39,6 +39,10 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   auftragId: string
   angebotPositionen: AngebotPosition[]
   angebotHandwerker?: AngebotHandwerkerRow[] | null
+  /**
+   * Nachtrag: nur ergänzen/aktualisieren — fehlende Stamm-Positionen nicht entfernen.
+   */
+  appendOnly?: boolean
 }): Promise<
   | { ok: true; neu: number; aktualisiert: number; entfernt: number }
   | { ok: false; message: string }
@@ -184,19 +188,22 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   }
 
   // Positionen, die im Angebot fehlen → aus Auftrag entfernen (sonst bleiben Summen/Badge falsch)
+  // Nachtrag (appendOnly): Stamm-Positionen bleiben.
   let entfernt = 0
-  for (const p of pool) {
-    if (!p.id || matchedIds.has(p.id)) continue
-    if (istInterneAuftragGewerkBeschreibung(p)) continue
-    if (p.handwerker_id?.trim()) {
-      const { error } = await supabaseAdmin
-        .from('auftrag_positionen')
-        .update({ aenderung_typ: 'entfernt' })
-        .eq('id', p.id)
-      if (!error) entfernt++
-    } else {
-      const { error } = await supabaseAdmin.from('auftrag_positionen').delete().eq('id', p.id)
-      if (!error) entfernt++
+  if (!input.appendOnly) {
+    for (const p of pool) {
+      if (!p.id || matchedIds.has(p.id)) continue
+      if (istInterneAuftragGewerkBeschreibung(p)) continue
+      if (p.handwerker_id?.trim()) {
+        const { error } = await supabaseAdmin
+          .from('auftrag_positionen')
+          .update({ aenderung_typ: 'entfernt' })
+          .eq('id', p.id)
+        if (!error) entfernt++
+      } else {
+        const { error } = await supabaseAdmin.from('auftrag_positionen').delete().eq('id', p.id)
+        if (!error) entfernt++
+      }
     }
   }
 

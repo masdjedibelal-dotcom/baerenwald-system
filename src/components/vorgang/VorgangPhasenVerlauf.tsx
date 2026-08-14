@@ -183,7 +183,7 @@ export function VorgangPhasenVerlauf({
 
   return (
     <>
-      <div className={cn('card', className)}>
+      <div className={cn('card dshell-framed', className)}>
         <div className="card-h">
           <div className="card-title title">Verlauf des Vorgangs</div>
         </div>

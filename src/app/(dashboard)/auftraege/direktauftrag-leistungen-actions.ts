@@ -67,7 +67,7 @@ export async function createDirektauftragMitLeistungen(input: {
   const titel =
     input.titel?.trim() ||
     (istAkut
-      ? `Direktauftrag — ${String(lead.melder_einheit ?? gewerk || 'Einsatz').trim() || 'Einsatz'}`
+      ? `Direktauftrag — ${String(lead.melder_einheit ?? (gewerk || 'Einsatz')).trim() || 'Einsatz'}`
       : `Direktauftrag${gewerk ? ` — ${gewerk}` : ''}`
     ).slice(0, 240)
 

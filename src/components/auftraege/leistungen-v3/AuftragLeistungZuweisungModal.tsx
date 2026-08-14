@@ -17,6 +17,7 @@ import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
+import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 
 function ymdToDisplay(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
@@ -75,10 +76,21 @@ export function AuftragLeistungZuweisungModal({
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
   const [selectedHwRows, setSelectedHwRows] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const assistent = useAssistentOptional()
+
+  /** KI-over-sheet darf Zuweisungs-Sheet nicht blockieren/„hängen“. */
+  function dismissKiOverSheet() {
+    if (!assistent?.open) return
+    if (assistent.scoped?.layer !== 'over-sheet') return
+    assistent.setOpen(false)
+    assistent.clearScoped()
+  }
 
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [partnerNetto, setPartnerNetto] = useState('')
+  /** Mehrfachzuweisung: EK pro Positions-ID */
+  const [ekByPos, setEkByPos] = useState<Record<string, string>>({})
   const [zeitModus, setZeitModus] = useState<'zeitraum' | 'tag'>('zeitraum')
   const [von, setVon] = useState('')
   const [bis, setBis] = useState('')
@@ -99,12 +111,18 @@ export function AuftragLeistungZuweisungModal({
       setSelectedHwRows([])
       setPickerOpen(false)
       setDirty(false)
+      setEkByPos({})
       return
     }
     if (!sample) return
     setTitel(sample.leistung_name?.trim() || '')
     setBeschreibung(richTextToPlain(sample.beschreibung ?? '') || '')
     setPartnerNetto(numInput(sample.preis_partner))
+    setEkByPos(
+      Object.fromEntries(
+        selectedPositions.map((p) => [p.id, numInput(p.preis_partner)])
+      )
+    )
     const start = sample.start_datum?.slice(0, 10) || ''
     const end = sample.end_datum?.slice(0, 10) || ''
     setVon(start ? ymdToDisplay(start) : '')
@@ -112,16 +130,18 @@ export function AuftragLeistungZuweisungModal({
     setZeitModus(start && end && start === end ? 'tag' : 'zeitraum')
     if (sample.handwerker_id) {
       setSelectedHwIds(new Set([sample.handwerker_id]))
-      // Zeile wird beim Öffnen des Pickers / Übernehmen befüllt; Platzhalter bis dahin
+      const hwJoin = Array.isArray(sample.handwerker)
+        ? sample.handwerker[0]
+        : sample.handwerker
       setSelectedHwRows((prev) => {
         const hit = prev.find((h) => h.id === sample.handwerker_id)
         if (hit) return [hit]
         return [
           {
             id: sample.handwerker_id!,
-            name: 'Zugewiesener Partner',
+            name: hwJoin?.name?.trim() || 'Zugewiesener Partner',
             firma: null,
-            telefon: null,
+            telefon: hwJoin?.telefon ?? null,
             letzter_einsatz: null,
             verfuegbar: true,
             gewerke: sample.gewerk_slug ? [sample.gewerk_slug] : null,
@@ -133,7 +153,9 @@ export function AuftragLeistungZuweisungModal({
       setSelectedHwRows([])
     }
     setDirty(false)
-  }, [open, sample])
+    // selectedPositions nur über IDs — sonst Endlosschleife bei neuer Array-Referenz
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync beim Öffnen / Sample-Wechsel
+  }, [open, sample?.id, positionIds.join('|')])
 
   function removeHw(id: string) {
     setDirty(true)
@@ -145,6 +167,11 @@ export function AuftragLeistungZuweisungModal({
     setSelectedHwRows((prev) => prev.filter((h) => h.id !== id))
   }
 
+  function setEkForPos(posId: string, raw: string) {
+    setDirty(true)
+    setEkByPos((prev) => ({ ...prev, [posId]: raw }))
+  }
+
   function confirm() {
     const ids = Array.from(selectedHwIds)
     if (!ids.length) {
@@ -152,11 +179,30 @@ export function AuftragLeistungZuweisungModal({
       return
     }
     const primaryHw = ids[0]
-    const ekNum = parseNum(partnerNetto)
-    if (ekNum == null || ekNum <= 0) {
-      toast.error('Partner-EK (netto) muss größer als 0 € sein.')
-      return
+
+    let ekNum: number | null = null
+    let ekByPositionId: Record<string, number> | undefined
+
+    if (isSingle) {
+      ekNum = parseNum(partnerNetto)
+      if (ekNum == null || ekNum <= 0) {
+        toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+        return
+      }
+    } else {
+      ekByPositionId = {}
+      for (const p of selectedPositions) {
+        const n = parseNum(ekByPos[p.id] ?? '')
+        if (n == null || n <= 0) {
+          toast.error(
+            `Partner-EK fehlt für „${p.leistung_name?.trim() || 'Leistung'}“ (größer als 0 €).`
+          )
+          return
+        }
+        ekByPositionId[p.id] = n
+      }
     }
+
     const vonYmd = von.trim() ? displayToYmd(von) : null
     const bisYmd =
       zeitModus === 'tag'
@@ -165,8 +211,11 @@ export function AuftragLeistungZuweisungModal({
           ? displayToYmd(bis)
           : vonYmd
 
+    dismissKiOverSheet()
+    setPickerOpen(false)
+
     startTransition(async () => {
-      if (isSingle && sample) {
+      if (isSingle && sample && ekNum != null) {
         const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
           leistung_name: titel.trim() || sample.leistung_name,
           beschreibung: beschreibung.trim() || null,
@@ -184,7 +233,8 @@ export function AuftragLeistungZuweisungModal({
         auftragId,
         positionIds,
         handwerkerId: primaryHw,
-        ekNetto: ekNum,
+        ekNetto: isSingle ? ekNum : null,
+        ekNettoByPositionId: ekByPositionId,
       })
       if (!assign.ok) {
         toast.error(assign.message)
@@ -214,14 +264,26 @@ export function AuftragLeistungZuweisungModal({
   }
 
   const ekOk = (() => {
-    const n = parseNum(partnerNetto)
-    return n != null && n > 0
+    if (isSingle) {
+      const n = parseNum(partnerNetto)
+      return n != null && n > 0
+    }
+    return selectedPositions.every((p) => {
+      const n = parseNum(ekByPos[p.id] ?? '')
+      return n != null && n > 0
+    })
   })()
   const canSend = !pending && selectedHwIds.size > 0 && ekOk
 
   const selectedDisplay = useMemo(() => {
     return selectedHwRows.filter((h) => selectedHwIds.has(h.id))
   }, [selectedHwRows, selectedHwIds])
+
+  function formatVk(pos: AuftragPosition): string {
+    const vk = pos.preis_fix
+    if (vk == null || !Number.isFinite(vk)) return '—'
+    return `${vk.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`
+  }
 
   return (
     <>
@@ -239,6 +301,8 @@ export function AuftragLeistungZuweisungModal({
         onConfirm={confirm}
         className="hw-anfrage-modal"
         bodyClassName="hw-anfrage-body"
+        /* Handwerker-Suche darüber → Parent zurücktreten, sonst peekt/verdeckt Zuweisung */
+        overlayClassName={pickerOpen ? 'editor-sheet-overlay--recessed' : undefined}
       >
         <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
         {isSingle ? (
@@ -265,7 +329,7 @@ export function AuftragLeistungZuweisungModal({
                   setBeschreibung(text)
                 }}
                 extraHint="Leistungsbeschreibung für die Handwerker-Anfrage (Partner-Portal / Mail)."
-                disabled={pending}
+                disabled={pending || pickerOpen}
               >
                 <textarea
                   className="input ta"
@@ -316,9 +380,13 @@ export function AuftragLeistungZuweisungModal({
                 <button
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setDirty(true)
                     setZeitModus('zeitraum')
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
                   }}
                   disabled={pending}
                 >
@@ -327,16 +395,22 @@ export function AuftragLeistungZuweisungModal({
                 <button
                   type="button"
                   className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setDirty(true)
                     setZeitModus('tag')
                     if (von) setBis(von)
+                    /* iOS: Modus-Wechsel darf Date-Picker nicht auto-öffnen */
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
                   }}
                   disabled={pending}
                 >
                   Einzelner Tag
                 </button>
               </div>
+              {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
               <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
                 <label className="hw-anfrage-field">
                   <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
@@ -359,7 +433,10 @@ export function AuftragLeistungZuweisungModal({
                       tabIndex={-1}
                       disabled={pending}
                       aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
                         const input = (e.currentTarget.parentElement?.querySelector(
                           'input[type="date"]'
                         ) ?? null) as HTMLInputElement | null
@@ -367,7 +444,6 @@ export function AuftragLeistungZuweisungModal({
                           input?.showPicker?.()
                         } catch {
                           input?.focus()
-                          input?.click()
                         }
                       }}
                     >
@@ -375,83 +451,107 @@ export function AuftragLeistungZuweisungModal({
                     </button>
                   </div>
                 </label>
-                {zeitModus === 'zeitraum' ? (
-                  <label className="hw-anfrage-field">
-                    <span className="hw-anfrage-label">Bis</span>
-                    <div className="hw-anfrage-date-field">
-                      <input
-                        type="date"
-                        className="input"
-                        value={bis.trim() ? displayToYmd(bis) : ''}
-                        onChange={(e) => {
-                          setDirty(true)
-                          const v = e.target.value
-                          setBis(v ? ymdToDisplay(v) : '')
-                        }}
-                        disabled={pending}
-                      />
-                      <button
-                        type="button"
-                        className="hw-anfrage-date-icon"
-                        tabIndex={-1}
-                        disabled={pending}
-                        aria-label="Kalender öffnen"
-                        onClick={(e) => {
-                          const input = (e.currentTarget.parentElement?.querySelector(
-                            'input[type="date"]'
-                          ) ?? null) as HTMLInputElement | null
-                          try {
-                            input?.showPicker?.()
-                          } catch {
-                            input?.focus()
-                            input?.click()
-                          }
-                        }}
-                      >
-                        <MockIcon ctx="btn" n="calendar" size={15} />
-                      </button>
-                    </div>
-                  </label>
-                ) : null}
+                <label
+                  className={cn(
+                    'hw-anfrage-field',
+                    zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
+                  )}
+                >
+                  <span className="hw-anfrage-label">Bis</span>
+                  <div className="hw-anfrage-date-field">
+                    <input
+                      type="date"
+                      className="input"
+                      value={bis.trim() ? displayToYmd(bis) : ''}
+                      onChange={(e) => {
+                        setDirty(true)
+                        const v = e.target.value
+                        setBis(v ? ymdToDisplay(v) : '')
+                      }}
+                      disabled={pending || zeitModus === 'tag'}
+                      tabIndex={zeitModus === 'tag' ? -1 : undefined}
+                    />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending || zeitModus === 'tag'}
+                      aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
+                  </div>
+                </label>
               </div>
             </div>
           </>
         ) : (
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-            {selectedPositions.length} Leistungen — Partner Netto und Handwerker gelten für alle
-            Ausgewählten.
-          </p>
-        )}
-
-        {!isSingle ? (
-          <label className="hw-anfrage-field">
-            <span className="hw-anfrage-label">Partner-EK netto *</span>
-            <div className="txt-prefix">
-              <span className="prefix" aria-hidden>
-                €
-              </span>
-              <input
-                type="number"
-                className="input"
-                step="0.01"
-                min="0.01"
-                required
-                value={partnerNetto}
-                onChange={(e) => {
-                  setDirty(true)
-                  setPartnerNetto(e.target.value)
-                }}
-                disabled={pending}
-                aria-invalid={!ekOk && partnerNetto.trim() !== ''}
-              />
+          <div className="hw-anfrage-section">
+            <div className="hw-anfrage-section-head">
+              <span>Partner-EK je Leistung</span>
+              <span>Handwerker gilt für alle</span>
+            </div>
+            <div className="hw-zuw-ek-table" role="table" aria-label="Leistungen mit Partner-EK">
+              <div className="hw-zuw-ek-head" role="row">
+                <span role="columnheader">Leistung</span>
+                <span role="columnheader">VK</span>
+                <span role="columnheader">EK netto *</span>
+              </div>
+              {selectedPositions.map((p) => {
+                const raw = ekByPos[p.id] ?? ''
+                const n = parseNum(raw)
+                const rowOk = n != null && n > 0
+                return (
+                  <div key={p.id} className="hw-zuw-ek-row" role="row">
+                    <span className="hw-zuw-ek-name" role="cell" title={p.leistung_name}>
+                      {p.leistung_name?.trim() || 'Leistung'}
+                    </span>
+                    <span className="hw-zuw-ek-vk" role="cell">
+                      {formatVk(p)}
+                    </span>
+                    <label className="hw-zuw-ek-input" role="cell">
+                      <span className="txt-prefix">
+                        <span className="prefix" aria-hidden>
+                          €
+                        </span>
+                        <input
+                          type="number"
+                          className="input"
+                          step="0.01"
+                          min="0.01"
+                          required
+                          value={raw}
+                          onChange={(e) => setEkForPos(p.id, e.target.value)}
+                          disabled={pending}
+                          aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`}
+                          aria-invalid={!rowOk && raw.trim() !== ''}
+                        />
+                      </span>
+                    </label>
+                  </div>
+                )
+              })}
             </div>
             {!ekOk ? (
               <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
-                Pflicht — größer als 0 €
+                Für jede Leistung Partner-EK größer als 0 € eintragen
               </span>
             ) : null}
-          </label>
-        ) : null}
+          </div>
+        )}
 
         <div className="hw-anfrage-section">
           <div className="hw-anfrage-section-head">
@@ -505,7 +605,10 @@ export function AuftragLeistungZuweisungModal({
             type="button"
             className="pos-add-btn w-full"
             disabled={pending}
-            onClick={() => setPickerOpen(true)}
+            onClick={() => {
+              dismissKiOverSheet()
+              setPickerOpen(true)
+            }}
           >
             <span className="icon-wrap">
               <MockIcon ctx="default" n="search" size={16} />

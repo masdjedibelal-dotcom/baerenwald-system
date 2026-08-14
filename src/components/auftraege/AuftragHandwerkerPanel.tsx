@@ -138,6 +138,23 @@ export function AuftragHandwerkerPanel({
       toast.error('Gewerk nicht in Stammdaten — bitte Position mit gültigem Gewerk anlegen.')
       return
     }
+    const alterHwId = replaceZuweisungId
+      ? gruppe.zuweisung?.handwerker_id?.trim() || null
+      : null
+    const replacePositionen = alterHwId
+      ? gruppe.positionen
+          .filter((p) => p.handwerker_id === alterHwId)
+          .map((p) => ({
+            id: p.id,
+            leistung_name: p.leistung_name,
+            leistung_status: p.leistung_status,
+            erledigt_am: p.erledigt_am,
+            preis_partner: p.preis_partner,
+            lohn_fix: p.lohn_fix,
+            material_fix: p.material_fix,
+            handwerker_id: p.handwerker_id,
+          }))
+      : undefined
     setModalScope({
       type: 'gewerk',
       gewerkId: gruppe.gewerkId,
@@ -149,7 +166,9 @@ export function AuftragHandwerkerPanel({
           p.einheit && p.einheit !== 'pauschal' ? `${p.menge ?? 1} ${p.einheit}` : 'Pauschal'
         return `${p.leistung_name}${p.beschreibung ? ` — ${p.beschreibung}` : ''} (${qty})`
       }),
-      replaceZuweisungId })
+      replaceZuweisungId,
+      replacePositionen,
+    })
   }
 
   function openPositionModal(gruppe: GewerkGruppe, position: AuftragPosition) {
@@ -157,11 +176,32 @@ export function AuftragHandwerkerPanel({
       toast.error('Gewerk nicht in Stammdaten.')
       return
     }
+    const z = gruppe.zuweisung
+    const replaceId =
+      position.handwerker_id && z?.id && String(z.status).toLowerCase() !== 'ersetzt'
+        ? z.id
+        : undefined
     setModalScope({
       type: 'position',
       position,
       gewerkId: gruppe.gewerkId,
-      gewerkName: gruppe.gewerkName })
+      gewerkName: gruppe.gewerkName,
+      replaceZuweisungId: replaceId,
+      replacePositionen: replaceId
+        ? [
+            {
+              id: position.id,
+              leistung_name: position.leistung_name,
+              leistung_status: position.leistung_status,
+              erledigt_am: position.erledigt_am,
+              preis_partner: position.preis_partner,
+              lohn_fix: position.lohn_fix,
+              material_fix: position.material_fix,
+              handwerker_id: position.handwerker_id,
+            },
+          ]
+        : undefined,
+    })
   }
 
   function changeGewerkStatus(zuweisungId: string, status: AuftragHandwerkerZuweisungStatus) {
@@ -205,7 +245,9 @@ export function AuftragHandwerkerPanel({
       <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
         <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
-          Handwerker zuweisen
+          {handwerkerRows.some((z) => z.handwerker_id && String(z.status).toLowerCase() !== 'ersetzt')
+            ? 'Handwerker bearbeiten'
+            : 'Handwerker zuweisen'}
         </h3>
         <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
           Pro Gewerk oder einzelne Leistung — Nachricht mit Ort, Zeitraum und Leistungen wird automatisch befüllt.
@@ -300,10 +342,15 @@ export function AuftragHandwerkerPanel({
                       variant="secondary"
                       size="sm"
                       disabled={!gruppe.gewerkId || pending}
-                      onClick={() => openGewerkModal(gruppe)}
+                      onClick={() =>
+                        openGewerkModal(
+                          gruppe,
+                          z && String(z.status).toLowerCase() !== 'ersetzt' ? z.id : undefined
+                        )
+                      }
                     >
                       <UserPlus className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
-                      {hwName ? 'Gewerk ändern' : 'Gewerk zuweisen'}
+                      {hwName && !abgelehnt ? 'Handwerker bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
                     </Button>
                   </div>
                 </div>
@@ -366,7 +413,7 @@ export function AuftragHandwerkerPanel({
                               disabled={!gruppe.gewerkId || pending}
                               onClick={() => openPositionModal(gruppe, p)}
                             >
-                              {p.handwerker_id ? 'Ändern' : 'Zuweisen'}
+                              {p.handwerker_id ? 'Handwerker bearbeiten' : 'Zuweisen'}
                             </Button>
                           </div>
                         </li>

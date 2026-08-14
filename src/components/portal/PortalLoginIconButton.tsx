@@ -13,16 +13,20 @@ type Props = {
   className?: string
   /** aria/title — Standard: Portal öffnen */
   label?: string
+  /** Desktop: Icon + „Login“-Text (z. B. neben Kundenakte) */
+  withLabel?: boolean
 }
 
 /**
- * CRM-Admin: Portal-Login (Impersonation) als Icon im Detail-Header — nicht im ⋯.
+ * CRM-Admin: Portal-Login (Impersonation).
+ * Mit `withLabel` als Chip neben Kundenakte (Desktop).
  */
 export function PortalLoginIconButton({
   kundeId,
   handwerkerId,
   className,
   label = 'Portal öffnen',
+  withLabel = false,
 }: Props) {
   const isCrmAdmin = useIsCrmAdmin()
   const [busy, setBusy] = useState(false)
@@ -57,13 +61,21 @@ export function PortalLoginIconButton({
   return (
     <button
       type="button"
-      className={cn('qa-btn portal-login-icon', className)}
+      className={cn(
+        withLabel ? 'vgid-chip ghost portal-login-chip' : 'qa-btn portal-login-icon',
+        className
+      )}
       aria-label={label}
       title={label}
       disabled={busy}
       onClick={() => void open()}
     >
-      <MockIcon ctx="row" n={hid ? 'users' : 'user'} size={18} />
+      <MockIcon
+        ctx={withLabel ? 'default' : 'row'}
+        n={hid ? 'users' : 'user'}
+        size={withLabel ? 22 : 18}
+      />
+      {withLabel ? <span>Login</span> : null}
     </button>
   )
 }

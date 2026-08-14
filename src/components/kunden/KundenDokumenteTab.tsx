@@ -13,7 +13,12 @@ import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import {
+  DokumenteVorgangAccordions,
+  groupByVorgangTitel,
+} from '@/components/ui/DokumenteVorgangAccordions'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { cn } from '@/lib/utils'
 
 type DocRow = {
@@ -26,9 +31,13 @@ type DocRow = {
   dokumentId?: string
   beschreibung: string
   freigabe: boolean
+  groupKey: string
+  groupTitle: string
 }
 
 const COLS = 'minmax(0, 1fr) auto'
+const ALLGEMEIN_KEY = 'allgemein'
+const ALLGEMEIN_TITLE = 'Allgemein'
 
 function formatBytes(n: number | null | undefined): string | null {
   if (n == null || n <= 0) return null
@@ -62,18 +71,37 @@ function normalizeAuftragAngebote(
         pdf_url?: string | null
         created_at?: string | null
         status?: string
+        lead_id?: string | null
+        leistungsumfang?: string | null
+        notizen?: string | null
       }
     | {
         id?: string
         pdf_url?: string | null
         created_at?: string | null
         status?: string
+        lead_id?: string | null
+        leistungsumfang?: string | null
+        notizen?: string | null
       }[]
     | null
     | undefined
 ) {
   if (!raw) return []
   return Array.isArray(raw) ? raw : [raw]
+}
+
+type AngTitelQuelle = {
+  leistungsumfang?: string | null
+  notizen?: string | null
+}
+
+function pickAngebotFuerTitel(list: AngTitelQuelle[]): AngTitelQuelle | null {
+  return (
+    list.find((a) => Boolean(a.leistungsumfang?.trim() || a.notizen?.trim())) ??
+    list[0] ??
+    null
+  )
 }
 
 export function KundenDokumenteTab({
@@ -105,6 +133,73 @@ export function KundenDokumenteTab({
     const rows: DocRow[] = []
     const seen = new Set<string>()
 
+    const leadById = new Map(leads.map((l) => [l.id, l]))
+    const auftragById = new Map(auftraege.map((a) => [a.id, a]))
+    const angebotById = new Map<string, AngTitelQuelle & { id: string; lead_id?: string | null }>()
+
+    for (const l of leads) {
+      for (const ang of l.angebote ?? []) {
+        if (!ang?.id) continue
+        angebotById.set(ang.id, {
+          id: ang.id,
+          lead_id: l.id,
+          leistungsumfang: ang.leistungsumfang,
+          notizen: ang.notizen,
+        })
+      }
+    }
+    for (const a of auftraege) {
+      for (const ang of normalizeAuftragAngebote(a.angebote)) {
+        if (!ang?.id) continue
+        angebotById.set(ang.id, {
+          id: ang.id,
+          lead_id: ang.lead_id ?? a.lead_id ?? null,
+          leistungsumfang: ang.leistungsumfang,
+          notizen: ang.notizen,
+        })
+      }
+    }
+
+    function groupForVorgang(opts: {
+      leadId?: string | null
+      auftragId?: string | null
+      angebot?: AngTitelQuelle | null
+      rechnungTitel?: string | null
+    }): { groupKey: string; groupTitle: string } {
+      const lead = opts.leadId ? leadById.get(opts.leadId) : undefined
+      const auftrag = opts.auftragId ? auftragById.get(opts.auftragId) : undefined
+      const angsFromAuftrag = auftrag
+        ? normalizeAuftragAngebote(auftrag.angebote)
+        : []
+      const angsFromLead = lead?.angebote ?? []
+      const angebot =
+        opts.angebot ??
+        pickAngebotFuerTitel([
+          ...angsFromAuftrag,
+          ...angsFromLead.map((x) => ({
+            leistungsumfang: x.leistungsumfang,
+            notizen: x.notizen,
+          })),
+        ])
+
+      const title = resolveAkteVorgangTitel({
+        angebot,
+        auftragTitel: auftrag?.titel,
+        rechnungTitel: opts.rechnungTitel,
+        situation: lead?.situation,
+        bereiche: lead?.bereiche,
+        fallback: auftrag?.titel || 'Vorgang',
+      })
+
+      if (opts.leadId) {
+        return { groupKey: `lead:${opts.leadId}`, groupTitle: title }
+      }
+      if (opts.auftragId) {
+        return { groupKey: `auftrag:${opts.auftragId}`, groupTitle: title }
+      }
+      return { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
+    }
+
     for (const d of dokumente) {
       if (d.typ === 'protokoll') continue
       const href = d.datei_url?.trim()
@@ -121,11 +216,18 @@ export function KundenDokumenteTab({
         dokumentId: d.id,
         beschreibung: m?.beschreibung ?? '',
         freigabe: m?.freigabe ?? false,
+        groupKey: ALLGEMEIN_KEY,
+        groupTitle: ALLGEMEIN_TITLE,
       })
       seen.add(id)
     }
 
     for (const a of auftraege) {
+      const leadId =
+        a.lead_id?.trim() ||
+        normalizeAuftragAngebote(a.angebote).find((x) => x.lead_id)?.lead_id ||
+        null
+      const group = groupForVorgang({ leadId, auftragId: a.id })
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         const id = `angebot-${ang.id}`
@@ -137,8 +239,9 @@ export function KundenDokumenteTab({
           created_at: m?.created_at || ang.created_at || a.created_at,
           groesse_bytes: null,
           quelle: 'angebot',
-          beschreibung: m?.beschreibung ?? (a.titel?.trim() || ''),
+          beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...group,
         })
         seen.add(id)
       }
@@ -153,8 +256,9 @@ export function KundenDokumenteTab({
           created_at: m?.created_at || a.created_at,
           groesse_bytes: null,
           quelle: 'dokumentation',
-          beschreibung: m?.beschreibung ?? (a.titel?.trim() || ''),
+          beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...group,
         })
       }
 
@@ -167,12 +271,14 @@ export function KundenDokumenteTab({
         created_at: abschlussMeta?.created_at || a.created_at,
         groesse_bytes: null,
         quelle: 'dokumentation',
-        beschreibung: abschlussMeta?.beschreibung ?? (a.titel?.trim() || ''),
+        beschreibung: abschlussMeta?.beschreibung ?? '',
         freigabe: abschlussMeta?.freigabe ?? true,
+        ...group,
       })
     }
 
     for (const l of leads) {
+      const group = groupForVorgang({ leadId: l.id })
       for (const ang of l.angebote ?? []) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         if ('auftrag_id' in ang && ang.auftrag_id) continue
@@ -187,6 +293,7 @@ export function KundenDokumenteTab({
           quelle: 'angebot',
           beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
+          ...group,
         })
         seen.add(id)
       }
@@ -195,6 +302,23 @@ export function KundenDokumenteTab({
     for (const r of rechnungen) {
       const id = `rechnung-${r.id}`
       const m = meta[id]
+      const auftragId = (r as { auftrag_id?: string | null }).auftrag_id?.trim() || null
+      const angebotId = (r as { angebot_id?: string | null }).angebot_id?.trim() || null
+      const auftrag = auftragId ? auftragById.get(auftragId) : undefined
+      const ang = angebotId ? angebotById.get(angebotId) : null
+      const leadId =
+        ang?.lead_id?.trim() ||
+        auftrag?.lead_id?.trim() ||
+        normalizeAuftragAngebote(auftrag?.angebote).find((x) => x.lead_id)?.lead_id ||
+        null
+      const group =
+        leadId || auftragId
+          ? groupForVorgang({
+              leadId,
+              auftragId,
+              angebot: ang,
+            })
+          : { groupKey: ALLGEMEIN_KEY, groupTitle: ALLGEMEIN_TITLE }
       rows.push({
         id,
         name: m?.name?.trim() || r.rechnungsnummer?.trim() || 'Rechnung',
@@ -204,6 +328,7 @@ export function KundenDokumenteTab({
         quelle: 'rechnung',
         beschreibung: m?.beschreibung ?? '',
         freigabe: m?.freigabe ?? true,
+        ...group,
       })
     }
 
@@ -211,6 +336,8 @@ export function KundenDokumenteTab({
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
   }, [dokumente, auftraege, leads, rechnungen, meta])
+
+  const groups = useMemo(() => groupByVorgangTitel(docs), [docs])
 
   const upd = (
     id: string,
@@ -281,6 +408,118 @@ export function KundenDokumenteTab({
 
   const busy = uploading || pending
 
+  function renderDocList(items: DocRow[]) {
+    if (isMobile) {
+      return (
+        <div className="dok-cards">
+          {items.map((d) => {
+            const sizeLabel = formatBytes(d.groesse_bytes)
+            const metaLine = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
+            return (
+              <DokMobileCard
+                key={d.id}
+                title={d.name}
+                meta={metaLine}
+                onClick={() => openDokumentDatei(d.href)}
+                badge={
+                  <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
+                    {d.freigabe ? 'Kunde' : 'intern'}
+                  </span>
+                }
+              />
+            )
+          })}
+        </div>
+      )
+    }
+
+    return (
+      <div className="dok-list dok-list--kunde">
+        {items.map((d) => {
+          const editing = editId === d.id
+          const sizeLabel = formatBytes(d.groesse_bytes)
+          const beschreibung = d.beschreibung?.trim() || ''
+          const subline =
+            beschreibung ||
+            [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
+          return (
+            <div
+              key={d.id}
+              className={cn('list-row', !editing && 'dok-list__row--openable')}
+              style={{
+                gridTemplateColumns: COLS,
+                cursor: editing ? 'default' : 'pointer',
+                alignItems: 'center',
+              }}
+              role={editing ? undefined : 'button'}
+              tabIndex={editing ? undefined : 0}
+              onClick={() => {
+                if (!editing) openDokumentDatei(d.href)
+              }}
+              onKeyDown={(e) => {
+                if (editing) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openDokumentDatei(d.href)
+                }
+              }}
+            >
+              {editing ? (
+                <div
+                  className="dok-list__main min-w-0"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    className="txt"
+                    value={d.name}
+                    onChange={(e) => upd(d.id, { name: e.target.value })}
+                    style={{ height: 30 }}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="dok-list__main min-w-0">
+                  <div className="dok-list__name">
+                    {d.name}
+                    {subline ? (
+                      <span className="dok-list__name-size"> · {subline}</span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+              <div
+                className="dok-list__actions"
+                style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {editing ? (
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="check"
+                    title="Fertig"
+                    onClick={() => setEditId(null)}
+                  />
+                ) : null}
+                {d.quelle === 'upload' ? (
+                  <MockBtn
+                    sm
+                    kind="ghost"
+                    icon="trash"
+                    title="Löschen"
+                    disabled={busy}
+                    onClick={() => removeDoc(d)}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <>
       <MockDokumenteCard count={docs.length}>
@@ -337,110 +576,8 @@ export function KundenDokumenteTab({
               ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
               : 'Noch keine Dokumente.'}
           </p>
-        ) : isMobile ? (
-          <div className="dok-cards">
-            {docs.map((d) => {
-              const sizeLabel = formatBytes(d.groesse_bytes)
-              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
-              return (
-                <DokMobileCard
-                  key={d.id}
-                  title={d.name}
-                  meta={meta}
-                  onClick={() => openDokumentDatei(d.href)}
-                  badge={
-                    <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
-                      {d.freigabe ? 'Kunde' : 'intern'}
-                    </span>
-                  }
-                />
-              )
-            })}
-          </div>
         ) : (
-          <div className="dok-list dok-list--kunde">
-            {docs.map((d) => {
-              const editing = editId === d.id
-              const sizeLabel = formatBytes(d.groesse_bytes)
-              const beschreibung = d.beschreibung?.trim() || ''
-              const subline =
-                beschreibung ||
-                [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
-              return (
-                <div
-                  key={d.id}
-                  className={cn('list-row', !editing && 'dok-list__row--openable')}
-                  style={{
-                    gridTemplateColumns: COLS,
-                    cursor: editing ? 'default' : 'pointer',
-                    alignItems: 'center',
-                  }}
-                  role={editing ? undefined : 'button'}
-                  tabIndex={editing ? undefined : 0}
-                  onClick={() => {
-                    if (!editing) openDokumentDatei(d.href)
-                  }}
-                  onKeyDown={(e) => {
-                    if (editing) return
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      openDokumentDatei(d.href)
-                    }
-                  }}
-                >
-                  {editing ? (
-                    <div
-                      className="dok-list__main min-w-0"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        className="txt"
-                        value={d.name}
-                        onChange={(e) => upd(d.id, { name: e.target.value })}
-                        style={{ height: 30 }}
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <div className="dok-list__main min-w-0">
-                      <div className="dok-list__name">
-                        {d.name}
-                        {subline ? (
-                          <span className="dok-list__name-size"> · {subline}</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    className="dok-list__actions"
-                    style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {editing ? (
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="check"
-                        title="Fertig"
-                        onClick={() => setEditId(null)}
-                      />
-                    ) : null}
-                    {d.quelle === 'upload' ? (
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="trash"
-                        title="Löschen"
-                        disabled={busy}
-                        onClick={() => removeDoc(d)}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <DokumenteVorgangAccordions groups={groups} renderItems={renderDocList} />
         )}
       </MockDokumenteCard>
     </>

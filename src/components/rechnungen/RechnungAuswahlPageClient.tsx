@@ -1,10 +1,10 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { useTransition } from '@/components/ui/action-busy'
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AppListScreen } from '@/components/layout/app'
-import { RechnungAuswahlPanel, type RechnungAuswahlZeile } from '@/components/rechnungen/RechnungAuswahlPanel'
+import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
+import type { RechnungAuswahlZeile } from '@/components/rechnungen/RechnungAuswahlPanel'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { loadRechnungWizardBootstrapFromAuftrag } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -12,10 +12,10 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Preisliste } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
 
+/** Deep-Link `/auftraege/[id]/rechnungen-auswahl` → Bottom Card, Schließen zurück zum Auftrag. */
 export function RechnungAuswahlPageClient({
   auftragId,
   rechnungen,
-  auftragsReferenz,
   gewerke,
   preislisten,
   firm,
@@ -31,11 +31,18 @@ export function RechnungAuswahlPageClient({
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [sheetOpen, setSheetOpen] = useState(true)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<RechnungWizardBootstrap | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
 
+  const backToAuftrag = useCallback(() => {
+    setSheetOpen(false)
+    router.push(`/auftraege/${auftragId}`)
+  }, [auftragId, router])
+
   const openWizard = useCallback((bootstrap: RechnungWizardBootstrap) => {
+    setSheetOpen(false)
     setWizardBootstrap(bootstrap)
     setWizardKey((k) => k + 1)
     setWizardOpen(true)
@@ -44,7 +51,8 @@ export function RechnungAuswahlPageClient({
   const closeWizard = useCallback(() => {
     setWizardOpen(false)
     setWizardBootstrap(null)
-  }, [])
+    router.push(`/auftraege/${auftragId}`)
+  }, [auftragId, router])
 
   const neueRechnung = useCallback(() => {
     startTransition(async () => {
@@ -58,17 +66,15 @@ export function RechnungAuswahlPageClient({
   }, [auftragId, openWizard])
 
   return (
-    <AppListScreen>
-      <div className="px-1 pb-6">
-        <RechnungAuswahlPanel
-          variant="page"
-          auftragId={auftragId}
-          rechnungen={rechnungen}
-          auftragsReferenz={auftragsReferenz}
-          onNeueRechnung={neueRechnung}
-          onWeiterbearbeiten={openWizard}
-        />
-      </div>
+    <>
+      <RechnungAuswahlModal
+        open={sheetOpen && !wizardOpen}
+        onClose={backToAuftrag}
+        auftragId={auftragId}
+        rechnungen={rechnungen}
+        onNeueRechnung={neueRechnung}
+        onWeiterbearbeiten={openWizard}
+      />
 
       {wizardOpen && wizardBootstrap ? (
         <RechnungWizard
@@ -81,11 +87,10 @@ export function RechnungAuswahlPageClient({
           onClose={closeWizard}
           onDone={() => {
             closeWizard()
-            router.push(`/auftraege/${auftragId}`)
             router.refresh()
           }}
         />
       ) : null}
-    </AppListScreen>
+    </>
   )
 }

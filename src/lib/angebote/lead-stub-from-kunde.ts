@@ -1,17 +1,22 @@
-import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import { kundeDisplayName, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import type { Kunde, LeadDetail } from '@/lib/types'
 
 /**
  * Temporäre Lead-Hülle für den Angebots-Wizard ohne DB-Insert.
  * `id` bleibt leer — echte Anfrage entsteht erst beim Speichern/Fertigstellen.
+ * HV: Auftraggeber = Kunde, damit Melder/Leistungsort im Wizard sichtbar sind.
  */
 export function leadStubFromKunde(kunde: Kunde): LeadDetail {
   const name = kundeDisplayName(kunde)
   const now = new Date().toISOString()
+  const istHv = istKundeHausverwaltungTyp(kunde.typ)
   return {
     id: '',
     kunde_id: kunde.id,
-    kanal: 'sonstiges',
+    auftraggeber_kunde_id: istHv ? kunde.id : null,
+    auftraggeber: istHv ? kunde : undefined,
+    anlass: istHv ? 'meldung' : 'projekt',
+    kanal: istHv ? 'hv_manuell' : 'sonstiges',
     status: 'neu',
     situation: null,
     bereiche: [],
@@ -32,5 +37,10 @@ export function leadStubFromKunde(kunde: Kunde): LeadDetail {
     updated_at: now,
     kunden: kunde,
     angebote: [],
+    melder_name: null,
+    melder_email: null,
+    melder_telefon: null,
+    melder_einheit: null,
+    kunde_objekt_id: null,
   }
 }

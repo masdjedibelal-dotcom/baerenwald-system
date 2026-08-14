@@ -39,7 +39,7 @@ import {
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
   if (v === 'angefragt') return 'Angefragt'
-  if (v === 'akzeptiert') return 'Akzeptiert'
+  if (v === 'akzeptiert' || v === 'angenommen') return 'Akzeptiert'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'zugewiesen') return 'Zugewiesen'
   if (v === 'ersetzt') return 'Ersetzt'
@@ -48,9 +48,12 @@ function hwStatusLabel(s: string | null | undefined): string {
 
 function hwBadgeClass(s: string | null | undefined): string {
   const v = (s ?? '').toLowerCase()
-  if (v === 'akzeptiert') return 'bg-emerald-100 text-emerald-900'
+  if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
+    return 'bg-emerald-100 text-emerald-900'
+  }
   if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
-  if (v === 'angefragt') return 'bg-blue-100 text-blue-900'
+  if (v === 'angefragt' || v === 'warten') return 'bg-blue-100 text-blue-900'
+  if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
   return 'bg-canvas text-muted'
 }
 
@@ -165,9 +168,14 @@ export function AngebotVersandSection({
     })
   }, [rows])
 
+  const statusOk =
+    detail.status === 'entwurf' ||
+    detail.status === 'handwerker_akzeptiert' ||
+    detail.status === 'gesendet_kunde' ||
+    String(detail.status_einfach ?? '').trim().toLowerCase() === 'gesendet'
   const kannAnKunde =
     darfAngebotAnKundeSenden(rows, detail.status) &&
-    (detail.status === 'entwurf' || detail.status === 'handwerker_akzeptiert') &&
+    statusOk &&
     Boolean(kundeEmail)
 
   function sendKunde() {
@@ -290,7 +298,7 @@ export function AngebotVersandSection({
         <div className="mb-3">
           <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Versand</h2>
           <p className="m-0 text-[length:var(--fs-text)] text-muted">
-            Zuerst Partner anfragen (falls nötig), danach Angebot an den Kunden senden.
+            Speichern legt das Angebot im Portal vor. Hier nur noch die E-Mail an den Kunden.
           </p>
         </div>
       ) : null}
@@ -306,7 +314,7 @@ export function AngebotVersandSection({
         <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">An Kunden</h3>
         {kannAnKunde ? (
           <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
-            Angebot an Kunden senden
+            E-Mail an Kunden senden
           </Button>
         ) : (
           <p className="text-[length:var(--fs-text)] text-muted">
@@ -314,7 +322,7 @@ export function AngebotVersandSection({
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
               : !darfAngebotAnKundeSenden(rows, detail.status)
                 ? handwerkerSendenBlockierHinweis(rows, orgFreigabeStatus)
-                : 'Nur bei Status „Entwurf“ oder „Handwerker akzeptiert“ versendbar.'}
+                : 'E-Mail-Versand möglich, sobald das Angebot gespeichert ist.'}
           </p>
         )}
       </Card>
@@ -471,7 +479,7 @@ export function AngebotVersandSection({
       <Modal
         open={kundeModal}
         onClose={() => setKundeModal(false)}
-        title="An Kunden senden"
+        title="E-Mail an Kunden"
         size="lg"
         footer={
           <div className="flex flex-wrap gap-2">
@@ -479,7 +487,7 @@ export function AngebotVersandSection({
               Abbrechen
             </Button>
             <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
-              Jetzt senden
+              E-Mail senden
             </Button>
           </div>
         }

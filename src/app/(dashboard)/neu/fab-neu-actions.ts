@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { createClient } from '@/lib/supabase-server'
-import { kundeDisplayName } from '@/lib/kunde-stammdaten'
+import { kundeDisplayName, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import type { LeadKanal } from '@/lib/types'
 
 export type FabKundeAuftragZeile = {
@@ -116,13 +116,23 @@ export async function listAuftraegeFuerKunde(
 }
 
 /**
- * Neue Anfrage für bestehenden Kunden — Basis für Angebots-Wizard ohne Vorauswahl.
- * Nutzt eine bestehende offene Anfrage desselben Kunden, statt eine zweite zu erzeugen
- * (sonst erscheinen Anfrage + Angebot parallel unter „Offen“).
+ * Nur FAB / Direkt-Angebot ohne bestehende Anfrage (`deferredLeadCreate`).
+ * Normale Angebote aus einer Anfrage nutzen den bestehenden Lead — hier nicht aufrufen.
+ *
+ * Immer neuer Lead-Träger (kein Reuse, auch nicht soft-gelöscht).
+ * Status sofort `angebot` → nicht in Anfragen-Liste, sichtbar in Vorgängen.
+ * Direkt-Rechnung braucht keinen Lead (Standalone in Vorgängen).
  */
 export async function createAnfrageFuerKunde(
   kundeId: string,
-  opts?: { kanal?: LeadKanal }
+  opts?: {
+    kanal?: LeadKanal
+    melder_name?: string | null
+    melder_email?: string | null
+    melder_telefon?: string | null
+    melder_einheit?: string | null
+    kunde_objekt_id?: string | null
+  }
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const id = kundeId.trim()
   if (!id) return { ok: false, message: 'Bitte einen Kunden wählen.' }
@@ -148,22 +158,7 @@ export async function createAnfrageFuerKunde(
     }
   }
 
-  // Bestehende offene Anfrage wiederverwenden (Melder oder Vertragskunde/HV).
-  const { data: bestehende } = await supabase
-    .from('leads')
-    .select('id, status, updated_at, angebote(id)')
-    .or(`kunde_id.eq.${id},auftraggeber_kunde_id.eq.${id}`)
-    .in('status', ['neu', 'kontaktiert', 'termin', 'angebot'])
-    .order('updated_at', { ascending: false })
-    .limit(20)
-
-  const wiederverwendbar = (bestehende ?? []).find((row) => {
-    const st = String(row.status ?? '').toLowerCase()
-    return st === 'neu' || st === 'kontaktiert' || st === 'termin' || st === 'angebot'
-  })
-  if (wiederverwendbar?.id) {
-    return { ok: true, leadId: String(wiederverwendbar.id) }
-  }
+  const istHv = istKundeHausverwaltungTyp(kunde.typ as string | null)
 
   const r = await createAnfrage({
     kunde_id: id,
@@ -176,15 +171,47 @@ export async function createAnfrageFuerKunde(
     ort: (kunde.ort as string | null) ?? null,
     strasse: (kunde.strasse as string | null) ?? null,
     hausnummer: (kunde.hausnummer as string | null) ?? null,
-    kanal: opts?.kanal ?? 'sonstiges',
+    kanal: opts?.kanal ?? (istHv ? 'hv_manuell' : 'sonstiges'),
     situation: '',
     bereiche: [],
     kundentyp: (kunde.typ as string | null) ?? 'privat',
     notizen: '',
     bestaetigungsmail_senden: false,
+    auftraggeber_kunde_id: istHv ? id : null,
+    anlass: istHv ? 'meldung' : 'projekt',
+    melder_name: opts?.melder_name ?? null,
+    melder_email: opts?.melder_email ?? null,
+    melder_telefon: opts?.melder_telefon ?? null,
+    melder_einheit: opts?.melder_einheit ?? null,
+    kunde_objekt_id: opts?.kunde_objekt_id ?? null,
+    funnel_daten: {
+      quelle: 'crm_direkt_angebot',
+      direkt_dokument: 'angebot',
+    },
   })
 
   if (!r.ok) return r
+
+  // Sofort aus Anfragen-Pipeline nehmen (Status vor Angebot = neu/kontaktiert/termin).
+  const now = new Date().toISOString()
+  const { error: statusErr } = await supabase
+    .from('leads')
+    .update({ status: 'angebot', updated_at: now })
+    .eq('id', r.id)
+    .is('geloescht_am', null)
+
+  if (statusErr) {
+    console.warn('[createAnfrageFuerKunde] status→angebot:', statusErr.message)
+  } else {
+    await supabase.from('leads_status_history').insert({
+      lead_id: r.id,
+      status_alt: 'neu',
+      status_neu: 'angebot',
+      user_id: null,
+      notiz: 'Direkt-Angebot — Lead nur als Vorgangsträger (nicht in Anfragen).',
+    })
+  }
+
   return { ok: true, leadId: r.id }
 }
 

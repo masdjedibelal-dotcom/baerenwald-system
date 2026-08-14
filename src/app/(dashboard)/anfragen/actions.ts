@@ -253,6 +253,11 @@ export type NeueAnfragePayload = {
   kunde_objekt_id?: string | null
   /** HV: Mieter-/Meldername (Vor- + Nachname) */
   melder_name?: string | null
+  melder_email?: string | null
+  melder_telefon?: string | null
+  melder_einheit?: string | null
+  /** Bestehender Mieter-Kunde; sonst bei Name neu anlegen */
+  melder_kunde_id?: string | null
   /** projekt | meldung — HV-Meldung braucht anlass meldung */
   anlass?: 'projekt' | 'meldung' | null
   /** Anzeigename / Fallback (z. B. „Vorname Nachname“ oder Firma). */
@@ -292,6 +297,107 @@ export type NeueAnfragePayload = {
    * (situation=notfall + freigabe_bypass_grund=akut).
    */
   als_akut?: boolean
+}
+
+export type MieterSuchTreffer = {
+  id: string
+  vorname: string | null
+  nachname: string | null
+  name: string
+  email: string | null
+  telefon: string | null
+  quelle: 'kunde' | 'bewohner'
+}
+
+/** Mieter-Suche für HV-Anfrage: Privatkunden + Bewohner an HV-Objekten. */
+export async function searchMieterFuerHv(
+  hvKundeId: string,
+  q: string
+): Promise<MieterSuchTreffer[]> {
+  const hv = hvKundeId.trim()
+  const term = q.trim()
+  if (!hv || term.length < 2) return []
+  const esc = term.replace(/%/g, '\\%').replace(/_/g, '\\_')
+  const pattern = `%${esc}%`
+  const supabase = createClient()
+
+  const [{ data: kunden }, { data: objekte }] = await Promise.all([
+    supabase
+      .from('kunden')
+      .select('id, name, vorname, nachname, email, telefon')
+      .eq('typ', 'privat')
+      .or(
+        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern}`
+      )
+      .order('nachname')
+      .limit(10),
+    supabase.from('kunden_objekte').select('id').eq('kunde_id', hv).limit(80),
+  ])
+
+  const out: MieterSuchTreffer[] = []
+  const seen = new Set<string>()
+
+  for (const k of kunden ?? []) {
+    const id = k.id as string
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const display =
+      [k.vorname, k.nachname].filter(Boolean).join(' ').trim() ||
+      (k.name as string | null)?.trim() ||
+      'Mieter'
+    out.push({
+      id,
+      vorname: (k.vorname as string | null) ?? null,
+      nachname: (k.nachname as string | null) ?? null,
+      name: display,
+      email: (k.email as string | null) ?? null,
+      telefon: (k.telefon as string | null) ?? null,
+      quelle: 'kunde',
+    })
+  }
+
+  const objektIds = (objekte ?? []).map((o) => o.id as string).filter(Boolean)
+  if (objektIds.length) {
+    const { data: einheiten } = await supabase
+      .from('objekt_einheiten')
+      .select('id')
+      .in('kunde_objekt_id', objektIds)
+      .eq('aktiv', true)
+    const einheitIds = (einheiten ?? []).map((e) => e.id as string).filter(Boolean)
+    if (einheitIds.length) {
+      const { data: bewohner } = await supabase
+        .from('einheit_bewohner')
+        .select('id, name, email, telefon')
+        .eq('kunde_id', hv)
+        .in('objekt_einheit_id', einheitIds)
+        .eq('aktiv', true)
+        .is('anonymisiert_am', null)
+        .ilike('name', pattern)
+        .limit(10)
+      for (const b of bewohner ?? []) {
+        const key = `bew:${b.id}`
+        if (seen.has(key)) continue
+        const full = String(b.name ?? '').trim()
+        if (!full) continue
+        // Skip if already matched as kunde by same email
+        const mail = (b.email as string | null)?.trim().toLowerCase()
+        if (mail && out.some((x) => x.email?.trim().toLowerCase() === mail)) continue
+        seen.add(key)
+        const parts = full.split(/\s+/).filter(Boolean)
+        out.push({
+          id: key,
+          vorname: parts[0] ?? null,
+          nachname: parts.slice(1).join(' ') || null,
+          name: full,
+          email: (b.email as string | null) ?? null,
+          telefon: (b.telefon as string | null) ?? null,
+          quelle: 'bewohner',
+        })
+      }
+    }
+  }
+
+  return out.slice(0, 12)
 }
 
 export async function createAnfrage(
@@ -423,13 +529,94 @@ export async function createAnfrage(
     if (kUpdErr) return { ok: false, message: kUpdErr.message }
   }
 
+  const hvAuftraggeberId = payload.auftraggeber_kunde_id?.trim() || null
+  const melderName = payload.melder_name?.trim() || null
+  const melderEmail = payload.melder_email?.trim() || null
+  const melderTelefon = payload.melder_telefon?.trim() || null
+  const melderEinheit = payload.melder_einheit?.trim() || null
+  let melderKundeId = payload.melder_kunde_id?.trim() || null
+
+  // HV + Mieter: Mieter als Lead-Kunde (wie Melder-Meldung), HV als Auftraggeber
+  if (istHausverwaltung && hvAuftraggeberId && (melderName || melderKundeId)) {
+    if (melderKundeId) {
+      const { data: mk } = await supabase
+        .from('kunden')
+        .select('id')
+        .eq('id', melderKundeId)
+        .maybeSingle()
+      if (!mk?.id) melderKundeId = null
+    }
+    if (!melderKundeId && melderEmail) {
+      const { data: byMail } = await supabase
+        .from('kunden')
+        .select('id')
+        .eq('email', melderEmail)
+        .maybeSingle()
+      if (byMail?.id) melderKundeId = byMail.id
+    }
+    if (!melderKundeId && melderName) {
+      const parts = melderName.split(/\s+/).filter(Boolean)
+      const v = parts[0] ?? ''
+      const n = parts.slice(1).join(' ')
+      const { data: neu, error: neuErr } = await supabase
+        .from('kunden')
+        .insert({
+          name: null,
+          vorname: v || null,
+          nachname: n || null,
+          email: melderEmail || null,
+          telefon: melderTelefon || null,
+          typ: 'privat',
+          plz: null,
+          ort: null,
+          strasse: null,
+          hausnummer: null,
+          adresse: null,
+          notizen: null,
+        })
+        .select('id')
+        .single()
+      if (neuErr || !neu?.id) {
+        return { ok: false, message: neuErr?.message ?? 'Mieter konnte nicht angelegt werden.' }
+      }
+      melderKundeId = neu.id
+    }
+    if (melderKundeId) {
+      kundeId = melderKundeId
+      if (melderEmail || melderTelefon) {
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+        if (melderEmail) patch.email = melderEmail
+        if (melderTelefon) patch.telefon = melderTelefon
+        await supabase.from('kunden').update(patch).eq('id', melderKundeId)
+      }
+    }
+  }
+
+  const objektId = payload.kunde_objekt_id?.trim() || null
+  if (istHausverwaltung && hvAuftraggeberId && objektId && melderName) {
+    try {
+      const { createObjektMieter } = await import('@/app/actions/objektakte-actions')
+      const bew = await createObjektMieter(hvAuftraggeberId, objektId, {
+        name: melderName,
+        email: melderEmail,
+        telefon: melderTelefon,
+      })
+      if (!bew.ok) console.warn('createAnfrage createObjektMieter:', bew.message)
+    } catch (e) {
+      console.warn('createAnfrage createObjektMieter:', e)
+    }
+  }
+
   const { data: leadRow, error: leadErr } = await supabase
     .from('leads')
     .insert({
       kunde_id: kundeId,
-      auftraggeber_kunde_id: payload.auftraggeber_kunde_id?.trim() || null,
-      kunde_objekt_id: payload.kunde_objekt_id?.trim() || null,
-      melder_name: payload.melder_name?.trim() || null,
+      auftraggeber_kunde_id: hvAuftraggeberId,
+      kunde_objekt_id: objektId,
+      melder_name: melderName,
+      melder_email: melderEmail,
+      melder_telefon: melderTelefon,
+      melder_einheit: melderEinheit,
       anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
       kanal: payload.kanal,
       status: 'neu',
@@ -794,6 +981,77 @@ export async function updateLeadKontakt(
   return { ok: true }
 }
 
+/** Melder + Leistungsort/Objekt am Lead (CRM-Angebot ohne Anfrage-Wizard). */
+export async function updateLeadMelderUndLeistungsort(
+  leadId: string,
+  data: {
+    melder_name?: string | null
+    melder_email?: string | null
+    melder_telefon?: string | null
+    melder_einheit?: string | null
+    kunde_objekt_id?: string | null
+    /** Optional: Angebot mit gleichem Objekt synchronisieren */
+    angebotId?: string | null
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = leadId?.trim()
+  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
+
+  const supabase = createClient()
+  const objektId =
+    data.kunde_objekt_id === undefined
+      ? undefined
+      : data.kunde_objekt_id?.trim() || null
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (data.melder_name !== undefined) patch.melder_name = data.melder_name?.trim() || null
+  if (data.melder_email !== undefined) patch.melder_email = data.melder_email?.trim() || null
+  if (data.melder_telefon !== undefined) {
+    patch.melder_telefon = data.melder_telefon?.trim() || null
+  }
+  if (data.melder_einheit !== undefined) {
+    patch.melder_einheit = data.melder_einheit?.trim() || null
+  }
+  if (objektId !== undefined) patch.kunde_objekt_id = objektId
+
+  // HV-Pipeline sicherstellen, falls Lead aus CRM-FAB ohne Auftraggeber kam
+  const { data: leadRow } = await supabase
+    .from('leads')
+    .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass')
+    .eq('id', id)
+    .maybeSingle()
+  if (!leadRow) return { ok: false, message: 'Anfrage nicht gefunden.' }
+
+  const kundeId = (leadRow.kunde_id as string | null)?.trim() || null
+  const agId = (leadRow.auftraggeber_kunde_id as string | null)?.trim() || null
+  if (!agId && kundeId) {
+    const { data: k } = await supabase.from('kunden').select('typ').eq('id', kundeId).maybeSingle()
+    if (istKundeHausverwaltungTyp(k?.typ as string | null)) {
+      patch.auftraggeber_kunde_id = kundeId
+      if (!(leadRow.anlass as string | null)?.trim()) patch.anlass = 'meldung'
+    }
+  }
+
+  const { error } = await supabase.from('leads').update(patch).eq('id', id)
+  if (error) return { ok: false, message: error.message }
+
+  const angebotId = data.angebotId?.trim()
+  if (angebotId && objektId !== undefined) {
+    await supabase
+      .from('angebote')
+      .update({ kunde_objekt_id: objektId, updated_at: new Date().toISOString() })
+      .eq('id', angebotId)
+    revalidatePath(`/angebote/${angebotId}`)
+  }
+
+  revalidatePath('/anfragen')
+  revalidatePath(`/anfragen/${id}`)
+  revalidatePath('/vorgaenge')
+  return { ok: true }
+}
+
 export async function saveLeadFunnelPositionen(
   leadId: string,
   positionen: LeadFunnelPosition[]
@@ -1082,17 +1340,6 @@ export async function deleteLeadNotizRow(
   return { ok: true }
 }
 
-/** Anfrage (Lead) dauerhaft löschen — abhängige Zeilen entfallen per ON DELETE CASCADE. */
-export async function deleteAnfrage(
-  leadId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase.from('leads').delete().eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  revalidatePath('/anfragen')
-  return { ok: true }
-}
-
 async function insertLeadTimelineEntry(
   leadId: string,
   typ: string,
@@ -1324,21 +1571,54 @@ export async function saveLeadNichtErreichbar(input: {
   return { ok: true, versuche, vorschlagVerloren }
 }
 
-/** Soft-delete: geloescht_am setzen (kein Hard-Delete). */
+/**
+ * Soft-delete nur für reine Anfragen ohne Dokumente.
+ * Mit Angebot/Auftrag/Rechnung → ablehnen (sonst verschwindet der ganze Vorgang aus Listen).
+ * Vorgang bewusst ausblenden: `deleteVorgang` unter /vorgaenge.
+ */
 export async function softDeleteAnfrage(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = leadId.trim()
+  if (!id) return { ok: false, message: 'Anfrage-ID fehlt.' }
+
   const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ geloescht_am: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) return { ok: false, message: error.message }
-  await insertLeadTimelineEntry(leadId, 'system', 'Anfrage als gelöscht markiert', null)
-  revalidatePath(`/anfragen/${leadId}`)
+  const [{ count: angCount }, { count: aufCount }] = await Promise.all([
+    supabase
+      .from('angebote')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_id', id),
+    supabase
+      .from('auftraege')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_id', id),
+  ])
+  if ((angCount ?? 0) > 0 || (aufCount ?? 0) > 0) {
+    return {
+      ok: false,
+      message:
+        'Diese Anfrage hat bereits Angebot oder Auftrag. Bitte über Vorgänge löschen — nicht hier.',
+    }
+  }
+
+  const { softDeleteLeadForPortal } = await import('@/lib/portal/soft-delete-lead')
+  const r = await softDeleteLeadForPortal({ leadId: id })
+  if (!r.ok) return r
+  await insertLeadTimelineEntry(id, 'system', 'Anfrage als gelöscht markiert', null)
+  revalidatePath(`/anfragen/${id}`)
   revalidatePath('/anfragen')
   revalidatePath('/vorgaenge')
   return { ok: true }
+}
+
+/**
+ * Anfrage löschen = Soft-Delete ohne Dokumente (nie Hard-Delete/CASCADE).
+ * Alias für softDeleteAnfrage.
+ */
+export async function deleteAnfrage(
+  leadId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return softDeleteAnfrage(leadId)
 }
 
 export async function restoreAnfrage(

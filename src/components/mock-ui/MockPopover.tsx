@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 
 export function MockPopover({
@@ -20,16 +21,32 @@ export function MockPopover({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0, width })
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!open || !anchorRef.current) return
-    const r = anchorRef.current.getBoundingClientRect()
-    const w = width
-    let left = align === 'right' ? r.right - w : r.left
-    left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
-    let top = r.bottom + 6
-    if (top + 260 > window.innerHeight) top = Math.max(8, r.top - 6 - 260)
-    setPos({ top, left, width: w })
+    const update = () => {
+      const el = anchorRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const w = width
+      let left = align === 'right' ? r.right - w : r.left
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
+      let top = r.bottom + 6
+      if (top + 260 > window.innerHeight) top = Math.max(8, r.top - 6 - 260)
+      setPos({ top, left, width: w })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
   }, [open, align, width, anchorRef])
 
   useEffect(() => {
@@ -56,9 +73,9 @@ export function MockPopover({
     }
   }, [open, onClose, anchorRef])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       className="popover"
@@ -66,7 +83,8 @@ export function MockPopover({
       onClick={(e) => e.stopPropagation()}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   )
 }
 

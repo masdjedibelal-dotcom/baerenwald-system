@@ -67,7 +67,7 @@ function firmKontaktZeile(f: FirmenEinstellungen): string {
 }
 
 function zahlungstext(firm: FirmenEinstellungen): string {
-  const tage = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || 14)
+  const tage = Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || 7)
   return `Zahlbar innerhalb von ${tage} Tagen nach Rechnungserhalt ohne Abzug.`
 }
 
@@ -206,7 +206,7 @@ export function buildRechnungHtmlInput(
 
   const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden)
   const empfaenger = formatKundeEmpfaengerFuerDokument(row.kunden)
-  const anrede: AngebotMailAnrede = privat ? 'du' : 'sie'
+  const anrede: AngebotMailAnrede = 'sie'
   const anredeCtx = kundeAnredeKontextFromEmpfaenger(empfaengerStamm)
   const rechnungsdatumDe = formatDatumDe(String(row.rechnungsdatum))
   const leistungsdatumDe =

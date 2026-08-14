@@ -105,14 +105,15 @@ const config: Config = {
         ],
       },
       fontSize: {
-        xs: ['11.5px', { lineHeight: '1.4' }],
-        sm: ['13px', { lineHeight: '1.5' }],
-        base: ['14px', { lineHeight: '1.5' }],
-        md: ['15px', { lineHeight: '1.5' }],
-        lg: ['18px', { lineHeight: '1.4' }],
-        xl: ['22px', { lineHeight: '1.3' }],
-        '2xl': ['28px', { lineHeight: '1.2' }],
-        chip: ['12.5px', { lineHeight: '1.4' }],
+        /* +20 % zur Mock-Basis (wie --app-font-scale: 1.2) */
+        xs: ['13.8px', { lineHeight: '1.4' }],
+        sm: ['15.6px', { lineHeight: '1.5' }],
+        base: ['16.8px', { lineHeight: '1.5' }],
+        md: ['18px', { lineHeight: '1.5' }],
+        lg: ['21.6px', { lineHeight: '1.4' }],
+        xl: ['26.4px', { lineHeight: '1.3' }],
+        '2xl': ['33.6px', { lineHeight: '1.2' }],
+        chip: ['15px', { lineHeight: '1.4' }],
       },
       spacing: {
         11: '44px',

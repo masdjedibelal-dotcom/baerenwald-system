@@ -162,8 +162,20 @@ async function fetchAuftragDetailRow(
   }
 }
 
+export type LoadAuftragDetailOpts = {
+  /**
+   * shell = nur Kern-Select (Rechnung/Schnellpfad)
+   * tabs = + Bautagebuch/Baustelle parallel (Default Detailseite)
+   */
+  mode?: 'shell' | 'tabs'
+}
+
 /** CRM-Detail: Service Role, damit verschachtelte Daten (Kunde, Angebot) zuverlässig geladen werden. */
-export async function loadAuftragDetail(id: string): Promise<AuftragDetail | null> {
+export async function loadAuftragDetail(
+  id: string,
+  opts?: LoadAuftragDetailOpts
+): Promise<AuftragDetail | null> {
+  const mode = opts?.mode ?? 'tabs'
   try {
     let { data, error } = await fetchAuftragDetailRow(id, AUFTRAG_DETAIL_SELECT)
 
@@ -183,13 +195,47 @@ export async function loadAuftragDetail(id: string): Promise<AuftragDetail | nul
     const parsed = parseAuftragDetailRow(
       data as AuftragDetail & { angebote?: { positionen?: unknown } | null }
     )
-    parsed.auftrag_bautagebuch = await listAuftragBautagebuch(id)
-    parsed.auftrag_bautagesberichte = await listAuftragBautagesberichte(id)
-    if (parsed.ist_bauprojekt) {
-      parsed.auftrag_baustelle_team = await loadAuftragBaustelleTeam(id)
-      parsed.auftrag_regiearbeiten = await listAuftragRegiearbeiten(id)
-      parsed.auftrag_wochenberichte = await listAuftragWochenberichte(id)
-      parsed.auftrag_baustellen_dokumente = await listAuftragBaustellenDokumente(id)
+
+    if (mode === 'shell') {
+      parsed.auftrag_bautagebuch = []
+      parsed.auftrag_bautagesberichte = []
+      parsed.auftrag_baustelle_team = {
+        bauleiter_name: (parsed as { bauleiter_name?: string | null }).bauleiter_name ?? null,
+        bauleiter_telefon: (parsed as { bauleiter_telefon?: string | null }).bauleiter_telefon ?? null,
+        bauleiter_email: (parsed as { bauleiter_email?: string | null }).bauleiter_email ?? null,
+        bau_mannschaft: parseStringListJson((parsed as { bau_mannschaft?: unknown }).bau_mannschaft),
+        bau_nachunternehmer_name:
+          (parsed as { bau_nachunternehmer_name?: string | null }).bau_nachunternehmer_name ?? null,
+        bau_nachunternehmer_firma:
+          (parsed as { bau_nachunternehmer_firma?: string | null }).bau_nachunternehmer_firma ?? null,
+      }
+      parsed.auftrag_regiearbeiten = []
+      parsed.auftrag_wochenberichte = []
+      parsed.auftrag_baustellen_dokumente = []
+      return parsed
+    }
+
+    // Extras parallel statt nacheinander
+    const [bautagebuch, bautagesberichte, baustelleBundle] = await Promise.all([
+      listAuftragBautagebuch(id),
+      listAuftragBautagesberichte(id),
+      parsed.ist_bauprojekt
+        ? Promise.all([
+            loadAuftragBaustelleTeam(id),
+            listAuftragRegiearbeiten(id),
+            listAuftragWochenberichte(id),
+            listAuftragBaustellenDokumente(id),
+          ]).then(([team, regie, wochen, doks]) => ({ team, regie, wochen, doks }))
+        : Promise.resolve(null),
+    ])
+
+    parsed.auftrag_bautagebuch = bautagebuch
+    parsed.auftrag_bautagesberichte = bautagesberichte
+    if (baustelleBundle) {
+      parsed.auftrag_baustelle_team = baustelleBundle.team
+      parsed.auftrag_regiearbeiten = baustelleBundle.regie
+      parsed.auftrag_wochenberichte = baustelleBundle.wochen
+      parsed.auftrag_baustellen_dokumente = baustelleBundle.doks
     } else {
       parsed.auftrag_baustelle_team = {
         bauleiter_name: (parsed as { bauleiter_name?: string | null }).bauleiter_name ?? null,

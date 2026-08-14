@@ -642,7 +642,7 @@ function partnerPortalMailHtml(input: {
   text: string
   branding: MailBranding
 }): string {
-  const greeting = `Hallo ${escapeHtml(input.name)},`
+  const greeting = `Guten Tag ${escapeHtml(input.name)},`
   const body = escapeHtml(input.text)
     .split(/\n\n+/)
     .map((p) => p.replace(/\n/g, '<br/>'))
@@ -654,15 +654,15 @@ function partnerPortalMailHtml(input: {
     ${body}
     ${portal}
     <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
-      Bei Fragen erreichst du uns jederzeit per Antwort auf diese E-Mail.
+      Bei Fragen erreichen Sie uns jederzeit per Antwort auf diese E-Mail.
     </p>
   `
   return mailHtmlBase(
     content,
     defaultPartnerPortalInviteBetreff(),
     input.branding,
-    'Du erhältst diese E-Mail mit Einladung zum Partner-Portal.',
-    { skipMeinBaerenwaldPs: true, anrede: 'du' }
+    'Sie erhalten diese E-Mail mit Einladung zum Partner-Portal.',
+    { skipMeinBaerenwaldPs: true, anrede: 'sie' }
   )
 }
 

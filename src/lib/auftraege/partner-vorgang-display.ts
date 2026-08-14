@@ -49,7 +49,13 @@ export function handwerkerAntwortAnzeige(
 
   const st = (pos.handwerker_status ?? '').toLowerCase()
 
-  if (st === 'akzeptiert') {
+  // bestaetigt = Partner hat zugesagt / arbeitet schon (Regie-Nachtrag, Start vor Ort)
+  if (
+    st === 'akzeptiert' ||
+    st === 'angenommen' ||
+    st === 'bestaetigt' ||
+    st === 'erledigt'
+  ) {
     return { label: 'Angenommen', variant: 'angenommen' }
   }
   if (st === 'abgelehnt') {

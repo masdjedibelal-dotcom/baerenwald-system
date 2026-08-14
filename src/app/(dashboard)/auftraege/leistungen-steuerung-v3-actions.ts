@@ -99,7 +99,10 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   auftragId: string
   positionIds: string[]
   handwerkerId: string
+  /** Ein EK für alle Positionen (Legacy / Einzelzuweisung). */
   ekNetto?: number | null
+  /** Pro Position eigener Partner-EK (Mehrfachzuweisung). */
+  ekNettoByPositionId?: Record<string, number | null | undefined>
 }): Promise<{ ok: true; updated: number } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
@@ -117,10 +120,11 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     .maybeSingle()
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
 
-  const ek =
+  const ekGlobal =
     input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
       ? Math.round(input.ekNetto * 100) / 100
       : null
+  const ekById = input.ekNettoByPositionId ?? null
 
   const { data: rows, error: loadErr } = await gate.supabase!
     .from('auftrag_positionen')
@@ -132,19 +136,27 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   if (!rows?.length) return { ok: false, message: 'Positionen nicht gefunden.' }
 
   let updated = 0
+  const gewerkIdsTouched = new Set<string>()
+
   for (const row of rows) {
     const current = row as PositionPartnerSnapshotRow
+    const posId = String(row.id)
+    const fromMap = ekById?.[posId]
+    const ekPos =
+      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+        ? Math.round(fromMap * 100) / 100
+        : ekGlobal
     const partnerPatch =
       metaPartnerAenderung(current, {
         handwerkerId: hwId,
-        preisPartner: ek ?? current.preis_partner,
-      }) ?? metaErstzuweisung(ek ?? current.preis_partner)
+        preisPartner: ekPos ?? current.preis_partner,
+      }) ?? metaErstzuweisung(ekPos ?? current.preis_partner)
 
     const patch: Record<string, unknown> = {
       handwerker_id: hwId,
       ...partnerPatch,
     }
-    if (ek == null && current.preis_partner != null) {
+    if (ekPos == null && current.preis_partner != null) {
       // EK unverändert — nicht überschreiben
       delete patch.preis_partner
     }
@@ -152,7 +164,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     const { error } = await gate.supabase!
       .from('auftrag_positionen')
       .update(patch)
-      .eq('id', row.id as string)
+      .eq('id', posId)
       .eq('auftrag_id', input.auftragId)
     if (error) return { ok: false, message: error.message }
     updated++
@@ -163,6 +175,39 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       gewerkSlug: row.gewerk_slug as string | null,
       gewerkName: String(row.gewerk_name ?? ''),
     })
+
+    const slug = String(row.gewerk_slug ?? '').trim()
+    const name = String(row.gewerk_name ?? '').trim()
+    if (slug || name) {
+      let gwQ = supabaseAdmin.from('gewerke').select('id')
+      if (slug) gwQ = gwQ.eq('slug', slug)
+      else gwQ = gwQ.eq('name', name)
+      const { data: gw } = await gwQ.maybeSingle()
+      if (gw?.id) gewerkIdsTouched.add(String(gw.id))
+    }
+  }
+
+  // Auftrag-Zuweisungstabelle mitziehen (Tagebuch anfordern / Partner-UI liest daraus).
+  for (const gewerkId of gewerkIdsTouched) {
+    const { data: existing } = await supabaseAdmin
+      .from('auftrag_handwerker')
+      .select('id')
+      .eq('auftrag_id', input.auftragId)
+      .eq('gewerk_id', gewerkId)
+      .maybeSingle()
+    if (existing?.id) {
+      await supabaseAdmin
+        .from('auftrag_handwerker')
+        .update({ handwerker_id: hwId, status: 'zugewiesen' })
+        .eq('id', existing.id)
+    } else {
+      await supabaseAdmin.from('auftrag_handwerker').insert({
+        auftrag_id: input.auftragId,
+        gewerk_id: gewerkId,
+        handwerker_id: hwId,
+        status: 'zugewiesen',
+      })
+    }
   }
 
   provisionProjektvertragFireAndForget(input.auftragId, hwId)

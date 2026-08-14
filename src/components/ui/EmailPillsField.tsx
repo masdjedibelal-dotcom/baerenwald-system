@@ -65,7 +65,7 @@ export function EmailPillsField({
             key={`${em}-${i}`}
             className="email-pill inline-flex max-w-full items-center gap-1 rounded-full border border-bw-border bg-bw-bg-soft pl-2.5 pr-1 py-0.5 text-[13px] text-bw-text"
           >
-            <span className="truncate max-w-[min(100%,240px)]" title={em}>
+            <span className="truncate max-w-[min(100%,14rem)]" title={em}>
               {em}
             </span>
             <button
@@ -86,7 +86,7 @@ export function EmailPillsField({
           ref={inputRef}
           type="email"
           autoComplete="off"
-          className="min-w-[140px] flex-1 border-0 bg-transparent py-1 text-[13px] text-bw-text outline-none placeholder:text-[12px] placeholder:font-normal placeholder:text-bw-text-muted"
+          className="min-w-0 flex-1 border-0 bg-transparent py-1 text-[13px] text-bw-text outline-none placeholder:text-[12px] placeholder:font-normal placeholder:text-bw-text-muted"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}

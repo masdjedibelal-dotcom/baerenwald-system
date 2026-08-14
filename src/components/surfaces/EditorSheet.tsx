@@ -113,14 +113,21 @@ export function EditorSheet({
     window.addEventListener('ki-field-overlay', on)
     return () => window.removeEventListener('ki-field-overlay', on)
   }, [])
-  const pauseFocusTrap = Boolean(
-    (assistent?.open && assistent.scoped?.layer === 'over-sheet') ||
-      fieldOverlayOpen ||
-      (typeof overlayClassName === 'string' &&
-        overlayClassName.includes('editor-sheet-overlay--recessed'))
-  )
   const [mounted, setMounted] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  const isRecessedOverlay =
+    typeof overlayClassName === 'string' &&
+    overlayClassName.includes('editor-sheet-overlay--recessed')
+  const isStackedOverlay =
+    typeof overlayClassName === 'string' &&
+    overlayClassName.includes('editor-sheet-overlay--stack')
+
+  const pauseFocusTrap = Boolean(
+    discardOpen ||
+      (assistent?.open && assistent.scoped?.layer === 'over-sheet') ||
+      fieldOverlayOpen ||
+      isRecessedOverlay
+  )
   const rootRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -142,8 +149,9 @@ export function EditorSheet({
     if (manageHistory) {
       releaseEditorSheetHistory(sheetId, { historyStillPushed: stillPushed })
     }
-    guardSheetPointerFallthrough()
     onCloseRef.current()
+    /* Nach Parent-Close — sonst schluckt der Guard ggf. noch den Verwerfen-Klick */
+    window.setTimeout(() => guardSheetPointerFallthrough(), 0)
   }, [sheetId, manageHistory])
 
   const requestClose = useCallback(() => {
@@ -168,9 +176,14 @@ export function EditorSheet({
     if (manageHistory) {
       releaseEditorSheetHistory(sheetId, { historyStillPushed: false })
     }
-    guardSheetPointerFallthrough()
     onCloseRef.current()
+    window.setTimeout(() => guardSheetPointerFallthrough(), 0)
   }, [sheetId, manageHistory])
+
+  /* Sheet geschlossen → Confirm-State zurücksetzen */
+  useEffect(() => {
+    if (!open) setDiscardOpen(false)
+  }, [open])
 
   const handleConfirm = useCallback(() => {
     guardSheetPointerFallthrough()
@@ -182,7 +195,8 @@ export function EditorSheet({
 
   const { dragZoneProps, sheetMotionStyle } = useSheetSwipeDismiss({
     onDismiss: requestClose,
-    blocked: !open || layout !== 'bottom' || discardOpen,
+    /* Recessed = Kind-Sheet offen — kein Swipe/Transform am Parent (sonst hängt translateY) */
+    blocked: !open || layout !== 'bottom' || discardOpen || isRecessedOverlay,
   })
 
   const confirmClose = useCallback(() => {
@@ -225,21 +239,28 @@ export function EditorSheet({
     return trapFocus(el, () => requestCloseRef.current())
   }, [open, mounted, pauseFocusTrap])
 
-  /* S7: iOS-Tastatur — Overlay bleibt Vollfläche (sonst Lücke → Seite darunter sichtbar).
-   * URL-Bar-Schwankungen ≠ Keyboard (Threshold); sonst peekt Nav/CTA unten durch. */
+  /* S7: Overlay deckt Layout-Viewport ab (nie auf vv.height schrumpfen — iOS-Lücke).
+   * Sheet mit padding-bottom an sichtbaren Boden ankern (URL-Bar / Tastatur).
+   * Recessed-Parent: kein Sync — sonst kämpfen zwei Overlays um Höhe/kb-open → Sheet hängt. */
   useEffect(() => {
-    if (!open || !isMobile) return
+    if (!open || !isMobile || !mounted || isRecessedOverlay) return
     const overlay = overlayRef.current
     const vv = window.visualViewport
     if (!overlay || !vv) return
     const sync = () => {
-      const byInner = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
       const clientH = document.documentElement.clientHeight || window.innerHeight
+      const coverH = Math.max(
+        window.innerHeight,
+        clientH,
+        Math.round(vv.height + vv.offsetTop)
+      )
+      const visibleBottom = Math.round(vv.offsetTop + vv.height)
+      const belowVisible = Math.max(0, coverH - visibleBottom)
+      const byInner = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
       const byClient = Math.max(0, clientH - vv.height)
-      // Konservativ: kleinere Schätzung — Übermaß = sichtbare Lücke über der Tastatur
       const rawKb = Math.min(byInner, byClient)
       const kb = rawKb > 100 ? Math.min(Math.round(rawKb), Math.round(window.innerHeight * 0.55)) : 0
-      const coverH = Math.max(window.innerHeight, clientH, vv.height + vv.offsetTop)
+
       overlay.style.top = '0'
       overlay.style.left = '0'
       overlay.style.right = '0'
@@ -247,8 +268,11 @@ export function EditorSheet({
       overlay.style.width = '100%'
       overlay.style.height = `${coverH}px`
       overlay.style.minHeight = `${coverH}px`
-      overlay.style.setProperty('--keyboard-inset', `${kb}px`)
-      document.body.classList.toggle('kb-open', kb > 40)
+      /* Flex-Ende = sichtbarer Viewport-Boden (border-box schrumpft Content-Box) */
+      overlay.style.paddingBottom = `${belowVisible}px`
+      /* belowVisible deckt Tastatur/URL-Bar schon ab */
+      overlay.style.setProperty('--keyboard-inset', '0px')
+      document.body.classList.toggle('kb-open', kb > 40 || belowVisible > 100)
     }
     const onFocusIn = (e: FocusEvent) => {
       sync()
@@ -277,12 +301,16 @@ export function EditorSheet({
       overlay.style.width = ''
       overlay.style.height = ''
       overlay.style.minHeight = ''
+      overlay.style.paddingBottom = ''
       overlay.style.removeProperty('--keyboard-inset')
       document.body.classList.remove('kb-open')
     }
-  }, [open, isMobile])
+  }, [open, isMobile, mounted, isRecessedOverlay])
 
   if (!open || !mounted) return null
+
+  const isRecessed = isRecessedOverlay
+  const isStacked = isStackedOverlay
 
   const api: EditorSheetApi = { requestClose }
 
@@ -319,6 +347,8 @@ export function EditorSheet({
         'editor-sheet',
         `editor-sheet--${layout}`,
         size === 'lg' && 'editor-sheet--lg',
+        isRecessed && 'editor-sheet--recessed',
+        isStacked && layout === 'bottom' && 'editor-sheet--stack-bottom',
         /* Fallback falls CSS-Build margin/justify droppt: Panel rechts ankern */
         layout === 'slide' && 'absolute right-0 top-0 ml-auto',
         className
@@ -326,21 +356,24 @@ export function EditorSheet({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      style={layout === 'bottom' ? sheetMotionStyle : undefined}
+      /* Recessed: Klassen-Transform nicht von Swipe-Inline überschreiben */
+      style={layout === 'bottom' && !isRecessed ? sheetMotionStyle : undefined}
     >
       {layout === 'bottom' ? (
         <div className="editor-sheet__drag-handle" {...dragZoneProps} aria-hidden>
           <div className="editor-sheet__drag-handle-bar" />
         </div>
       ) : null}
-      <header
-        className="editor-sheet__header"
-        {...(layout === 'bottom' ? dragZoneProps : {})}
-      >
+      {/* Drag nur am Handle — nicht am Header, sonst frisst iOS den X-Klick */}
+      <header className="editor-sheet__header">
         <button
           type="button"
           className="editor-sheet__icon-btn"
-          onClick={requestClose}
+          onClick={(e) => {
+            e.stopPropagation()
+            requestClose()
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
           aria-label="Schließen"
         >
           <X className="h-5 w-5" aria-hidden />
@@ -354,7 +387,9 @@ export function EditorSheet({
         </div>
         <div className="editor-sheet__header-end">{end}</div>
       </header>
-      <div className={cn('editor-sheet__body', bodyClassName)}>{children}</div>
+      <div className={cn('editor-sheet__body', bodyClassName)} data-scroll-lock-allow>
+        {children}
+      </div>
       {footer ? (
         <EditorSheetApiContext.Provider value={api}>
           <div className="editor-sheet__footer">{footer}</div>
@@ -373,10 +408,12 @@ export function EditorSheet({
           /* Canvas/Wizard liegt bei z-index 400 — Sheet muss darüber (Position bearbeiten etc.) */
           context === 'canvas' && 'editor-sheet-overlay--over-wizard',
           layout === 'slide' && 'justify-end',
+          discardOpen && 'editor-sheet-overlay--behind-confirm',
           overlayClassName
         )}
         role="presentation"
         onClick={(e) => {
+          if (discardOpen) return
           if (e.target === e.currentTarget) requestClose()
         }}
       >

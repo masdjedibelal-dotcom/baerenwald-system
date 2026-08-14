@@ -2,9 +2,13 @@
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import {
+  angebotDarfDirektAuftragOhneHvFreigabe,
+  resolveAnfrageFreigabeRegeln,
+} from '@/lib/anfragen/anfrage-akut-schwelle'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
@@ -23,9 +27,6 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { VerlaufPanel } from '@/components/crm/VerlaufPanel'
-import { buildLeadVerlaufItems, type VerlaufBuiltItem } from '@/lib/crm/verlauf'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { StatusBadgeActionPopover } from '@/components/ui/StatusBadgeActionPopover'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
@@ -33,7 +34,8 @@ import {
   acceptAngebotAndCreateAuftrag,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
-import { AngebotBearbeitenWahlModal } from '@/components/angebote/AngebotBearbeitenWahlModal'
+import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
+import type { AngebotAuswahlZeile } from '@/components/angebote/AngebotAuswahlPanel'
 import {
   previewAuftragsbestaetigungMail,
   recordKundeAbgelehntMitDetails,
@@ -62,6 +64,7 @@ import {
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
+import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -72,7 +75,6 @@ import type {
   LeadDetail,
   LeadDokumentRow,
   LeadNotizRow,
-  LeadTimelineRow,
   Preisliste,
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
@@ -83,14 +85,13 @@ import {
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 
-type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte' | 'aktivitaet'
+type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
 const ANGEBOT_DETAIL_TAB_IDS = new Set<AngebotDetailTab>([
   'uebersicht',
   'leistungen',
   'zahlung',
   'akte',
-  'aktivitaet',
 ])
 const ANGEBOT_DETAIL_DEFAULT_TAB: AngebotDetailTab = 'uebersicht'
 
@@ -134,7 +135,7 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
     tab === 'projekt-historie' ||
     tab === 'phasen'
   ) {
-    return 'aktivitaet'
+    return 'uebersicht'
   }
   const cumulative = resolveCumulativeDetailTabAlias(tab)
   if (cumulative === 'anfrage-details' || cumulative === 'angebot-details') return 'uebersicht'
@@ -144,7 +145,6 @@ function resolveAngebotDetailTabFromQuery(raw: string | null): AngebotDetailTab 
 
 export function AngebotDetailPageClient({
   detail,
-  timeline: timelineInitial,
   auftragId,
   gewerke,
   wizardPreislisten,
@@ -155,7 +155,6 @@ export function AngebotDetailPageClient({
   projektKontext,
 }: {
   detail: AngebotDetail
-  timeline: LeadTimelineRow[]
   auftragId: string | null
   gewerke: Gewerk[]
   wizardPreislisten: Preisliste[]
@@ -181,7 +180,10 @@ export function AngebotDetailPageClient({
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardBootstrap, setWizardBootstrap] = useState<AngebotWizardBootstrap | null>(null)
   const [wizardSessionKey, setWizardSessionKey] = useState(0)
-  const [bearbeitenWahlOpen, setBearbeitenWahlOpen] = useState(false)
+  /** Nach Kopie/Neu: gespeicherte ID, falls Close vor onDone */
+  const [wizardSavedAngebotId, setWizardSavedAngebotId] = useState<string | null>(null)
+  const wizardFinishLockRef = useRef(false)
+  const [angebotAuswahlOpen, setAngebotAuswahlOpen] = useState(false)
   const [kundeVersandOpen, setKundeVersandOpen] = useState(false)
   const [ablehnenOpen, setAblehnenOpen] = useState(false)
   const [ablehnenGrund, setAblehnenGrund] = useState<KundeAblehnungGrund | ''>('')
@@ -218,10 +220,53 @@ export function AngebotDetailPageClient({
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
 
-  function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap) {
+  const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
+    const fromCtx = (projektKontext?.angebote ?? []).map((a) => ({
+      id: a.id,
+      status: a.status,
+      status_einfach: a.status_einfach,
+      gesamt_fix: a.gesamt_fix,
+      gesamt_min: a.gesamt_min,
+      gesamt_max: a.gesamt_max,
+      created_at: a.created_at,
+      angebotsnr: a.angebotsnr,
+    }))
+    if (!fromCtx.some((a) => a.id === detail.id)) {
+      fromCtx.unshift({
+        id: detail.id,
+        status: detail.status,
+        status_einfach: detail.status_einfach ?? null,
+        gesamt_fix: detail.gesamt_fix ?? null,
+        gesamt_min: detail.gesamt_min ?? null,
+        gesamt_max: detail.gesamt_max ?? null,
+        created_at: detail.created_at ?? new Date().toISOString(),
+        angebotsnr: detail.angebotsnr ?? null,
+      })
+    }
+    return fromCtx
+  }, [projektKontext?.angebote, detail])
+
+  function openWizardMitBootstrap(bootstrap: AngebotWizardBootstrap | null) {
+    wizardFinishLockRef.current = false
+    setWizardSavedAngebotId(bootstrap?.angebotId?.trim() || null)
     setWizardBootstrap(bootstrap)
     setWizardSessionKey((k) => k + 1)
     setWizardOpen(true)
+  }
+
+  function finishWizardAndGo(angebotId: string | null | undefined) {
+    const target = (angebotId ?? wizardSavedAngebotId)?.trim() || null
+    /* Immer schließen — Lock nur gegen doppelte Navigation (onDone + onClose). */
+    setWizardOpen(false)
+    setWizardBootstrap(null)
+    setWizardSavedAngebotId(null)
+    if (wizardFinishLockRef.current) return
+    wizardFinishLockRef.current = true
+    if (target && target !== detail.id) {
+      router.push(`/angebote/${target}`)
+      return
+    }
+    refresh()
   }
 
   function openWizardBearbeiten() {
@@ -233,8 +278,9 @@ export function AngebotDetailPageClient({
       router.push(`/angebote/neu?angebot_id=${detail.id}`)
       return
     }
-    if (statusEinfach !== 'entwurf') {
-      setBearbeitenWahlOpen(true)
+    /* Mehrere Angebote oder kein reiner Entwurf → Auswahl wie an der Anfrage */
+    if (angeboteAuswahlZeilen.length > 1 || statusEinfach !== 'entwurf') {
+      setAngebotAuswahlOpen(true)
       return
     }
     startTransition(async () => {
@@ -267,8 +313,7 @@ export function AngebotDetailPageClient({
   }, [detail.id, detail.angebot_handwerker])
 
   function closeWizard() {
-    setWizardOpen(false)
-    setWizardBootstrap(null)
+    finishWizardAndGo(wizardSavedAngebotId)
   }
 
   const kunde = detail.kunden
@@ -322,62 +367,6 @@ export function AngebotDetailPageClient({
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
   }, [lead?.lead_dokumente])
-
-  const timelineItems = useMemo(() => {
-    const base = buildLeadVerlaufItems(timelineInitial ?? [], {
-      fallbackCreatedAt: detail.created_at,
-      fallbackCreatedLabel: `Angebot erstellt${detail.angebotsnr?.trim() ? ` — ${detail.angebotsnr.trim()}` : ''}`,
-    })
-
-    const withAngebotLink: VerlaufBuiltItem[] = base.map((item) => {
-      if (item.inspect && !item.inspect.angebotId && !item.inspect.href) {
-        return {
-          ...item,
-          inspect: {
-            ...item.inspect,
-            kind: item.inspect.kind === 'email' ? ('email' as const) : ('angebot' as const),
-            angebotId: detail.id,
-            href: `/angebote/${detail.id}`,
-            hrefLabel: 'Zum Angebot',
-          },
-        }
-      }
-      return item
-    })
-
-    const openSteps: VerlaufBuiltItem[] = []
-    if (!auftragId && statusEinfach !== 'angenommen') {
-      if (statusEinfach === 'entwurf') {
-        openSteps.push({
-          id: 'open-versand',
-          text: 'Angebot an Kunden senden',
-          time: 'offen',
-          state: 'open',
-          inspect: null,
-          ts: Number.MAX_SAFE_INTEGER - 1,
-          source: 'open',
-        })
-      }
-      openSteps.push({
-        id: 'open-auftrag',
-        text: 'Auftragsbestätigung',
-        time: 'offen',
-        state: 'open',
-        inspect: null,
-        ts: Number.MAX_SAFE_INTEGER,
-        source: 'open',
-      })
-    }
-
-    return [...withAngebotLink, ...openSteps]
-  }, [
-    timelineInitial,
-    detail.created_at,
-    detail.angebotsnr,
-    detail.id,
-    auftragId,
-    statusEinfach,
-  ])
 
   const anhaengeCount = useMemo(() => {
     const hasLead = Boolean(detail.lead_id ?? lead?.id)
@@ -439,14 +428,80 @@ export function AngebotDetailPageClient({
     setAcceptOpen(true)
   }
 
+  const unterSchwelleDirektAuftrag = useMemo(() => {
+    if (auftragId) return false
+    const ag = lead?.auftraggeber
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: ag?.portal_modus,
+      freigabeModus: ag?.freigabe_modus,
+      orgSchwelleEur: ag?.freigabe_schwelle_eur,
+      orgNotfallDirekt: ag?.notfall_direkt,
+      objektSchwelleEur: lead?.kunden_objekte?.freigabe_schwelle_eur,
+      objektNotfallDirekt: lead?.kunden_objekte?.notfall_direkt,
+    })
+    return angebotDarfDirektAuftragOhneHvFreigabe({
+      portalModus: regeln.portalModus,
+      freigabeModus: regeln.freigabeModus,
+      schwelleEur: regeln.schwelleEur,
+      betragEur: summenMail.nettoMax,
+      hatAuftraggeber: Boolean(lead?.auftraggeber_kunde_id?.trim() || ag?.id),
+    })
+  }, [auftragId, lead, summenMail.nettoMax])
+
+  const direktAuftragUnterSchwelleHinweis = useMemo(() => {
+    if (!unterSchwelleDirektAuftrag || !lead) return null
+    const ag = lead.auftraggeber
+    const regeln = resolveAnfrageFreigabeRegeln({
+      portalModus: ag?.portal_modus,
+      freigabeModus: ag?.freigabe_modus,
+      orgSchwelleEur: ag?.freigabe_schwelle_eur,
+      orgNotfallDirekt: ag?.notfall_direkt,
+      objektSchwelleEur: lead.kunden_objekte?.freigabe_schwelle_eur,
+      objektNotfallDirekt: lead.kunden_objekte?.notfall_direkt,
+    })
+    if (regeln.schwelleEur == null || regeln.schwelleEur <= 0) return null
+    return {
+      betragEur: summenMail.nettoMax,
+      schwelleEur: regeln.schwelleEur,
+    }
+  }, [unterSchwelleDirektAuftrag, lead, summenMail.nettoMax])
+
+  const runDirektAuftrag = useCallback(() => {
+    startTransition(async () => {
+      const res = await acceptAngebotAndCreateAuftrag(detail.id, {
+        start_datum: heuteYmd(),
+        end_datum: null,
+        send_kunden_email: false,
+        direktOhneHvFreigabe: true,
+      })
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      toast.success('Auftrag erstellt — ohne Kundenmail / ohne HV-Freigabe')
+      router.push(`/auftraege/${res.auftragId}`)
+      refresh()
+    })
+  }, [detail.id, router, refresh, startTransition])
+
   const primaryAction = useMemo((): DetailActionDef | null => {
-    const cta = primaryCta('angebot', statusEinfach || detail.status)
+    const cta = primaryCta('angebot', statusEinfach || detail.status, {
+      unterSchwelleDirektAuftrag,
+    })
     if (!cta) return null
     if (cta.id === 'angebot_versenden') {
       return {
         label: cta.label,
         icon: cta.icon,
         onClick: () => setKundeVersandOpen(true),
+        disabled: pending,
+      }
+    }
+    if (cta.id === 'direkt_auftrag') {
+      return {
+        label: cta.label,
+        icon: cta.icon,
+        onClick: runDirektAuftrag,
         disabled: pending,
       }
     }
@@ -459,7 +514,7 @@ export function AngebotDetailPageClient({
       }
     }
     return null
-  }, [statusEinfach, detail.status, pending])
+  }, [statusEinfach, detail.status, pending, unterSchwelleDirektAuftrag, runDirektAuftrag])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (!kannBearbeiten) return null
@@ -473,8 +528,15 @@ export function AngebotDetailPageClient({
 
   const stammdatenInhalt = (
     <>
-      {lead ? <HvMeldungKontextCards lead={lead} /> : null}
       <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+      {lead ? (
+        <HvMeldungKontextCards
+          lead={lead}
+          direktAuftragUnterSchwelle={direktAuftragUnterSchwelleHinweis}
+          angebotId={detail.id}
+          onSaved={() => refresh()}
+        />
+      ) : null}
     </>
   )
 
@@ -482,14 +544,49 @@ export function AngebotDetailPageClient({
     <AngebotLeistungenTab detail={detail} onOpenDokument={openWizardBearbeiten} />
   )
 
-  const verlaufInhalt = <VerlaufPanel items={timelineItems} />
-
   const dokumenteInhalt = (
     <AngebotAnhaengeTab
       detail={detail}
       leadId={detail.lead_id ?? lead?.id ?? null}
       dokumente={dokumenteRows}
       rechnungen={projektKontext?.rechnungen ?? []}
+      geschwisterAngebote={(projektKontext?.angebote ?? []).map((a) => ({
+        id: a.id,
+        created_at: a.created_at,
+        angebotsnr: a.angebotsnr,
+        pdf_url: a.pdf_url ?? null,
+      }))}
+      protokolle={
+        projektKontext?.auftrag
+          ? [
+              ...(projektKontext.auftrag.abnahme_protokoll_url
+                ? [
+                    {
+                      id: 'abnahme-protokoll',
+                      name: 'Abnahmeprotokoll',
+                      href: projektKontext.auftrag.abnahme_protokoll_url,
+                      created_at: projektKontext.auftrag.created_at ?? null,
+                      beschreibung: 'Abnahme',
+                    },
+                  ]
+                : []),
+              ...(projektKontext.auftrag.abschlussdokumentation_url
+                ? [
+                    {
+                      id: 'abschluss-doku',
+                      name: 'Abschlussdokumentation',
+                      href: projektKontext.auftrag.abschlussdokumentation_url,
+                      created_at:
+                        projektKontext.auftrag.abschlussdokumentation_gesendet_at ??
+                        projektKontext.auftrag.created_at ??
+                        null,
+                      beschreibung: 'Abschluss',
+                    },
+                  ]
+                : []),
+            ]
+          : []
+      }
       onReload={() => refresh()}
     />
   )
@@ -502,7 +599,7 @@ export function AngebotDetailPageClient({
         onReload={() => refresh()}
       />
     ) : (
-      <MockCard title="Notizen" icon="messages">
+      <MockCard title="Notizen" icon="messages" className="dshell-framed">
         <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
           Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
         </div>
@@ -555,13 +652,6 @@ export function AngebotDetailPageClient({
         />
       ),
     },
-    {
-      id: 'aktivitaet',
-      label: entityDetailTabLabel('aktivitaet'),
-      icon: 'history',
-      count: timelineItems.length || undefined,
-      render: () => <div className="space-y-6">{verlaufInhalt}</div>,
-    },
   ]
 
   return (
@@ -585,7 +675,13 @@ export function AngebotDetailPageClient({
         badges: (
           <StatusBadgeActionPopover
             title="Status"
-            badge={<StatusBadge status={statusEinfach || detail.status} label={angebotStatus.label} />}
+            badge={
+              <StatusBadge
+                status={detail.status}
+                label={angebotStatus.label}
+                kind={variantToMockBadgeKind(angebotStatus.variant)}
+              />
+            }
             actions={
               (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId
                 ? [
@@ -607,9 +703,6 @@ export function AngebotDetailPageClient({
           />
         ),
         meta: headMeta,
-        titleTrailing: (
-          <PortalLoginIconButton kundeId={detail.kunde_id} label="Kundenportal öffnen" />
-        ),
         actions: (
           <DetailActionsBar
             sheetTitle="Angebot"
@@ -668,20 +761,34 @@ export function AngebotDetailPageClient({
           firm={wizardFirm}
           bootstrap={wizardBootstrap}
           onClose={closeWizard}
-          onDone={() => {
-            closeWizard()
+          onSaved={(id) => {
+            setWizardSavedAngebotId(id)
             refresh()
+          }}
+          onDone={(id) => {
+            finishWizardAndGo(id)
           }}
         />
       ) : null}
 
       {detail.lead_id ? (
-        <AngebotBearbeitenWahlModal
-          open={bearbeitenWahlOpen}
-          onClose={() => setBearbeitenWahlOpen(false)}
-          angebotId={detail.id}
+        <AngebotAuswahlModal
+          open={angebotAuswahlOpen}
+          onClose={() => setAngebotAuswahlOpen(false)}
           leadId={detail.lead_id}
-          onBearbeiten={openWizardMitBootstrap}
+          angebote={angeboteAuswahlZeilen}
+          onNeuesAngebot={() => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(null)
+          }}
+          onWeiterbearbeiten={(bootstrap) => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(bootstrap)
+          }}
+          onKopie={(bootstrap) => {
+            setAngebotAuswahlOpen(false)
+            openWizardMitBootstrap(bootstrap)
+          }}
         />
       ) : null}
 

@@ -65,8 +65,8 @@ export function naechsterSchrittAngebot(input: {
   }
   if (input.statusEinfach === 'entwurf') {
     return {
-      label: gueltigHint ? `→ Angebot versenden · ${gueltigHint}` : '→ Angebot versenden',
-      hint: 'Positionen prüfen — dann versenden oder direkt annehmen.',
+      label: gueltigHint ? `→ Angebot annehmen · ${gueltigHint}` : '→ Angebot annehmen',
+      hint: 'Auftrag anlegen — E-Mail-Versand optional über Bearbeiten.',
     }
   }
   if (input.statusEinfach === 'gesendet' || input.statusEinfach === 'abgelaufen') {

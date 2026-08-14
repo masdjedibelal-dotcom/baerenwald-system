@@ -130,9 +130,9 @@ export function AngebotWizardMailPreview({
           srcDoc={mailIframeSrcDoc(
             html,
             !angebotId
-              ? 'Angebot wird gespeichert…'
+              ? 'E-Mail-Vorschau wird vorbereitet…'
               : loading
-                ? 'Echte E-Mail-Vorlage lädt…'
+                ? 'E-Mail-Vorschau wird geladen…'
                 : 'Vorschau lädt…'
           )}
         />

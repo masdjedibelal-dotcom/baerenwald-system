@@ -40,7 +40,7 @@ export function KundenportalLinkVersendenModal({
   const [text, setText] = useState('')
   const [html, setHtml] = useState('')
   const [portalLink, setPortalLink] = useState('')
-  const [anrede, setAnrede] = useState<'du' | 'sie'>('du')
+  const [anrede, setAnrede] = useState<'du' | 'sie'>('sie')
 
   const loadDraft = useCallback(async () => {
     if (!kundeId?.trim()) {
@@ -65,7 +65,7 @@ export function KundenportalLinkVersendenModal({
     setText(draft.text)
     setHtml(draft.html)
     setPortalLink(draft.portalLink)
-    setAnrede(draft.anrede)
+    setAnrede('sie')
   }, [kundeId, fallbackEmail, onClose])
 
   useEffect(() => {

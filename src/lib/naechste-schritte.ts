@@ -14,7 +14,8 @@ export function buildAngebotNaechsteSchritte(opts: {
 }): NaechsterSchritt[] {
   const { status, auftragId, nachgefasst = false, onNachfassen, onAngebotAnnehmen } = opts
 
-  const gesendet = status === 'gesendet' || status === 'abgelaufen'
+  const kannAnnehmen =
+    (status === 'entwurf' || status === 'gesendet' || status === 'abgelaufen') && !auftragId
   const nachfassErledigt =
     nachgefasst || status === 'angenommen' || status === 'abgelehnt' || Boolean(auftragId)
   const kannNachfassen =
@@ -31,9 +32,9 @@ export function buildAngebotNaechsteSchritte(opts: {
     {
       id: 'annehmen',
       label: 'Angebot annehmen',
-      dateLabel: auftragId ? 'Erledigt' : gesendet ? 'Als Nächstes' : '—',
+      dateLabel: auftragId ? 'Erledigt' : kannAnnehmen ? 'Als Nächstes' : '—',
       done: Boolean(auftragId),
-      onClick: gesendet && !auftragId ? onAngebotAnnehmen : undefined,
+      onClick: kannAnnehmen ? onAngebotAnnehmen : undefined,
       href: auftragId ? `/auftraege/${auftragId}` : undefined,
     },
   ]

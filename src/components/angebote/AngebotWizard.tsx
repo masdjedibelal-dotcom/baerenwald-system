@@ -24,8 +24,15 @@ import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { Check, FileText } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
+import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundeModal } from '@/components/kunden/KundeModal'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
+import {
+  draftFromLeadMelder,
+  MelderLeistungsortFields,
+  type MelderLeistungsortDraft,
+} from '@/components/crm/MelderLeistungsortFields'
 import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
@@ -42,6 +49,7 @@ import {
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
 import { createAnfrageFuerKunde } from '@/app/(dashboard)/neu/fab-neu-actions'
+import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import {
   angebotMetaPatchFromZahlfrist,
@@ -96,9 +104,9 @@ import {
 import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
+  istKundeHausverwaltungTyp,
   kundeStrasseHausnummerZeile,
 } from '@/lib/kunde-stammdaten'
-import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
@@ -209,17 +217,20 @@ export function AngebotWizard({
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [leadState, setLeadState] = useState(lead)
 
-  useEffect(() => {
-    setLeadState(lead)
-  }, [lead])
-
   const name = kundenName(leadState)
   const projekt = projektLabel(leadState)
   const melder = resolveLeadKunde(leadState.kunden)
   const ag = leadState.auftraggeber
-  const isHv = Boolean(leadState.auftraggeber_kunde_id || ag?.id)
+  const isHv = Boolean(
+    leadState.auftraggeber_kunde_id ||
+      ag?.id ||
+      istKundeHausverwaltungTyp(leadState.kundentyp) ||
+      istKundeHausverwaltungTyp(melder?.typ)
+  )
   const kundeId = leadVertragsKundeId(leadState)
-  const sheetKunde = (isHv ? ag : melder) ?? null
+  const hvKundeId =
+    (leadState.auftraggeber_kunde_id || ag?.id || (isHv ? kundeId : null) || '').trim() || null
+  const sheetKunde = (isHv ? ag ?? melder : melder) ?? null
   const leistungsumfangInitial =
     bereicheFuerAnzeige(leadState.bereiche, leadState.situation)
       .map((b) => BEREICH_LABELS[b] ?? b)
@@ -308,7 +319,11 @@ export function AngebotWizard({
     return null
   })
   const [kundeEditOpen, setKundeEditOpen] = useState(false)
+  const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [melderDraft, setMelderDraft] = useState<MelderLeistungsortDraft>(() =>
+    draftFromLeadMelder(lead)
+  )
   const [fotoLightboxUrl, setFotoLightboxUrl] = useState<string | null>(null)
   const [mailBodyDraft, setMailBodyDraft] = useState('')
   const [, setPositions] = useState<WizardPosition[]>(() =>
@@ -384,16 +399,16 @@ export function AngebotWizard({
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
 
   useEffect(() => {
-    if (mailTo.length) return
-    if (sheetEmail && isValidEmail(sheetEmail)) setMailTo([sheetEmail])
-  }, [sheetEmail, mailTo.length])
+    setLeadState(lead)
+    setMelderDraft(draftFromLeadMelder(lead))
+  }, [lead])
 
   useEffect(() => {
-    if (sheet !== 'kunde' || !isHv) {
+    if (!isHv) {
       setHvObjekte([])
       return
     }
-    const hvId = (ag?.id || leadState.auftraggeber_kunde_id || '').trim()
+    const hvId = hvKundeId
     if (!hvId) {
       setHvObjekte([])
       return
@@ -405,9 +420,25 @@ export function AngebotWizard({
     return () => {
       cancelled = true
     }
-  }, [sheet, isHv, ag?.id, leadState.auftraggeber_kunde_id])
+  }, [isHv, hvKundeId])
 
-  const mailAnrede = meta.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
+  function patchMelderDraft(patch: Partial<MelderLeistungsortDraft>) {
+    setMelderDraft((prev) => {
+      const next = { ...prev, ...patch }
+      if (patch.kunde_objekt_id !== undefined) {
+        setMeta((m) => ({ ...m, kunde_objekt_id: next.kunde_objekt_id }))
+      }
+      return next
+    })
+    setDraftDirty(true)
+  }
+
+  useEffect(() => {
+    if (mailTo.length) return
+    if (sheetEmail && isValidEmail(sheetEmail)) setMailTo([sheetEmail])
+  }, [sheetEmail, mailTo.length])
+
+  const mailAnrede = mailAnredeFromKundeTyp(kundeTyp)
   const mailKundeKontext = useMemo((): KundeAnredeKontext => {
     const k = sheetKunde
     return {
@@ -644,14 +675,29 @@ export function AngebotWizard({
       toast.error('Kein Kunde verknüpft — Anfrage kann nicht angelegt werden.')
       return null
     }
-    const r = await createAnfrageFuerKunde(kid)
+    const r = await createAnfrageFuerKunde(kid, {
+      melder_name: melderDraft.melder_name || null,
+      melder_email: melderDraft.melder_email || null,
+      melder_telefon: melderDraft.melder_telefon || null,
+      melder_einheit: melderDraft.melder_einheit || null,
+      kunde_objekt_id: melderDraft.kunde_objekt_id,
+    })
     if (!r.ok) {
       toast.error(r.message)
       return null
     }
-    setLeadState((prev) => ({ ...prev, id: r.leadId }))
+    setLeadState((prev) => ({
+      ...prev,
+      id: r.leadId,
+      auftraggeber_kunde_id: prev.auftraggeber_kunde_id || kid,
+      melder_name: melderDraft.melder_name || null,
+      melder_email: melderDraft.melder_email || null,
+      melder_telefon: melderDraft.melder_telefon || null,
+      melder_einheit: melderDraft.melder_einheit || null,
+      kunde_objekt_id: melderDraft.kunde_objekt_id,
+    }))
     return r.leadId
-  }, [deferredLeadCreate, leadState])
+  }, [deferredLeadCreate, leadState, melderDraft])
 
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
@@ -716,6 +762,28 @@ export function AngebotWizard({
           toast.error(res.message)
           return null
         }
+        if (isHv) {
+          const sync = await updateLeadMelderUndLeistungsort(leadId, {
+            melder_name: melderDraft.melder_name || null,
+            melder_email: melderDraft.melder_email || null,
+            melder_telefon: melderDraft.melder_telefon || null,
+            melder_einheit: melderDraft.melder_einheit || null,
+            kunde_objekt_id: melderDraft.kunde_objekt_id,
+            angebotId: res.angebotId,
+          })
+          if (!sync.ok) {
+            toast.error(sync.message)
+          } else {
+            setLeadState((prev) => ({
+              ...prev,
+              melder_name: melderDraft.melder_name || null,
+              melder_email: melderDraft.melder_email || null,
+              melder_telefon: melderDraft.melder_telefon || null,
+              melder_einheit: melderDraft.melder_einheit || null,
+              kunde_objekt_id: melderDraft.kunde_objekt_id,
+            }))
+          }
+        }
         setAngebotId(res.angebotId)
         setMeta(metaPersist)
         savedSnapshotRef.current = draftSnapshotRef.current
@@ -723,9 +791,11 @@ export function AngebotWizard({
         onSaved?.(res.angebotId)
         if (opts?.notify) {
           toast.success(
-            res.angebotsnr?.trim()
-              ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-              : 'Entwurf gespeichert'
+            istNachtrag
+              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
+              : res.angebotsnr?.trim()
+                ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+                : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
@@ -761,6 +831,8 @@ export function AngebotWizard({
       hwZuweisungen,
       istNachtrag,
       bootstrap?.nachtragZu?.auftragId,
+      isHv,
+      melderDraft,
     ]
   )
 
@@ -842,6 +914,9 @@ export function AngebotWizard({
   async function handleFinishSpeichern() {
     const id = await persistDraft({ notify: true })
     if (!id) return
+    setSheet(null)
+    setKundeEditOpen(false)
+    setFotoLightboxUrl(null)
     onDone?.(id, {
       mode: 'saved',
       auftragKorrektur: istAuftragKorrektur || undefined,
@@ -881,10 +956,15 @@ export function AngebotWizard({
         return
       }
       toast.success(
-        istAuftragKorrektur
-          ? 'Korrektur gespeichert und an den Kunden versendet'
-          : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+        istNachtrag
+          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
+          : istAuftragKorrektur
+            ? 'Korrektur gespeichert und an den Kunden versendet'
+            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
+      setSheet(null)
+      setKundeEditOpen(false)
+      setFotoLightboxUrl(null)
       onDone?.(id, {
         mode: 'sent',
         auftragKorrektur: istAuftragKorrektur || undefined,
@@ -909,7 +989,7 @@ export function AngebotWizard({
         titel: lu ? `Angebot ${lu} — ${name}` : m.titel,
       }
       if (isDefaultAngebotEinleitung(m.einleitung, altLu)) {
-        const effAnrede = m.anrede ?? mailAnredeFromKundeTyp(kundeTyp)
+        const effAnrede = mailAnredeFromKundeTyp(kundeTyp)
         patch.einleitung = defaultAngebotEinleitungText(effAnrede, lu || projekt)
       }
       return { ...m, ...patch }
@@ -940,7 +1020,13 @@ export function AngebotWizard({
 
   const versandCrowValue = mailTo[0]?.trim() || sheetEmail?.trim() || 'Empfänger ergänzen'
 
-  const wizardSubtitle = name?.trim() && name !== '—' ? name.trim() : undefined
+  const wizardSubtitle = istNachtrag
+    ? [name?.trim() && name !== '—' ? name.trim() : null, 'Auftrag bleibt bis zur Annahme unverändert']
+        .filter(Boolean)
+        .join(' · ') || 'Auftrag bleibt bis zur Annahme unverändert'
+    : name?.trim() && name !== '—'
+      ? name.trim()
+      : undefined
 
   const headerEnd = (
     <>
@@ -970,16 +1056,14 @@ export function AngebotWizard({
           {
             label: saving ? 'Speichern…' : 'Speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            hint: 'Speichert und schließt',
             onClick: () => {
               if (saving) return
               void handleFinishSpeichern()
             },
           },
           {
-            label: saving ? 'Senden…' : 'Senden',
+            label: saving ? 'E-Mail…' : 'E-Mail senden',
             icon: <MockIcon ctx="btn" n="send" size={16} />,
-            hint: 'Versendet und schließt',
             onClick: () => {
               if (saving) return
               void handleFinishVersenden()
@@ -1039,7 +1123,10 @@ export function AngebotWizard({
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
-        onClick={() => setSheet('versand')}
+        onClick={() => {
+          setSheet('versand')
+          void ensureDraftForPreview()
+        }}
       />
     </div>
   )
@@ -1121,25 +1208,17 @@ export function AngebotWizard({
             <span className="gfc-l">Budget</span>
             <span className="gfc-v">{budgetAnzeige}</span>
           </div>
-          {isHv ? (
-            hvObjekte.length === 0 ? (
-              <div className="gfc-row">
-                <span className="gfc-l">Objekte</span>
-                <span className="gfc-v">—</span>
-              </div>
-            ) : (
-              hvObjekte.map((o, i) => (
-                <div key={o.id} className="gfc-row">
-                  <span className="gfc-l">{i === 0 ? 'Objekte' : ''}</span>
-                  <span className="gfc-v">
-                    {kundenObjektKurzlabel(o)}
-                    {leadState.kunde_objekt_id === o.id ? ' · aktiv' : ''}
-                  </span>
-                </div>
-              ))
-            )
-          ) : null}
         </div>
+        {isHv ? (
+          <div style={{ marginTop: 16 }}>
+            <MelderLeistungsortFields
+              draft={melderDraft}
+              onChange={patchMelderDraft}
+              objekte={hvObjekte}
+              onNeuObjekt={hvKundeId ? () => setObjektNeuOpen(true) : undefined}
+            />
+          </div>
+        ) : null}
       </EditorSheet>
 
       <KundeModal
@@ -1152,6 +1231,23 @@ export function AngebotWizard({
         context="canvas"
         onSaved={onKundeSaved}
       />
+
+      {hvKundeId ? (
+        <KundenObjektModal
+          open={objektNeuOpen}
+          onClose={() => setObjektNeuOpen(false)}
+          kundeId={hvKundeId}
+          verwaltungName={crowKundeValue}
+          onSaved={(objekt) => {
+            setHvObjekte((prev) => {
+              if (prev.some((o) => o.id === objekt.id)) return prev
+              return [...prev, objekt]
+            })
+            patchMelderDraft({ kunde_objekt_id: objekt.id })
+            setObjektNeuOpen(false)
+          }}
+        />
+      ) : null}
 
       <EditorSheet
         open={sheet === 'dokument'}
@@ -1173,6 +1269,7 @@ export function AngebotWizard({
             value={projektbeschreibung}
             onSave={setProjektbeschreibung}
             multiline
+            className="sheet-editable-field--dok-beschreibung"
             kiExtraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
             placeholder="Projektbeschreibung…"
             autoOpen={sheet === 'dokument' && focusField === 'beschreibung'}
@@ -1276,35 +1373,26 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
-          <div className="full wizard-zahlung-dates">
-            <MockField label="Gültig bis">
-              <DateInput
-                size="sm"
-                value={meta.gueltig_bis}
-                onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
-              />
-            </MockField>
-            <MockField
-              label="Leistungszeitraum von"
+          <MockField label="Gültig bis" full>
+            <DateInput
+              size="sm"
+              value={meta.gueltig_bis}
+              onChange={(e) => setMeta((m) => ({ ...m, gueltig_bis: e.target.value }))}
+            />
+          </MockField>
+          <div className="full">
+            <LeistungszeitraumFields
+              von={meta.leistungszeitraum_von ?? ''}
+              bis={meta.leistungszeitraum_bis ?? ''}
               hint={istAuftragKorrektur ? 'Ausführungszeitraum am Auftrag' : undefined}
-            >
-              <DateInput
-                size="sm"
-                value={meta.leistungszeitraum_von ?? ''}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_von: e.target.value }))
-                }
-              />
-            </MockField>
-            <MockField label="Leistungszeitraum bis">
-              <DateInput
-                size="sm"
-                value={meta.leistungszeitraum_bis ?? ''}
-                onChange={(e) =>
-                  setMeta((m) => ({ ...m, leistungszeitraum_bis: e.target.value }))
-                }
-              />
-            </MockField>
+              onChange={({ von, bis }) =>
+                setMeta((m) => ({
+                  ...m,
+                  leistungszeitraum_von: von,
+                  leistungszeitraum_bis: bis,
+                }))
+              }
+            />
           </div>
           <MockField label="Zahlfrist" full>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1350,8 +1438,9 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Versand"
         context="canvas"
+        size="lg"
       >
-        <div className="form-grid form-grid--sheet">
+        <div className="form-grid form-grid--sheet form-grid--sheet-versand">
           <EmailPillsField
             label="An"
             required

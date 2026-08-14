@@ -44,7 +44,10 @@ export async function insertAuftragTimelineEvent(input: {
   /** Verknüpfung zu email_log → Mail-Vorschau in Aktivität */
   email_log_id?: string | null
 }): Promise<{ ok: true; id?: string } | { ok: false; message: string }> {
-  const fuerKunde = input.fuer_kunde_freigegeben ?? false
+  /* Portal-RLS liest fuer_kunde_freigegeben — sichtbar_fuer_kunde allein reicht nicht. */
+  const fuerKunde =
+    input.fuer_kunde_freigegeben ?? input.sichtbar_fuer_kunde ?? false
+  const sichtbar = input.sichtbar_fuer_kunde ?? fuerKunde
   const freiAt = fuerKunde ? (input.freigegeben_at ?? new Date().toISOString()) : null
   const base = {
     auftrag_id: input.auftrag_id,
@@ -54,7 +57,7 @@ export async function insertAuftragTimelineEvent(input: {
     foto_urls: input.foto_urls?.filter(Boolean) ?? [],
     erstellt_von: input.erstellt_von ?? null,
     handwerker_id: input.handwerker_id ?? null,
-    sichtbar_fuer_kunde: input.sichtbar_fuer_kunde ?? false,
+    sichtbar_fuer_kunde: sichtbar,
     fuer_kunde_freigegeben: fuerKunde,
     freigegeben_at: freiAt,
   }

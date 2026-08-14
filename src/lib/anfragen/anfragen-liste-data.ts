@@ -49,6 +49,7 @@ export async function loadAnfragenListe(): Promise<{
       .from('leads')
       .select(ANFRAGEN_LISTE_SELECT)
       .in('status', [...ANFRAGEN_LISTE_STATUS])
+      .is('geloescht_am', null)
       .order('created_at', { ascending: false })
       .limit(100)
   )

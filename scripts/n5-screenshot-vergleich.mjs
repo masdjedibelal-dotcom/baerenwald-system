@@ -13,13 +13,12 @@ const MOCK_URL = 'http://127.0.0.1:8765/Baerenwald%20CRM%20(standalone)%20(9).ht
 const APP = 'http://127.0.0.1:3001';
 const DESKTOP = { width: 1440, height: 900 };
 const MOBILE = { width: 375, height: 812 };
-const TABS = ['uebersicht', 'leistungen', 'zahlung', 'akte', 'aktivitaet'];
+const TABS = ['uebersicht', 'leistungen', 'zahlung', 'akte'];
 const TAB_LABEL = {
   uebersicht: 'Übersicht',
   leistungen: 'Leistungen',
   zahlung: 'Zahlung',
   akte: 'Akte',
-  aktivitaet: 'Aktivität',
 };
 
 async function shot(page, name) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { Check, Circle, Flag } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
@@ -35,6 +35,40 @@ export type TodoLockedLinks = {
   label?: string | null
 }
 
+function formatFristLabel(iso: string | null | undefined): string {
+  const raw = iso?.slice(0, 10)
+  if (!raw) return '—'
+  const d = new Date(`${raw}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return raw
+  return d.toLocaleDateString('de-DE', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function isFristOverdue(iso: string | null | undefined, erledigt: boolean): boolean {
+  if (erledigt || !iso) return false
+  const raw = iso.slice(0, 10)
+  const today = new Date()
+  today.setHours(12, 0, 0, 0)
+  const due = new Date(`${raw}T12:00:00`)
+  return due.getTime() < today.getTime()
+}
+
+function prioLabel(p: TodoPrioritaet): string {
+  return PRIO.find((x) => x.value === p)?.label ?? p
+}
+
+function Prop({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="prop">
+      <span className="prop-l">{label}</span>
+      <span className="prop-v">{children}</span>
+    </div>
+  )
+}
+
 export function TodoEditorSheet({
   open,
   todo,
@@ -48,6 +82,7 @@ export function TodoEditorSheet({
   onClose: () => void
   onSaved: () => void
 }) {
+  const [mode, setMode] = useState<'view' | 'edit'>('edit')
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [faelligAm, setFaelligAm] = useState('')
@@ -67,9 +102,12 @@ export function TodoEditorSheet({
   const linksLocked = Boolean(
     lockedLinks?.kundeId || lockedLinks?.leadId || lockedLinks?.auftragId || lockedLinks?.handwerkerId
   )
+  const isNew = !todo
+  const isView = !isNew && mode === 'view'
 
   useEffect(() => {
     if (!open) return
+    setMode(todo ? 'view' : 'edit')
     setTitel(todo?.titel ?? '')
     setBeschreibung(todo?.beschreibung ?? '')
     setFaelligAm(todo?.faellig_am?.slice(0, 10) ?? '')
@@ -112,8 +150,6 @@ export function TodoEditorSheet({
     }
   }, [open, todo, lockedLinks, linksLocked])
 
-  const isNew = !todo
-
   const teamOptions = useMemo(
     () => [
       { value: '', label: 'Niemand' },
@@ -121,6 +157,33 @@ export function TodoEditorSheet({
     ],
     [team]
   )
+
+  const zugewiesenLabel = useMemo(() => {
+    if (!zugewiesenAn) return '—'
+    return team.find((m) => m.id === zugewiesenAn)?.name ?? '—'
+  }, [team, zugewiesenAn])
+
+  const vorgangLabel = useMemo(() => {
+    if (todo?.auftraege?.titel?.trim()) return todo.auftraege.titel.trim()
+    if (todo?.leads?.kontakt_name?.trim()) return `Anfrage · ${todo.leads.kontakt_name.trim()}`
+    if (lockedLinks?.label?.trim()) return lockedLinks.label.trim()
+    const opt = vorgangOpts.find((o) => o.value === vorgangKey)
+    return opt?.label ?? '—'
+  }, [todo, lockedLinks, vorgangOpts, vorgangKey])
+
+  const kundeLabel = useMemo(() => {
+    if (todo?.kunden?.name?.trim()) return todo.kunden.name.trim()
+    const opt = kundeOpts.find((o) => o.value === kundeId)
+    return opt?.label ?? (kundeId ? '—' : '—')
+  }, [todo, kundeOpts, kundeId])
+
+  const handwerkerLabel = useMemo(() => {
+    const fromTodo =
+      todo?.handwerker?.firma?.trim() || todo?.handwerker?.name?.trim() || null
+    if (fromTodo) return fromTodo
+    const opt = hwOpts.find((o) => o.value === handwerkerId)
+    return opt?.label ?? '—'
+  }, [todo, hwOpts, handwerkerId])
 
   function applyVorgangKey(key: string) {
     setVorgangKey(key)
@@ -175,17 +238,30 @@ export function TodoEditorSheet({
     })
   }
 
+  const sheetTitle = isNew ? 'Neues To-do' : isView ? 'To-do' : 'To-do bearbeiten'
+
   return (
     <EditorSheet
       open={open}
       onClose={onClose}
-      title={isNew ? 'Neues To-do' : 'To-do'}
+      title={sheetTitle}
       confirmBusy={pending}
-      onConfirm={save}
+      onConfirm={isView ? undefined : save}
       confirmDisabled={pending || !titel.trim()}
       manageHistory={false}
+      headerEnd={
+        isView ? (
+          <button
+            type="button"
+            className="btn ghost sm"
+            onClick={() => setMode('edit')}
+          >
+            Bearbeiten
+          </button>
+        ) : undefined
+      }
       footer={
-        !isNew ? (
+        !isNew && !isView ? (
           <div className="flex w-full items-center justify-start gap-2">
             <button type="button" className="btn ghost danger" disabled={pending} onClick={remove}>
               Löschen
@@ -194,89 +270,137 @@ export function TodoEditorSheet({
         ) : undefined
       }
     >
-      <div className="todo-editor space-y-4">
-        <Input
-          label="Titel"
-          value={titel}
-          onChange={(e) => setTitel(e.target.value)}
-          placeholder="Was ist zu tun?"
-          required
-          autoFocus
-        />
-        <Textarea
-          label="Beschreibung"
-          value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
-          rows={4}
-          placeholder="Details, Notizen…"
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            type="date"
-            label="Frist"
-            value={faelligAm}
-            onChange={(e) => setFaelligAm(e.target.value)}
-          />
-          <div>
-            <div className="mb-1 text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
-              Priorität
-            </div>
-            <div className="seg">
-              {PRIO.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  className={cn(prioritaet === p.value && 'on')}
-                  onClick={() => setPrioritaet(p.value)}
-                >
-                  {p.label}
-                </button>
-              ))}
+      {isView ? (
+        <div className="todo-detail">
+          <div className="todo-detail__card">
+            <h3 className="todo-detail__title">
+              <TodoPrioFlag prioritaet={prioritaet} />
+              <span>{titel.trim() || 'Ohne Titel'}</span>
+            </h3>
+            <div className="props">
+              <Prop label="Status">{todo?.erledigt ? 'Erledigt' : 'Offen'}</Prop>
+              <Prop label="Frist">
+                {(() => {
+                  const raw = faelligAm || todo?.faellig_am
+                  const label = formatFristLabel(raw)
+                  const overdue = isFristOverdue(raw, Boolean(todo?.erledigt))
+                  if (label === '—') return '—'
+                  return (
+                    <span
+                      className={cn(
+                        'todo-row__frist',
+                        overdue && 'todo-row__frist--overdue'
+                      )}
+                    >
+                      {label}
+                    </span>
+                  )
+                })()}
+              </Prop>
+              <Prop label="Priorität">{prioLabel(prioritaet)}</Prop>
+              <Prop label="Zuweisen">{zugewiesenLabel}</Prop>
+              {beschreibung.trim() ? (
+                <Prop label="Notiz">
+                  <span className="todo-detail__notiz">{beschreibung.trim()}</span>
+                </Prop>
+              ) : null}
+              {linksLocked && lockedLinks?.label ? (
+                <Prop label="Verknüpft">{lockedLinks.label}</Prop>
+              ) : (
+                <>
+                  <Prop label="Kunde">{kundeLabel}</Prop>
+                  <Prop label="Vorgang">{vorgangLabel}</Prop>
+                  <Prop label="Handwerker">{handwerkerLabel}</Prop>
+                </>
+              )}
             </div>
           </div>
         </div>
-        <Select
-          label="Zuweisen"
-          value={zugewiesenAn}
-          options={teamOptions}
-          onChange={(e) => setZugewiesenAn(e.target.value)}
-        />
-
-        {linksLocked ? (
-          lockedLinks?.label ? (
-            <p className="text-[length:var(--fs-text)] text-[var(--text-3)]">
-              Verknüpft: {lockedLinks.label}
-            </p>
-          ) : null
-        ) : (
-          <div className="space-y-3 border-t border-[var(--border)] pt-3">
-            <p className="text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
-              Verknüpfung
-            </p>
-            <Combobox
-              label="Kunde"
-              options={[{ value: '', label: '— keiner —' }, ...kundeOpts]}
-              value={kundeId}
-              onChange={setKundeId}
-              placeholder="Kunde suchen…"
+      ) : (
+        <div className="todo-editor space-y-4">
+          <Input
+            label="Titel"
+            value={titel}
+            onChange={(e) => setTitel(e.target.value)}
+            placeholder="Was ist zu tun?"
+            required
+            autoFocus
+          />
+          <Textarea
+            label="Beschreibung"
+            value={beschreibung}
+            onChange={(e) => setBeschreibung(e.target.value)}
+            rows={4}
+            placeholder="Details, Notizen…"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              type="date"
+              label="Frist"
+              value={faelligAm}
+              onChange={(e) => setFaelligAm(e.target.value)}
             />
-            <Combobox
-              label="Vorgang"
-              options={[{ value: '', label: '— keiner —' }, ...vorgangOpts]}
-              value={vorgangKey}
-              onChange={applyVorgangKey}
-              placeholder="Anfrage / Auftrag…"
-            />
-            <Combobox
-              label="Handwerker"
-              options={[{ value: '', label: '— keiner —' }, ...hwOpts]}
-              value={handwerkerId}
-              onChange={setHandwerkerId}
-              placeholder="Partner suchen…"
-            />
+            <div>
+              <div className="mb-1 text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
+                Priorität
+              </div>
+              <div className="seg">
+                {PRIO.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    className={cn(prioritaet === p.value && 'on')}
+                    onClick={() => setPrioritaet(p.value)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+          <Select
+            label="Zuweisen"
+            value={zugewiesenAn}
+            options={teamOptions}
+            onChange={(e) => setZugewiesenAn(e.target.value)}
+          />
+
+          {linksLocked ? (
+            lockedLinks?.label ? (
+              <p className="text-[length:var(--fs-text)] text-[var(--text-3)]">
+                Verknüpft: {lockedLinks.label}
+              </p>
+            ) : null
+          ) : (
+            <div className="space-y-3 border-t border-[var(--border)] pt-3">
+              <p className="text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
+                Verknüpfung
+              </p>
+              <Combobox
+                label="Kunde"
+                options={[{ value: '', label: '— keiner —' }, ...kundeOpts]}
+                value={kundeId}
+                onChange={setKundeId}
+                placeholder="Kunde suchen…"
+              />
+              <Combobox
+                label="Vorgang"
+                options={[{ value: '', label: '— keiner —' }, ...vorgangOpts]}
+                value={vorgangKey}
+                onChange={applyVorgangKey}
+                placeholder="Anfrage / Auftrag…"
+              />
+              <Combobox
+                label="Handwerker"
+                options={[{ value: '', label: '— keiner —' }, ...hwOpts]}
+                value={handwerkerId}
+                onChange={setHandwerkerId}
+                placeholder="Partner suchen…"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </EditorSheet>
   )
 }

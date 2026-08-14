@@ -56,7 +56,7 @@ function formatSchwelleLabel(raw: string): string {
   return `${Math.round(n).toLocaleString('de-DE')} €`
 }
 
-/** HV-Freigaberegeln: immer Angebot; unter Schwelle Auto-Auftrag; darüber Freigabe/Annahme. */
+/** HV-Freigaberegeln: immer Angebot; unter Schwelle CRM „Direkt Auftrag“; darüber Freigabe/Annahme. */
 export function FreigabeRegelnEditor({ value, onChange, disabled, className }: Props) {
   const behandlung = freigabeBehandlungFromValue(value.freigabe_modus, value.notfall_direkt)
   const schwelleLabel = formatSchwelleLabel(value.freigabe_schwelle_eur)
@@ -70,9 +70,9 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
 
   const purpose =
     behandlung === 'direkt'
-      ? 'Immer Angebot — unter und über der Schwelle wird ohne Freigabe automatisch beauftragt.'
+      ? 'Immer Angebot — CRM zeigt „Direkt Auftrag“ (ohne Kundenmail / ohne HV-Freigabe).'
       : hatSchwelle
-        ? `Immer Angebot. Bis ${schwelleLabel} automatisch Auftrag (ohne Annahme) — darüber wartet Freigabe/Annahme.`
+        ? `Immer Angebot. Bis ${schwelleLabel}: „Direkt Auftrag“ ohne HV-Freigabe — darüber wartet Freigabe/Annahme.`
         : 'Immer Angebot. Ohne gesetzte Schwelle braucht jedes Angebot Freigabe/Annahme.'
 
   const tiles = [
@@ -80,18 +80,18 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
       id: 'freigabe' as const,
       title: 'Freigabe oberhalb',
       desc: hatSchwelle
-        ? `Über ${schwelleLabel}: Freigabe nötig. Darunter: Auto-Auftrag.`
+        ? `Über ${schwelleLabel}: Freigabe nötig. Darunter: Direkt Auftrag im CRM.`
         : 'Jedes Angebot braucht Freigabe.',
     },
     {
       id: 'direkt' as const,
-      title: 'Immer automatisch',
-      desc: 'Kein Warten auf Freigabe — Angebot wird direkt zum Auftrag.',
+      title: 'Immer direkt',
+      desc: 'Kein Warten auf Freigabe — CRM „Direkt Auftrag“ ohne Kundenmail.',
     },
     {
       id: 'notfall' as const,
-      title: 'Akut ohne Angebot',
-      desc: 'Nur Notfall/Akut: Direktauftrag möglich. Sonst wie Freigabe oberhalb.',
+      title: 'Direktbeauftragung bei Sofortmaßnahmen',
+      desc: 'z. B. Wasser läuft, kein Strom, Heizung komplett aus — ohne Freigabe, nur Info an HV.',
     },
   ]
 

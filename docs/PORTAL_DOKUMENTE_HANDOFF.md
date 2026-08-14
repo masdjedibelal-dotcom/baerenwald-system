@@ -13,8 +13,8 @@ Sortierung: **neueste zuerst**, ohne Datum unten (`sortDokumentZeilenNachDatum` 
 | Versand (CRM) | Speicherort | Portal-Feld |
 |---------------|-------------|-------------|
 | Angebot an Kunde | `angebote.pdf_url` + `gesendet_am` | `dokumenteFromAngebot` |
-| Rechnung an Kunde | `rechnungen.pdf_url` + `status=gesendet` | `dokumenteFromRechnungen` |
-| Abnahmeprotokoll | `auftraege.abnahme_protokoll_url` | `dokumenteFromAuftrag` |
+| Rechnung an Kunde | `rechnungen.pdf_url` + `status in (gesendet, bezahlt)` | `dokumenteFromRechnungen` |
+| Abnahmeprotokoll | `auftraege.abnahme_protokoll_url` + Unterlagen HV/Mieter via `verteileAbnahmeAnUnterlagen` | `dokumenteFromAuftrag` / `kunden_dokumente` |
 | **Abschlussdokumentation** | `auftraege.abschlussdokumentation_url` + `abschlussdokumentation_gesendet_at` | `dokumenteFromAuftrag` |
 | Projekt-Update mit Fotos | `auftrag_timeline` + `fuer_kunde_freigegeben` | `dokumenteFromTimeline` |
 | Bautagebuch (freigegeben) | `auftrag_bautagebuch_eintraege` | `dokumenteFromBautagebuch` |
@@ -26,8 +26,10 @@ Sortierung: **neueste zuerst**, ohne Datum unten (`sortDokumentZeilenNachDatum` 
 | Tabelle / Objekt | Pflichtfelder | Wann sichtbar | CRM setzt bei |
 |------------------|---------------|---------------|---------------|
 | **`angebote`** | `pdf_url`, `gesendet_am`, `status_einfach` | `gesendet` / `kunde_akzeptiert` / `angenommen` | `sendAngebotToKunde` → `persistPdfForAngebot` + Status |
-| **`rechnungen`** | `pdf_url`, `rechnungsnummer`, `status = gesendet`, `gesendet_at` oder `rechnungsdatum` | Nach Versand | `sendeRechnungAnKunde` → `persistPdfForRechnung` |
-| **`auftraege`** | `abnahme_protokoll_url`, optional `abnahme_datum` | Nach Abnahme | `abnahmeprotokoll-actions` |
+| **`rechnungen`** | `pdf_url`, `rechnungsnummer`, `status ∈ {gesendet, bezahlt}`, `gesendet_at` oder `rechnungsdatum` | Nach Versand (bleibt nach Zahlung) | `sendeRechnungAnKunde` → `persistPdfForRechnung` |
+| **`auftraege`** | `abnahme_protokoll_url`, optional `abnahme_datum` | Nach Abnahme | `abnahmeprotokoll-actions` → zusätzlich `verteileAbnahmeAnUnterlagen` |
+| **`kunden_dokumente`** | `datei_url`, `typ=abnahmeprotokoll` | HV + Mieter (eigene `kunde_id`) | `verteileAbnahmeAnUnterlagen` nach Kundenversand |
+| **`auftrag_bautagebuch_eintraege`** | `fuer_kunde_freigegeben = true` | Nach Freigabe | `bautagebuch-actions` (Kunden-RLS) |
 | **`auftraege`** | `abschlussdokumentation_url`, `abschlussdokumentation_gesendet_at` | Nach Mail-Versand | `sendAbschlussdokumentationAnKunde` |
 | **Bautagebuch** | `fuer_kunde_freigegeben = true`, `foto_urls` | Nach Freigabe | `bautagebuch-actions` (publish) |
 | **Timeline** | `fuer_kunde_freigegeben = true`, `foto_urls` | Nach Freigabe | Dokumente-Tab / Kunden-Status |
@@ -54,10 +56,12 @@ HW-Uploads aus dem Portal landen in `angebot_handwerker` — CRM **liest** nur (
 ## Kurz-Checkliste CRM
 
 1. Angebot an Kunde: PDF + `gesendet_am` + `status_einfach`
-2. Rechnung an Kunde: PDF + `status = gesendet` + `gesendet_at`
+2. Rechnung an Kunde: PDF + `status ∈ {gesendet, bezahlt}` + `gesendet_at`
 3. Projektvertrag: `handwerker_vertraege.pdf_url` (auto via `provision-projektvertrag.ts`)
 4. Abschlussdoku: PDF in Storage `protokolle` → `abschlussdokumentation_url` (bei Mail-Versand)
-5. HW-Uploads: nur lesen, nicht doppelt pflegen
-6. Bautagebuch/Timeline: erst nach `fuer_kunde_freigegeben`
+5. Abnahme: PDF + Unterlagen HV/Mieter (`kunden_dokumente`) + ggf. HV-Notification
+6. HW-Uploads: nur lesen, nicht doppelt pflegen
+7. Bautagebuch/Timeline: erst nach `fuer_kunde_freigegeben` (Legacy `sichtbar_fuer_kunde` allein reicht nicht)
+8. HV-Portal: Leads/Angebote auch über `auftraggeber_kunde_id` (`portal_kunde_lead_ids`)
 
 **Fehlt ein Dokument in der Portal-Liste → fast immer fehlende `pdf_url` oder Status/Datum**, nicht die Portal-Logik.

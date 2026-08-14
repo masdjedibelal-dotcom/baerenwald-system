@@ -45,11 +45,15 @@
     --r-lg: 16px;
     --r-pill: 999px;
 
-    /* Typo-Skala — Spec §14: Meta · Text · Titel · Überschrift */
-    --fs-meta: 12px;
-    --fs-text: 13.5px;
-    --fs-title: 15px;
-    --fs-head: 19px;
+    /*
+     * Typo-Skala — Spec §14: Meta · Text · Titel · Überschrift
+     * --app-font-scale: CRM-weit lesbarer (Desktop/Laptop +20 %).
+     */
+    --app-font-scale: 1.2;
+    --fs-meta: calc(12px * var(--app-font-scale));
+    --fs-text: calc(13.5px * var(--app-font-scale));
+    --fs-title: calc(15px * var(--app-font-scale));
+    --fs-head: calc(19px * var(--app-font-scale));
     /* Weißraum — Spec §14 */
     --sp-card: 20px;
     --sp-stack: 16px;
@@ -82,7 +86,7 @@
      */
     --control-h: 40px;
     --list-search-h: 30px;
-    --placeholder-size: 12px;
+    --placeholder-size: calc(12px * var(--app-font-scale));
     --mobile-sticky-offset: 0px;
 
     /* Sidebar chrome (Mock) */
@@ -144,7 +148,6 @@
 
     --fl-accent: var(--green);
     --app-card: var(--card);
-    --app-font-scale: 1;
     --app-text-base: calc(14px * var(--app-font-scale));
     --app-text-sm: calc(13px * var(--app-font-scale));
     --app-text-xs: calc(11.5px * var(--app-font-scale));
@@ -184,11 +187,11 @@
   /* Mobil: Typo + Lesekomfort (Kontrast, Luft, klare Schichten) */
   @media (max-width: 767px) {
     :root {
-      --fs-meta: 13px;
-      --fs-text: 15px;
-      --fs-title: 17px;
-      --fs-head: 22px;
-      --placeholder-size: 13px;
+      --fs-meta: calc(13px * var(--app-font-scale));
+      --fs-text: calc(15px * var(--app-font-scale));
+      --fs-title: calc(17px * var(--app-font-scale));
+      --fs-head: calc(22px * var(--app-font-scale));
+      --placeholder-size: calc(13px * var(--app-font-scale));
       --list-search-h: 40px;
       --control-h: 44px;
       /* Listbar sticky innerhalb .page — Topbar ist außerhalb */
@@ -259,11 +262,11 @@
       'Helvetica Neue',
       Arial,
       sans-serif;
-    /* scale=1 → exakt Mock 14px */
+    /* scale=1.2 → CRM-weit +20 % Lesbarkeit */
     font-size: calc(14px * var(--app-font-scale, 1));
     letter-spacing: -0.01em;
     color: var(--text);
-    background: var(--bg);
+    background: var(--bg-mobile, #eef1ee);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -295,7 +298,7 @@
   input,
   textarea,
   select {
-    font-size: 16px !important;
+    font-size: calc(16px * var(--app-font-scale, 1)) !important;
   }
 
   /* Placeholder einheitlich kleiner als Input-Wert (iOS bleibt 16px beim Tippen) */

@@ -39,10 +39,7 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
-import {
-  ANFRAGE_WARTE_AUF_HV_LABEL,
-  rechnungStatusDisplay,
-} from '@/lib/status/status-display'
+import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import { HwEingangsrechnungenListe } from '@/components/rechnungen/HwEingangsrechnungenListe'
@@ -132,7 +129,6 @@ const EXPORT_FIELDS: ExportField[] = [
 type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 function statusKind(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return 'warten'
   const u = row.unterstatus.toLowerCase()
   // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
   if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
@@ -155,15 +151,11 @@ function statusKind(row: VorgangListeRow): string {
   return 'aktiv'
 }
 
-const STATUS_FILTER_WARTET_FREIGABE = 'wartet_freigabe'
-
 function statusFilterKey(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return STATUS_FILTER_WARTET_FREIGABE
   return row.unterstatus
 }
 
 function statusLabel(row: VorgangListeRow): string {
-  if (row.badges.wartet_freigabe) return ANFRAGE_WARTE_AUF_HV_LABEL
   return row.unterstatusLabel
 }
 
@@ -321,9 +313,10 @@ export function VorgaengeListeClient({
       setFilter(phase)
       setStatusFilter([])
       if (phase !== 'rechnung') setRechnungRichtung('ausgehend')
-      // Erledigt nur unter „Alle“ — Phasen immer Offen
-      const nextLc = phase === 'alle' ? lifecycle : 'offen'
-      if (phase !== 'alle') setLifecycle('offen')
+      // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
+      const keepsLifecycle = phase === 'alle' || phase === 'rechnung'
+      const nextLc = keepsLifecycle ? lifecycle : 'offen'
+      if (!keepsLifecycle) setLifecycle('offen')
       if (!embedded) {
         syncPhaseToUrl(
           phase,
@@ -362,8 +355,8 @@ export function VorgaengeListeClient({
     if (phase === 'rechnung' && r === 'eingehend') setRechnungRichtung('eingehend')
     else setRechnungRichtung('ausgehend')
     const lc = searchParams.get('lifecycle')
-    // Erledigt-Toggle nur unter „Alle“
-    if (phase === 'alle') {
+    // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
+    if (phase === 'alle' || phase === 'rechnung') {
       if (lc === 'erledigt' || lc === 'offen') setLifecycle(lc)
       else setLifecycle('offen')
     } else {
@@ -417,14 +410,16 @@ export function VorgaengeListeClient({
   }, [localRows, restrictPartnerName, restrictHandwerkerId, restrictKundeId, restrictLeadIds])
 
   const lifecycleCounts = useMemo(() => {
+    const scope =
+      filter === 'rechnung' ? baseRows.filter((v) => v.phase === 'rechnung') : baseRows
     let offen = 0
     let erledigt = 0
-    for (const v of baseRows) {
+    for (const v of scope) {
       if (isVorgangErledigt(v)) erledigt += 1
       else offen += 1
     }
     return { offen, erledigt }
-  }, [baseRows])
+  }, [baseRows, filter])
 
   const hwLifecycleCounts = useMemo(() => {
     let offen = 0
@@ -437,13 +432,13 @@ export function VorgaengeListeClient({
   }, [hwEingangsrechnungen])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
-  /** Offen/Erledigt-Toggle nur bei „Alle“. */
-  const showLifecycleToggle = filter === 'alle'
-  const effectiveLifecycleCounts = lifecycleCounts
+  /** Offen/Erledigt-Toggle bei „Alle“ und „Rechnung“. */
+  const showLifecycleToggle = filter === 'alle' || filter === 'rechnung'
+  const effectiveLifecycleCounts = showHwEingang ? hwLifecycleCounts : lifecycleCounts
 
-  /** Erledigt nur unter „Alle“ — Phasen-Listen immer ohne erledigte Vorgänge. */
+  /** Erledigt-Filter unter „Alle“ und „Rechnung“; andere Phasen nur Offen. */
   const lifecycleRows = useMemo(() => {
-    if (filter === 'alle') {
+    if (filter === 'alle' || filter === 'rechnung') {
       return baseRows.filter((v) =>
         lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
       )
@@ -460,25 +455,12 @@ export function VorgaengeListeClient({
       ]
     }
     // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
-    const phaseRows =
-      filter === 'alle' || filter === 'bestand'
-        ? lifecycleRows
-        : lifecycleRows.filter((v) => v.phase === filter)
-    const hatWartetFreigabe = phaseRows.some((v) => v.badges.wartet_freigabe)
-
     if (filter !== 'alle' && filter !== 'bestand' && filter in PHASE_UNTERSTATUS_VALUES) {
       const phase = filter as VorgangPhase
-      const opts = PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
+      return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
         value: u,
         label: unterstatusLabel(phase, u),
       }))
-      if (hatWartetFreigabe) {
-        opts.unshift({
-          value: STATUS_FILTER_WARTET_FREIGABE,
-          label: ANFRAGE_WARTE_AUF_HV_LABEL,
-        })
-      }
-      return opts
     }
     const byKey = new Map<string, string>()
     for (const v of lifecycleRows) {
@@ -491,12 +473,16 @@ export function VorgaengeListeClient({
       .map(([value, label]) => ({ value, label }))
   }, [lifecycleRows, filter, showHwEingang])
 
-  /** HW-Eingang: Filter über globales Sheet; ohne Statuswahl nur Offen. */
+  /** HW-Eingang: Filter über globales Sheet; ohne Statuswahl nach Offen/Erledigt. */
   const hwFilteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const statuses = statusFilter.length > 0 ? statusFilter : ['eingereicht']
     return hwEingangsrechnungen.filter((r) => {
-      if (!statuses.includes(r.status)) return false
+      if (statusFilter.length > 0) {
+        if (!statusFilter.includes(r.status)) return false
+      } else {
+        const erledigt = hwRechnungIstErledigt(r.status)
+        if (lifecycle === 'erledigt' ? !erledigt : erledigt) return false
+      }
       if (fKunde) {
         const needle = fKunde.toLowerCase()
         const inKunde = (r.kundeName ?? '').toLowerCase().includes(needle)
@@ -539,6 +525,7 @@ export function VorgaengeListeClient({
   }, [
     hwEingangsrechnungen,
     statusFilter,
+    lifecycle,
     query,
     fKunde,
     fTitel,
@@ -946,6 +933,40 @@ export function VorgaengeListeClient({
     </>
   )
 
+  const lifecycleToggle = (variant: 'stack' | 'compact') => (
+    <div
+      className={cn(
+        'segment-toggle segment-toggle--listbar',
+        variant === 'stack' ? 'segment-toggle--stack' : 'segment-toggle--compact'
+      )}
+      role="group"
+      aria-label="Lebenszyklus"
+    >
+      <button
+        type="button"
+        className={cn(
+          'segment-toggle-btn',
+          lifecycle === 'offen' && 'segment-toggle-btn--active'
+        )}
+        onClick={() => setLifecycleFilter('offen')}
+      >
+        Offen{' '}
+        <span className="segment-toggle-count">{effectiveLifecycleCounts.offen}</span>
+      </button>
+      <button
+        type="button"
+        className={cn(
+          'segment-toggle-btn',
+          lifecycle === 'erledigt' && 'segment-toggle-btn--active'
+        )}
+        onClick={() => setLifecycleFilter('erledigt')}
+      >
+        Erledigt{' '}
+        <span className="segment-toggle-count">{effectiveLifecycleCounts.erledigt}</span>
+      </button>
+    </div>
+  )
+
   return (
     <div>
       <div className="listbar">
@@ -981,7 +1002,11 @@ export function VorgaengeListeClient({
                 </MockChip>
                 <MockChip
                   active={rechnungRichtung === 'eingehend'}
-                  count={hwLifecycleCounts.offen}
+                  count={
+                    lifecycle === 'erledigt'
+                      ? hwLifecycleCounts.erledigt
+                      : hwLifecycleCounts.offen
+                  }
                   onClick={() => setRechnungRichtungFilter('eingehend')}
                 >
                   Eingehend
@@ -993,6 +1018,7 @@ export function VorgaengeListeClient({
             title="Listen-Aktionen"
             activeHint={activeFilterCount}
             directOpen={() => setFilterOpen(true)}
+            leading={showLifecycleToggle ? lifecycleToggle('compact') : undefined}
             items={[
               {
                 icon: 'filter',
@@ -1015,40 +1041,6 @@ export function VorgaengeListeClient({
             ]}
             desktop={
               <>
-                {showLifecycleToggle ? (
-                  <div
-                    className="segment-toggle segment-toggle--listbar"
-                    role="group"
-                    aria-label="Lebenszyklus"
-                  >
-                    <button
-                      type="button"
-                      className={cn(
-                        'segment-toggle-btn',
-                        lifecycle === 'offen' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setLifecycleFilter('offen')}
-                    >
-                      Offen{' '}
-                      <span className="segment-toggle-count">
-                        {effectiveLifecycleCounts.offen}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        'segment-toggle-btn',
-                        lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setLifecycleFilter('erledigt')}
-                    >
-                      Erledigt{' '}
-                      <span className="segment-toggle-count">
-                        {effectiveLifecycleCounts.erledigt}
-                      </span>
-                    </button>
-                  </div>
-                ) : null}
                 <MockBtn
                   icon="filter"
                   kind={activeFilterCount ? 'primary' : 'ghost'}
@@ -1079,40 +1071,7 @@ export function VorgaengeListeClient({
           />
         </div>
         {showLifecycleToggle ? (
-          <div
-            className="listbar-lifecycle"
-            role="group"
-            aria-label="Lebenszyklus"
-          >
-            <div className="segment-toggle segment-toggle--listbar segment-toggle--stack">
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'offen' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('offen')}
-              >
-                Offen{' '}
-                <span className="segment-toggle-count">
-                  {effectiveLifecycleCounts.offen}
-                </span>
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'segment-toggle-btn',
-                  lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-                )}
-                onClick={() => setLifecycleFilter('erledigt')}
-              >
-                Erledigt{' '}
-                <span className="segment-toggle-count">
-                  {effectiveLifecycleCounts.erledigt}
-                </span>
-              </button>
-            </div>
-          </div>
+          <div className="listbar-lifecycle">{lifecycleToggle('stack')}</div>
         ) : null}
       </div>
 
@@ -1226,7 +1185,7 @@ export function VorgaengeListeClient({
       {showHwEingang ? (
         <HwEingangsrechnungenListe
           rows={hwFilteredRows}
-          filterKey={`${statusFilter.join(',')}|${query}|${fKunde}|${fTitel}|${fWertVon}|${fWertBis}|${fDatumVon}|${fDatumBis}`}
+          filterKey={`${lifecycle}|${statusFilter.join(',')}|${query}|${fKunde}|${fTitel}|${fWertVon}|${fWertBis}|${fDatumVon}|${fDatumBis}`}
         />
       ) : (
       <div

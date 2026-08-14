@@ -1575,13 +1575,21 @@ export async function deleteRechnungEntwurf(
   const supabase = createClient()
   const { data: rec } = await supabase
     .from('rechnungen')
-    .select('status, auftrag_id')
+    .select('status, auftrag_id, rechnungsnummer')
     .eq('id', rechnungId)
     .maybeSingle()
 
   if (!rec) return { ok: false, message: 'Rechnung nicht gefunden.' }
-  if (rec.status !== 'entwurf') {
-    return { ok: false, message: 'Nur Entwürfe können gelöscht werden.' }
+
+  const status = String(rec.status ?? '')
+    .trim()
+    .toLowerCase()
+  const erlaubt = new Set(['entwurf', 'gesendet', 'versendet', 'bezahlt', 'storniert'])
+  if (!erlaubt.has(status)) {
+    return {
+      ok: false,
+      message: `Rechnung mit Status „${rec.status ?? 'unbekannt'}“ kann nicht gelöscht werden.`,
+    }
   }
 
   const { error } = await supabase.from('rechnungen').delete().eq('id', rechnungId)
@@ -1591,4 +1599,11 @@ export async function deleteRechnungEntwurf(
   revalidatePath('/vorgaenge')
   if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id}`)
   return { ok: true }
+}
+
+/** Alias — Löschen inkl. erledigter Rechnungen (bezahlt/storniert/gesendet). */
+export async function deleteRechnung(
+  rechnungId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return deleteRechnungEntwurf(rechnungId)
 }

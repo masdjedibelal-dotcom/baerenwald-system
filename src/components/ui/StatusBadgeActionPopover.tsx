@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, type ReactNode } from 'react'
+import { ActionIcon } from '@/components/ui/ActionIcon'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -33,25 +34,6 @@ export function StatusBadgeActionPopover({
 
   if (!actions.length) return <>{badge}</>
 
-  const trigger = (
-    <button
-      ref={anchorRef}
-      type="button"
-      className={cn('status-badge-action-pop__trigger', open && 'is-open')}
-      aria-label={`${title} ändern`}
-      aria-expanded={open}
-      aria-haspopup="menu"
-      onClick={(e) => {
-        // Mobil: Klick muss zum ActionsMenu-Trigger bubblen (Sheet öffnen)
-        if (isMobile) return
-        e.stopPropagation()
-        setOpen((v) => !v)
-      }}
-    >
-      {badge}
-    </button>
-  )
-
   if (isMobile) {
     const items: ActionsMenuItem[] = actions.map((a) => ({
       label: a.label,
@@ -59,6 +41,16 @@ export function StatusBadgeActionPopover({
       icon: a.icon ? <MockIcon ctx="btn" n={a.icon} size={16} /> : undefined,
       onClick: a.onClick,
     }))
+    /* Kein nested <button> — ActionsMenu-Trigger ist bereits klickbar. */
+    const trigger = (
+      <span
+        className="status-badge-action-pop__trigger status-badge-action-pop__trigger--with-caret"
+        aria-label={`${title} ändern`}
+      >
+        {badge}
+        <ActionIcon n="chevron-down" size={14} className="status-badge-action-pop__caret" />
+      </span>
+    )
     return (
       <div className="status-badge-action-pop">
         <ActionsMenu trigger={trigger} items={items} sheetTitle={title} align="left" />
@@ -68,7 +60,21 @@ export function StatusBadgeActionPopover({
 
   return (
     <div className="status-badge-action-pop">
-      {trigger}
+      <button
+        ref={anchorRef}
+        type="button"
+        className={cn('status-badge-action-pop__trigger', open && 'is-open')}
+        aria-label={`${title} ändern`}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen((v) => !v)
+        }}
+      >
+        {badge}
+        <ActionIcon n="chevron-down" size={14} className="status-badge-action-pop__caret" />
+      </button>
       <MockPopover
         open={open}
         onClose={() => setOpen(false)}

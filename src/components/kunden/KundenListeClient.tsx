@@ -17,13 +17,13 @@ import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
-import { runDuplicateKunde } from '@/lib/list-actions'
+import { runDuplicateKunde, runDeleteKunde } from '@/lib/list-actions'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import { cn } from '@/lib/utils'
-import { mergeKunden } from '@/app/actions/kunden'
+import { deleteKunde, mergeKunden } from '@/app/actions/kunden'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
@@ -45,15 +45,11 @@ const EXPORT_FIELDS: ExportField[] = [
 ]
 
 const KUNDEN_COLS: ResizableColDef[] = [
+  { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
   { id: 'name', defaultWidth: 220, minWidth: 140, maxWidth: 420 },
   { id: 'typ', defaultWidth: 130, minWidth: 90, maxWidth: 200 },
   { id: 'telefon', defaultWidth: 150, minWidth: 110, maxWidth: 220 },
   { id: 'email', defaultWidth: 220, minWidth: 140, maxWidth: 360 },
-]
-
-const KUNDEN_COLS_SELECT: ResizableColDef[] = [
-  { id: 'check', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
-  ...KUNDEN_COLS,
 ]
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
@@ -84,10 +80,8 @@ function toExportRow(k: KundeListeZeile) {
 
 export function KundenListeClient({
   kunden,
-  onMergeRequest,
 }: {
   kunden: KundeListeZeile[]
-  onMergeRequest?: (idA: string, idB: string) => void
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -97,12 +91,13 @@ export function KundenListeClient({
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
   const [mergeListOpen, setMergeListOpen] = useState(false)
   const [listMergePending, setListMergePending] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') {
@@ -188,7 +183,6 @@ export function KundenListeClient({
         )
       : null
   const toggleSel = (id: string) => setSelected((s) => ({ ...s, [id]: !s[id] }))
-  const allSelected = filtered.length > 0 && filtered.every((k) => selected[k.id])
 
   const selectedRows = useMemo(
     () => filtered.filter((k) => selected[k.id]),
@@ -209,48 +203,39 @@ export function KundenListeClient({
     )
   }, [exportToCSV, selectedRows])
 
-  const bulkMerge = useCallback(() => {
-    if (selectedRows.length !== 2) return
-    const [a, b] = selectedRows
-    const idA = a.id
-    const idB = b.id
-
-    if (onMergeRequest) {
-      onMergeRequest(idA, idB)
-      return
+  const runBulkDelete = useCallback(async () => {
+    const ids = selectedRows.map((k) => k.id)
+    if (!ids.length) return
+    setBulkDeletePending(true)
+    const loadingId = toast.loading(
+      ids.length === 1 ? 'Kunde wird gelöscht…' : `${ids.length} Kunden werden gelöscht…`
+    )
+    let okCount = 0
+    let lastErr: string | null = null
+    for (const id of ids) {
+      const r = await deleteKunde(id)
+      if (r.ok) okCount += 1
+      else lastErr = r.message
     }
+    setBulkDeletePending(false)
+    setBulkDeleteOpen(false)
+    setSelected({})
+    if (okCount > 0) {
+      toast.success(okCount === 1 ? 'Kunde gelöscht' : `${okCount} Kunden gelöscht`, {
+        id: loadingId,
+      })
+      router.refresh()
+    } else {
+      toast.error(lastErr ?? 'Löschen fehlgeschlagen', { id: loadingId })
+    }
+    if (okCount > 0 && lastErr) toast.error(lastErr)
+  }, [router, selectedRows])
 
-    void (async () => {
-      try {
-        const mod = await import('@/app/actions/kunden')
-        const mergeFn = (mod as { mergeKunden?: (a: string, b: string) => Promise<{ ok: boolean }> })
-          .mergeKunden
-        if (typeof mergeFn === 'function') {
-          const loadingId = toast.loading('Zusammenführen…')
-          const r = await mergeFn(idA, idB)
-          if (r.ok) {
-            toast.success('Kunden zusammengeführt', { id: loadingId })
-            setSelected({})
-            router.refresh()
-          } else {
-            toast.error('Zusammenführen fehlgeschlagen', { id: loadingId })
-          }
-          return
-        }
-      } catch {
-        /* mergeKunden noch nicht verfügbar */
-      }
-      toast.info('Merge wird geladen')
-      router.push(`/kunden?merge=${idA},${idB}`)
-    })()
-  }, [onMergeRequest, router, selectedRows])
-
-  const colDefs = selectMode ? KUNDEN_COLS_SELECT : KUNDEN_COLS
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    selectMode ? 'crm.cols.kunden.select.v1' : 'crm.cols.kunden.v1',
-    colDefs
+    'crm.cols.kunden.select.v1',
+    KUNDEN_COLS
   )
-  const resizeOffset = selectMode ? 1 : 0
+  const resizeOffset = 1
 
   const paginationResetKey = `${typFilter}|${query}|${fName}|${sortCol}|${sortDir}`
   const {
@@ -273,6 +258,23 @@ export function KundenListeClient({
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
   const isMobile = useIsMobile()
   const displayItems = isMobile ? infiniteItems : pageItems
+
+  const allPageSelected =
+    displayItems.length > 0 && displayItems.every((k) => selected[k.id])
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((k) => selected[k.id])
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelected({})
+      return
+    }
+    const n: Record<string, boolean> = {}
+    filtered.forEach((k) => {
+      n[k.id] = true
+    })
+    setSelected(n)
+  }
 
   const filterFooter = (
     <div className="sheet-footer-actions">
@@ -331,116 +333,80 @@ export function KundenListeClient({
   return (
     <div>
       <div className="listbar">
-        <div className="listbar-chips" role="group" aria-label="Kundentyp">
-          {(
-            [
-              ['alle', 'Alle', typCounts.alle],
-              ['privat', 'Privat', typCounts.privat],
-              ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
-              ['gewerbe', 'Gewerbe', typCounts.gewerbe],
-            ] as const
-          ).map(([value, label, count]) => (
-            <MockChip
-              key={value}
-              active={typFilter === value}
-              count={count}
-              onClick={() => setTypFilter(value)}
-            >
-              {label}
-            </MockChip>
-          ))}
-        </div>
-        <ListbarActionsMenu
-          title="Listen-Aktionen"
-          activeHint={activeFilterCount}
-          items={[
-            {
-              icon: 'filter',
-              label: 'Filter & Suchen',
-              hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
-              active: activeFilterCount > 0,
-              onSelect: () => setFilterOpen(true),
-            },
-            {
-              icon: 'checks',
-              label: selectMode ? 'Auswahl beenden' : 'Multiauswahl',
-              hint: selectMode ? `${selectedCount} gewählt` : undefined,
-              active: selectMode,
-              onSelect: () => {
-                setSelectMode((m) => !m)
-                setSelected({})
+        <div className="listbar-main">
+          <div className="listbar-chips" role="group" aria-label="Kundentyp">
+            {(
+              [
+                ['alle', 'Alle', typCounts.alle],
+                ['privat', 'Privat', typCounts.privat],
+                ['hausverwaltung', 'Hausverwaltung', typCounts.hausverwaltung],
+                ['gewerbe', 'Gewerbe', typCounts.gewerbe],
+              ] as const
+            ).map(([value, label, count]) => (
+              <MockChip
+                key={value}
+                active={typFilter === value}
+                count={count}
+                onClick={() => setTypFilter(value)}
+              >
+                {label}
+              </MockChip>
+            ))}
+          </div>
+          <ListbarActionsMenu
+            title="Listen-Aktionen"
+            activeHint={activeFilterCount}
+            items={[
+              {
+                icon: 'filter',
+                label: 'Filter & Suchen',
+                hint: activeFilterCount ? `${activeFilterCount} aktiv` : undefined,
+                active: activeFilterCount > 0,
+                onSelect: () => setFilterOpen(true),
               },
-            },
-            ...(selectMode && selectedCount === 2
-              ? [
-                  {
-                    icon: 'users' as const,
-                    label: 'Zusammenführen',
-                    onSelect: () => setMergeListOpen(true),
-                  },
-                ]
-              : []),
-            {
-              icon: 'download',
-              label: 'CSV exportieren',
-              onSelect: () =>
-                runMockListExport(
-                  exportToCSV,
-                  (filtered.length ? filtered : kunden).map(toExportRow),
-                  EXPORT_FIELDS,
-                  'kunden'
-                ),
-            },
-          ]}
-          desktop={
-            <>
-              <MockBtn
-                icon="filter"
-                kind={activeFilterCount ? 'primary' : 'ghost'}
-                sm
-                title={
-                  activeFilterCount
-                    ? `Filter & Suchen (${activeFilterCount})`
-                    : 'Filter & Suchen'
-                }
-                onClick={() => setFilterOpen(true)}
-              />
-              <MockBtn
-                icon="checks"
-                kind={selectMode ? 'primary' : 'ghost'}
-                sm
-                title={selectMode ? `Auswahl beenden (${selectedCount})` : 'Auswählen'}
-                onClick={() => {
-                  setSelectMode((m) => !m)
-                  setSelected({})
-                }}
-              />
-              {selectMode && selectedCount === 2 ? (
-                <MockBtn
-                  icon="users"
-                  kind="primary"
-                  sm
-                  title="Zusammenführen"
-                  onClick={() => setMergeListOpen(true)}
-                />
-              ) : null}
-              <MockBtn
-                icon="download"
-                kind="ghost"
-                sm
-                title="CSV exportieren"
-                onClick={() =>
+              {
+                icon: 'download',
+                label: 'CSV exportieren',
+                onSelect: () =>
                   runMockListExport(
                     exportToCSV,
                     (filtered.length ? filtered : kunden).map(toExportRow),
                     EXPORT_FIELDS,
                     'kunden'
-                  )
-                }
-              />
-            </>
-          }
-        />
+                  ),
+              },
+            ]}
+            desktop={
+              <>
+                <MockBtn
+                  icon="filter"
+                  kind={activeFilterCount ? 'primary' : 'ghost'}
+                  sm
+                  title={
+                    activeFilterCount
+                      ? `Filter & Suchen (${activeFilterCount})`
+                      : 'Filter & Suchen'
+                  }
+                  onClick={() => setFilterOpen(true)}
+                />
+                <MockBtn
+                  icon="download"
+                  kind="ghost"
+                  sm
+                  title="CSV exportieren"
+                  onClick={() =>
+                    runMockListExport(
+                      exportToCSV,
+                      (filtered.length ? filtered : kunden).map(toExportRow),
+                      EXPORT_FIELDS,
+                      'kunden'
+                    )
+                  }
+                />
+              </>
+            }
+          />
+        </div>
       </div>
 
       {isMobile ? (
@@ -494,10 +460,19 @@ export function KundenListeClient({
             Export
           </MockBtn>
           {selectedCount === 2 ? (
-            <MockBtn kind="ghost" sm icon="link" onClick={bulkMerge}>
+            <MockBtn kind="ghost" sm icon="link" onClick={() => setMergeListOpen(true)}>
               Zusammenführen
             </MockBtn>
           ) : null}
+          <MockBtn
+            kind="danger"
+            sm
+            icon="trash"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={bulkDeletePending}
+          >
+            Löschen
+          </MockBtn>
           <MockBtn
             kind="ghost"
             sm
@@ -509,35 +484,61 @@ export function KundenListeClient({
         </div>
       ) : null}
 
+      <MockModal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!bulkDeletePending) setBulkDeleteOpen(false)
+        }}
+        icon="trash"
+        title={selectedCount === 1 ? 'Kunde löschen?' : `${selectedCount} Kunden löschen?`}
+        sub="Inkl. aller Vorgänge und Rechnungen — dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={bulkDeletePending ? undefined : 'trash'}
+              disabled={bulkDeletePending}
+              onClick={() => void runBulkDelete()}
+            >
+              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {bulkDeletePending
+            ? 'Bitte warten…'
+            : selectedCount === 1
+              ? 'Der ausgewählte Kunde wird unwiderruflich gelöscht — inklusive aller Vorgänge und Rechnungen.'
+              : `${selectedCount} ausgewählte Kunden werden unwiderruflich gelöscht — inklusive aller Vorgänge und Rechnungen.`}
+        </div>
+      </MockModal>
+
       <PullToRefresh onRefresh={() => router.refresh()}>
       <div
-        className={cn(
-          'listcard listcard--scroll listcard--cols',
-          (isMobile || selectMode) && 'vg-selectmode'
-        )}
+        className="listcard listcard--scroll listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
-          {selectMode ? (
-            <div
-              className="vg-check"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (allSelected) setSelected({})
-                else {
-                  const n: Record<string, boolean> = {}
-                  filtered.forEach((k) => {
-                    n[k.id] = true
-                  })
-                  setSelected(n)
-                }
-              }}
-            >
-              <span className={cn('vg-box', allSelected && 'on')}>
-                {allSelected ? <MockIcon ctx="default" n="check" size={12} /> : null}
-              </span>
-            </div>
-          ) : null}
+          <div
+            className="vg-check"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleSelectAll()
+            }}
+            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
+              {allFilteredSelected || allPageSelected ? (
+                <MockIcon ctx="default" n="check" size={12} />
+              ) : null}
+            </span>
+          </div>
           <MockSortHead
             col="name"
             sortCol={sortCol}
@@ -607,6 +608,9 @@ export function KundenListeClient({
             const mail = k.email?.trim() || ''
             const copy = () => runDuplicateKunde(k.id, router)
             const edit = () => openDetail(k.id)
+            const del = () => {
+              void runDeleteKunde(k.id, router, kundeListenName(k))
+            }
             const row = isMobile ? (
               <div
                 role="button"
@@ -649,27 +653,25 @@ export function KundenListeClient({
                 role="button"
                 tabIndex={0}
                 className={cn('list-row', selected[k.id] && 'sel')}
-                onClick={() => (selectMode ? toggleSel(k.id) : openDetail(k.id))}
+                onClick={() => openDetail(k.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    selectMode ? toggleSel(k.id) : openDetail(k.id)
+                    openDetail(k.id)
                   }
                 }}
               >
-                {selectMode ? (
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(k.id)
-                    }}
-                  >
-                    <span className={cn('vg-box', selected[k.id] && 'on')}>
-                      {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
-                ) : null}
+                <div
+                  className="vg-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSel(k.id)
+                  }}
+                >
+                  <span className={cn('vg-box', selected[k.id] && 'on')}>
+                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
+                  </span>
+                </div>
                 <div className="lc-title" style={{ fontWeight: 600 }}>
                   {kundeListenName(k)}
                 </div>
@@ -696,6 +698,11 @@ export function KundenListeClient({
               <SwipeRow
                 key={k.id}
                 disabled={!isMobile}
+                leftActions={
+                  isMobile
+                    ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
+                    : undefined
+                }
                 rightActions={
                   isMobile
                     ? [
@@ -757,7 +764,6 @@ export function KundenListeClient({
                   }
                   toast.success(res.message)
                   setMergeListOpen(false)
-                  setSelectMode(false)
                   setSelected({})
                   router.push(`/kunden/${survivor.id}`)
                   router.refresh()

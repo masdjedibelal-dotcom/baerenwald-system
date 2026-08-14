@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Einheitliche Portal-Zeile in Stammdaten (Kunde · Handwerker · Vorgang):
- * - Aktiv: grüner Dot + „Portal aktiv“ · rechts Login (Icon + Label)
+ * - Aktiv: grüner Dot + „Portal aktiv“ · Login nur wenn nicht ausgelagert (Kunde: Chip neben Kundenakte)
  * - Nicht registriert: roter Dot + „Noch nicht registriert“ · rechts „Einladen“
  */
 export function StammdatenPortalZeile({
@@ -20,6 +20,7 @@ export function StammdatenPortalZeile({
   handwerkerId,
   fallbackEmail,
   gesperrt = false,
+  hideLogin = false,
   /** Handwerker: Eltern öffnet Partner-Einladungs-Modal */
   onInvite,
 }: {
@@ -27,6 +28,8 @@ export function StammdatenPortalZeile({
   handwerkerId?: string | null
   fallbackEmail?: string | null
   gesperrt?: boolean
+  /** Login sitzt woanders (z. B. Chip neben Kundenakte) */
+  hideLogin?: boolean
   onInvite?: () => void
   /** @deprecated */
   editing?: boolean
@@ -114,7 +117,7 @@ export function StammdatenPortalZeile({
         : 'd'
 
   const showInvite = !gesperrt && registered === false
-  const showLogin = !gesperrt && registered === true && isCrmAdmin
+  const showLogin = !hideLogin && !gesperrt && registered === true && isCrmAdmin
 
   return (
     <>

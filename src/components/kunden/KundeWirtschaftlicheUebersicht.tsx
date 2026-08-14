@@ -97,7 +97,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
       </div>
 
       <div className="kw-kpi-row">
-        <div className="card kw-kpi">
+        <div className="card kw-kpi dshell-framed">
           <div className="kw-kpi-label">
             Umsatz{zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}
           </div>
@@ -122,7 +122,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
           )}
         </div>
 
-        <div className="card kw-kpi">
+        <div className="card kw-kpi dshell-framed">
           <div className="kw-kpi-label">Offener Betrag</div>
           <div className="kw-kpi-val">{formatEurGanz(snap.offenerBetrag)}</div>
           <div className="kw-kpi-meta">
@@ -130,7 +130,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
           </div>
         </div>
 
-        <div className="card kw-kpi">
+        <div className="card kw-kpi dshell-framed">
           <div className="kw-kpi-label">Aktive Vorgänge</div>
           <div className="kw-kpi-val">{snap.aktiveVorgaenge}</div>
           <div className="kw-kpi-meta">
@@ -139,7 +139,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
         </div>
       </div>
 
-      <div className="card kw-chart">
+      <div className="card kw-chart dshell-framed">
         <div className="card-h">
           <div className="card-title title">
             <MockIcon ctx="emphasis" n="activity" size={16} />

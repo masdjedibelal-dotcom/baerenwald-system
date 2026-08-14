@@ -159,17 +159,8 @@ export function persistWasZeilenInFunnel(
 ): LeadFunnelDaten {
   const funnel = { ...funnelIn }
 
-  const positionen: LeadFunnelPosition[] = zeilen.flatMap((w) =>
-    w.ergaenzungen.map((e) => ({
-      leistung: e.text.trim(),
-      menge: 1,
-      einheit: 'pauschal',
-      preis_min: 0,
-      preis_max: 0,
-      relevant_fuer_rechnung: e.relevant_fuer_rechnung,
-      ...(w.gewerk_id ? { gewerk_id: w.gewerk_id } : {}),
-    }))
-  )
+  /* Titel + Ergänzungen → funnel.positionen (Anfrage-Leistungen-Tab / Direktauftrag). */
+  const positionen = wasZeilenToFunnelPositionen(zeilen)
 
   return {
     ...funnel,

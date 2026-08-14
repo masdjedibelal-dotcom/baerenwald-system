@@ -66,6 +66,10 @@ export type StaffFunnelState = {
   /** HV optional: Mieter (Melder) */
   mieterVorname: string
   mieterNachname: string
+  mieterEmail: string
+  mieterTelefon: string
+  /** Bestehender Mieter-Kunde (privat), wenn aus Suche gewählt */
+  mieterKundeId: string | null
   /** HV: verknüpftes Gebäude aus kunden_objekte */
   kundeObjektId: string | null
   // preis
@@ -76,6 +80,8 @@ export type StaffFunnelState = {
   beratungText: string
   istBauprojekt: boolean
   freitext: string
+  /** Akut/Notfall: Direktbeauftragung ohne Angebot */
+  alsAkut: boolean
 }
 
 /**
@@ -298,6 +304,9 @@ export function createInitialStaffFunnelState(
     objektHausnummer: '',
     mieterVorname: '',
     mieterNachname: '',
+    mieterEmail: '',
+    mieterTelefon: '',
+    mieterKundeId: null,
     kundeObjektId: null,
     preisModus: 'rahmen',
     preisMin: null,
@@ -306,6 +315,7 @@ export function createInitialStaffFunnelState(
     beratungText: '',
     istBauprojekt: false,
     freitext: '',
+    alsAkut: false,
     ...partial,
   }
 }
