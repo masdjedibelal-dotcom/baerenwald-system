@@ -897,7 +897,7 @@ export async function setHandwerkerPortalGesperrt(
 
 
 /**
- * Handwerker löschen — blockiert bei Verträgen/Einbehalten oder aktiven Zuweisungen.
+ * Handwerker löschen — Verträge werden mitgelöscht; blockiert bei Einbehalten oder aktiven Zuweisungen.
  */
 export async function deleteHandwerker(
   handwerkerId: string
@@ -918,17 +918,13 @@ export async function deleteHandwerker(
     return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
   }
 
-  const [{ count: ahCount }, { count: posCount }, { count: vertragCount }] = await Promise.all([
+  const [{ count: ahCount }, { count: posCount }] = await Promise.all([
     supabase
       .from('angebot_handwerker')
       .select('id', { count: 'exact', head: true })
       .eq('handwerker_id', id),
     supabase
       .from('auftrag_positionen')
-      .select('id', { count: 'exact', head: true })
-      .eq('handwerker_id', id),
-    supabase
-      .from('handwerker_vertraege')
       .select('id', { count: 'exact', head: true })
       .eq('handwerker_id', id),
   ])
@@ -942,12 +938,6 @@ export async function deleteHandwerker(
       ? 0
       : (einbehaltCount ?? 0)
 
-  if ((vertragCount ?? 0) > 0) {
-    return {
-      ok: false,
-      message: 'Handwerker hat Verträge — bitte zuerst Verträge entfernen.',
-    }
-  }
   if (einbehalte > 0) {
     return {
       ok: false,
@@ -963,6 +953,7 @@ export async function deleteHandwerker(
   }
 
   for (const table of [
+    'handwerker_vertraege',
     'partner_dokumente',
     'handwerker_bewertungen',
     'partner_bautagebuch_anfragen',
