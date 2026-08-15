@@ -30,7 +30,7 @@ function Section({
 
 /**
  * Leistungs-Drawer: Position · Zuweisung · optional Nachtrag-Freigabe.
- * Freigabe: Footer Bestätigen / Ablehnen (kein Header-Icon).
+ * Freigabe: Footer Bestätigen / Ablehnen. Zuweisen: Primary-Button im Header.
  */
 export function LeistungDrawer({
   open,
@@ -53,23 +53,44 @@ export function LeistungDrawer({
 
   const headerEnd =
     !brauchtFreigabe && actions.length > 0 ? (
-      <div className="flex items-center gap-0.5">
-        {actions.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className="editor-sheet__icon-btn"
-            disabled={a.disabled}
-            aria-label={a.label}
-            title={a.label}
-            onClick={() => {
-              onClose()
-              a.onClick()
-            }}
-          >
-            <MockIcon ctx="default" n={a.icon ?? 'user'} size={20} />
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        {actions.map((a) => {
+          const isZuweisen = a.id === 'zuweisen'
+          const label = isZuweisen ? 'Zuweisen' : a.label
+          if (isZuweisen) {
+            return (
+              <button
+                key={a.id}
+                type="button"
+                className="btn primary sm"
+                disabled={a.disabled}
+                aria-label={label}
+                onClick={() => {
+                  onClose()
+                  a.onClick()
+                }}
+              >
+                {label}
+              </button>
+            )
+          }
+          return (
+            <button
+              key={a.id}
+              type="button"
+              className="editor-sheet__icon-btn"
+              disabled={a.disabled}
+              aria-label={a.label}
+              title={a.label}
+              onClick={() => {
+                onClose()
+                a.onClick()
+              }}
+            >
+              <MockIcon ctx="default" n={a.icon ?? 'user'} size={20} />
+            </button>
+          )
+        })}
       </div>
     ) : undefined
 

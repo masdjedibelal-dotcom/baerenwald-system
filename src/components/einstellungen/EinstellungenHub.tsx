@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, FileText, List, Users } from 'lucide-react'
+import { Bell, Building2, List, Users } from 'lucide-react'
 
 type HubTile = {
   href: string
@@ -30,10 +30,10 @@ const TILES: HubTile[] = [
     icon: List,
   },
   {
-    href: '/einstellungen/formulare',
-    title: 'Formulare',
-    description: 'Vorlagen für Abnahme & Co.',
-    icon: FileText,
+    href: '/einstellungen/benachrichtigungen',
+    title: 'Benachrichtigungen',
+    description: 'E-Mail & Push',
+    icon: Bell,
   },
 ]
 
@@ -42,7 +42,7 @@ export function EinstellungenHub() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-bw-text md:text-2xl">Einstellungen</h1>
-        <p className="mt-1 text-sm text-bw-text-muted">Firma, Team, Preislisten und Formulare.</p>
+        <p className="mt-1 text-sm text-bw-text-muted">Firma, Team, Preislisten und Benachrichtigungen.</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {TILES.map((tile) => {

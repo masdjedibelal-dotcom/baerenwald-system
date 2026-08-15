@@ -22,6 +22,7 @@ import {
 } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
+import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpartnerCard'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
@@ -416,6 +417,11 @@ export function KundeDetailClient({
           }
           refresh()
         }}
+      />
+      <KundenAnsprechpartnerCard
+        kundeId={kunde.id}
+        initial={kunde.kunden_ansprechpartner ?? []}
+        onChanged={() => refresh()}
       />
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard

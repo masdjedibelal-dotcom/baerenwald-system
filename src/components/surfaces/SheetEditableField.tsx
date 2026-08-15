@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
   multiline?: boolean
   /** Zeilen im Edit-Textarea (default 10) */
   rows?: number
-  /** KI-Sparkles im Edit-Sheet */
+  /** KI-Sparkles im Edit-Sheet / Inline */
   kiExtraHint?: string | null
   disabled?: boolean
   /** Beim Mount/True einmal Edit-Sheet öffnen (Deep-Link Fokus) */
@@ -22,13 +23,21 @@ type Props = {
   className?: string
   /** Zusätzlicher Hinweis unter dem Label in der Liste */
   hint?: string | null
-  /** EditorSheet-Kontext */
+  /**
+   * `detail` = bereits in einem Sheet → immer inline tippen (kein verschachteltes Sheet).
+   * `canvas` = auf der Seite: Desktop inline, Mobil Sheet+Stift.
+   */
   sheetContext?: EditorSheetContext
+  /**
+   * `auto` (default): detail → inline; canvas → Desktop inline / Mobil Sheet.
+   * `inline` / `sheet`: erzwingen.
+   */
+  editMode?: 'auto' | 'inline' | 'sheet'
 }
 
 /**
- * Read-only-Zeile mit Stift → EditorSheet (Mobil Bottom Sheet / Desktop Split-over).
- * Bestätigen rechts, Schließen links — gleiches Surface wie andere Sheets.
+ * Textfeld: Desktop (und in Detail-Sheets) direkt tippen;
+ * Mobil auf der Canvas-Seite optional Sheet mit Stift.
  */
 export function SheetEditableField({
   label,
@@ -43,14 +52,20 @@ export function SheetEditableField({
   className,
   hint,
   sheetContext = 'canvas',
+  editMode = 'auto',
 }: Props) {
+  const isMobile = useIsMobile()
+  const useSheet =
+    editMode === 'sheet' ||
+    (editMode === 'auto' && sheetContext !== 'detail' && isMobile)
+
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
-    if (autoOpen) setOpen(true)
-  }, [autoOpen])
+    if (autoOpen && useSheet) setOpen(true)
+  }, [autoOpen, useSheet])
 
   useEffect(() => {
     if (!open) return
@@ -66,6 +81,51 @@ export function SheetEditableField({
 
   const display = value.trim()
   const showKi = Boolean(kiExtraHint != null || multiline)
+
+  if (!useSheet) {
+    const control = multiline ? (
+      <textarea
+        className="input ta wizard-dok-beschreibung"
+        rows={rows}
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(e) => onSave(e.target.value)}
+      />
+    ) : (
+      <input
+        className="input"
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(e) => onSave(e.target.value)}
+      />
+    )
+
+    return (
+      <div className={cn('sheet-editable-field sheet-editable-field--inline full', className)}>
+        {hint ? <p className="sheet-editable-field__hint">{hint}</p> : null}
+        {showKi ? (
+          <KiAssistFieldLabel
+            label={label}
+            value={value}
+            onApply={onSave}
+            extraHint={kiExtraHint}
+            multiline={multiline}
+            disabled={disabled}
+            className="full"
+          >
+            {control}
+          </KiAssistFieldLabel>
+        ) : (
+          <div className="full">
+            <div className="lt-field-lbl">{label}</div>
+            {control}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>

@@ -24,6 +24,7 @@ import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import { cn } from '@/lib/utils'
 import { deleteKunde, mergeKunden } from '@/app/actions/kunden'
+import { KundenMergeAssistentSheet } from '@/components/kunden/KundenMergeAssistentSheet'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
@@ -95,6 +96,7 @@ export function KundenListeClient({
   const [sortCol, setSortCol] = useState<SortCol | null>('name')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
   const [mergeListOpen, setMergeListOpen] = useState(false)
+  const [mergeAssistentOpen, setMergeAssistentOpen] = useState(false)
   const [listMergePending, setListMergePending] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
@@ -188,11 +190,6 @@ export function KundenListeClient({
     () => filtered.filter((k) => selected[k.id]),
     [filtered, selected]
   )
-
-  const bulkOpen = useCallback(() => {
-    const row = selectedRows[0]
-    if (row) router.push(`/kunden/${row.id}`)
-  }, [router, selectedRows])
 
   const bulkExport = useCallback(() => {
     runMockListExport(
@@ -403,11 +400,24 @@ export function KundenListeClient({
                     )
                   }
                 />
+                <MockBtn
+                  icon="users"
+                  kind="ghost"
+                  sm
+                  title="Duplikate-Assistent"
+                  onClick={() => setMergeAssistentOpen(true)}
+                />
               </>
             }
           />
         </div>
       </div>
+
+      <KundenMergeAssistentSheet
+        open={mergeAssistentOpen}
+        onClose={() => setMergeAssistentOpen(false)}
+        onMerged={() => router.refresh()}
+      />
 
       {isMobile ? (
         <MobileListFilterSheet
@@ -447,15 +457,10 @@ export function KundenListeClient({
 
       {selectedCount > 0 ? (
         <div className="bulkbar">
-          <span>
+          <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
           <div style={{ flex: 1 }} />
-          {selectedCount === 1 ? (
-            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
-              Öffnen
-            </MockBtn>
-          ) : null}
           <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
             Export
           </MockBtn>
@@ -476,7 +481,7 @@ export function KundenListeClient({
           <MockBtn
             kind="ghost"
             sm
-            className="qa-btn"
+            className="qa-btn bulkbar-clear"
             icon="x"
             onClick={() => setSelected({})}
             title="Auswahl aufheben"

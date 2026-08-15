@@ -134,7 +134,6 @@ export function ObjektAkteDetailClient({
         <MeldeLinksCard
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
-          qrLabel="QR-Code Objekt"
           aushangPdfHref={`/api/objekte/${objekt.id}/aushang-pdf`}
         />
       ) : null}

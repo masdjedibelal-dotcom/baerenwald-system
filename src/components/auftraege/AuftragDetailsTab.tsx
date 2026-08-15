@@ -347,7 +347,7 @@ export function AuftragLeistungenTab({
                       : [
                           {
                             id: 'zuweisen',
-                            label: 'Zuweisung ändern',
+                            label: 'Zuweisen',
                             icon: 'user',
                             onClick: () => setZuweisungIds([row.id]),
                           },

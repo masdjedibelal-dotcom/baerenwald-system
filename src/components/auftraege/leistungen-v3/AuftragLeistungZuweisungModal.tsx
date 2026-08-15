@@ -9,6 +9,10 @@ import {
   sendAuftragLeistungenAnHandwerkerV3,
   zuweiseHandwerkerAnPositionenV3,
 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
+import {
+  sendAngebotLeistungenAnHandwerkerV3,
+  zuweiseHandwerkerAnAngebotPositionen,
+} from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
 import type { AuftragPosition } from '@/lib/types'
 import { richTextToPlain } from '@/lib/rich-text'
@@ -53,7 +57,7 @@ function gewerkeLabel(h: HandwerkerGewerkListeEintrag): string {
 export function AuftragLeistungZuweisungModal({
   open,
   onClose,
-  auftragId,
+  auftragId = null,
   angebotId = null,
   projektName = 'Projekt',
   positionIds,
@@ -63,7 +67,8 @@ export function AuftragLeistungZuweisungModal({
 }: {
   open: boolean
   onClose: () => void
-  auftragId: string
+  /** Auftrag-Modus; ohne → Angebot-Zuweisung über angebotId */
+  auftragId?: string | null
   angebotId?: string | null
   projektName?: string
   positionIds: string[]
@@ -71,6 +76,7 @@ export function AuftragLeistungZuweisungModal({
   gewerke?: { id: string; name: string; slug: string }[]
   onDone: () => void
 }) {
+  const isAngebotOnly = !auftragId?.trim() && Boolean(angebotId?.trim())
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
@@ -215,6 +221,50 @@ export function AuftragLeistungZuweisungModal({
     setPickerOpen(false)
 
     startTransition(async () => {
+      if (isAngebotOnly && angebotId) {
+        const assign = await zuweiseHandwerkerAnAngebotPositionen({
+          angebotId,
+          positionIds,
+          handwerkerId: primaryHw,
+          ekNetto: isSingle ? ekNum : null,
+          ekNettoByPositionId: ekByPositionId,
+          leistung_name: isSingle ? titel.trim() || sample?.leistung_name : undefined,
+          beschreibung: isSingle ? beschreibung.trim() || null : undefined,
+          aufgabe_notiz: isSingle
+            ? beschreibung.trim() || null
+            : selectedPositions
+                .map((p) => p.leistung_name?.trim() || 'Leistung')
+                .join(', '),
+        })
+        if (!assign.ok) {
+          toast.error(assign.message)
+          return
+        }
+
+        const sent = await sendAngebotLeistungenAnHandwerkerV3({
+          angebotId,
+          zuweisungIds: assign.zuweisungIds,
+        })
+        if (!sent.ok) {
+          toast.error(sent.message)
+          return
+        }
+
+        toast.success(
+          sent.gesendet === 1
+            ? 'Anfrage an Handwerker gesendet'
+            : `${sent.gesendet} Anfragen an Handwerker gesendet`
+        )
+        onDone()
+        onClose()
+        return
+      }
+
+      if (!auftragId) {
+        toast.error('Auftrag fehlt.')
+        return
+      }
+
       if (isSingle && sample && ekNum != null) {
         const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
           leistung_name: titel.trim() || sample.leistung_name,
@@ -305,6 +355,75 @@ export function AuftragLeistungZuweisungModal({
         overlayClassName={pickerOpen ? 'editor-sheet-overlay--recessed' : undefined}
       >
         <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
+
+        <div className="hw-anfrage-section">
+          <div className="hw-anfrage-section-head">
+            <span>Partner suchen</span>
+            {selectedHwIds.size > 0 ? <span>{selectedHwIds.size} ausgewählt</span> : null}
+          </div>
+
+          <input
+            className="sel w-full"
+            readOnly
+            placeholder="Partner suchen…"
+            disabled={pending}
+            aria-label="Partner suchen"
+            onFocus={(e) => {
+              e.currentTarget.blur()
+              if (pending) return
+              dismissKiOverSheet()
+              setPickerOpen(true)
+            }}
+            onClick={() => {
+              if (pending) return
+              dismissKiOverSheet()
+              setPickerOpen(true)
+            }}
+          />
+
+          {selectedDisplay.length > 0 ? (
+            <ul className="hw-anfrage-list mt-3">
+              {selectedDisplay.map((h) => {
+                const displayName = h.firma?.trim() || h.name
+                const label = gewerkeLabel(h) || sample?.gewerk_name || '—'
+                const rating = h.bewertung ?? null
+                return (
+                  <li key={h.id}>
+                    <div className="hw-anfrage-row is-selected">
+                      <span className="hw-anfrage-avatar" aria-hidden>
+                        {handwerkerInitialen(displayName)}
+                      </span>
+                      <span className="hw-anfrage-row-text">
+                        <span className="hw-anfrage-row-name">{displayName}</span>
+                        <span className="hw-anfrage-row-meta">
+                          {label}
+                          {rating != null ? (
+                            <>
+                              {' '}
+                              <span className="hw-anfrage-star">★</span> {rating.toFixed(1)}
+                            </>
+                          ) : null}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="hw-anfrage-remove"
+                        aria-label={`${displayName} entfernen`}
+                        disabled={pending}
+                        onClick={() => removeHw(h.id)}
+                      >
+                        <MockIcon ctx="btn" n="x" size={14} />
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">Noch kein Partner gewählt.</p>
+          )}
+        </div>
+
         {isSingle ? (
           <>
             <label className="hw-anfrage-field">
@@ -372,6 +491,7 @@ export function AuftragLeistungZuweisungModal({
               ) : null}
             </label>
 
+            {!isAngebotOnly ? (
             <div className="hw-anfrage-section">
               <div className="hw-anfrage-section-head">
                 <span>Zeitraum</span>
@@ -497,12 +617,13 @@ export function AuftragLeistungZuweisungModal({
                 </label>
               </div>
             </div>
+            ) : null}
           </>
         ) : (
           <div className="hw-anfrage-section">
             <div className="hw-anfrage-section-head">
               <span>Partner-EK je Leistung</span>
-              <span>Handwerker gilt für alle</span>
+              <span>Partner gilt für alle</span>
             </div>
             <div className="hw-zuw-ek-table" role="table" aria-label="Leistungen mit Partner-EK">
               <div className="hw-zuw-ek-head" role="row">
@@ -552,70 +673,6 @@ export function AuftragLeistungZuweisungModal({
             ) : null}
           </div>
         )}
-
-        <div className="hw-anfrage-section">
-          <div className="hw-anfrage-section-head">
-            <span>Handwerker anfragen</span>
-            {selectedHwIds.size > 0 ? <span>{selectedHwIds.size} ausgewählt</span> : null}
-          </div>
-
-          {selectedDisplay.length > 0 ? (
-            <ul className="hw-anfrage-list">
-              {selectedDisplay.map((h) => {
-                const displayName = h.firma?.trim() || h.name
-                const label = gewerkeLabel(h) || sample?.gewerk_name || '—'
-                const rating = h.bewertung ?? null
-                return (
-                  <li key={h.id}>
-                    <div className="hw-anfrage-row is-selected">
-                      <span className="hw-anfrage-avatar" aria-hidden>
-                        {handwerkerInitialen(displayName)}
-                      </span>
-                      <span className="hw-anfrage-row-text">
-                        <span className="hw-anfrage-row-name">{displayName}</span>
-                        <span className="hw-anfrage-row-meta">
-                          {label}
-                          {rating != null ? (
-                            <>
-                              {' '}
-                              <span className="hw-anfrage-star">★</span> {rating.toFixed(1)}
-                            </>
-                          ) : null}
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        className="hw-anfrage-remove"
-                        aria-label={`${displayName} entfernen`}
-                        disabled={pending}
-                        onClick={() => removeHw(h.id)}
-                      >
-                        <MockIcon ctx="btn" n="x" size={14} />
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Noch kein Handwerker gewählt.</p>
-          )}
-
-          <button
-            type="button"
-            className="pos-add-btn w-full"
-            disabled={pending}
-            onClick={() => {
-              dismissKiOverSheet()
-              setPickerOpen(true)
-            }}
-          >
-            <span className="icon-wrap">
-              <MockIcon ctx="default" n="search" size={16} />
-            </span>
-            <span>Handwerker suchen</span>
-          </button>
-        </div>
       </EditorSheet>
 
       <HandwerkerSuchenSheet

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronRight, Info, MoreHorizontal } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Check, ChevronRight, Info } from 'lucide-react'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -22,13 +22,9 @@ export type LeistungenTabBulkAction = {
   onClick: (selectedIds: string[]) => void
 }
 
-const LS_KEY = 'crm.cols.leistungen.v1'
-
 type ColId = 'bezeichnung' | 'menge' | 'preis' | 'status' | 'gewerk' | 'handwerker' | 'ek'
 
-const CORE_COLS: ColId[] = ['bezeichnung', 'menge', 'preis', 'status']
-const OPTIONAL_COLS: ColId[] = ['gewerk', 'handwerker', 'ek']
-const ALL_COLS: ColId[] = [...CORE_COLS, ...OPTIONAL_COLS]
+const ALL_COLS: ColId[] = ['bezeichnung', 'menge', 'preis', 'status', 'gewerk', 'handwerker', 'ek']
 
 const COL_LABELS: Record<ColId, string> = {
   bezeichnung: 'Bezeichnung',
@@ -40,7 +36,7 @@ const COL_LABELS: Record<ColId, string> = {
   ek: 'EK',
 }
 
-const DEFAULT_VISIBLE: Record<ColId, boolean> = {
+const VISIBLE_COLS: Record<ColId, boolean> = {
   bezeichnung: true,
   menge: true,
   preis: true,
@@ -50,28 +46,9 @@ const DEFAULT_VISIBLE: Record<ColId, boolean> = {
   ek: false,
 }
 
-function loadVisible(): Record<ColId, boolean> {
-  if (typeof window === 'undefined') return { ...DEFAULT_VISIBLE }
-  try {
-    const raw = window.localStorage.getItem(LS_KEY)
-    if (!raw) return { ...DEFAULT_VISIBLE }
-    const parsed = JSON.parse(raw) as Partial<Record<ColId, boolean>>
-    const next = { ...DEFAULT_VISIBLE }
-    for (const id of ALL_COLS) {
-      if (typeof parsed[id] === 'boolean') next[id] = parsed[id]!
-    }
-    // Kernspalten bleiben immer anwählbar, Default an — Nutzer darf ausblenden außer Bezeichnung
-    next.bezeichnung = true
-    return next
-  } catch {
-    return { ...DEFAULT_VISIBLE }
-  }
-}
-
 /**
  * Spec §7 / Phase 6 — eine read-only Leistungen-Tabelle für alle Phasen.
  * Positionen ändern = zuständiges Dokument öffnen (Callback), nicht inline editieren.
- * N4: Spalten-⋯ mit localStorage-Persistenz.
  */
 export function LeistungenTab({
   phase,
@@ -124,26 +101,6 @@ export function LeistungenTab({
   const allowBulk = phase === 'auftrag' && (bulkActions?.length ?? 0) > 0
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [visibleCols, setVisibleCols] = useState<Record<ColId, boolean>>(DEFAULT_VISIBLE)
-  const [colsOpen, setColsOpen] = useState(false)
-
-  useEffect(() => {
-    setVisibleCols(loadVisible())
-  }, [])
-
-  function persistCols(next: Record<ColId, boolean>) {
-    setVisibleCols(next)
-    try {
-      window.localStorage.setItem(LS_KEY, JSON.stringify(next))
-    } catch {
-      /* ignore quota */
-    }
-  }
-
-  function toggleCol(id: ColId) {
-    if (id === 'bezeichnung') return
-    persistCols({ ...visibleCols, [id]: !visibleCols[id] })
-  }
 
   const activeRow = useMemo(
     () => (activeId ? rows.find((r) => r.id === activeId) ?? null : null),
@@ -168,10 +125,10 @@ export function LeistungenTab({
   }, [groupByGewerk, rows])
 
   const deskCols = useMemo(() => {
-    const cols = ALL_COLS.filter((id) => visibleCols[id])
+    const cols = ALL_COLS.filter((id) => VISIBLE_COLS[id])
     if (groupByGewerk) return cols.filter((id) => id !== 'gewerk')
     return cols
-  }, [visibleCols, groupByGewerk])
+  }, [groupByGewerk])
 
   const cols = useMemo(() => {
     const parts: string[] = []
@@ -338,7 +295,7 @@ export function LeistungenTab({
               <div key={id} className="lt-main">
                 <div className="lt-name">
                   <span className="lt-nametext">{row.bezeichnung}</span>
-                  {visibleCols.status ? (
+                  {VISIBLE_COLS.status ? (
                     <span className="lt-status-mobile">
                       <StatusBadge status={row.status} label={row.statusLabel} />
                     </span>
@@ -346,12 +303,12 @@ export function LeistungenTab({
                 </div>
                 {row.subline ? <div className="lt-sub">{row.subline}</div> : null}
                 <div className="lt-mobile-foot">
-                  {visibleCols.menge ? (
+                  {VISIBLE_COLS.menge ? (
                     <span>
                       <span className="lt-mobile-lbl">Menge</span> {row.mengeLabel}
                     </span>
                   ) : null}
-                  {visibleCols.preis ? (
+                  {VISIBLE_COLS.preis ? (
                     <span>
                       <span className="lt-mobile-lbl">Preis</span> {row.preisLabel}
                     </span>
@@ -405,45 +362,6 @@ export function LeistungenTab({
     )
   }
 
-  const toolbar = (
-    <div className="lt-toolbar">
-      <button
-        type="button"
-        className="lt-cols-btn"
-        aria-label="Spalten"
-        aria-expanded={colsOpen}
-        title="Spalten"
-        onClick={() => setColsOpen((o) => !o)}
-      >
-        <MoreHorizontal className="h-4 w-4" aria-hidden />
-      </button>
-      {colsOpen ? (
-        <div className="lt-cols-pop" role="menu" aria-label="Sichtbare Spalten">
-          <div className="lt-cols-pop__title">Spalten</div>
-          {ALL_COLS.map((id) => (
-            <label key={id} className="lt-cols-pop__row">
-              <input
-                type="checkbox"
-                checked={visibleCols[id]}
-                disabled={id === 'bezeichnung'}
-                onChange={() => toggleCol(id)}
-              />
-              <span>
-                {COL_LABELS[id]}
-                {OPTIONAL_COLS.includes(id) ? (
-                  <span className="lt-cols-pop__opt"> optional</span>
-                ) : null}
-              </span>
-            </label>
-          ))}
-          <button type="button" className="lt-cols-pop__done" onClick={() => setColsOpen(false)}>
-            Fertig
-          </button>
-        </div>
-      ) : null}
-    </div>
-  )
-
   if (!rows.length) {
     return (
       <div className="lt-root space-y-3">
@@ -478,11 +396,8 @@ export function LeistungenTab({
               {dokLabel}
             </Button>
           ) : null}
-          {toolbar}
         </div>
-      ) : (
-        <div className="lt-hint lt-hint--bare">{toolbar}</div>
-      )}
+      ) : null}
 
       {allowBulk && selectedCount > 0 ? (
         <div className="lt-bulk" role="toolbar" aria-label="Sammelaktionen">
@@ -629,24 +544,9 @@ export function LeistungenTab({
         }
         actions={
           activeRow
-            ? [
-                ...(activeRow.brauchtFreigabe
-                  ? []
-                  : drawerActionsForRow?.(activeRow) ?? []),
-                ...(onOpenDokument
-                  ? [
-                      {
-                        id: 'dokument',
-                        label: dokLabel,
-                        variant: 'primary' as const,
-                        onClick: () => {
-                          setActiveId(null)
-                          onOpenDokument()
-                        },
-                      },
-                    ]
-                  : []),
-              ]
+            ? activeRow.brauchtFreigabe
+              ? []
+              : drawerActionsForRow?.(activeRow) ?? []
             : []
         }
       />

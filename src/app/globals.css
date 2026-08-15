@@ -47,9 +47,9 @@
 
     /*
      * Typo-Skala — Spec §14: Meta · Text · Titel · Überschrift
-     * --app-font-scale: CRM-weit lesbarer (Desktop/Laptop +20 %).
+     * --app-font-scale: CRM-weit (Desktop + Mobil). 1.14 ≈ +14 % zur Basis (5 % unter 1.2).
      */
-    --app-font-scale: 1.2;
+    --app-font-scale: 1.14;
     --fs-meta: calc(12px * var(--app-font-scale));
     --fs-text: calc(13.5px * var(--app-font-scale));
     --fs-title: calc(15px * var(--app-font-scale));

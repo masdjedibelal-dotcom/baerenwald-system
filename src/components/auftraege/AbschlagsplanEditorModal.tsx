@@ -299,9 +299,10 @@ export function AbschlagsplanEditorModal({
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--grow">
                   <span className="zahlplan-rate-card__lbl">Bezeichnung</span>
                   <input
-                    className="txt"
+                    className="txt zahlplan-rate-card__name"
                     value={r.label}
                     disabled={isFrozen}
+                    aria-label="Bezeichnung"
                     onChange={(e) => upd(r.id, { label: e.target.value })}
                   />
                 </label>
@@ -320,8 +321,13 @@ export function AbschlagsplanEditorModal({
                 )}
               </div>
 
+              <div className="zahlplan-rate-card__hero" aria-label="Betrag brutto">
+                <span className="zahlplan-rate-card__hero-lbl">Brutto</span>
+                <span className="zahlplan-rate-card__hero-val">{formatEurBetrag(betrag)}</span>
+              </div>
+
               <div className="zahlplan-rate-card__grid">
-                <label className="zahlplan-rate-card__field">
+                <label className="zahlplan-rate-card__field zahlplan-rate-card__field--art">
                   <span className="zahlplan-rate-card__lbl">Art</span>
                   <select
                     className="sel"
@@ -335,7 +341,7 @@ export function AbschlagsplanEditorModal({
                   </select>
                 </label>
 
-                <label className="zahlplan-rate-card__field">
+                <label className="zahlplan-rate-card__field zahlplan-rate-card__field--wert">
                   <span className="zahlplan-rate-card__lbl">Wert</span>
                   {r.typ === 'rest' ? (
                     <div className="zahlplan-rate-card__auto">auto</div>
@@ -357,14 +363,14 @@ export function AbschlagsplanEditorModal({
                   )}
                 </label>
 
-                <div className="zahlplan-rate-card__field">
+                <div className="zahlplan-rate-card__field zahlplan-rate-card__field--betrag">
                   <span className="zahlplan-rate-card__lbl">Betrag (brutto)</span>
                   <div className="zahlplan-editor-betrag zahlplan-rate-card__betrag">
                     {formatEurBetrag(betrag)}
                   </div>
                 </div>
 
-                <label className="zahlplan-rate-card__field">
+                <label className="zahlplan-rate-card__field zahlplan-rate-card__field--faellig">
                   <span className="zahlplan-rate-card__lbl">Fällig</span>
                   <input
                     className="txt"

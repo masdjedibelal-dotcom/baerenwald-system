@@ -77,11 +77,6 @@ export function AuftragBautagebuchSection({
       <div className="bt-feed-h">
         <div className="bt-feed-h__left">
           <h2 className="bt-feed-title">Bautagebuch</h2>
-          <p className="bt-feed-sub">
-            {sorted.length === 0
-              ? 'Updates vom Handwerker — Start, Fortschritt, Ergebnis'
-              : `${sorted.length} Eintrag${sorted.length === 1 ? '' : 'e'} (Start · Fortschritt · Ergebnis)`}
-          </p>
         </div>
         {!disabled ? (
           <div className="bt-feed-h__actions">
@@ -107,9 +102,6 @@ export function AuftragBautagebuchSection({
         <div className="bt-feed-empty">
           <MockIcon ctx="empty" n="camera" size={28} />
           <p>Noch keine Einträge.</p>
-          <p className="bt-feed-empty__hint">
-            Start, Fortschritt und Ergebnis erscheinen hier als getrennte Einträge.
-          </p>
         </div>
       ) : (
         <ul className="bt-inserat-list">

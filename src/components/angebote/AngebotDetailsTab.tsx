@@ -1,15 +1,17 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
+import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
+import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import type { AngebotDetail, Gewerk, LeadDetail } from '@/lib/types'
+import type { AngebotDetail, AngebotPosition, AuftragPosition, Gewerk, LeadDetail } from '@/lib/types'
 import { formatDatum, formatDatumZeit } from '@/lib/utils'
 
 function projektTitel(detail: AngebotDetail, lead?: LeadDetail | null): string {
@@ -23,6 +25,39 @@ function projektTitel(detail: AngebotDetail, lead?: LeadDetail | null): string {
 
 function beschreibungFromAngebot(detail: AngebotDetail): string | null {
   return detail.projektbeschreibung?.trim() || null
+}
+
+/** AngebotPosition → View-Model für das gemeinsame Zuweisungs-Sheet. */
+function angebotPosAlsZuweisungView(p: AngebotPosition): AuftragPosition {
+  const menge = Math.max(p.menge || 1, 0.0001)
+  const vkLine =
+    p.gesamt_min != null && p.gesamt_min > 0
+      ? p.gesamt_min
+      : Math.round((p.lohn_netto + p.material_netto) * menge * 100) / 100
+  const ekLine =
+    p.einkaufspreis != null && Number.isFinite(p.einkaufspreis)
+      ? Math.round(p.einkaufspreis * menge * 100) / 100
+      : null
+  return {
+    id: p.id,
+    auftrag_id: '',
+    gewerk_slug: p.gewerk_slug ?? null,
+    gewerk_name: p.gewerk_name,
+    gewerk_block_key: p.gewerk_block_key,
+    oberkategorie: null,
+    unterkategorie: null,
+    leistung_name: p.leistung_name?.trim() || p.leistung || 'Position',
+    beschreibung: p.beschreibung ?? null,
+    einheit: p.einheit ?? null,
+    menge: p.menge ?? null,
+    preis_fix: vkLine,
+    preis_partner: ekLine,
+    lohn_fix: null,
+    material_fix: null,
+    handwerker_id: p.handwerker_id ?? null,
+    handwerker: p.handwerker_name?.trim() ? { name: p.handwerker_name.trim() } : null,
+    sort_order: null,
+  }
 }
 
 /** Angebot: eigener Tab Projektinfos (nicht unter Leistungen). */
@@ -89,10 +124,12 @@ export function AngebotProjektinfosTab({
   )
 }
 
-/** Angebot: Leistungen — shared read-only Tabelle (Phase 6). */
+/** Angebot: Leistungen — shared Tabelle + Zuweisen wie Auftrag. */
 export function AngebotLeistungenTab({
   detail,
+  lead,
   onOpenDokument,
+  onSaved,
 }: {
   detail: AngebotDetail
   lead?: LeadDetail | null
@@ -101,30 +138,83 @@ export function AngebotLeistungenTab({
   onSaved?: () => void
   onOpenDokument?: () => void
 }) {
-  const rows = useMemo(() => {
-    const pos = (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p))
-    return leistungenFromAngebotPositionen(pos, {
-      status: 'entwurf',
-      statusLabel: 'Im Angebot',
-    })
-  }, [detail.positionen])
+  const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
+
+  const kannZuweisen = angebotDarfImWizardBearbeitetWerden(String(detail.status))
+
+  const leistungPositionen = useMemo(
+    () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)),
+    [detail.positionen]
+  )
+
+  const rows = useMemo(
+    () =>
+      leistungenFromAngebotPositionen(leistungPositionen, {
+        status: 'entwurf',
+        statusLabel: 'Im Angebot',
+      }),
+    [leistungPositionen]
+  )
+
+  const zuweisungPositionen = useMemo(
+    () => leistungPositionen.map(angebotPosAlsZuweisungView),
+    [leistungPositionen]
+  )
 
   const summen = useMemo(() => summenAusPositionen(detail.positionen ?? [], 19), [detail.positionen])
 
+  const projektName = useMemo(() => projektTitel(detail, lead), [detail, lead])
+
   return (
-    <LeistungenTab
-      phase="angebot"
-      rows={rows}
-      onOpenDokument={onOpenDokument}
-      dokumentHint=""
-      groupByGewerk
-      footerNettoMwst={{
-        netto: summen.nettoMin,
-        mwstSatz: summen.mwstSatz,
-        mwstBetrag: summen.mwstBetragMin,
-      }}
-      emptyHint="Noch keine Positionen — über „Angebot bearbeiten“ anlegen."
-    />
+    <>
+      <LeistungenTab
+        phase="angebot"
+        rows={rows}
+        onOpenDokument={onOpenDokument}
+        dokumentHint=""
+        groupByGewerk
+        footerNettoMwst={{
+          netto: summen.nettoMin,
+          mwstSatz: summen.mwstSatz,
+          mwstBetrag: summen.mwstBetragMin,
+        }}
+        emptyHint="Noch keine Positionen — über „Angebot bearbeiten“ anlegen."
+        bulkActions={
+          kannZuweisen
+            ? [{ id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) }]
+            : undefined
+        }
+        drawerActionsForRow={
+          kannZuweisen
+            ? (row) => [
+                {
+                  id: 'zuweisen',
+                  label: 'Zuweisen',
+                  icon: 'user',
+                  onClick: () => setZuweisungIds([row.id]),
+                },
+              ]
+            : undefined
+        }
+      />
+
+      {zuweisungIds ? (
+        <AuftragLeistungZuweisungModal
+          open
+          onClose={() => setZuweisungIds(null)}
+          auftragId={null}
+          angebotId={detail.id}
+          projektName={projektName}
+          positionIds={zuweisungIds}
+          positionen={zuweisungPositionen}
+          gewerke={[]}
+          onDone={() => {
+            setZuweisungIds(null)
+            onSaved?.()
+          }}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -138,7 +228,7 @@ export function AngebotDetailsTab(props: {
 }) {
   return (
     <>
-      <AngebotLeistungenTab detail={props.detail} />
+      <AngebotLeistungenTab detail={props.detail} onSaved={props.onSaved} />
       <AngebotProjektinfosTab
         detail={props.detail}
         lead={props.lead}

@@ -19,7 +19,7 @@ const AngebotWizard = dynamic(
   }
 )
 
-/** FAB / Neu: Angebot ohne vorab angelegte Anfrage — Lead entsteht erst beim Speichern. */
+/** FAB / Neu: Angebot ohne vorab angelegte Anfrage — Lead erst bei erfolgreichem Speichern (bzw. Foto-Upload). */
 export function AngebotNeuFromKundeClient({
   kunde,
   gewerke,

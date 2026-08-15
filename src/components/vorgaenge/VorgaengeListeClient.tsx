@@ -26,7 +26,6 @@ import {
   runDuplicateRechnung,
 } from '@/lib/list-actions'
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
-import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { toast } from '@/components/ui/app-toast'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
@@ -242,7 +241,6 @@ export function VorgaengeListeClient({
   const [rechnungRichtung, setRechnungRichtung] = useState<'ausgehend' | 'eingehend'>('ausgehend')
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
-  const [bulkErledigtPending, setBulkErledigtPending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const visibleCols: Record<DataColId, boolean> = {
     kunde: true,
@@ -653,13 +651,6 @@ export function VorgaengeListeClient({
     return { leadIds, standaloneRechnungIds }
   }, [selectedRows])
 
-  const canBulkAlsErledigt = useMemo(() => {
-    if (!selectedRows.length) return false
-    return selectedRows.every(
-      (v) => v.phase === 'anfrage' && !v.standalone && v.leadId && !isVorgangErledigt(v)
-    )
-  }, [selectedRows])
-
   const runBulkDelete = useCallback(async () => {
     const { leadIds, standaloneRechnungIds } = bulkDeleteTargets
     if (!leadIds.length && !standaloneRechnungIds.length) return
@@ -720,51 +711,6 @@ export function VorgaengeListeClient({
     toast.error(`${r.okCount} gelöscht, ${r.failCount} fehlgeschlagen`, { id: loadingId })
     router.refresh()
   }, [bulkDeleteTargets, router, selectedRows])
-
-  const bulkMarkErledigt = useCallback(() => {
-    if (!canBulkAlsErledigt) return
-    const leadIds = Array.from(new Set(selectedRows.map((v) => v.leadId).filter(Boolean)))
-    void (async () => {
-      setBulkErledigtPending(true)
-      const loadingId = toast.loading('Status wird gesetzt…')
-      let ok = 0
-      let fail = 0
-      for (const leadId of leadIds) {
-        const r = await updateLeadStatus(leadId, 'abgebrochen', 'Als erledigt markiert (Liste)')
-        if (r.ok) ok += 1
-        else fail += 1
-      }
-      setBulkErledigtPending(false)
-      setSelected({})
-      if (fail === 0) {
-        for (const leadId of leadIds) {
-          const row = selectedRows.find((v) => v.leadId === leadId)
-          if (row) {
-            const k = rowKey(row)
-            setFlashKeys((f) => ({ ...f, [k]: true }))
-            window.setTimeout(() => {
-              setFlashKeys((f) => {
-                const n = { ...f }
-                delete n[k]
-                return n
-              })
-            }, 1200)
-          }
-        }
-        toast.success(ok === 1 ? 'Als erledigt markiert' : `${ok} als erledigt markiert`, {
-          id: loadingId,
-        })
-      } else {
-        toast.error(`${ok} ok, ${fail} fehlgeschlagen`, { id: loadingId })
-      }
-      router.refresh()
-    })()
-  }, [canBulkAlsErledigt, router, selectedRows])
-
-  const bulkOpen = useCallback(() => {
-    const row = selectedRows[0]
-    if (row) router.push(row.detailHref)
-  }, [router, selectedRows])
 
   const paginationResetKey = `${lifecycle}|${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
   const {
@@ -1099,26 +1045,10 @@ export function VorgaengeListeClient({
 
       {selectedCount > 0 ? (
         <div className="bulkbar">
-          <span>
+          <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
           <div style={{ flex: 1 }} />
-          {selectedCount === 1 ? (
-            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
-              Öffnen
-            </MockBtn>
-          ) : null}
-          {canBulkAlsErledigt ? (
-            <MockBtn
-              kind="ghost"
-              sm
-              icon="check"
-              disabled={bulkErledigtPending}
-              onClick={bulkMarkErledigt}
-            >
-              Als erledigt
-            </MockBtn>
-          ) : null}
           <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
             Export
           </MockBtn>
@@ -1134,7 +1064,7 @@ export function VorgaengeListeClient({
           <MockBtn
             kind="ghost"
             sm
-            className="qa-btn"
+            className="qa-btn bulkbar-clear"
             icon="x"
             onClick={() => setSelected({})}
             title="Auswahl aufheben"

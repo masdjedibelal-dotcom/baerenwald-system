@@ -1,13 +1,15 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { toast } from '@/components/ui/app-toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
 import type { Gewerk, Preisliste } from '@/lib/types'
 import { createPreisliste, updatePreisliste } from '@/app/(dashboard)/preislisten/actions'
@@ -21,7 +23,7 @@ import {
 import { PreislistenCsvImportModal } from '@/components/preislisten/PreislistenCsvImportModal'
 import type { PreislistenImportResponse } from '@/lib/preislisten-import'
 
-const COLS = 'minmax(0, 1.6fr) 120px 140px 28px'
+const COLS = 'minmax(0, 1.6fr) 120px 140px'
 
 function isPresetEinheit(e: string): boolean {
   return (EINHEIT_VORSCHLAEGE as readonly string[]).includes(e)
@@ -32,20 +34,11 @@ function formatPreisLabel(pl: Preisliste): string {
   return `${p.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`
 }
 
-/** „800–1.400“ oder „800“ → erste Zahl als Netto-Preis */
-function parsePreisText(raw: string): number | null {
-  const cleaned = raw.replace(/€/gi, '').trim()
-  if (!cleaned) return null
-  const first = cleaned.split(/[–—\-]/)[0]?.trim() ?? ''
-  const n = Number(first.replace(/\./g, '').replace(',', '.'))
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-
 type LeistungForm = {
   gewerk_id: string
   leistung: string
   einheit: string
-  preisText: string
+  preis: number
   beschreibung: string
 }
 
@@ -54,7 +47,7 @@ function emptyForm(gewerkId: string): LeistungForm {
     gewerk_id: gewerkId,
     leistung: '',
     einheit: 'pauschal',
-    preisText: '',
+    preis: 0,
     beschreibung: '',
   }
 }
@@ -68,6 +61,7 @@ export function PreislistenClient({
   gewerkeAlle: Gewerk[]
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [rows, setRows] = useState<Preisliste[]>(() => sortPreislistenRows(initialRows))
   const gewAll = gewerkeAlle
 
@@ -130,7 +124,7 @@ export function PreislistenClient({
       gewerk_id: row.gewerk_id,
       leistung: row.leistung,
       einheit: sp.wahl === EINHEIT_CUSTOM ? sp.freitext : sp.wahl,
-      preisText: String(preislisteEinzelpreis(row)),
+      preis: preislisteEinzelpreis(row),
       beschreibung: '',
     })
     setEditLeistung(row)
@@ -152,9 +146,9 @@ export function PreislistenClient({
       setErr('Bitte eine Einheit angeben.')
       return
     }
-    const preisMin = parsePreisText(form.preisText)
-    if (preisMin == null) {
-      setErr('Preis angeben (z.B. 800 oder 800–1.400).')
+    const preisMin = form.preis
+    if (!Number.isFinite(preisMin) || preisMin <= 0) {
+      setErr('Preis angeben.')
       return
     }
 
@@ -242,40 +236,24 @@ export function PreislistenClient({
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
+      <EinstellungenSectionHeading
+        actions={
+          <>
+            <MockBtn sm kind="ghost" icon="upload" title="CSV Import" onClick={() => setCsvOpen(true)} />
+            <MockBtn
+              sm
+              kind="primary"
+              icon="plus"
+              disabled={!activeGewerkId}
+              onClick={openNeuModal}
+            >
+              Leistung
+            </MockBtn>
+          </>
+        }
       >
-        <MockIcon ctx="nav" n="clipboard-list" size={16} style={{ color: 'var(--text-3)' }} />
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
-        >
-          Preisliste
-        </span>
-        <div style={{ flex: 1 }} />
-        <MockBtn sm kind="ghost" icon="upload" title="CSV Import" onClick={() => setCsvOpen(true)} />
-        <MockBtn
-          sm
-          kind="primary"
-          icon="plus"
-          disabled={!activeGewerkId}
-          onClick={openNeuModal}
-        >
-          Leistung
-        </MockBtn>
-      </div>
+        Preisliste
+      </EinstellungenSectionHeading>
 
       <div className="chiprow" style={{ marginBottom: 16 }}>
         {gewerkeTabs.map((g) => (
@@ -300,42 +278,82 @@ export function PreislistenClient({
         </div>
       ) : (
         <>
-          <div className="listcard">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div>Leistung</div>
-              <div>Einheit</div>
-              <div>Preis</div>
-              <div />
-            </div>
-            {filtered.map((r) => (
-              <div
-                key={r.id}
-                role="button"
-                tabIndex={0}
-                className="list-row"
-                style={{ gridTemplateColumns: COLS, alignItems: 'center' }}
-                onClick={() => openEditLeistung(r)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openEditLeistung(r)
-                  }
-                }}
-              >
-                <div className="lc-title" style={{ fontWeight: 500 }}>
-                  {r.leistung}
-                </div>
-                <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>
-                  {r.einheit || '—'}
-                </div>
-                <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>
-                  {formatPreisLabel(r)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
-                  <MockIcon ctx="default" n="chevron-right" size={16} />
-                </div>
+          <div className="listcard listcard--cols">
+            {isMobile ? null : (
+              <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
+                <div>Leistung</div>
+                <div>Einheit</div>
+                <div>Preis</div>
               </div>
-            ))}
+            )}
+            {filtered.map((r) => {
+              const titel = r.leistung?.trim() || '—'
+              const einheit = r.einheit?.trim() || '—'
+              const preis = formatPreisLabel(r)
+              const open = () => openEditLeistung(r)
+              const onKey = (e: KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  open()
+                }
+              }
+              if (isMobile) {
+                return (
+                  <div
+                    key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    className="vg-row vg-row--kontakt"
+                    onClick={open}
+                    onKeyDown={onKey}
+                  >
+                    <div className="vg-vorgang">
+                      <div className="t" title={titel}>
+                        {titel}
+                      </div>
+                    </div>
+                    <div
+                      className="vg-kontakt"
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: '4px 12px',
+                        alignItems: 'baseline',
+                      }}
+                    >
+                      <span title={einheit}>{einheit}</span>
+                      <span
+                        title={preis}
+                        style={{
+                          fontWeight: 500,
+                          color: 'var(--text-2)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {preis}
+                      </span>
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <div
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  className="list-row"
+                  style={{ gridTemplateColumns: COLS, alignItems: 'center' }}
+                  onClick={open}
+                  onKeyDown={onKey}
+                >
+                  <div className="lc-title" style={{ fontWeight: 500 }}>
+                    {titel}
+                  </div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>{einheit}</div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>{preis}</div>
+                </div>
+              )
+            })}
           </div>
           <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-4)' }}>
             {filtered.length} Leistung{filtered.length === 1 ? '' : 'en'} · {activeGewerkName}
@@ -411,12 +429,11 @@ export function PreislistenClient({
                 />
               </MockField>
             ) : null}
-            <MockField label="Preis" full>
-              <input
-                className="input"
-                value={form.preisText}
-                onChange={(e) => markForm({ preisText: e.target.value })}
-                placeholder="800–1.400 €"
+            <MockField label="Preis (netto)" full>
+              <EuroNettoInput
+                value={form.preis}
+                onChange={(preis) => markForm({ preis })}
+                placeholder="0"
               />
             </MockField>
             <MockField label="Beschreibung" full>

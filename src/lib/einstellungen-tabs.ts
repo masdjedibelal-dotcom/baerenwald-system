@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
-import { Bell, Building2, FileText, List, Users } from 'lucide-react'
+import { Bell, Building2, List, Users } from 'lucide-react'
 
-export type EinstellungenTabId = 'firma' | 'team' | 'preise' | 'formulare' | 'benachrichtigungen'
+export type EinstellungenTabId = 'firma' | 'team' | 'preise' | 'benachrichtigungen'
 
 export type EinstellungenTabDef = {
   id: EinstellungenTabId
@@ -14,7 +14,7 @@ export type EinstellungenTabDef = {
   matchPrefixes: string[]
 }
 
-/** Einstellungen-Nav: Firma · Team · Preislisten · Formulare · Benachrichtigungen */
+/** Einstellungen-Nav: Firma · Team · Preislisten · Benachrichtigungen */
 export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
   {
     id: 'firma',
@@ -44,14 +44,6 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
       '/einstellungen/vorlagen',
       '/einstellungen/preisliste',
     ],
-  },
-  {
-    id: 'formulare',
-    href: '/einstellungen/formulare',
-    label: 'Formulare',
-    icon: FileText,
-    mockIcon: 'forms',
-    matchPrefixes: ['/einstellungen/formulare'],
   },
   {
     id: 'benachrichtigungen',

@@ -52,6 +52,20 @@ export type LeadStatusHistory = {
 }
 
 /** privat | gewerbe | hausverwaltung | sonstiges */
+/** CRM-Ansprechpartner unter einem Kunden (Versand-Empfänger, kein Portal-Login). */
+export type KundeAnsprechpartner = {
+  id: string
+  kunde_id: string
+  name: string
+  email: string | null
+  telefon: string | null
+  rolle: string | null
+  ist_primaer: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string | null
+}
+
 export type Kunde = {
   id: string
   name: string
@@ -70,6 +84,8 @@ export type Kunde = {
   created_at: string
   updated_at?: string | null
   ansprechpartner?: string | null
+  /** CRM-Ansprechpartner-Liste (geladen am Detail) */
+  kunden_ansprechpartner?: KundeAnsprechpartner[] | null
   webseite?: string | null
   geburtstag?: string | null
   kundennummer?: string | null
@@ -187,6 +203,8 @@ export type Lead = {
   kunde_id: string | null
   /** Ausgewähltes Verwaltungsobjekt (Gewerbe/Hausverwaltung) */
   kunde_objekt_id?: string | null
+  /** Optionaler Ansprechpartner (Empfänger) */
+  ansprechpartner_id?: string | null
   kanal: LeadKanal
   status: LeadStatus
   situation: string | null
@@ -428,6 +446,8 @@ export type Angebot = {
   kunde_id: string | null
   /** Ausführungsort (Verwaltungsobjekt) */
   kunde_objekt_id?: string | null
+  /** Optionaler Ansprechpartner (Versand-Empfänger) */
+  ansprechpartner_id?: string | null
   status: AngebotStatus
   positionen: AngebotPosition[]
   gesamt_fix?: number | null

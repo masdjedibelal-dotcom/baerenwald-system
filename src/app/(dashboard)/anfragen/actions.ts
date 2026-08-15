@@ -442,14 +442,25 @@ export async function createAnfrage(
     }
   }
 
+  let ansprechpartnerId: string | null = null
+
   if (!kundeId && email) {
-    const { data: existing } = await supabase
-      .from('kunden')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-    if (existing?.id) {
-      kundeId = existing.id
+    const { findKundeOderAnsprechpartnerByEmail } = await import(
+      '@/app/actions/kunden-ansprechpartner'
+    )
+    const hit = await findKundeOderAnsprechpartnerByEmail(email)
+    if (hit.ok) {
+      kundeId = hit.kundeId
+      ansprechpartnerId = hit.ansprechpartnerId
+    } else {
+      const { data: existing } = await supabase
+        .from('kunden')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle()
+      if (existing?.id) {
+        kundeId = existing.id
+      }
     }
   }
 
@@ -611,6 +622,7 @@ export async function createAnfrage(
     .from('leads')
     .insert({
       kunde_id: kundeId,
+      ansprechpartner_id: ansprechpartnerId,
       auftraggeber_kunde_id: hvAuftraggeberId,
       kunde_objekt_id: objektId,
       melder_name: melderName,

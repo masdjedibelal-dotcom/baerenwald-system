@@ -54,8 +54,6 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
   berechneHinweis35aAnteil,
   berechneRechnung,
-  kundeKannReverseCharge13b,
-  kundeZeigt35a,
   parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
@@ -374,21 +372,6 @@ export function RechnungWizard({
   )
   const kleinunternehmer = parseKleinunternehmerSetting(firm.kleinunternehmer)
   const defaultMwst = Math.max(0, parseInt(firm.mwst_satz, 10) || DEFAULT_MWST_SATZ)
-
-  useEffect(() => {
-    const erlaubt13b = !kleinunternehmer && kundeKannReverseCharge13b(kunde?.typ)
-    const erlaubt35aTyp = !kleinunternehmer && kundeZeigt35a(kunde?.typ)
-    setMeta((m) => {
-      let next = m
-      if (m.reverse_charge_13b && !erlaubt13b) {
-        next = { ...next, reverse_charge_13b: false }
-      }
-      if (m.hinweis_35a && !erlaubt35aTyp) {
-        next = { ...next, hinweis_35a: false }
-      }
-      return next === m ? m : next
-    })
-  }, [kunde?.typ, kleinunternehmer])
 
   const berechnung = useMemo(
     () =>
@@ -909,11 +892,7 @@ export function RechnungWizard({
         : berechnung.brutto,
     }
   )
-  const hinweis35aErlaubt =
-    !kleinunternehmer && kundeZeigt35a(kunde?.typ) && anteil35a.lohn_netto > 0
-  const hinweis13bErlaubt =
-    !kleinunternehmer && kundeKannReverseCharge13b(kunde?.typ)
-  const ustLabel = meta.reverse_charge_13b && hinweis13bErlaubt
+  const ustLabel = meta.reverse_charge_13b
     ? 'MwSt 0% (§13b)'
     : berechnung.mwst_satz === 0
       ? 'MwSt 0%'
@@ -985,41 +964,29 @@ export function RechnungWizard({
         {(
           [
             {
-              on: meta.hinweis_35a && hinweis35aErlaubt,
+              on: meta.hinweis_35a,
               set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
-              erlaubt: hinweis35aErlaubt,
               label: '§35a EStG-Hinweis ausweisen',
               sub:
-                (anteil35a.lohn_netto > 0
+                anteil35a.lohn_netto > 0
                   ? anteil35a.hat_materialausweis
                     ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
                     : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
-                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen') +
-                (!hinweis35aErlaubt
-                  ? kundeZeigt35a(kunde?.typ)
-                    ? ' — nur bei Lohnanteil > 0'
-                    : ' — nur bei Privatkunden'
-                  : ''),
+                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
             },
             {
-              on: meta.reverse_charge_13b && hinweis13bErlaubt,
+              on: meta.reverse_charge_13b,
               set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
-              erlaubt: hinweis13bErlaubt,
               label: 'Reverse-Charge (§13b UStG)',
-              sub:
-                'Steuerschuldnerschaft des Leistungsempfängers' +
-                (!hinweis13bErlaubt
-                  ? ' — nur für Gewerbe- oder Hausverwaltungs-Kunden'
-                  : ''),
+              sub: 'Steuerschuldnerschaft des Leistungsempfängers',
             },
           ] as const
         ).map((c) => (
           <button
             key={c.label}
             type="button"
-            className={cn('rw-tax__opt', c.on && 'on', !c.erlaubt && 'is-disabled')}
-            disabled={!c.erlaubt}
-            onClick={() => c.erlaubt && c.set(!c.on)}
+            className={cn('rw-tax__opt', c.on && 'on')}
+            onClick={() => c.set(!c.on)}
           >
             <span className="rw-tax__check" aria-hidden>
               {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}

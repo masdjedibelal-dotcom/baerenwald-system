@@ -17,12 +17,14 @@ import {
   type CrmNotificationItem,
 } from '@/app/(dashboard)/notifications/actions'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 /**
  * TopBar-Glocke: Unread-Badge · Liste · Klick öffnet direkt den Vorgang.
  */
 export function CrmNotificationsBell() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState<CrmNotificationFilter>('ungelesen')
   const [items, setItems] = useState<CrmNotificationItem[]>([])
@@ -153,7 +155,7 @@ export function CrmNotificationsBell() {
           setOpen(false)
         }}
         title="Updates"
-        subtitle="Portal & externe Meldungen · neueste 20"
+        subtitle={isMobile ? 'Portal & externe Meldungen · neueste 20' : null}
         context="detail"
         size="md"
         manageHistory={false}

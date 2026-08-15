@@ -38,7 +38,7 @@ import type {
   RechnungAuswahlZeile,
   RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
-import { formatDatum, cn } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { StatusTone } from '@/lib/status/status-tone'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -407,14 +407,12 @@ export function VorgangZahlungTab({
     (abschlagRows.length > 0 || abschlussRows.length > 0) &&
     rows.length > 1
 
-  const { bezahltBrutto, gestelltBrutto } = useMemo(() => {
+  const bezahltBrutto = useMemo(() => {
     let bezahlt = 0
-    let gestellt = 0
     for (const row of rows) {
       if (row.status === 'bezahlt') bezahlt += row.betrag
-      else if (row.status === 'gestellt') gestellt += row.betrag
     }
-    return { bezahltBrutto: bezahlt, gestelltBrutto: gestellt }
+    return bezahlt
   }, [rows])
 
   const invoiceSumBrutto = useMemo(
@@ -429,23 +427,11 @@ export function VorgangZahlungTab({
         ? invoiceSumBrutto || gesamtBruttoHint || 0
         : totalBrutto || invoiceSumBrutto
 
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({})
-
-  function isRateExpanded(rowId: string, defaultOpen: boolean): boolean {
-    if (expandedIds[rowId] !== undefined) return Boolean(expandedIds[rowId])
-    return defaultOpen
-  }
-
-  function toggleExpand(rowId: string, currentlyExpanded: boolean) {
-    setExpandedIds((prev) => ({ ...prev, [rowId]: !currentlyExpanded }))
-  }
-
   const pct =
     totalBruttoResolved > 0
       ? Math.round((bezahltBrutto / Math.max(totalBruttoResolved, bezahltBrutto)) * 100)
       : 0
   const offen = Math.max(0, totalBruttoResolved - bezahltBrutto)
-  const naechste = rows.find((r) => r.isNext) ?? null
   const openRate = rows.find((r) => r.id === openRateId) ?? null
   const openRechnung = openRate?.rechnungId
     ? rechnungById.get(openRate.rechnungId) ?? null
@@ -609,67 +595,41 @@ export function VorgangZahlungTab({
 
   function renderRateRow(row: RateRow) {
     const belege = row.belege ?? []
-    const hasBelege = belege.length > 0
     const aktiv =
       (row.rechnungId != null && row.rechnungId === aktuelleRechnungId) ||
       belege.some((b) => b.id === aktuelleRechnungId)
-    // Accordion nur Desktop; mobil öffnet Tap immer den Bottom-Sheet (RateDrawer)
-    const showAccordion = !isMobile && hasBelege && (showGruppen || belege.length > 1)
-    // Standard: nur die aktive Rate offen, Rest zugeklappt
-    const expanded = isRateExpanded(row.id, showAccordion && aktiv)
-
-    function onToggleAccordion() {
-      if (!showAccordion) return
-      toggleExpand(row.id, expanded)
-    }
 
     function onOpenDrawer() {
       setOpenRateId(row.id)
     }
 
     return (
-      <div key={row.id} className={cn('zahlplan-rate', expanded && 'zahlplan-rate--open')}>
+      <div key={row.id} className="zahlplan-rate">
         <div
           role="button"
           tabIndex={0}
-          aria-expanded={showAccordion ? expanded : undefined}
           className={[
             'list-row',
             'zahlplan-row',
             'zahlplan-row--simple',
             'zahlung-row',
-            showAccordion ? 'zahlung-row--accordion' : '',
             row.isNext ? 'zahlung-row--next' : '',
             aktiv ? 'zahlung-row--next' : '',
           ]
             .filter(Boolean)
             .join(' ')}
-          onClick={() => {
-            if (showAccordion) onToggleAccordion()
-            else onOpenDrawer()
-          }}
+          onClick={onOpenDrawer}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              if (showAccordion) onToggleAccordion()
-              else onOpenDrawer()
+              onOpenDrawer()
             }
           }}
         >
           <div className="zahlplan-row__label">
             <span className="zahlplan-row__title">
-              {showAccordion ? (
-                <span className="zahlplan-row__expand" aria-hidden>
-                  <MockIcon ctx="btn" n={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
-                </span>
-              ) : null}
               <span className="zahlplan-row__name">{row.label}</span>
               <StatusBadge status={row.badgeStatus} label={row.badgeLabel} tone={row.badgeTone} />
-              {(row.belegCount ?? 0) > 0 && showAccordion ? (
-                <span className="zahlplan-row__count">
-                  {row.belegCount} {row.belegCount === 1 ? 'Beleg' : 'Belege'}
-                </span>
-              ) : null}
             </span>
             {row.sub ? <div className="zahlplan-row__pct">{row.sub}</div> : null}
           </div>
@@ -687,58 +647,9 @@ export function VorgangZahlungTab({
           </div>
           <div className="zahlplan-row__betrag">{formatEurBetrag(row.betrag)}</div>
           <div className="zahlplan-row__menu">
-            {showAccordion ? (
-              <button
-                type="button"
-                className="zahlplan-row__detail"
-                title="Details"
-                aria-label={`${row.label} Details`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenDrawer()
-                }}
-              >
-                <MockIcon ctx="btn" n="dots" size={15} />
-              </button>
-            ) : (
-              <MockIcon ctx="btn" n="chevron-right" size={15} />
-            )}
+            <MockIcon ctx="btn" n="chevron-right" size={15} />
           </div>
         </div>
-        {showAccordion && expanded ? (
-          <div className="zahlplan-belege" role="list">
-            {belege.map((b) => {
-              const belegAktiv = b.id === aktuelleRechnungId
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  role="listitem"
-                  className={[
-                    'zahlplan-beleg',
-                    belegAktiv ? 'zahlplan-beleg--aktiv' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (aktuelleRechnungId === b.id) {
-                      router.push(`/rechnungen/${b.id}?tab=uebersicht`)
-                      return
-                    }
-                    router.push(`/rechnungen/${b.id}`)
-                  }}
-                >
-                  <span className="zahlplan-beleg__nr">{b.nummer || '—'}</span>
-                  <StatusBadge status={b.status} label={b.statusLabel} />
-                  <span className="zahlplan-beleg__betrag">
-                    {b.brutto != null ? formatEurBetrag(b.brutto) : '—'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
       </div>
     )
   }
@@ -841,12 +752,6 @@ export function VorgangZahlungTab({
               von {formatEurBetrag(totalBruttoResolved || bezahltBrutto)}
             </span>
           </div>
-          {variant !== 'rechnung' ? (
-            <div className="zahlplan-summary__meta">
-              {pct} % bezahlt
-              {gestelltBrutto > 0 ? ` · ${formatEurBetrag(gestelltBrutto)} gestellt` : ''}
-            </div>
-          ) : null}
         </div>
         {variant !== 'rechnung' ? (
           <div className="zahlplan-bar" aria-hidden>
@@ -860,20 +765,6 @@ export function VorgangZahlungTab({
           <div className="zahlung-tab-hint">
             <MockIcon ctx="btn" n="file-invoice" size={15} />
             <span>Gesamtrechnung — als eine Rechnung gestellt.</span>
-          </div>
-        ) : naechste && interactive ? (
-          <div className="zahlung-tab-hint">
-            <MockIcon ctx="btn" n="file-invoice" size={15} />
-            <span>
-              Als nächstes: <b>{naechste.label}</b>
-              {naechste.faellig
-                ? ` · fällig ${formatDatum(String(naechste.faellig).slice(0, 10))}`
-                : ''}{' '}
-              · {formatEurBetrag(naechste.betrag)}
-            </span>
-            <MockBtn sm kind="ghost" icon="chevron-right" onClick={() => setOpenRateId(naechste.id)}>
-              Öffnen
-            </MockBtn>
           </div>
         ) : null}
 
@@ -931,11 +822,6 @@ export function VorgangZahlungTab({
             <span>
               Bezahlt <b>{formatEurBetrag(bezahltBrutto)}</b>
             </span>
-            {gestelltBrutto > 0 ? (
-              <span>
-                Gestellt <b>{formatEurBetrag(gestelltBrutto)}</b>
-              </span>
-            ) : null}
             <span className="zahlplan-foot__offen">
               Offen <b>{formatEurBetrag(offen)}</b>
             </span>

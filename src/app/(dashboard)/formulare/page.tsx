@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-/** Formulare nur noch unter Einstellungen — Legacy-Route redirectet. */
+/** Legacy-Listenroute — Formulare-UI ausgeblendet. */
 export default function FormulareRedirectPage() {
-  redirect('/einstellungen/formulare')
+  redirect('/einstellungen/firma')
 }

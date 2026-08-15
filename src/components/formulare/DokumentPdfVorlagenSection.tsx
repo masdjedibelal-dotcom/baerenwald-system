@@ -44,15 +44,7 @@ export function DokumentPdfVorlagenSection({
 
   return (
     <>
-      <Sec
-        title={`Dokumentvorlagen · ${vorlagen.length}`}
-        icon="file-invoice"
-        hint="Muster: Max Mustermann"
-      >
-        <p className="formulare-sec__lead">
-          Alle PDFs, die an Kunden versendet werden — Vorschau mit Beispieldaten (nicht speicherbar,
-          Layout kommt aus dem System).
-        </p>
+      <Sec title={`Dokumentvorlagen · ${vorlagen.length}`} icon="file-invoice">
         <div className="listcard listcard--cols" style={{ ['--list-cols' as string]: COLS }}>
           <div className="list-row head" aria-hidden>
             <div />
@@ -160,16 +152,7 @@ export function DokumentPdfVorlagenSection({
           onClose={() => setPreview(null)}
           icon={preview.icon}
           title={preview.title}
-          sub="Muster-PDF mit Max Mustermann"
           className="wide"
-          footer={
-            <>
-              <div style={{ flex: 1 }} />
-              <MockBtn sm kind="primary" icon="check" onClick={() => setPreview(null)}>
-                Schließen
-              </MockBtn>
-            </>
-          }
         >
           <div
             style={{

@@ -473,27 +473,7 @@ export function AuftragDokumenteTab({
         className="dshell-framed"
         collapsible={false}
         title={`Dokumente · ${zeilen.length}`}
-        action={
-          isMobile ? undefined : (
-            <button
-              type="button"
-              className="btn primary sm inline-flex gap-1.5"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              <MockIcon ctx="btn" n="upload" size={15} />
-              Datei hochladen
-            </button>
-          )
-        }
       >
-        {!isMobile ? (
-          <p className="mb-3 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Projekt-Dokumente (Angebot, Rechnungen, Uploads). Partner-Compliance findest du im Tab{' '}
-            <span className="font-medium text-bw-text">Compliance</span>.
-          </p>
-        ) : null}
-
         {!isMobile ? (
           <>
             <input

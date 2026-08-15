@@ -165,7 +165,6 @@ export const SUB_LABELS: Record<string, Record<string, string>> = {
     firma: 'Firma & Branding',
     benutzer: 'Team',
     preise: 'Preislisten',
-    formulare: 'Formulare',
     integration: 'Integrationen',
     compliance: 'Compliance',
     datenschutz: 'Datenschutz & DSGVO',

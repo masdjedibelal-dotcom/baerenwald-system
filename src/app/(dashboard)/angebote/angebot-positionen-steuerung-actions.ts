@@ -305,3 +305,189 @@ export async function bulkDeleteAngebotPositionen(
   if (!saved.ok) return saved
   return { ok: true, deleted }
 }
+
+/**
+ * Handwerker an Angebots-Positionen zuweisen (Partner-EK + angebot_handwerker),
+ * analog zu Auftrag `zuweiseHandwerkerAnPositionenV3`.
+ */
+export async function zuweiseHandwerkerAnAngebotPositionen(input: {
+  angebotId: string
+  positionIds: string[]
+  handwerkerId: string
+  ekNetto?: number | null
+  ekNettoByPositionId?: Record<string, number | null | undefined>
+  leistung_name?: string
+  beschreibung?: string | null
+  aufgabe_notiz?: string | null
+}): Promise<{ ok: true; updated: number; zuweisungIds: string[] } | { ok: false; message: string }> {
+  const gate = await assertAngebotEditable(input.angebotId)
+  if (!gate.ok) return gate
+
+  const ids = Array.from(new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)))
+  const hwId = input.handwerkerId.trim()
+  if (!ids.length || !hwId) {
+    return { ok: false, message: 'Positionen und Handwerker erforderlich.' }
+  }
+
+  const { data: hw, error: hwErr } = await gate.supabase!
+    .from('handwerker')
+    .select('id, name, firma')
+    .eq('id', hwId)
+    .maybeSingle()
+  if (hwErr || !hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
+
+  const hwName =
+    (hw.firma as string | null)?.trim() ||
+    (hw.name as string | null)?.trim() ||
+    'Handwerker'
+
+  const ekGlobal =
+    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
+      ? Math.round(input.ekNetto * 100) / 100
+      : null
+  const ekById = input.ekNettoByPositionId ?? null
+
+  const next = [...gate.positionen]
+  let updated = 0
+  const gewerkIds = new Set<string>()
+
+  for (const posId of ids) {
+    const idx = next.findIndex((p) => p.id === posId)
+    if (idx < 0) return { ok: false, message: 'Position nicht gefunden.' }
+    const current = next[idx]!
+    if (istGewerkBeschreibungPosition(current) || istFreitextPosition(current)) {
+      return { ok: false, message: 'Diese Position kann hier nicht zugewiesen werden.' }
+    }
+
+    const menge =
+      current.menge != null && Number.isFinite(current.menge) && current.menge > 0
+        ? current.menge
+        : 1
+    const fromMap = ekById?.[posId]
+    const ekLine =
+      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+        ? Math.round(fromMap * 100) / 100
+        : ekGlobal
+    if (ekLine == null || ekLine <= 0) {
+      return {
+        ok: false,
+        message: `Partner-EK fehlt für „${current.leistung_name?.trim() || current.leistung || 'Leistung'}“.`,
+      }
+    }
+
+    const leistung =
+      ids.length === 1 && input.leistung_name !== undefined
+        ? input.leistung_name.trim() || current.leistung_name || current.leistung
+        : current.leistung_name || current.leistung
+    const beschreibung =
+      ids.length === 1 && input.beschreibung !== undefined
+        ? input.beschreibung?.trim() ?? ''
+        : current.beschreibung
+
+    next[idx] = {
+      ...current,
+      leistung,
+      leistung_name: leistung,
+      beschreibung,
+      handwerker_id: hwId,
+      handwerker_name: hwName,
+      einkaufspreis: ekStueckFromInput(ekLine, menge),
+    }
+    updated++
+
+    const gid = current.gewerk_id?.trim()
+    if (!gid) {
+      return {
+        ok: false,
+        message: `„${leistung || 'Leistung'}“ hat kein Gewerk — Zuweisung nicht möglich.`,
+      }
+    }
+    gewerkIds.add(gid)
+  }
+
+  const saved = await persistAngebotPositionen(gate.supabase!, input.angebotId, next)
+  if (!saved.ok) return saved
+
+  const notiz = input.aufgabe_notiz?.trim() || null
+  const zuweisungIds: string[] = []
+
+  for (const gewerkId of gewerkIds) {
+    const { data: existingRows } = await gate.supabase!
+      .from('angebot_handwerker')
+      .select('id, status')
+      .eq('angebot_id', input.angebotId)
+      .eq('gewerk_id', gewerkId)
+      .eq('handwerker_id', hwId)
+
+    const existing = (existingRows ?? []).find((r) => {
+      const st = String(r.status ?? '').toLowerCase()
+      return st !== 'ersetzt' && st !== 'abgelehnt'
+    })
+
+    if (existing?.id) {
+      if (notiz) {
+        await gate.supabase!
+          .from('angebot_handwerker')
+          .update({ aufgabe_notiz: notiz })
+          .eq('id', existing.id)
+      }
+      zuweisungIds.push(String(existing.id))
+      continue
+    }
+
+    const { data: inserted, error: insErr } = await gate.supabase!
+      .from('angebot_handwerker')
+      .insert({
+        angebot_id: input.angebotId,
+        gewerk_id: gewerkId,
+        handwerker_id: hwId,
+        status: 'ausstehend',
+        aufgabe_notiz: notiz,
+      })
+      .select('id')
+      .single()
+
+    if (insErr || !inserted?.id) {
+      return { ok: false, message: insErr?.message ?? 'Handwerker-Zuweisung konnte nicht angelegt werden.' }
+    }
+    zuweisungIds.push(String(inserted.id))
+  }
+
+  revalidatePath(`/angebote/${input.angebotId}`)
+  return { ok: true, updated, zuweisungIds }
+}
+
+/** Partner-Anfrage für Zuweisungen nach Leistungs-Zuweisen (Angebot). */
+export async function sendAngebotLeistungenAnHandwerkerV3(input: {
+  angebotId: string
+  zuweisungIds: string[]
+}): Promise<{ ok: true; gesendet: number } | { ok: false; message: string }> {
+  const ids = Array.from(new Set(input.zuweisungIds.map((id) => id.trim()).filter(Boolean)))
+  if (!ids.length) return { ok: false, message: 'Keine Zuweisungen zum Senden.' }
+
+  const { loadAngebotDetailAdmin } = await import('@/app/(dashboard)/angebote/actions')
+  const { sendHandwerkerAnfrageFuerZuweisung } = await import(
+    '@/lib/angebote/send-handwerker-anfrage'
+  )
+
+  const detail = await loadAngebotDetailAdmin(input.angebotId)
+  if (!detail?.kunden) return { ok: false, message: 'Angebot nicht gefunden.' }
+
+  const byId = new Map((detail.angebot_handwerker ?? []).map((z) => [z.id, z]))
+  let gesendet = 0
+
+  for (const id of ids) {
+    const row = byId.get(id)
+    if (!row) return { ok: false, message: 'Zuweisung nicht gefunden.' }
+    const send = await sendHandwerkerAnfrageFuerZuweisung(
+      detail,
+      row as unknown as Record<string, unknown>,
+      true
+    )
+    if (!send.ok) return { ok: false, message: send.message }
+    gesendet++
+  }
+
+  revalidatePath(`/angebote/${input.angebotId}`)
+  return { ok: true, gesendet }
+}

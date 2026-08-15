@@ -201,7 +201,7 @@ export async function inviteBenutzer(
 
 export async function updateBenutzerProfil(
   id: string,
-  patch: { name: string; rolle: 'admin' | 'manager'; telefon?: string }
+  patch: { name: string; rolle: 'admin' | 'manager'; telefon?: string; email?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
   if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
@@ -209,9 +209,29 @@ export async function updateBenutzerProfil(
     return { ok: false, message: 'Nur CRM-Mitarbeiter können hier bearbeitet werden.' }
   }
 
+  const currentEmail = (user.user.email?.trim() || '').toLowerCase()
+  const nextEmail = (patch.email?.trim() || currentEmail).toLowerCase()
+  if (!nextEmail || !nextEmail.includes('@')) {
+    return { ok: false, message: 'Gültige E-Mail nötig' }
+  }
+
+  if (nextEmail !== currentEmail) {
+    const portal = await portalKontoFuerEmail(nextEmail, id)
+    if (portal) return { ok: false, message: portalFehler(portal) }
+
+    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+    const taken = (existing?.users ?? []).find(
+      (u) => u.id !== id && (u.email ?? '').toLowerCase() === nextEmail
+    )
+    if (taken) {
+      return { ok: false, message: 'Diese E-Mail ist bereits vergeben.' }
+    }
+  }
+
   const prev = (user.user.user_metadata ?? {}) as Record<string, unknown>
   const telefon = patch.telefon?.trim() ?? ''
   const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+    ...(nextEmail !== currentEmail ? { email: nextEmail, email_confirm: true } : {}),
     user_metadata: {
       ...prev,
       name: patch.name.trim(),
@@ -226,10 +246,9 @@ export async function updateBenutzerProfil(
   })
   if (error) return { ok: false, message: error.message }
 
-  const email = (user.user.email?.trim() || '').toLowerCase()
   await upsertCrmMitarbeiterProfil({
     authUserId: id,
-    email,
+    email: nextEmail,
     name: patch.name.trim(),
     telefon,
   })

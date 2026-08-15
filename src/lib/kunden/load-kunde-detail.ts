@@ -127,6 +127,9 @@ const KUNDE_DETAIL_RELATIONS = `
       ),
       kunden_dokumente(
         id, kunde_id, name, typ, datei_url, groesse_bytes, created_at
+      ),
+      kunden_ansprechpartner(
+        id, kunde_id, name, email, telefon, rolle, ist_primaer, sort_order, created_at, updated_at
       )
     `
 

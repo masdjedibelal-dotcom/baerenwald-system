@@ -2,7 +2,7 @@
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
 import { Button } from '@/components/ui/Button'
@@ -35,6 +35,7 @@ import {
   crmBestaetigeHandwerkerAnfrage,
   loescheHandwerkerAnfrage,
 } from '@/app/(dashboard)/angebote/actions'
+import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
@@ -113,7 +114,14 @@ export function AngebotVersandSection({
 
   const kunde = detail.kunden
   const kundeTyp = resolveAngebotKundeTyp(kunde?.typ, detail.leads?.kundentyp)
-  const kundeEmail = kunde?.email?.trim() ?? ''
+  const [apRows, setApRows] = useState<
+    Array<{ id: string; name: string; email: string | null }>
+  >([])
+  const [mailToOverride, setMailToOverride] = useState<string | null>(null)
+  const kundeEmail =
+    mailToOverride?.trim() ||
+    kunde?.email?.trim() ||
+    ''
   const kundeName = kunde?.name?.trim() ?? 'Kundin'
   const vorname =
     kundeBegruessungsVorname({
@@ -178,19 +186,43 @@ export function AngebotVersandSection({
     statusOk &&
     Boolean(kundeEmail)
 
+  useEffect(() => {
+    const kid = detail.kunde_id?.trim()
+    if (!kid) {
+      setApRows([])
+      return
+    }
+    let cancelled = false
+    void listKundenAnsprechpartner(kid).then((rowsAp) => {
+      if (cancelled) return
+      setApRows(
+        rowsAp
+          .filter((r) => r.email?.trim())
+          .map((r) => ({ id: r.id, name: r.name, email: r.email }))
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [detail.kunde_id])
+
   function sendKunde() {
     startTransition(async () => {
       const res = await fetch(`/api/angebote/${detail.id}/senden`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ typ: 'kunde', subject }),
+        body: JSON.stringify({
+          typ: 'kunde',
+          subject,
+          to: kundeEmail ? [kundeEmail] : undefined,
+        }),
       })
       const json = (await res.json()) as { error?: string }
       if (!res.ok) {
         toast.error(json.error ?? 'Versand fehlgeschlagen')
         return
       }
-      toast.success(`Angebot an ${kundeName} gesendet`)
+      toast.success(`Angebot an ${kundeEmail || kundeName} gesendet`)
       setKundeModal(false)
       onKundeSent?.()
       router.refresh()
@@ -493,8 +525,39 @@ export function AngebotVersandSection({
         }
       >
         <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
-          Empfänger: <span className="font-medium text-bw-text">{kundeEmail}</span>
+          Empfänger:{' '}
+          <span className="font-medium text-bw-text">{kundeEmail || '—'}</span>
         </p>
+        {(kunde?.email?.trim() || apRows.length > 0) ? (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {kunde?.email?.trim() ? (
+              <button
+                type="button"
+                className={cn(
+                  'zahlplan-preset-chip',
+                  (!mailToOverride || mailToOverride === kunde.email.trim()) && 'is-on'
+                )}
+                onClick={() => setMailToOverride(kunde.email!.trim())}
+              >
+                Stamm · {kunde.email.trim()}
+              </button>
+            ) : null}
+            {apRows.map((ap) => {
+              const mail = ap.email?.trim() || ''
+              if (!mail) return null
+              return (
+                <button
+                  key={ap.id}
+                  type="button"
+                  className={cn('zahlplan-preset-chip', mailToOverride === mail && 'is-on')}
+                  onClick={() => setMailToOverride(mail)}
+                >
+                  {ap.name} · {mail}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
         <KiAssistFieldLabel
           label="Betreff"
           value={subject}

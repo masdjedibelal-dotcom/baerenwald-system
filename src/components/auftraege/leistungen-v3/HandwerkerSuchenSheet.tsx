@@ -131,7 +131,7 @@ export function HandwerkerSuchenSheet({
     <EditorSheet
       open={open}
       onClose={onClose}
-      title="Handwerker suchen"
+      title="Partner suchen"
       context="detail"
       size="lg"
       overlayClassName="editor-sheet-overlay--stack"
@@ -166,7 +166,7 @@ export function HandwerkerSuchenSheet({
 
         <input
           className="sel w-full"
-          placeholder="Handwerker suchen…"
+          placeholder="Partner suchen…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           /* Kein autoFocus — sonst Keyboard + Sheet-Höhe springen beim erneuten Öffnen */

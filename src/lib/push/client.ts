@@ -58,7 +58,8 @@ export async function showLocalTestNotification(): Promise<void> {
     if (p !== 'granted') throw new Error('Berechtigung verweigert')
   }
   const reg = await ensureCrmServiceWorker()
-  await reg.showNotification('Bärenwald', {
+  // Titel leer: sonst „Bärenwald from Bärenwald“ (Safari/PWA hängt den App-Namen an).
+  await reg.showNotification('', {
     body: 'Test erfolgreich — Push ist auf diesem Gerät aktiv.',
     icon: '/icons/pwa-192.png',
     tag: 'crm-push-test',

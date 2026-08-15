@@ -9,7 +9,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'Bärenwald',
+    title: '',
     body: 'Neue Benachrichtigung',
     url: '/login',
   }
@@ -33,8 +33,12 @@ self.addEventListener('push', (event) => {
       ? targetUrl
       : `/login?next=${encodeURIComponent(targetUrl)}`
 
+  // Gleicher Text wie Manifest-Name → Safari: „Bärenwald from Bärenwald“. Leer = nur App-Name.
+  let title = String(data.title || '').trim()
+  if (!title || /^bärenwald$/i.test(title)) title = ''
+
   event.waitUntil(
-    self.registration.showNotification(String(data.title || 'Bärenwald'), {
+    self.registration.showNotification(title, {
       body: String(data.body || ''),
       icon: '/icons/pwa-192.png',
       badge: '/icons/pwa-192.png',

@@ -19,7 +19,7 @@ type Props = {
 
 /**
  * CRM-Admin: Portal-Login (Impersonation).
- * Mit `withLabel` als Chip neben Kundenakte (Desktop).
+ * Mit `withLabel` als Chip neben Kundenakte (Desktop + Mobil).
  */
 export function PortalLoginIconButton({
   kundeId,

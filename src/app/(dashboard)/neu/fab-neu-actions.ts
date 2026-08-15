@@ -215,6 +215,55 @@ export async function createAnfrageFuerKunde(
   return { ok: true, leadId: r.id }
 }
 
+/**
+ * Direkt-Angebot abgebrochen: Lead-Träger ohne gespeichertes Angebot soft-löschen.
+ * Nur `crm_direkt_angebot` — normale Anfragen bleiben unberührt.
+ */
+export async function discardOrphanDirektAngebotLead(
+  leadId: string
+): Promise<{ ok: true; discarded: boolean } | { ok: false; message: string }> {
+  const id = leadId.trim()
+  if (!id) return { ok: true, discarded: false }
+
+  const supabase = createClient()
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('id, funnel_daten, geloescht_am')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) return { ok: false, message: error.message }
+  if (!lead?.id) return { ok: true, discarded: false }
+  if ((lead as { geloescht_am?: string | null }).geloescht_am) {
+    return { ok: true, discarded: false }
+  }
+
+  const funnel = (lead as { funnel_daten?: unknown }).funnel_daten
+  const quelle =
+    funnel && typeof funnel === 'object' && !Array.isArray(funnel)
+      ? String((funnel as { quelle?: unknown }).quelle ?? '')
+      : ''
+  if (quelle !== 'crm_direkt_angebot') {
+    return { ok: true, discarded: false }
+  }
+
+  const { data: angs, error: angErr } = await supabase
+    .from('angebote')
+    .select('id')
+    .eq('lead_id', id)
+    .limit(1)
+
+  if (angErr) return { ok: false, message: angErr.message }
+  if ((angs ?? []).length > 0) {
+    return { ok: true, discarded: false }
+  }
+
+  const { softDeleteLeadForPortal } = await import('@/lib/portal/soft-delete-lead')
+  const del = await softDeleteLeadForPortal({ leadId: id })
+  if (!del.ok) return del
+  return { ok: true, discarded: true }
+}
+
 /** Auftrag ohne Angebot/Anfrage — nur Kunde. */
 export async function createDirektAuftrag(input: {
   kundeId: string

@@ -1,12 +1,10 @@
 /**
  * Portal-Web-Push aus dem CRM (Shared DB: push_subscriptions + push_prefs).
- * Titel immer „Bärenwald“ — Inhalt nur im Body.
+ * Notification-Titel leer (App-Name „Bärenwald“ kommt vom Manifest) — Inhalt nur im Body.
  */
 import webpush from 'web-push'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
-
-const PUSH_APP_TITLE = 'Bärenwald'
 
 let vapidReady = false
 
@@ -85,7 +83,8 @@ export async function sendPortalWebPushToUsers(
   }
 
   const payload = JSON.stringify({
-    title: PUSH_APP_TITLE,
+    // Leer: Manifest liefert „Bärenwald“ — sonst Safari „Bärenwald from Bärenwald“
+    title: '',
     body,
     url: input.url || '/portal',
     tag: input.tag ?? 'baerenwald',

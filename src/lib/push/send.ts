@@ -69,9 +69,14 @@ export async function sendCrmPushToStaff(input: {
     return { sent: 0, skipped: subErr?.message || 'no_subscriptions' }
   }
 
+  const rawTitle = String(input.title ?? '').trim()
+  // Gleicher Name wie Manifest → Safari „Bärenwald from Bärenwald“
+  const title = !rawTitle || /^bärenwald$/i.test(rawTitle) ? '' : rawTitle
+  const body = String(input.body ?? '').trim() || rawTitle || 'Neue Benachrichtigung'
+
   const payload = JSON.stringify({
-    title: input.title,
-    body: input.body,
+    title,
+    body: /^bärenwald$/i.test(body) && title === '' ? 'Neue Benachrichtigung' : body,
     url: input.url,
     tag: input.tag ?? `crm-${input.typ}`,
   })

@@ -481,6 +481,59 @@ export async function mergeKunden(
     return { data: null, error: null }
   })
 
+  // Ansprechpartner des Merge-Kunden zum Survivor umhängen
+  await withCrmReadFallback(async (db) => {
+    await db
+      .from('kunden_ansprechpartner')
+      .update({ kunde_id: survivor })
+      .eq('kunde_id', merge)
+    return { data: null, error: null }
+  })
+
+  // Kontaktdaten des aufgelösten Kunden als Ansprechpartner am Survivor anlegen
+  {
+    const mergeName =
+      [mergeRow.vorname, mergeRow.nachname].filter((x) => !strEmpty(x)).join(' ').trim() ||
+      String(mergeRow.name ?? '').trim() ||
+      String(mergeRow.ansprechpartner ?? '').trim() ||
+      'Ehemaliger Kontakt'
+    const mergeEmail = strEmpty(mergeRow.email) ? null : String(mergeRow.email).trim()
+    const mergeTel = strEmpty(mergeRow.telefon) ? null : String(mergeRow.telefon).trim()
+    const survivorEmail = strEmpty(survRow.email) ? null : String(survRow.email).trim().toLowerCase()
+    const sameAsSurvivorMail =
+      Boolean(mergeEmail) &&
+      Boolean(survivorEmail) &&
+      mergeEmail!.toLowerCase() === survivorEmail
+
+    if (!sameAsSurvivorMail && (mergeEmail || mergeTel || mergeName !== 'Ehemaliger Kontakt')) {
+      let existingApId: string | null = null
+      if (mergeEmail) {
+        const { data: existingAp } = await withCrmReadFallback(async (db) =>
+          db
+            .from('kunden_ansprechpartner')
+            .select('id')
+            .eq('kunde_id', survivor)
+            .ilike('email', mergeEmail)
+            .limit(1)
+            .maybeSingle()
+        )
+        existingApId = (existingAp as { id: string } | null)?.id ?? null
+      }
+      if (!existingApId) {
+        await withCrmReadFallback(async (db) =>
+          db.from('kunden_ansprechpartner').insert({
+            kunde_id: survivor,
+            name: mergeName,
+            email: mergeEmail,
+            telefon: mergeTel,
+            rolle: 'Zusammengeführt',
+            ist_primaer: false,
+          })
+        )
+      }
+    }
+  }
+
   const patch: Record<string, unknown> = {}
   const fillKeys = [
     'email',

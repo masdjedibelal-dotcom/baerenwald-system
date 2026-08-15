@@ -110,8 +110,6 @@ export function RateDrawer({
   const r = rate
   const belege = r.belege ?? []
   const aktivBeleg = belege.find((b) => b.id === r.rechnungId) ?? belege[0] ?? null
-  const crumbNr = (aktivBeleg?.nummer || r.reNr || '').trim()
-  const sheetCrumb = crumbNr ? `${crumbNr} >` : null
   const ueberfaellig =
     r.status === 'gestellt' &&
     Boolean(r.faellig) &&
@@ -122,7 +120,6 @@ export function RateDrawer({
       open={open}
       onClose={onClose}
       title={r.label || 'Abschlag'}
-      crumb={sheetCrumb}
       headerEnd={headerEnd}
       size="lg"
     >
@@ -174,39 +171,18 @@ export function RateDrawer({
                 </li>
               ))}
             </ul>
-            {r.status === 'bezahlt' ? (
-              <div className="rate-drawer-note">
-                Bezahlt — Positionsänderungen erzeugen Storno + neue Rechnung.
-              </div>
-            ) : r.status === 'gestellt' ? (
-              <div className="rate-drawer-note">
-                Versendet — nur Mail ohne Storno; Positionsänderungen mit Storno.
-              </div>
-            ) : null}
           </div>
         ) : (
-          <>
-            <div className="props">
-              <MockProp label="Nummer">{aktivBeleg?.nummer || r.reNr || '—'}</MockProp>
-              <MockProp label="Status">
-                {r.status === 'bezahlt'
-                  ? 'Bezahlt'
-                  : r.status === 'gestellt'
-                    ? 'Gestellt'
-                    : aktivBeleg?.statusLabel || '—'}
-              </MockProp>
-              <MockProp label="Änderbar">
-                {r.status === 'bezahlt' || r.status === 'gestellt'
-                  ? 'über Bearbeiten'
-                  : 'direkt bearbeitbar'}
-              </MockProp>
-            </div>
-            <div className="rate-drawer-note">
-              {r.status === 'bezahlt' || r.status === 'gestellt'
-                ? 'Positionsänderungen erzeugen Storno + neue Rechnung; nur Mail ohne Storno.'
-                : 'Änderbar bis Zahlungseingang.'}
-            </div>
-          </>
+          <div className="props">
+            <MockProp label="Nummer">{aktivBeleg?.nummer || r.reNr || '—'}</MockProp>
+            <MockProp label="Status">
+              {r.status === 'bezahlt'
+                ? 'Bezahlt'
+                : r.status === 'gestellt'
+                  ? 'Gestellt'
+                  : aktivBeleg?.statusLabel || '—'}
+            </MockProp>
+          </div>
         )
       )}
 

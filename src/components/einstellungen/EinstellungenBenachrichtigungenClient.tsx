@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from '@/components/ui/app-toast'
+import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import {
   getCrmPushSetup,
   removeCrmPushSubscription,
@@ -31,19 +32,7 @@ import {
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
-        <div style={{ flex: 1 }} />
-      </div>
+      <EinstellungenSectionHeading className="mb-3.5">{title}</EinstellungenSectionHeading>
       <div>{children}</div>
     </div>
   )
@@ -76,9 +65,9 @@ function statusCopy(status: PushCapabilityStatus, hasSub: boolean): {
       }
     case 'ready':
       return {
-        title: hasSub ? 'Aktiv auf diesem Gerät' : 'Bereit',
+        title: hasSub ? '' : 'Bereit',
         sub: hasSub
-          ? 'Push kommt auch bei geschlossener App. Ohne Login öffnet der Tip den Login-Screen.'
+          ? ''
           : 'Master einschalten, um dieses Gerät zu registrieren.',
       }
   }
@@ -203,6 +192,7 @@ export function EinstellungenBenachrichtigungenClient() {
   const copy = statusCopy(cap, hasSub)
   const masterOn = prefs.push_enabled
   const eventsDisabled = !masterOn || pending
+  const showStatus = Boolean(copy.title || copy.sub)
 
   return (
     <>
@@ -222,14 +212,20 @@ export function EinstellungenBenachrichtigungenClient() {
             onClick={() => toggleMaster(!masterOn)}
           />
         </div>
-        <p className="mt-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
-          <strong className="font-medium text-[var(--text)]">{copy.title}</strong>
-          <br />
-          {copy.sub}
-        </p>
+        {showStatus ? (
+          <p className="mt-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
+            {copy.title ? (
+              <>
+                <strong className="font-medium text-[var(--text)]">{copy.title}</strong>
+                {copy.sub ? <br /> : null}
+              </>
+            ) : null}
+            {copy.sub}
+          </p>
+        ) : null}
         {typeof Notification !== 'undefined' && Notification.permission === 'granted' ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="btn ghost sm" disabled={pending} onClick={onTest}>
+            <button type="button" className="btn primary sm" disabled={pending} onClick={onTest}>
               Test-Benachrichtigung
             </button>
           </div>

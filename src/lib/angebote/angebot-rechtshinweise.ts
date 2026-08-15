@@ -1,6 +1,5 @@
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
-  kundeKannReverseCharge13b,
   kundeZeigt35a,
   parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
@@ -16,7 +15,7 @@ export type AngebotRechtshinweise = {
   hinweis_13b: boolean
 }
 
-/** Standard je Kundentyp / Firmeneinstellung (Angebots-Wizard). */
+/** Standard-Vorschläge (nur Defaults — Auswahl bleibt immer frei). */
 export function defaultAngebotRechtshinweise(
   kundeTyp: string | null | undefined,
   firm: FirmenEinstellungen
@@ -35,15 +34,8 @@ export function parseRechtshinweiseFromWizardMeta(
   firm: FirmenEinstellungen
 ): AngebotRechtshinweise {
   const defaults = defaultAngebotRechtshinweise(kundeTyp, firm)
-  const klein = parseKleinunternehmerSetting(firm.kleinunternehmer)
-  const erlaubt35a = kundeZeigt35a(kundeTyp) && !klein
-  const erlaubt13b = kundeKannReverseCharge13b(kundeTyp) && !klein
   if (!raw || typeof raw !== 'object') {
-    return {
-      ...defaults,
-      hinweis_35a: defaults.hinweis_35a && erlaubt35a,
-      hinweis_13b: defaults.hinweis_13b && erlaubt13b,
-    }
+    return { ...defaults }
   }
   const wm = raw as Record<string, unknown>
   const raw35a =
@@ -51,9 +43,9 @@ export function parseRechtshinweiseFromWizardMeta(
   const raw13b =
     typeof wm.hinweis_13b === 'boolean' ? wm.hinweis_13b : defaults.hinweis_13b
   return {
-    hinweis_35a: Boolean(raw35a && erlaubt35a),
+    hinweis_35a: Boolean(raw35a),
     hinweis_19: false,
-    hinweis_13b: Boolean(raw13b && erlaubt13b),
+    hinweis_13b: Boolean(raw13b),
   }
 }
 
@@ -66,20 +58,18 @@ export function formatHinweis35a(lohnNetto: number): string {
 export { HINWEIS_KLEINUNTERNEHMER, HINWEIS_REVERSE_CHARGE_13B }
 
 export function kannHinweis35aAngebot(
-  kundeTyp: string | null | undefined,
-  firm: FirmenEinstellungen,
-  lohnNetto: number
+  _kundeTyp: string | null | undefined,
+  _firm: FirmenEinstellungen,
+  _lohnNetto: number
 ): boolean {
-  return lohnNetto > 0 && kundeZeigt35a(kundeTyp) && !parseKleinunternehmerSetting(firm.kleinunternehmer)
+  return true
 }
 
 export function kannHinweis13bAngebot(
-  kundeTyp: string | null | undefined,
-  firm: FirmenEinstellungen
+  _kundeTyp: string | null | undefined,
+  _firm: FirmenEinstellungen
 ): boolean {
-  return (
-    kundeKannReverseCharge13b(kundeTyp) && !parseKleinunternehmerSetting(firm.kleinunternehmer)
-  )
+  return true
 }
 
 /** USt + Steuernummer für PDF-Fuß (wie Musterangebot). */

@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { toast } from '@/components/ui/app-toast'
 import {
   createAngebot,
   createKundeQuick,
@@ -325,6 +326,8 @@ export function AngebotNeuForm({
         nachname: neuNachname.trim() || null,
         email: neuEmail.trim() || null,
         telefon: neuTelefon.trim() || null,
+        /* Bestehende Firma gewählt → Kontakt als Ansprechpartner, kein neuer Account */
+        parentKundeId: kundeId || null,
       })
       setSaving(false)
       if (!created.ok) {
@@ -333,6 +336,13 @@ export function AngebotNeuForm({
       }
       kid = created.id
       setKundeId(created.id)
+      if (created.via === 'ansprechpartner') {
+        toast.success(
+          created.ansprechpartnerId
+            ? 'Als Ansprechpartner am bestehenden Kunden hinterlegt'
+            : 'Bestehenden Kunden gefunden (gleiche E-Mail)'
+        )
+      }
     }
 
     if (!kid) {

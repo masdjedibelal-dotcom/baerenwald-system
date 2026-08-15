@@ -6,10 +6,8 @@ import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
 
 const ROLLEN: { rolle: string; beschreibung: string; aktiv: boolean }[] = [
-  { rolle: 'Inhaber', beschreibung: 'Voller Zugriff inkl. Finanzen & Einstellungen', aktiv: true },
-  { rolle: 'Projektleitung', beschreibung: 'Aufträge, Handwerker, Termine', aktiv: true },
-  { rolle: 'Backoffice', beschreibung: 'Rechnungen, Kunden, Dokumente', aktiv: true },
-  { rolle: 'Nur Lesen', beschreibung: 'Ansicht ohne Bearbeitung', aktiv: false },
+  { rolle: 'Administrator', beschreibung: 'Voller Zugriff inkl. Finanzen & Einstellungen', aktiv: true },
+  { rolle: 'Mitarbeiter', beschreibung: 'Aufträge, Handwerker, Termine', aktiv: true },
 ]
 
 export function EinstellungenSicherheitClient() {

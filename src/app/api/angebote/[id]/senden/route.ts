@@ -42,7 +42,7 @@ async function loadDetail(
   }
 }
 
-type BodyKunde = { typ: 'kunde'; subject?: string }
+type BodyKunde = { typ: 'kunde'; subject?: string; to?: string[] }
 type BodyHandwerker = {
   typ: 'handwerker'
   zuweisung_id: string
@@ -103,11 +103,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         { status: 400 }
       )
     }
-    if (!detail.kunden?.email?.trim()) {
+    const toOverride = (body.to ?? []).map((e) => e.trim()).filter(Boolean)
+    if (!toOverride.length && !detail.kunden?.email?.trim()) {
       return NextResponse.json({ error: 'Kunden-E-Mail fehlt' }, { status: 400 })
     }
 
-    const r = await sendAngebotToKunde(angebotId)
+    const r = await sendAngebotToKunde(angebotId, {
+      to: toOverride.length ? toOverride : undefined,
+      betreff: body.subject?.trim() || undefined,
+    })
     if (!r.ok) {
       return NextResponse.json({ error: r.message }, { status: 502 })
     }

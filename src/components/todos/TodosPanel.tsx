@@ -173,46 +173,44 @@ export function TodosPanel({
     <div className={cn('todos-panel', compact && 'todos-panel--compact')}>
       <div className="todos-panel__head">
         {!compact ? <h2 className="todos-panel__title">{title}</h2> : <span />}
-        <div className="todos-panel__head-actions">
-          {showFilterChips ? (
-            <div className="todos-panel__chips" role="group" aria-label="Filter">
-              <button
-                type="button"
-                className={cn('chip', view === 'alle' && 'active')}
-                aria-pressed={view === 'alle'}
-                onClick={() => setView('alle')}
-              >
-                Alle
-              </button>
-              <button
-                type="button"
-                className={cn('chip', view === 'offen' && 'active')}
-                aria-pressed={view === 'offen'}
-                onClick={() => setView('offen')}
-              >
-                Offen
-              </button>
-              <button
-                type="button"
-                className={cn('chip', view === 'erledigt' && 'active')}
-                aria-pressed={view === 'erledigt'}
-                onClick={() => setView('erledigt')}
-              >
-                Erledigt
-              </button>
-            </div>
-          ) : null}
+        <button
+          type="button"
+          className="todos-panel__add"
+          onClick={openNew}
+          aria-label="To-do hinzufügen"
+          title="Hinzufügen"
+        >
+          <Plus className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+      {showFilterChips ? (
+        <div className="todos-panel__chips" role="group" aria-label="Filter">
           <button
             type="button"
-            className="todos-panel__add"
-            onClick={openNew}
-            aria-label="To-do hinzufügen"
-            title="Hinzufügen"
+            className={cn('chip', view === 'alle' && 'active')}
+            aria-pressed={view === 'alle'}
+            onClick={() => setView('alle')}
           >
-            <Plus className="h-5 w-5" aria-hidden />
+            Alle
+          </button>
+          <button
+            type="button"
+            className={cn('chip', view === 'offen' && 'active')}
+            aria-pressed={view === 'offen'}
+            onClick={() => setView('offen')}
+          >
+            Offen
+          </button>
+          <button
+            type="button"
+            className={cn('chip', view === 'erledigt' && 'active')}
+            aria-pressed={view === 'erledigt'}
+            onClick={() => setView('erledigt')}
+          >
+            Erledigt
           </button>
         </div>
-      </div>
+      ) : null}
 
       {loadErr ? <p className="text-[length:var(--fs-meta)] text-[var(--red-tx)]">{loadErr}</p> : null}
 

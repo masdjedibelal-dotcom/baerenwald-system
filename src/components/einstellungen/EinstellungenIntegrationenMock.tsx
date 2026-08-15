@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
+import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 
 const INTEGRATIONEN = [
   { name: 'DATEV Export', desc: 'Buchhaltungs-Schnittstelle', on: true },
@@ -15,19 +16,7 @@ const INTEGRATIONEN = [
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>{title}</span>
-        <div style={{ flex: 1 }} />
-      </div>
+      <EinstellungenSectionHeading className="mb-3.5">{title}</EinstellungenSectionHeading>
       <div>{children}</div>
     </div>
   )

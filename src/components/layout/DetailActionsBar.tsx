@@ -114,7 +114,7 @@ function hasMenuContent(items: ActionsMenuItem[]): boolean {
 }
 
 /**
- * Desktop: von rechts ⋯ · Primary · Secondary. Mobil: ⋯ oben, CTAs floating.
+ * Desktop: Secondary · Primary · ⋯ (⋯ ganz rechts). Mobil: ⋯ oben, CTAs floating.
  */
 export function DetailActionsBar({
   primary,

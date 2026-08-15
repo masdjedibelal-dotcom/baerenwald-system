@@ -6,22 +6,18 @@ import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { RechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
-import { cn, formatDatum } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 
 export function RechnungWizardDetailsCard({
   meta,
   onMetaChange,
   onRechnungsdatumChange,
-  zeigt13b,
-  hinweis35aErlaubt,
   lohnNettoPdf,
   showMailFields = false,
 }: {
   meta: RechnungWizardMeta
   onMetaChange: (patch: Partial<RechnungWizardMeta>) => void
   onRechnungsdatumChange: (value: string) => void
-  zeigt13b: boolean
-  hinweis35aErlaubt: boolean
   lohnNettoPdf: number
   showMailFields?: boolean
 }) {
@@ -62,19 +58,11 @@ export function RechnungWizardDetailsCard({
         </label>
       </div>
       <div className="space-y-2.5">
-        <label
-          className={cn(
-            'flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border px-3 py-2.5 text-[length:var(--fs-text)]',
-            hinweis35aErlaubt
-              ? 'border-bw-border bg-bw-hover/30'
-              : 'cursor-not-allowed border-bw-border/60 opacity-50'
-          )}
-        >
+        <label className="flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
           <input
             type="checkbox"
             className="mt-0.5"
             checked={meta.hinweis_35a}
-            disabled={!hinweis35aErlaubt}
             onChange={(e) => onMetaChange({ hinweis_35a: e.target.checked })}
           />
           <span>
@@ -82,26 +70,23 @@ export function RechnungWizardDetailsCard({
             <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
               Lohnkosten-Hinweis neben der Summenaufstellung
               {lohnNettoPdf > 0 ? ` (${formatEurBetrag(lohnNettoPdf)} netto)` : ''}
-              {!hinweis35aErlaubt ? ' — nur bei Privatkunden und Lohnanteil > 0' : ''}
             </span>
           </span>
         </label>
-        {zeigt13b ? (
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={meta.reverse_charge_13b}
-              onChange={(e) => onMetaChange({ reverse_charge_13b: e.target.checked })}
-            />
-            <span>
-              <span className="font-medium">§ 13b UStG (Reverse Charge)</span>
-              <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                Steuerschuldnerschaft Leistungsempfänger
-              </span>
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={meta.reverse_charge_13b}
+            onChange={(e) => onMetaChange({ reverse_charge_13b: e.target.checked })}
+          />
+          <span>
+            <span className="font-medium">§ 13b UStG (Reverse Charge)</span>
+            <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+              Steuerschuldnerschaft Leistungsempfänger
             </span>
-          </label>
-        ) : null}
+          </span>
+        </label>
       </div>
       <label className="field">
         <span className="field-l">Einleitung (PDF)</span>
@@ -165,12 +150,10 @@ export function RechnungWizardDetailsCard({
         label="§ 35a EStG"
         value={meta.hinweis_35a ? 'Aktiv' : 'Aus'}
       />
-      {zeigt13b ? (
-        <MobileOverviewField
-          label="§ 13b Reverse Charge"
-          value={meta.reverse_charge_13b ? 'Aktiv' : 'Aus'}
-        />
-      ) : null}
+      <MobileOverviewField
+        label="§ 13b Reverse Charge"
+        value={meta.reverse_charge_13b ? 'Aktiv' : 'Aus'}
+      />
       <MobileOverviewField
         label="Einleitung"
         value={

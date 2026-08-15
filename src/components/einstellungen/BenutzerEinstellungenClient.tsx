@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { Input } from '@/components/ui/Input'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { toast } from '@/components/ui/app-toast'
+import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
   inviteBenutzer,
@@ -17,28 +17,10 @@ import {
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 
-const COLS = '42px 2fr 1.5fr 1fr'
-
-function initialsFromName(name: string, email: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) {
-    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
-  }
-  if (parts.length === 1 && parts[0]!.length >= 2) {
-    return parts[0]!.slice(0, 2).toUpperCase()
-  }
-  const local = email.split('@')[0] ?? '?'
-  return local.slice(0, 2).toUpperCase() || '?'
-}
+const COLS = '1.4fr 1.6fr 1.1fr 0.9fr'
 
 function rolleLabel(rolle: BenutzerZeile['rolle']): string {
-  return rolle === 'admin' ? 'Inhaber' : 'Projektleitung'
-}
-
-function avatarColor(u: BenutzerZeile, index: number): string {
-  if (u.rolle === 'admin') return 'green'
-  const cycle = ['', 'yellow', ''] as const
-  return cycle[index % cycle.length] ?? ''
+  return rolle === 'admin' ? 'Administrator' : 'Mitarbeiter'
 }
 
 export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeile[] }) {
@@ -51,6 +33,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   const [inviteRolle, setInviteRolle] = useState<'admin' | 'manager'>('manager')
   const [edit, setEdit] = useState<BenutzerZeile | null>(null)
   const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [editTelefon, setEditTelefon] = useState('')
   const [editRolle, setEditRolle] = useState<'admin' | 'manager'>('manager')
   const [pending, startTransition] = useTransition()
@@ -64,6 +47,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   function openEdit(u: BenutzerZeile) {
     setEdit(u)
     setEditName(u.name)
+    setEditEmail(u.email)
     setEditTelefon(u.telefon)
     setEditRolle(u.rolle)
   }
@@ -88,6 +72,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     startTransition(async () => {
       const r = await updateBenutzerProfil(edit.id, {
         name: editName,
+        email: editEmail,
         rolle: editRolle,
         telefon: editTelefon,
       })
@@ -118,27 +103,70 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       empty
     ) : (
       <div className="dok-cards">
-        {rows.map((u, i) => {
-          const initials = initialsFromName(u.name, u.email)
-          const color = avatarColor(u, i)
+        {rows.map((u) => {
+          const tel = u.telefon?.trim() || ''
+          const mail = u.email?.trim() || ''
           return (
-            <DokMobileCard
+            <div
               key={u.id}
-              title={u.name}
-              meta={
-                [u.email || null, !u.aktiv ? 'deaktiviert' : null].filter(Boolean).join(' · ') ||
-                null
-              }
+              role="button"
+              tabIndex={0}
+              className={`dok-card${!u.aktiv ? ' opacity-55' : ''}`}
+              style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
               onClick={() => openEdit(u)}
-              badge={<MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>}
-              className={!u.aktiv ? 'opacity-55' : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openEdit(u)
+                }
+              }}
             >
-              <div className="mb-2 flex items-center gap-2">
-                <div className={`avatar ${color}`.trim()} aria-hidden>
-                  {initials}
+              <div className="dok-card__head">
+                <span className="dok-card__title">
+                  {u.name}
+                  {!u.aktiv ? (
+                    <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
+                  ) : null}
+                </span>
+                <div className="dok-card__badge">
+                  <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
                 </div>
               </div>
-            </DokMobileCard>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  marginTop: 4,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 'var(--fs-text)',
+                    color: 'var(--text-3)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={mail || undefined}
+                >
+                  {mail || '—'}
+                </span>
+                <span
+                  style={{
+                    fontSize: 'var(--fs-meta)',
+                    color: 'var(--text-4)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={tel || undefined}
+                >
+                  {tel || '—'}
+                </span>
+              </div>
+            </div>
           )
         })}
       </div>
@@ -150,70 +178,75 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     ) : (
       <div style={{ margin: 0 }}>
         <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
-          <div />
           <div>Name</div>
           <div>E-Mail</div>
+          <div>Telefon</div>
           <div>Rolle</div>
         </div>
-        {rows.map((u, i) => {
-          const initials = initialsFromName(u.name, u.email)
-          const color = avatarColor(u, i)
-          return (
+        {rows.map((u) => (
+          <div
+            key={u.id}
+            role="button"
+            tabIndex={0}
+            className="list-row"
+            style={{
+              gridTemplateColumns: COLS,
+              cursor: 'pointer',
+              alignItems: 'center',
+              opacity: u.aktiv ? 1 : 0.55,
+            }}
+            onClick={() => openEdit(u)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                openEdit(u)
+              }
+            }}
+          >
             <div
-              key={u.id}
-              role="button"
-              tabIndex={0}
-              className="list-row"
               style={{
-                gridTemplateColumns: COLS,
-                cursor: 'pointer',
-                alignItems: 'center',
-                opacity: u.aktiv ? 1 : 0.55,
-              }}
-              onClick={() => openEdit(u)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openEdit(u)
-                }
+                fontSize: 'var(--fs-text)',
+                fontWeight: 600,
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <div className={`avatar ${color}`.trim()} aria-hidden>
-                {initials}
-              </div>
-              <div
-                style={{
-                  fontSize: 'var(--fs-text)',
-                  fontWeight: 500,
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {u.name}
-                {!u.aktiv ? (
-                  <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  fontSize: 'var(--fs-meta)',
-                  color: 'var(--text-3)',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {u.email || '—'}
-              </div>
-              <div>
-                <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
-              </div>
+              {u.name}
+              {!u.aktiv ? (
+                <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
+              ) : null}
             </div>
-          )
-        })}
+            <div
+              style={{
+                fontSize: 'var(--fs-text)',
+                color: 'var(--text-2)',
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {u.email || '—'}
+            </div>
+            <div
+              style={{
+                fontSize: 'var(--fs-meta)',
+                color: 'var(--text-3)',
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {u.telefon?.trim() || '—'}
+            </div>
+            <div>
+              <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
+            </div>
+          </div>
+        ))}
       </div>
     )
 
@@ -222,9 +255,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       {isMobile ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="m-0 text-[length:var(--fs-text)] font-semibold text-[var(--text)]">
-              Teammitglieder
-            </h2>
+            <EinstellungenSectionHeading>Teammitglieder</EinstellungenSectionHeading>
             {inviteBtn}
           </div>
           {mobileList}
@@ -252,10 +283,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             onChange={(e) => setInviteEmail(e.target.value)}
           />
           <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Nur CRM-Mitarbeiter. Handwerker-, Partner- und Kunden-Logins werden hier nicht
-            verwaltet — bitte eine eigene Mitarbeiter-E-Mail verwenden.
-          </p>
           <div>
             <label className="input-label" htmlFor="invite-rolle">
               Rolle
@@ -266,8 +293,8 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               value={inviteRolle}
               onChange={(e) => setInviteRolle(e.target.value as 'admin' | 'manager')}
             >
-              <option value="manager">Projektleitung</option>
-              <option value="admin">Inhaber</option>
+              <option value="manager">Mitarbeiter</option>
+              <option value="admin">Administrator</option>
             </select>
           </div>
         </div>
@@ -283,6 +310,13 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       >
         <div className="space-y-3">
           <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+          <Input
+            label="E-Mail"
+            type="email"
+            required
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
+          />
           <Input
             label="Handy / Direktwahl"
             type="tel"
@@ -300,8 +334,8 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               value={editRolle}
               onChange={(e) => setEditRolle(e.target.value as 'admin' | 'manager')}
             >
-              <option value="manager">Projektleitung</option>
-              <option value="admin">Inhaber</option>
+              <option value="manager">Mitarbeiter</option>
+              <option value="admin">Administrator</option>
             </select>
           </div>
         </div>

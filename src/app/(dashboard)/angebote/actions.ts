@@ -219,7 +219,15 @@ export async function createKundeQuick(input: {
   name?: string | null
   email: string | null
   telefon: string | null
-}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  /**
+   * Bestehender Kunden-Account: lege Kontakt als Ansprechpartner an
+   * statt einen neuen Kunden zu erzeugen.
+   */
+  parentKundeId?: string | null
+}): Promise<
+  | { ok: true; id: string; ansprechpartnerId?: string | null; via?: 'kunde' | 'ansprechpartner' }
+  | { ok: false; message: string }
+> {
   const vorname = (input.vorname ?? '').trim()
   const nachname = (input.nachname ?? '').trim()
   const legacy = (input.name ?? '').trim()
@@ -233,6 +241,43 @@ export async function createKundeQuick(input: {
     v = parts[0] ?? ''
     n = parts.slice(1).join(' ')
   }
+  const displayName = [v, n].filter(Boolean).join(' ').trim() || legacy
+  const email = input.email?.trim() || null
+  const telefon = input.telefon?.trim() || null
+  const parentId = input.parentKundeId?.trim() || null
+
+  const { findKundeOderAnsprechpartnerByEmail, addAnsprechpartnerToKunde } = await import(
+    '@/app/actions/kunden-ansprechpartner'
+  )
+
+  if (email) {
+    const hit = await findKundeOderAnsprechpartnerByEmail(email)
+    if (hit.ok) {
+      return {
+        ok: true,
+        id: hit.kundeId,
+        ansprechpartnerId: hit.ansprechpartnerId,
+        via: hit.via,
+      }
+    }
+  }
+
+  if (parentId) {
+    const ap = await addAnsprechpartnerToKunde({
+      kundeId: parentId,
+      name: displayName,
+      email,
+      telefon,
+    })
+    if (!ap.ok) return ap
+    return {
+      ok: true,
+      id: ap.kundeId,
+      ansprechpartnerId: ap.id || null,
+      via: 'ansprechpartner',
+    }
+  }
+
   const { data, error } = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
@@ -240,8 +285,8 @@ export async function createKundeQuick(input: {
         name: null,
         vorname: v || null,
         nachname: n || null,
-        email: input.email?.trim() || null,
-        telefon: input.telefon?.trim() || null,
+        email,
+        telefon,
         typ: 'privat',
         adresse: null,
         plz: null,
@@ -253,7 +298,7 @@ export async function createKundeQuick(input: {
   )
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Fehler' }
-  return { ok: true, id: (data as { id: string }).id }
+  return { ok: true, id: (data as { id: string }).id, via: 'kunde' }
 }
 
 export type CreateAngebotInput = {

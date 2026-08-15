@@ -231,11 +231,6 @@ export function HandwerkerListeClient({
     [filtered, selected]
   )
 
-  const bulkOpen = useCallback(() => {
-    const row = selectedRows[0]
-    if (row) router.push(`/handwerker/${row.id}`)
-  }, [router, selectedRows])
-
   const bulkExport = useCallback(() => {
     runMockListExport(
       exportToCSV,
@@ -479,15 +474,10 @@ export function HandwerkerListeClient({
 
       {selectedCount > 0 ? (
         <div className="bulkbar">
-          <span>
+          <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
           <div style={{ flex: 1 }} />
-          {selectedCount === 1 ? (
-            <MockBtn kind="ghost" sm icon="external-link" onClick={bulkOpen}>
-              Öffnen
-            </MockBtn>
-          ) : null}
           <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
             Export
           </MockBtn>
@@ -503,7 +493,7 @@ export function HandwerkerListeClient({
           <MockBtn
             kind="ghost"
             sm
-            className="qa-btn"
+            className="qa-btn bulkbar-clear"
             icon="x"
             onClick={() => setSelected({})}
             title="Auswahl aufheben"

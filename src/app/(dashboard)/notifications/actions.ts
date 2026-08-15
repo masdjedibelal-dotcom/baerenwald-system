@@ -218,6 +218,16 @@ function pushLead(
   const anlass = (row.anlass ?? '').trim().toLowerCase()
   const isMieterMeldung =
     erfassung === 'melder' && (!anlass || anlass === 'meldung')
+  const funnelQuelle =
+    row.funnel_daten &&
+    typeof row.funnel_daten === 'object' &&
+    !Array.isArray(row.funnel_daten)
+      ? String((row.funnel_daten as { quelle?: unknown }).quelle ?? '')
+      : ''
+  // Direkt-Angebot-Träger (auch Waise ohne Angebot) ≠ echte neue Anfrage
+  if (funnelQuelle === 'crm_direkt_angebot') {
+    return
+  }
   const bypass = (row.freigabe_bypass_grund ?? '').trim().toLowerCase()
   const funnelDirekt =
     row.funnel_daten &&

@@ -48,7 +48,7 @@ import {
   saveAngebotWizardDraft,
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
-import { createAnfrageFuerKunde } from '@/app/(dashboard)/neu/fab-neu-actions'
+import { createAnfrageFuerKunde, discardOrphanDirektAngebotLead } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import {
@@ -73,11 +73,7 @@ import {
   summenAusPositionen,
   summenKostenaufstellungAusPositionen,
 } from '@/lib/angebot-positionen'
-import {
-  kannHinweis13bAngebot,
-  kannHinweis35aAngebot,
-} from '@/lib/angebote/angebot-rechtshinweise'
-import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import { findAnfahrtZeilen } from '@/lib/anfahrt-angebot'
@@ -198,7 +194,8 @@ export function AngebotWizard({
   bootstrap?: AngebotWizardBootstrap | null
   /**
    * FAB „Neues Angebot“: Lead-ID ist zunächst leer.
-   * Anfrage wird erst beim ersten Speichern/Fertigstellen angelegt.
+   * Anfrage wird erst nach erfolgreicher Validierung beim Speichern angelegt
+   * (oder bei Foto-Upload); Abbruch ohne Angebot soft-löscht den Träger.
    */
   deferredLeadCreate?: boolean
   /** Deep-Link vom Assistenten: 1–5 */
@@ -386,6 +383,8 @@ export function AngebotWizard({
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
+  /** Lead, der in dieser Direkt-Angebot-Session angelegt wurde (für Abbruch-Cleanup). */
+  const sessionCreatedLeadRef = useRef<string | null>(null)
 
   const [mailTo, setMailTo] = useState<string[]>(() =>
     sheetEmail && isValidEmail(sheetEmail) ? [sheetEmail] : []
@@ -524,9 +523,7 @@ export function AngebotWizard({
     const ka = summenKostenaufstellungAusPositionen(positionenFuerSummen)
     return ka?.lohn_netto ?? 0
   }, [positionenFuerSummen])
-  const hinweis13bErlaubt = kannHinweis13bAngebot(kundeTyp, firm)
-  const hinweis35aErlaubt = kannHinweis35aAngebot(kundeTyp, firm, lohnNettoPdf)
-  const reverseChargeAktiv = Boolean(meta.hinweis_13b && hinweis13bErlaubt)
+  const reverseChargeAktiv = Boolean(meta.hinweis_13b)
   const firmMwstSatz = Math.max(
     0,
     parseInt(String(firm.mwst_satz ?? '19'), 10) || DEFAULT_MWST_SATZ
@@ -539,22 +536,6 @@ export function AngebotWizard({
     () => summenAusPositionen(positionenFuerSummen, effektiverMwstSatz),
     [positionenFuerSummen, effektiverMwstSatz]
   )
-
-  useEffect(() => {
-    setMeta((m) => {
-      let next = m
-      if (m.hinweis_13b && !hinweis13bErlaubt) {
-        next = { ...next, hinweis_13b: false }
-      }
-      if (
-        m.hinweis_35a &&
-        (!kundeZeigt35a(kundeTyp) || parseKleinunternehmerSetting(firm.kleinunternehmer))
-      ) {
-        next = { ...next, hinweis_35a: false }
-      }
-      return next === m ? m : next
-    })
-  }, [kundeTyp, firm, hinweis13bErlaubt])
 
   useEffect(() => {
     const hat = findAnfahrtZeilen(zeilen).length > 0
@@ -686,6 +667,7 @@ export function AngebotWizard({
       toast.error(r.message)
       return null
     }
+    sessionCreatedLeadRef.current = r.leadId
     setLeadState((prev) => ({
       ...prev,
       id: r.leadId,
@@ -699,14 +681,26 @@ export function AngebotWizard({
     return r.leadId
   }, [deferredLeadCreate, leadState, melderDraft])
 
+  const discardSessionLeadIfOrphan = useCallback(async () => {
+    if (!deferredLeadCreate) return
+    if (angebotId?.trim()) return
+    const orphanId = sessionCreatedLeadRef.current?.trim()
+    if (!orphanId) return
+    try {
+      await discardOrphanDirektAngebotLead(orphanId)
+    } catch (e) {
+      console.warn('[AngebotWizard] orphan lead discard:', e)
+    } finally {
+      sessionCreatedLeadRef.current = null
+    }
+  }, [deferredLeadCreate, angebotId])
+
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
       }
-      const leadId = await ensureLeadId()
-      if (!leadId) return null
       const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
       if (!titelOk) {
         toast.error('Bitte einen Angebotstitel angeben.')
@@ -721,6 +715,9 @@ export function AngebotWizard({
         toast.error('Bitte bei allen Artikel-Positionen eine Bezeichnung eintragen.')
         return null
       }
+
+      const leadId = await ensureLeadId()
+      if (!leadId) return null
 
       const metaPersist: AngebotWizardMeta = {
         ...meta,
@@ -760,6 +757,12 @@ export function AngebotWizard({
         })
         if (!res.ok) {
           toast.error(res.message)
+          // Speichern fehlgeschlagen → frisch angelegten Träger wieder entfernen
+          if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
+            await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
+            sessionCreatedLeadRef.current = null
+            setLeadState((prev) => ({ ...prev, id: '' }))
+          }
           return null
         }
         if (isHv) {
@@ -785,6 +788,7 @@ export function AngebotWizard({
           }
         }
         setAngebotId(res.angebotId)
+        sessionCreatedLeadRef.current = null
         setMeta(metaPersist)
         savedSnapshotRef.current = draftSnapshotRef.current
         setDraftDirty(false)
@@ -801,6 +805,11 @@ export function AngebotWizard({
         return res.angebotId
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
+          await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
+          sessionCreatedLeadRef.current = null
+          setLeadState((prev) => ({ ...prev, id: '' }))
+        }
         return null
       } finally {
         if (manageBusy) setSaving(false)
@@ -814,6 +823,7 @@ export function AngebotWizard({
       ensureLeadId,
       meta,
       mitAnfahrt,
+      deferredLeadCreate,
       zeilen,
       projektbeschreibung,
       projektFotos,
@@ -904,6 +914,7 @@ export function AngebotWizard({
         }
       }
     }
+    await discardSessionLeadIfOrphan()
     onClose()
   }
 
@@ -1412,8 +1423,6 @@ export function AngebotWizard({
             embedded
             meta={meta}
             onMetaChange={(patch) => setMeta((m) => ({ ...m, ...patch }))}
-            hinweis35aErlaubt={hinweis35aErlaubt}
-            hinweis13bErlaubt={hinweis13bErlaubt}
             lohnNettoPdf={lohnNettoPdf}
           />
         </div>
