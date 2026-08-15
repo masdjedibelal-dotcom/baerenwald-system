@@ -28,6 +28,15 @@
     --text-2: #404a45;
     --text-3: #6a746f;
     --text-4: #9aa39e;
+    /* Placeholder / leere Selects — lesbarer als --text-4 */
+    --placeholder: var(--text-3);
+    /* Form-Inputs: abgesetzt vom Sheet/Card-Weiß */
+    --input-bg: var(--bg-soft);
+    --input-border: var(--border-strong);
+    /* Sheets / Modals / Slide-overs: Hintergrund dämpfen */
+    --overlay-scrim: rgba(20, 24, 31, 0.58);
+    --overlay-scrim-strong: rgba(20, 24, 31, 0.64);
+    --overlay-blur: 10px;
 
     --blue-bg: #e4ecf7;
     --blue-tx: #1f4fa8;
@@ -130,6 +139,9 @@
     --bw-text-mid: var(--text-2);
     --bw-text-muted: var(--text-3);
     --bw-text-subtle: var(--text-4);
+    --bw-placeholder: var(--placeholder);
+    --bw-input-bg: var(--input-bg);
+    --bw-overlay-scrim: var(--overlay-scrim);
     --bw-link: var(--green);
     --bw-success: var(--green);
 
@@ -202,10 +214,17 @@
       --text-2: #2f3833;
       --text-3: #5a645f;
       --text-4: #8a938e;
+      --placeholder: var(--text-3);
       --bg-mobile: #eef1ee;
       --card: #ffffff;
       --card-mobile: #ffffff;
       --bg-soft: #f3f5f3;
+      --input-bg: var(--bg-soft);
+      --input-border: var(--border-strong);
+      /* Mobil: Scrim etwas stärker — weniger Ablenkung hinter dem Sheet */
+      --overlay-scrim: rgba(20, 24, 31, 0.62);
+      --overlay-scrim-strong: rgba(20, 24, 31, 0.68);
+      --overlay-blur: 12px;
 
       /* 4/5) Weichere Borders + ruhige Elevation */
       --border: rgba(22, 32, 27, 0.08);
