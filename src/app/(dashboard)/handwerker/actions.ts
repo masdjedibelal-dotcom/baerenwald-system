@@ -13,6 +13,7 @@ import {
   VERTRAEGE_PDFS_BUCKET,
 } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
+import { authUserIsCrmTeam } from '@/lib/auth/is-crm-staff'
 
 /** Lange Auth-Sperre (gleiche Dauer wie bei Spam-Kunden / deaktivierten CRM-Mitarbeitern). */
 const AUTH_BAN_DURATION = '876600h'
@@ -827,7 +828,8 @@ export async function duplicateHandwerker(
 
 /**
  * Partner vom Portal ausschließen / wieder freigeben.
- * Gesperrt → kein Login/Register; bestehendes Auth-Konto wird gebannt.
+ * Gesperrt → Flag ist_portal_gesperrt; reines Partner-Auth wird gebannt.
+ * CRM-Team-Accounts (gleiche E-Mail) werden nie gebannt.
  */
 export async function setHandwerkerPortalGesperrt(
   handwerkerId: string,
@@ -870,22 +872,26 @@ export async function setHandwerkerPortalGesperrt(
 
   const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
   if (authUserId) {
-    const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-      ban_duration: gesperrt ? AUTH_BAN_DURATION : 'none',
-    })
-    if (banErr) {
-      console.error('[setHandwerkerPortalGesperrt] Auth-Ban fehlgeschlagen:', banErr.message)
-    }
-    if (gesperrt) {
-      try {
-        const admin = supabaseAdmin.auth.admin as {
-          signOut?: (uid: string, scope?: string) => Promise<unknown>
+    // CRM-Team teilt oft denselben Auth-User — niemals bannen (Portal-Sperre reicht über ist_portal_gesperrt).
+    const isCrm = await authUserIsCrmTeam(authUserId)
+    if (!isCrm) {
+      const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        ban_duration: gesperrt ? AUTH_BAN_DURATION : 'none',
+      })
+      if (banErr) {
+        console.error('[setHandwerkerPortalGesperrt] Auth-Ban fehlgeschlagen:', banErr.message)
+      }
+      if (gesperrt) {
+        try {
+          const admin = supabaseAdmin.auth.admin as {
+            signOut?: (uid: string, scope?: string) => Promise<unknown>
+          }
+          if (typeof admin.signOut === 'function') {
+            await admin.signOut(authUserId, 'global')
+          }
+        } catch (e) {
+          console.error('[setHandwerkerPortalGesperrt] Sign-out fehlgeschlagen:', e)
         }
-        if (typeof admin.signOut === 'function') {
-          await admin.signOut(authUserId, 'global')
-        }
-      } catch (e) {
-        console.error('[setHandwerkerPortalGesperrt] Sign-out fehlgeschlagen:', e)
       }
     }
   }
@@ -970,12 +976,16 @@ export async function deleteHandwerker(
 
   const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
   if (authUserId) {
-    try {
-      await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        ban_duration: AUTH_BAN_DURATION,
-      })
-    } catch (e) {
-      console.warn('[deleteHandwerker] Auth-Ban:', e)
+    // CRM-Team-Login (gleiche E-Mail wie Handwerker) nicht bannen — sonst CRM-Zugang weg.
+    const isCrm = await authUserIsCrmTeam(authUserId)
+    if (!isCrm) {
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          ban_duration: AUTH_BAN_DURATION,
+        })
+      } catch (e) {
+        console.warn('[deleteHandwerker] Auth-Ban:', e)
+      }
     }
   }
 
