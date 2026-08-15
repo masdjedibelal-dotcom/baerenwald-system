@@ -2529,6 +2529,19 @@ export async function createAuftragFromAngebot(
   const auftragId = auftrag.id as string
   const projektLink = projektUrlFromToken((auftrag as { kunden_token?: string }).kunden_token ?? kundenToken)
 
+  if (angebot.lead_id) {
+    try {
+      const { spiegelLeadBefundNachAuftrag } = await import('@/lib/org/spiegel-lead-befund')
+      const sp = await spiegelLeadBefundNachAuftrag({
+        leadId: String(angebot.lead_id),
+        auftragId,
+      })
+      if (!sp.ok) console.warn('[createAuftragFromAngebot] befund-spiegel:', sp.message)
+    } catch (e) {
+      console.warn('[createAuftragFromAngebot] befund-spiegel:', e)
+    }
+  }
+
   const postInsertTasks: Array<PromiseLike<unknown>> = []
 
   let angebotPosDirty = false

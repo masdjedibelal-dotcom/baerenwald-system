@@ -44,6 +44,7 @@ import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { LeadBefundCrmCard } from '@/components/anfragen/LeadBefundCrmCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
@@ -507,9 +508,9 @@ export function AnfrageDetailClient({
 
   const openAngebotErstellen = useCallback(() => {
     if (wartetAufHvFreigabe) {
-      toast.message('Warte auf HV-Freigabe', {
+      toast.message('Warte auf HV / Hausmeister', {
         description:
-          'Die Hausverwaltung muss den Vorgang erst freigeben, bevor du ein Angebot erstellst.',
+          'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du disponierst.',
       })
       return
     }
@@ -539,9 +540,9 @@ export function AnfrageDetailClient({
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
       if (wartetAufHvFreigabe) {
-        toast.message('Warte auf HV-Freigabe', {
+        toast.message('Warte auf HV / Hausmeister', {
           description:
-            'Die Hausverwaltung muss den Vorgang erst freigeben (Angebot einfordern), bevor du ein Angebot erstellst.',
+            'HV muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du ein Angebot erstellst.',
         })
         return
       }
@@ -561,12 +562,12 @@ export function AnfrageDetailClient({
     }
     if (wartetAufHvFreigabe) {
       return {
-        label: 'Warte auf HV-Freigabe',
+        label: 'Warte auf HV / Hausmeister',
         icon: 'clock',
         onClick: () => {
-          toast.message('Warte auf HV-Freigabe', {
+          toast.message('Warte auf HV / Hausmeister', {
             description:
-              'Mieter-Meldung: HV muss „Vorgang freigeben“ — danach erscheint „Angebot erstellen“.',
+              'Mieter-Meldung: HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach erscheint „Angebot erstellen“.',
           })
         },
         disabled: false,
@@ -708,6 +709,7 @@ export function AnfrageDetailClient({
     <>
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
+      <LeadBefundCrmCard leadId={lead.id} />
     </>
   )
 
@@ -720,9 +722,9 @@ export function AnfrageDetailClient({
           ? openDirektBeauftragen
           : wartetAufHvFreigabe
             ? () =>
-                toast.message('Warte auf HV-Freigabe', {
+                toast.message('Warte auf HV / Hausmeister', {
                   description:
-                    'HV muss den Vorgang erst freigeben — danach kannst du ein Angebot erstellen.',
+                    'HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach kannst du disponieren.',
                 })
             : !hatAuftrag
               ? openDirektBeauftragen
@@ -732,7 +734,7 @@ export function AnfrageDetailClient({
         istAkut
           ? 'Direkt beauftragen'
           : wartetAufHvFreigabe
-            ? 'Warte auf HV-Freigabe'
+            ? 'Warte auf HV / Hausmeister'
             : 'Angebot erstellen'
       }
       emptyTitle="Noch keine Leistungen"

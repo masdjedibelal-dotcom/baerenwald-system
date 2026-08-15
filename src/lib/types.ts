@@ -1017,6 +1017,8 @@ export type PartnerDokument = {
   status?: string | null
   freigegeben_am?: string | null
   ablehnung_grund?: string | null
+  geloescht_am?: string | null
+  geloescht_von?: string | null
   compliance_dokument_typen?: ComplianceDokumentTyp | null
 }
 

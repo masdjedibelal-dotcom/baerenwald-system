@@ -10,6 +10,8 @@ import {
 } from '@/lib/handwerker/compliance-katalog'
 import {
   partnerDokumentIstFreigegeben,
+  partnerDokumentIstGeloescht,
+  partnerDokumentStatusLabel,
 } from '@/lib/handwerker/partner-dokument-status'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -19,6 +21,9 @@ function listStatus(doc: PartnerDokument): {
   label: string
   tone: 'ok' | 'warn' | 'bad' | 'neutral'
 } {
+  if (partnerDokumentIstGeloescht(doc)) {
+    return { label: 'Gelöscht', tone: 'bad' }
+  }
   const s = (doc.status ?? '').toLowerCase()
   if (partnerDokumentIstFreigegeben(doc.status)) {
     return { label: 'Angenommen', tone: 'ok' }
@@ -26,7 +31,7 @@ function listStatus(doc: PartnerDokument): {
   if (s === 'abgelehnt') {
     return { label: 'Abgelehnt', tone: 'bad' }
   }
-  return { label: 'Offen', tone: 'warn' }
+  return { label: partnerDokumentStatusLabel(doc.status), tone: 'warn' }
 }
 
 export function HandwerkerComplianceUnterlagenTable({

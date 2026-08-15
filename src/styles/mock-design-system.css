@@ -22549,7 +22549,7 @@ button.crow.crow--tap:hover {
 .ap-list__head,
 .ap-list__row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -22563,6 +22563,27 @@ button.crow.crow--tap:hover {
   letter-spacing: 0.03em;
 }
 .ap-list__row + .ap-list__row { border-top: 0.5px solid var(--border); }
+.ap-list__row--openable {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.ap-list__row--openable:hover {
+  background: var(--bg-soft);
+}
+.ap-list__name-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-text);
+  font-weight: 600;
+  color: var(--text);
+}
 .ap-list__name {
   display: flex;
   flex-wrap: wrap;

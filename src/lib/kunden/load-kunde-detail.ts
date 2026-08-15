@@ -429,8 +429,18 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
 
   const { melder_leads: _melderLeads, auftraggeber_leads: _auftraggeberLeads, ...kundeBase } = row
 
+  const ansprechpartnerSorted = [...(row.kunden_ansprechpartner ?? [])].sort((a, b) => {
+    if (Boolean(a.ist_primaer) !== Boolean(b.ist_primaer)) {
+      return a.ist_primaer ? -1 : 1
+    }
+    const so = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    if (so !== 0) return so
+    return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'de')
+  })
+
   return {
     ...kundeBase,
+    kunden_ansprechpartner: ansprechpartnerSorted,
     leads: leadsMerged,
     auftraege: auftraegeMerged,
     rechnungen: rechnungenMerged,

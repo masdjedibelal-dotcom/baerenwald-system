@@ -33,7 +33,8 @@ export function leadWartetAufHvStartFreigabe(
   if (!leadIstMieterMeldung(lead)) return false
   if (leadIstAkut(lead)) return false
   const st = (lead.hv_meldung_status ?? 'neu').trim().toLowerCase()
-  return st === 'neu' || st === ''
+  // Auch während Hausmeister-Prüfung: BW darf nicht disponieren
+  return st === 'neu' || st === '' || st === 'hm_pruefung'
 }
 
 /** Effektive Schwelle / Notfall-Direkt: Objekt überschreibt Org (NULL = erben). */

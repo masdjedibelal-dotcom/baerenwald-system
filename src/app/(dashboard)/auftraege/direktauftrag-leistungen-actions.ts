@@ -136,6 +136,14 @@ export async function createDirektauftragMitLeistungen(input: {
     sichtbar_fuer_kunde: false,
   })
 
+  try {
+    const { spiegelLeadBefundNachAuftrag } = await import('@/lib/org/spiegel-lead-befund')
+    const sp = await spiegelLeadBefundNachAuftrag({ leadId, auftragId })
+    if (!sp.ok) console.warn('[createDirektauftragMitLeistungen] befund-spiegel:', sp.message)
+  } catch (e) {
+    console.warn('[createDirektauftragMitLeistungen] befund-spiegel:', e)
+  }
+
   if (istAkut) {
     try {
       const { mailOrgNotfallDirektInfo } = await import('@/lib/email/meldung-mail-templates')

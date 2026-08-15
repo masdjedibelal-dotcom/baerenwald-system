@@ -37,6 +37,8 @@ export const HV_MELDUNG_STATUS_LABELS: Record<string, string> = {
   kleinreparatur: 'Kleinreparatur',
   abgelehnt: 'Abgelehnt',
   abgeschlossen: 'Abgeschlossen',
+  hm_pruefung: 'Hausmeister-Prüfung',
+  hm_erledigt: 'Vom Hausmeister erledigt',
 }
 
 export const KOSTENTRAEGER_LABELS: Record<string, string> = {

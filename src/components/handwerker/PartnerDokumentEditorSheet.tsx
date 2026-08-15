@@ -20,6 +20,8 @@ import {
 import { createClient } from '@/lib/supabase'
 import {
   partnerDokumentIstFreigegeben,
+  partnerDokumentIstGeloescht,
+  partnerDokumentIstOffen,
   partnerDokumentStatusLabel,
 } from '@/lib/handwerker/partner-dokument-status'
 import {
@@ -144,7 +146,17 @@ export function PartnerDokumentEditorSheet({
 
   const isEdit = Boolean(existing)
   const isReview = Boolean(existing?.datei_url)
-  const istBestaetigt = partnerDokumentIstFreigegeben(existing?.status)
+  const istGeloescht = partnerDokumentIstGeloescht(existing)
+  const istOffen = partnerDokumentIstOffen(existing?.status) && !istGeloescht
+  const istErledigt =
+    !istOffen &&
+    (partnerDokumentIstFreigegeben(existing?.status) ||
+      String(existing?.status ?? '').toLowerCase() === 'abgelehnt')
+  /** Nach Entscheidung oder Soft-Delete: nur noch endgültig löschen. */
+  const nurEndgueltigLoeschen = istGeloescht || istErledigt
+  const statusAnzeige = istGeloescht
+    ? 'Gelöscht'
+    : partnerDokumentStatusLabel(existing?.status)
 
   useEffect(() => {
     if (!open) return
@@ -261,14 +273,14 @@ export function PartnerDokumentEditorSheet({
 
   function removeDoc() {
     if (!existing || !effectiveTyp) return
-    if (!confirm(`„${existing.bezeichnung || effectiveTyp.bezeichnung}“ wirklich löschen?`)) return
+    if (!confirm(`„${existing.bezeichnung || effectiveTyp.bezeichnung}“ endgültig löschen? Das kann nicht rückgängig gemacht werden.`)) return
     startTransition(async () => {
       const r = await deletePartnerDokument(existing.id, handwerkerId)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Gelöscht')
+      toast.success('Endgültig gelöscht')
       setDirty(false)
       onSaved?.()
       onClose()
@@ -283,7 +295,7 @@ export function PartnerDokumentEditorSheet({
         toast.error(r.message)
         return
       }
-      toast.success('Dokument bestätigt — Partner sieht den Status im Portal.')
+      toast.success('Dokument angenommen — Partner sieht den Status im Portal.')
       setDirty(false)
       onSaved?.()
       onClose()
@@ -381,30 +393,43 @@ export function PartnerDokumentEditorSheet({
   const showUrl = localPreviewUrl || previewUrl
 
   const reviewFooter = isReview ? (
-    <div className="flex w-full gap-2">
+    nurEndgueltigLoeschen ? (
       <Button
         type="button"
-        variant="secondary"
-        className="flex-1"
-        disabled={pending}
-        onClick={() => {
-          setAblehnGrund(existing?.ablehnung_grund?.trim() || '')
-          setAblehnenOpen(true)
-        }}
-      >
-        Ablehnen
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        className="flex-1"
+        variant="danger"
+        className="w-full"
         disabled={pending}
         loading={pending}
-        onClick={freigeben}
+        onClick={removeDoc}
       >
-        {istBestaetigt ? 'Erneut bestätigen' : 'Bestätigen'}
+        Endgültig löschen
       </Button>
-    </div>
+    ) : (
+      <div className="flex w-full gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          className="flex-1"
+          disabled={pending}
+          onClick={() => {
+            setAblehnGrund(existing?.ablehnung_grund?.trim() || '')
+            setAblehnenOpen(true)
+          }}
+        >
+          Ablehnen
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          className="flex-1"
+          disabled={pending}
+          loading={pending}
+          onClick={freigeben}
+        >
+          Annehmen
+        </Button>
+      </div>
+    )
   ) : undefined
 
   return (
@@ -421,7 +446,7 @@ export function PartnerDokumentEditorSheet({
         confirmBusy={pending}
         footer={reviewFooter}
         headerEnd={
-          isReview ? (
+          isReview && !nurEndgueltigLoeschen ? (
             <button
               type="button"
               className="editor-sheet__confirm-text"
@@ -440,17 +465,17 @@ export function PartnerDokumentEditorSheet({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-[length:var(--fs-meta)] text-bw-text-muted">
                 <span>
                   Status:{' '}
-                  <strong className="font-medium text-bw-text">
-                    {partnerDokumentStatusLabel(existing?.status)}
-                  </strong>
+                  <strong className="font-medium text-bw-text">{statusAnzeige}</strong>
                 </span>
                 {existing?.gueltig_bis ? (
                   <span>Gültig bis {formatDatum(String(existing.gueltig_bis).slice(0, 10))}</span>
                 ) : null}
-                {existing?.hochgeladen_am ? (
-                  <span>Hochgeladen {formatDatum(String(existing.hochgeladen_am).slice(0, 10))}</span>
-                ) : null}
               </div>
+              {istGeloescht ? (
+                <p className="m-0 rounded-lg border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
+                  Vom Partner gelöscht — Datei bleibt sichtbar, bis du endgültig löschst.
+                </p>
+              ) : null}
               {existing?.ablehnung_grund?.trim() ? (
                 <p className="m-0 rounded-lg border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
                   Ablehnung: {existing.ablehnung_grund.trim()}

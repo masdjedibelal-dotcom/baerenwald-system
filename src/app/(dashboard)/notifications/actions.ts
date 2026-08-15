@@ -23,6 +23,7 @@ export type CrmNotificationTyp =
   | 'partner_positions_meldung'
   | 'partner_weitere_arbeit'
   | 'partner_compliance_pruefung'
+  | 'partner_compliance_geloescht'
   | 'partner_unterlage'
   | 'partner_fachdoku'
 
@@ -84,6 +85,8 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Weitere Arbeit zur Prüfung'
     case 'partner_compliance_pruefung':
       return 'Partner-Dokument zur Freigabe'
+    case 'partner_compliance_geloescht':
+      return 'Partner-Dokument gelöscht'
     case 'partner_unterlage':
       return 'Partner-Unterlage hochgeladen'
     case 'partner_fachdoku':
@@ -114,6 +117,7 @@ function typIcon(typ: CrmNotificationTyp): string {
     case 'handwerker_einreichung':
     case 'hw_rechnung_eingegangen':
     case 'partner_compliance_pruefung':
+    case 'partner_compliance_geloescht':
     case 'partner_unterlage':
     case 'partner_fachdoku':
       return 'upload'
@@ -144,6 +148,7 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
     case 'partner_compliance_pruefung':
+    case 'partner_compliance_geloescht':
     case 'partner_unterlage':
     case 'partner_fachdoku':
       return 'Auftrag öffnen'
@@ -184,6 +189,8 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Partner hat weitere Regie-Arbeit gemeldet. Unter Leistungen anerkennen oder ablehnen.'
     case 'partner_compliance_pruefung':
       return 'Compliance-Dokument (z. B. Handwerkskarte) wartet auf Freigabe in Akte/Handwerker-Profil.'
+    case 'partner_compliance_geloescht':
+      return 'Partner hat eine Compliance-Unterlage gelöscht. Datei bleibt sichtbar, bis du endgültig löschst.'
     case 'partner_unterlage':
       return 'Partner hat Unterlagen am Auftrag hochgeladen — unter Akte → Dokumente prüfen.'
     case 'partner_fachdoku':
@@ -893,6 +900,43 @@ async function collectCrmNotificationItems(opts?: {
         createdAt: (row.hochgeladen_am as string) || since,
         gelesen: false,
       })
+    }
+  }
+
+  // ── Partner: Soft-gelöschte Compliance-Unterlagen ────────────
+  {
+    const { data: geloeschtRows, error: geloeschtErr } = await supabase
+      .from('partner_dokumente')
+      .select(
+        'id, typ, bezeichnung, geloescht_am, auftrag_id, handwerker_id, handwerker:handwerker_id(name)'
+      )
+      .eq('status', 'geloescht')
+      .gte('geloescht_am', since)
+      .order('geloescht_am', { ascending: false })
+      .limit(PER_SOURCE_LIMIT)
+    if (!geloeschtErr) {
+      for (const row of geloeschtRows ?? []) {
+        const hw = one(
+          row.handwerker as { name?: string | null } | { name?: string | null }[] | null
+        )
+        const hwName = hw?.name?.trim() || 'Handwerker'
+        const auftragId = (row.auftrag_id as string | null)?.trim() || null
+        const hwId = (row.handwerker_id as string | null)?.trim() || null
+        const bez = String(row.bezeichnung ?? row.typ ?? 'Dokument').trim()
+        items.push({
+          sourceKey: `partner_compliance_geloescht:${row.id}`,
+          typ: 'partner_compliance_geloescht',
+          title: `${hwName}: Dokument gelöscht`,
+          subtitle: bez || null,
+          href: auftragId
+            ? `/auftraege/${auftragId}?tab=akte`
+            : hwId
+              ? `/handwerker/${hwId}?tab=compliance`
+              : '/handwerker',
+          createdAt: (row.geloescht_am as string) || since,
+          gelesen: false,
+        })
+      }
     }
   }
 

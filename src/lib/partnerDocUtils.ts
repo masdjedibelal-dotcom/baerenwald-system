@@ -1,5 +1,11 @@
-/** Storage-Bucket für Partner-/Handwerker-Compliance-Dokumente (privat). */
+/** Storage-Bucket für CRM-Compliance-Uploads (privat). */
 export const PARTNER_DOCS_BUCKET = 'partner-dokumente'
+
+/**
+ * Portal-Uploads (Compliance, Fachdoku, Bautagebuch, …) — privater Bucket.
+ * CRM hat lange nur in partner-dokumente gesucht → „Datei nicht gefunden“.
+ */
+export const HANDWERKER_UPLOADS_BUCKET = 'handwerker-uploads'
 
 /** Öffentlicher Bucket für Vertrags-PDFs (Rahmen-/Projektvertrag). */
 export const VERTRAEGE_PDFS_BUCKET = 'vertraege-pdfs'
@@ -8,6 +14,10 @@ export type StoredDocumentRef = { bucket: string; path: string }
 
 const SUPABASE_OBJECT_URL_RE =
   /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/?#]+)\/([^?#]+)/i
+
+/** Relativpfade aus dem Portal liegen unter handwerker-uploads. */
+const PORTAL_PATH_HINT =
+  /\/(compliance|angebote|bautagebuch|fachdoku|position-eintraege|auftraege|firma)\//i
 
 function normalizeStoragePath(path: string): string {
   return path
@@ -20,6 +30,19 @@ function normalizeStoragePath(path: string): string {
       }
     })
     .join('/')
+}
+
+function guessBucketForRelativePath(path: string): string {
+  if (path.startsWith(`${HANDWERKER_UPLOADS_BUCKET}/`)) return HANDWERKER_UPLOADS_BUCKET
+  if (path.startsWith(`${PARTNER_DOCS_BUCKET}/`)) return PARTNER_DOCS_BUCKET
+  if (path.startsWith(`${VERTRAEGE_PDFS_BUCKET}/`)) return VERTRAEGE_PDFS_BUCKET
+  if (PORTAL_PATH_HINT.test(`/${path}`)) return HANDWERKER_UPLOADS_BUCKET
+  return PARTNER_DOCS_BUCKET
+}
+
+function stripBucketPrefix(path: string, bucket: string): string {
+  if (path.startsWith(`${bucket}/`)) return path.slice(bucket.length + 1)
+  return path
 }
 
 /**
@@ -42,13 +65,8 @@ export function parseStoredDocumentRef(
 
   if (!/^https?:\/\//i.test(s)) {
     let path = s.replace(/^\/+/, '')
-    let bucket = PARTNER_DOCS_BUCKET
-    if (path.startsWith(`${VERTRAEGE_PDFS_BUCKET}/`)) {
-      bucket = VERTRAEGE_PDFS_BUCKET
-      path = path.slice(VERTRAEGE_PDFS_BUCKET.length + 1)
-    } else if (path.startsWith(`${PARTNER_DOCS_BUCKET}/`)) {
-      path = path.slice(PARTNER_DOCS_BUCKET.length + 1)
-    }
+    const bucket = guessBucketForRelativePath(path)
+    path = stripBucketPrefix(path, bucket)
     path = normalizeStoragePath(path)
     return path ? { bucket, path } : null
   }
@@ -56,7 +74,14 @@ export function parseStoredDocumentRef(
   return null
 }
 
-/** Relativer Storage-Pfad oder Legacy-URL → Pfad im Bucket partner-dokumente */
+/** Alternativ-Bucket, falls Signieren im vermuteten Bucket fehlschlägt. */
+export function alternatePartnerDocBucket(bucket: string): string | null {
+  if (bucket === PARTNER_DOCS_BUCKET) return HANDWERKER_UPLOADS_BUCKET
+  if (bucket === HANDWERKER_UPLOADS_BUCKET) return PARTNER_DOCS_BUCKET
+  return null
+}
+
+/** Relativer Storage-Pfad im CRM-Bucket partner-dokumente (Legacy). */
 export function partnerDokumentStoragePath(datei_url: string | null | undefined): string | null {
   const ref = parseStoredDocumentRef(datei_url)
   if (!ref || ref.bucket !== PARTNER_DOCS_BUCKET) return null

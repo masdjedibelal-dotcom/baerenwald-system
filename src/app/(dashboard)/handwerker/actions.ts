@@ -9,9 +9,7 @@ import {
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
 import {
-  PARTNER_DOCS_BUCKET,
   parseStoredDocumentRef,
-  partnerDokumentStoragePath,
   VERTRAEGE_PDFS_BUCKET,
 } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
@@ -220,7 +218,7 @@ const HANDWERKER_DETAIL_SELECT_BASE = `
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
     id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
-    status, freigegeben_am, ablehnung_grund
+    status, freigegeben_am, ablehnung_grund, geloescht_am, geloescht_von
   )
 `
 
@@ -231,7 +229,7 @@ const HANDWERKER_DETAIL_SELECT_BASE_NO_PORTAL = `
   partner_kategorien ( id, name, slug, sort_order ),
   partner_dokumente (
     id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am,
-    status, freigegeben_am, ablehnung_grund
+    status, freigegeben_am, ablehnung_grund, geloescht_am, geloescht_von
   )
 `
 
@@ -485,7 +483,7 @@ export async function loadPartnerDokumenteForAuftrag(
   const { data, error } = await supabase
     .from('partner_dokumente')
     .select(
-      'id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am, status, freigegeben_am, ablehnung_grund'
+      'id, handwerker_id, auftrag_id, typ, bezeichnung, gueltig_bis, datei_url, notizen, hochgeladen_am, status, freigegeben_am, ablehnung_grund, geloescht_am, geloescht_von'
     )
     .eq('auftrag_id', auftragId)
     .order('hochgeladen_am', { ascending: false })
@@ -567,9 +565,9 @@ export async function replacePartnerDokumentForTyp(input: {
   const { data: existing } = await q
 
   for (const row of existing ?? []) {
-    const path = partnerDokumentStoragePath((row as { datei_url?: string | null }).datei_url)
-    if (path) {
-      await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
+    const ref = parseStoredDocumentRef((row as { datei_url?: string | null }).datei_url)
+    if (ref?.path) {
+      await supabase.storage.from(ref.bucket).remove([ref.path])
     }
     await supabase.from('partner_dokumente').delete().eq('id', (row as { id: string }).id)
   }
@@ -630,28 +628,37 @@ export async function signPartnerDokumentUrl(
   const ref = parseStoredDocumentRef(s)
   if (ref?.path) {
     const { supabaseAdmin } = await import('@/lib/supabase-admin')
-    const { data, error } = await supabaseAdmin.storage
-      .from(ref.bucket)
-      .createSignedUrl(ref.path, 3600)
+    const { alternatePartnerDocBucket } = await import('@/lib/partnerDocUtils')
 
-    if (!error && data?.signedUrl) {
-      return { ok: true, url: data.signedUrl }
+    const tryBuckets = [ref.bucket]
+    const alt = alternatePartnerDocBucket(ref.bucket)
+    if (alt) tryBuckets.push(alt)
+
+    let lastMsg = ''
+    for (const bucket of tryBuckets) {
+      const { data, error } = await supabaseAdmin.storage
+        .from(bucket)
+        .createSignedUrl(ref.path, 3600)
+
+      if (!error && data?.signedUrl) {
+        return { ok: true, url: data.signedUrl }
+      }
+      lastMsg = error?.message ?? ''
+
+      if (bucket === VERTRAEGE_PDFS_BUCKET) {
+        const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(ref.path)
+        if (pub.publicUrl) return { ok: true, url: pub.publicUrl }
+      }
     }
 
-    if (ref.bucket === VERTRAEGE_PDFS_BUCKET) {
-      const { data: pub } = supabaseAdmin.storage.from(ref.bucket).getPublicUrl(ref.path)
-      if (pub.publicUrl) return { ok: true, url: pub.publicUrl }
-    }
-
-    const msg = error?.message ?? ''
-    if (/not found|object not found/i.test(msg)) {
+    if (/not found|object not found/i.test(lastMsg)) {
       return {
         ok: false,
         message:
           'Datei im Storage nicht gefunden — das Dokument wurde ggf. gelöscht oder verschoben. Bitte erneut hochladen.',
       }
     }
-    return { ok: false, message: msg || 'Signierte URL fehlgeschlagen' }
+    return { ok: false, message: lastMsg || 'Signierte URL fehlgeschlagen' }
   }
 
   if (/^https?:\/\//i.test(s)) {
@@ -671,9 +678,19 @@ export async function deletePartnerDokument(
     .select('datei_url, auftrag_id')
     .eq('id', id)
     .maybeSingle()
-  const path = partnerDokumentStoragePath((row as { datei_url?: string | null } | null)?.datei_url)
-  if (path) {
-    await supabase.storage.from(PARTNER_DOCS_BUCKET).remove([path])
+  const ref = parseStoredDocumentRef((row as { datei_url?: string | null } | null)?.datei_url)
+  if (ref?.path) {
+    const { supabaseAdmin } = await import('@/lib/supabase-admin')
+    const { alternatePartnerDocBucket } = await import('@/lib/partnerDocUtils')
+    await supabaseAdmin.storage.from(ref.bucket).remove([ref.path])
+    const alt = alternatePartnerDocBucket(ref.bucket)
+    if (alt) {
+      try {
+        await supabaseAdmin.storage.from(alt).remove([ref.path])
+      } catch {
+        /* alternate bucket optional */
+      }
+    }
   }
   const { error } = await supabase.from('partner_dokumente').delete().eq('id', id)
   if (error) return { ok: false, message: error.message }

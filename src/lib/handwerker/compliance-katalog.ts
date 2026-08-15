@@ -159,6 +159,7 @@ export function dokumentFuerTyp(
 ): PartnerDokument | undefined {
   return dokumente.find((d) => {
     if (d.typ !== typSlug || !d.datei_url?.trim()) return false
+    if (String(d.status ?? '').toLowerCase() === 'geloescht' || d.geloescht_am) return false
     if (opts?.handwerkerId && d.handwerker_id !== opts.handwerkerId) return false
     if (opts?.auftragId !== undefined) {
       const want = opts.auftragId
@@ -180,7 +181,9 @@ export function dokumenteFuerTyp(
       d.typ === typSlug &&
       d.handwerker_id === handwerkerId &&
       d.auftrag_id === auftragId &&
-      d.datei_url?.trim()
+      d.datei_url?.trim() &&
+      String(d.status ?? '').toLowerCase() !== 'geloescht' &&
+      !d.geloescht_am
   )
 }
 
@@ -191,6 +194,9 @@ export function complianceDokumentStatus(
 ): ComplianceDokumentStatus {
   void typ
   if (!doc?.datei_url?.trim()) return 'fehlend'
+  if (String(doc.status ?? '').toLowerCase() === 'geloescht' || doc.geloescht_am) {
+    return 'fehlend'
+  }
   const workflow = (doc.status ?? '').toLowerCase()
   if (workflow === 'abgelehnt') return 'abgelehnt'
   if (!partnerDokumentIstFreigegeben(doc.status)) {

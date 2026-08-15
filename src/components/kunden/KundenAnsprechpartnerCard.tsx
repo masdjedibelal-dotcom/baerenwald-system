@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { useEffect, useMemo, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
 import { useTransition } from '@/components/ui/action-busy'
 import {
@@ -16,26 +18,36 @@ import type { KundeAnsprechpartner } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
-function AnsprechpartnerEditorFooter({
-  pending,
-  canSave,
-  onSave,
-}: {
-  pending: boolean
-  canSave: boolean
-  onSave: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="zahlplan-editor-footer">
-      <MockBtn kind="ghost" disabled={pending} onClick={() => requestClose?.()}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn kind="primary" icon="check" disabled={!canSave || pending} onClick={onSave}>
-        {pending ? 'Speichern…' : 'Speichern'}
-      </MockBtn>
-    </div>
-  )
+/** Typische Rollen in einer Hausverwaltung. */
+export const ANSPRECHPARTNER_ROLLEN = [
+  { value: '', label: 'Rolle wählen…' },
+  { value: 'Hausmeister', label: 'Hausmeister' },
+  { value: 'Objektleiter', label: 'Objektleiter' },
+  { value: 'Verwaltung', label: 'Verwaltung' },
+  { value: 'Buchhaltung', label: 'Buchhaltung' },
+  { value: 'Geschäftsführung', label: 'Geschäftsführung' },
+  { value: 'Eigentümervertretung', label: 'Eigentümervertretung' },
+  { value: 'Technik', label: 'Technik' },
+  { value: 'Empfang', label: 'Empfang' },
+  { value: 'Sonstiges', label: 'Sonstiges' },
+] as const
+
+function sortAnsprechpartner(rows: KundeAnsprechpartner[]): KundeAnsprechpartner[] {
+  return [...rows].sort((a, b) => {
+    if (Boolean(a.ist_primaer) !== Boolean(b.ist_primaer)) {
+      return a.ist_primaer ? -1 : 1
+    }
+    const so = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    if (so !== 0) return so
+    return a.name.localeCompare(b.name, 'de')
+  })
+}
+
+function rolleSelectValue(rolle: string): string {
+  const t = rolle.trim()
+  if (!t) return ''
+  if (ANSPRECHPARTNER_ROLLEN.some((o) => o.value === t)) return t
+  return 'Sonstiges'
 }
 
 export function KundenAnsprechpartnerCard({
@@ -50,7 +62,7 @@ export function KundenAnsprechpartnerCard({
   className?: string
 }) {
   const isMobile = useIsMobile()
-  const [rows, setRows] = useState<KundeAnsprechpartner[]>(initial)
+  const [rows, setRows] = useState(() => sortAnsprechpartner(initial))
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState<KundeAnsprechpartner | null>(null)
   const [name, setName] = useState('')
@@ -61,8 +73,21 @@ export function KundenAnsprechpartnerCard({
   const [pending, startTransition] = useTransition()
 
   useEffect(() => {
-    setRows(initial)
+    setRows(sortAnsprechpartner(initial))
   }, [initial])
+
+  const dirty = useMemo(() => {
+    if (!edit) {
+      return Boolean(name.trim() || email.trim() || telefon.trim() || rolle.trim() || istPrimaer)
+    }
+    return (
+      name.trim() !== edit.name.trim() ||
+      (email.trim() || '') !== (edit.email ?? '').trim() ||
+      (telefon.trim() || '') !== (edit.telefon ?? '').trim() ||
+      (rolle.trim() || '') !== (edit.rolle ?? '').trim() ||
+      Boolean(istPrimaer) !== Boolean(edit.ist_primaer)
+    )
+  }, [edit, name, email, telefon, rolle, istPrimaer])
 
   function openNeu() {
     setEdit(null)
@@ -87,7 +112,7 @@ export function KundenAnsprechpartnerCard({
   function reload() {
     startTransition(async () => {
       const next = await listKundenAnsprechpartner(kundeId)
-      setRows(next)
+      setRows(sortAnsprechpartner(next))
       onChanged?.()
     })
   }
@@ -128,6 +153,8 @@ export function KundenAnsprechpartnerCard({
         return
       }
       toast.success('Gelöscht')
+      setOpen(false)
+      setEdit(null)
       reload()
     })
   }
@@ -175,32 +202,27 @@ export function KundenAnsprechpartnerCard({
         </div>
       ) : (
         <div className="ap-list">
-          <div className="ap-list__head">
+          <div className="ap-list__head ap-list__head--simple">
             <span>Name</span>
-            <span>E-Mail</span>
-            <span>Telefon</span>
-            <span />
+            <span>Rolle</span>
+            <span>Kontakt</span>
           </div>
           {rows.map((r) => (
-            <div key={r.id} className="ap-list__row">
-              <button type="button" className="ap-list__name" onClick={() => openEdit(r)}>
+            <button
+              key={r.id}
+              type="button"
+              className="ap-list__row ap-list__row--openable"
+              onClick={() => openEdit(r)}
+            >
+              <span className="ap-list__name-cell">
                 {r.name}
                 {r.ist_primaer ? <span className="ap-badge">Primär</span> : null}
-                {r.rolle ? <span className="ap-list__rolle">{r.rolle}</span> : null}
-              </button>
-              <span className="ap-list__dim">{r.email || '—'}</span>
-              <span className="ap-list__dim">{r.telefon || '—'}</span>
-              <div className="ap-list__actions">
-                <MockBtn sm kind="ghost" icon="pen" title="Bearbeiten" onClick={() => openEdit(r)} />
-                <MockBtn
-                  sm
-                  kind="ghost"
-                  icon="trash"
-                  title="Löschen"
-                  onClick={() => entfernen(r)}
-                />
-              </div>
-            </div>
+              </span>
+              <span className="ap-list__dim">{r.rolle || '—'}</span>
+              <span className="ap-list__dim">
+                {[r.email, r.telefon].filter(Boolean).join(' · ') || '—'}
+              </span>
+            </button>
           ))}
         </div>
       )}
@@ -208,64 +230,66 @@ export function KundenAnsprechpartnerCard({
       <EditorSheet
         open={open}
         onClose={() => setOpen(false)}
-        title={edit ? 'Ansprechpartner' : 'Neuer Ansprechpartner'}
-        dirty={Boolean(name.trim() || email.trim() || telefon.trim() || rolle.trim())}
+        title={edit ? 'Ansprechpartner bearbeiten' : 'Neuer Ansprechpartner'}
+        dirty={dirty}
         size="md"
-        footer={
-          <AnsprechpartnerEditorFooter
-            pending={pending}
-            canSave={Boolean(name.trim())}
-            onSave={speichern}
-          />
-        }
+        compose={Boolean(edit)}
+        composeLabel="Speichern"
+        onConfirm={speichern}
+        confirmDisabled={!name.trim() || pending}
+        confirmBusy={pending}
       >
-        <label className="hw-anfrage-field">
-          <span className="hw-anfrage-label">Name *</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="hw-anfrage-field">
-          <span className="hw-anfrage-label">E-Mail</span>
-          <input
-            className="input"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+        <div className="space-y-4">
+          <Input
+            label="Name"
+            required
+            value={name}
+            disabled={pending}
+            onChange={(e) => setName(e.target.value)}
           />
-        </label>
-        <label className="hw-anfrage-field">
-          <span className="hw-anfrage-label">Telefon</span>
-          <input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
-        </label>
-        <label className="hw-anfrage-field">
-          <span className="hw-anfrage-label">Rolle</span>
-          <input
-            className="input"
-            placeholder="z. B. Buchhaltung"
-            value={rolle}
+          <Select
+            label="Rolle"
+            value={rolleSelectValue(rolle)}
+            options={ANSPRECHPARTNER_ROLLEN.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
+            disabled={pending}
             onChange={(e) => setRolle(e.target.value)}
           />
-        </label>
-        <label className="ap-check">
-          <input
-            type="checkbox"
-            checked={istPrimaer}
-            onChange={(e) => setIstPrimaer(e.target.checked)}
-          />
-          <span>Primärer Ansprechpartner</span>
-        </label>
-        {edit ? (
-          <button
-            type="button"
-            className="btn ghost sm mt-2"
+          <Input
+            label="E-Mail"
+            type="email"
+            value={email}
             disabled={pending}
-            onClick={() => {
-              setOpen(false)
-              entfernen(edit)
-            }}
-          >
-            <MockIcon ctx="btn" n="trash" size={14} /> Löschen
-          </button>
-        ) : null}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            label="Telefon"
+            value={telefon}
+            disabled={pending}
+            onChange={(e) => setTelefon(e.target.value)}
+          />
+          <label className="ap-check">
+            <input
+              type="checkbox"
+              checked={istPrimaer}
+              disabled={pending}
+              onChange={(e) => setIstPrimaer(e.target.checked)}
+            />
+            <span>Primärer Ansprechpartner</span>
+          </label>
+          {edit ? (
+            <button
+              type="button"
+              className="btn ghost sm"
+              disabled={pending}
+              onClick={() => entfernen(edit)}
+            >
+              <MockIcon ctx="btn" n="trash" size={14} /> Löschen
+            </button>
+          ) : null}
+        </div>
       </EditorSheet>
     </div>
   )

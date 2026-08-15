@@ -13,7 +13,13 @@ function authorize(req: Request): boolean {
   return auth === `Bearer ${secret}`
 }
 
-type UploadTyp = 'compliance' | 'unterlage' | 'fachdoku' | 'angebot' | 'rechnung'
+type UploadTyp =
+  | 'compliance'
+  | 'compliance_delete'
+  | 'unterlage'
+  | 'fachdoku'
+  | 'angebot'
+  | 'rechnung'
 
 type Body = {
   typ?: string
@@ -29,6 +35,7 @@ function parseTyp(raw: string): UploadTyp | null {
   const t = raw.trim().toLowerCase()
   if (
     t === 'compliance' ||
+    t === 'compliance_delete' ||
     t === 'unterlage' ||
     t === 'fachdoku' ||
     t === 'angebot' ||
@@ -40,7 +47,7 @@ function parseTyp(raw: string): UploadTyp | null {
 }
 
 /**
- * Portal → CRM: Partner-Upload (Compliance / Unterlage / Fachnachweis / Angebot / Rechnung).
+ * Portal → CRM: Partner-Upload oder Soft-Delete (Compliance).
  * Push + Timeline; Glocke liest zusätzlich aus DB.
  */
 export async function POST(req: Request) {
@@ -70,6 +77,7 @@ export async function POST(req: Request) {
   const dokumentId = String(body.dokumentId ?? '').trim() || null
   const slotId = String(body.slotId ?? '').trim() || null
   const titel = String(body.titel ?? '').trim() || null
+  const isDelete = typ === 'compliance_delete'
 
   const { data: hw } = await supabaseAdmin
     .from('handwerker')
@@ -111,8 +119,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Auftrag unbekannt' }, { status: 404 })
     }
 
-    const timelineTyp =
-      typ === 'compliance'
+    const timelineTyp = isDelete
+      ? 'partner_compliance'
+      : typ === 'compliance'
         ? 'partner_compliance'
         : typ === 'fachdoku'
           ? 'partner_fachdoku'
@@ -121,8 +130,9 @@ export async function POST(req: Request) {
             : typ === 'rechnung'
               ? 'partner_rechnung'
               : 'partner_unterlage'
-    const timelineTitel =
-      typ === 'compliance'
+    const timelineTitel = isDelete
+      ? 'Compliance-Dokument gelöscht (Partner)'
+      : typ === 'compliance'
         ? 'Compliance-Dokument zur Prüfung'
         : typ === 'fachdoku'
           ? 'Fachnachweis hochgeladen'
@@ -145,7 +155,7 @@ export async function POST(req: Request) {
   await writeAuditEvent({
     entityType: auftragId ? 'auftrag' : 'handwerker',
     entityId: auftragId || handwerkerId,
-    aktion: `partner_${typ}_upload`,
+    aktion: isDelete ? 'partner_compliance_delete' : `partner_${typ}_upload`,
     actorRolle: 'system',
     payload: {
       handwerker_id: handwerkerId,
@@ -156,8 +166,9 @@ export async function POST(req: Request) {
     },
   })
 
-  const pushTyp: CrmNotificationTyp =
-    typ === 'compliance'
+  const pushTyp: CrmNotificationTyp = isDelete
+    ? 'partner_compliance_geloescht'
+    : typ === 'compliance'
       ? 'partner_compliance_pruefung'
       : typ === 'fachdoku'
         ? 'partner_fachdoku'
@@ -167,8 +178,9 @@ export async function POST(req: Request) {
             ? 'handwerker_einreichung'
             : 'partner_unterlage'
 
-  const pushTitle =
-    typ === 'compliance'
+  const pushTitle = isDelete
+    ? `${hwName}: Dokument gelöscht`
+    : typ === 'compliance'
       ? `${hwName}: Dokument zur Freigabe`
       : typ === 'fachdoku'
         ? `${hwName}: Fachnachweis hochgeladen`
@@ -180,17 +192,19 @@ export async function POST(req: Request) {
 
   const pushBody =
     titel ||
-    (typ === 'compliance'
-      ? 'Compliance-Upload wartet auf Prüfung.'
-      : typ === 'angebot'
-        ? 'Partner-Angebot liegt unter Akte → Dokumente.'
-        : typ === 'rechnung'
-          ? 'Partner-Rechnung liegt unter Akte → Dokumente.'
-          : 'Neuer Partner-Upload.')
+    (isDelete
+      ? 'Partner hat eine Compliance-Unterlage gelöscht — bitte prüfen.'
+      : typ === 'compliance'
+        ? 'Compliance-Upload wartet auf Prüfung.'
+        : typ === 'angebot'
+          ? 'Partner-Angebot liegt unter Akte → Dokumente.'
+          : typ === 'rechnung'
+            ? 'Partner-Rechnung liegt unter Akte → Dokumente.'
+            : 'Neuer Partner-Upload.')
 
   const href = auftragId
     ? `/auftraege/${auftragId}?tab=akte`
-    : typ === 'compliance'
+    : typ === 'compliance' || isDelete
       ? `/handwerker/${handwerkerId}?tab=compliance`
       : anfrageId
         ? `/angebote`

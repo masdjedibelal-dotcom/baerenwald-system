@@ -72,17 +72,19 @@ export async function saveKundenAnsprechpartner(
   }
 
   if (ansprechpartnerId?.trim()) {
+    const patch: Record<string, unknown> = {
+      name,
+      email,
+      telefon,
+      rolle,
+      ist_primaer: istPrimaer,
+      updated_at: new Date().toISOString(),
+    }
+    if (istPrimaer) patch.sort_order = 0
     const { error } = await withCrmReadFallback(async (db) =>
       db
         .from('kunden_ansprechpartner')
-        .update({
-          name,
-          email,
-          telefon,
-          rolle,
-          ist_primaer: istPrimaer,
-          updated_at: new Date().toISOString(),
-        })
+        .update(patch)
         .eq('id', ansprechpartnerId.trim())
         .eq('kunde_id', kid)
     )
@@ -101,6 +103,7 @@ export async function saveKundenAnsprechpartner(
         telefon,
         rolle,
         ist_primaer: istPrimaer,
+        sort_order: istPrimaer ? 0 : 100,
       })
       .select('id')
       .single()
