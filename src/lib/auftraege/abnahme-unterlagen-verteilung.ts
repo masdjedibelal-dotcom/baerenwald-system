@@ -1,11 +1,8 @@
 /**
  * A6: Abnahme-PDF nach Signatur in Unterlagen von HV + Mieter ablegen + HV benachrichtigen.
  * Kanonische Quelle bleibt auftrag_abnahmeprotokolle (V3).
+ * Keine E-Mail — nur Unterlagen + Portal-Glocke/Push.
  */
-import { mailOrgAbnahmeDokument } from '@/lib/email/meldung-mail-templates'
-import { getMailBranding } from '@/lib/get-mail-branding'
-import { sendMail } from '@/lib/mail-service'
-import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function insertUnterlageOnce(input: {
@@ -51,7 +48,6 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       titel,
       kunde_id,
       lead_id,
-      abschlussdokumentation_url,
       leads!lead_id(
         id,
         auftraggeber_kunde_id,
@@ -121,42 +117,4 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       typ: 'abnahmeprotokoll',
     })
   }
-
-  if (!hvId) return
-
-  const { data: hv } = await supabaseAdmin
-    .from('kunden')
-    .select('id, name, email, org_anzeigename, portal_modus')
-    .eq('id', hvId)
-    .maybeSingle()
-
-  const email = (hv as { email?: string | null } | null)?.email?.trim()
-  if (!email) return
-
-  const branding = await getMailBranding(supabaseAdmin)
-  const orgName =
-    (hv as { org_anzeigename?: string; name?: string } | null)?.org_anzeigename?.trim() ||
-    (hv as { name?: string } | null)?.name?.trim() ||
-    'Auftraggeber'
-  const tpl = mailOrgAbnahmeDokument(
-    {
-      orgName,
-      objektTitel: String(auf.titel ?? 'Auftrag'),
-      portalLink: buildPortalLoginLink(),
-      abschlussberichtUrl:
-        (auf as { abschlussdokumentation_url?: string | null }).abschlussdokumentation_url ?? null,
-    },
-    branding
-  )
-
-  void sendMail({
-    typ: 'org_abnahme_dokument',
-    an: email,
-    anName: orgName,
-    betreff: tpl.betreff,
-    html: tpl.html,
-    leadId: lead ? String((lead as { id?: string }).id ?? auf.lead_id ?? '') || undefined : undefined,
-    kundeId: hvId,
-    auftragId,
-  })
 }

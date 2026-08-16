@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 
 type Punkt = {
   id: string
@@ -20,22 +21,33 @@ type Befund = {
   punkte: Punkt[]
 }
 
-function statusLabel(s: string | null): string {
+function statusLabel(s: string | null): string | null {
   const v = (s ?? '').toLowerCase()
   if (v === 'unauffaellig') return 'Unauffällig'
   if (v === 'auffaellig') return 'Auffällig'
   if (v === 'nicht_pruefbar') return 'Nicht prüfbar'
-  return '—'
+  return null
 }
 
-function ergebnisLabel(s: string | null): string {
-  if (s === 'selbst_erledigt') return 'Selbst erledigt'
-  if (s === 'fachfirma_angebot') return 'Fachfirma — Angebot'
-  if (s === 'fachfirma_akut') return 'Fachfirma — Akut'
-  return s?.trim() || 'Prüfung läuft'
+function ergebnisMeta(s: string | null): { label: string; tone: 'yel' | 'grn' | 'red' | 'muted' } {
+  if (s === 'selbst_erledigt') return { label: 'Selbst erledigt', tone: 'grn' }
+  if (s === 'fachfirma_angebot') return { label: 'Fachfirma — Angebot', tone: 'yel' }
+  if (s === 'fachfirma_akut') return { label: 'Fachfirma — Akut', tone: 'red' }
+  if (s?.trim()) return { label: s.trim(), tone: 'muted' }
+  return { label: 'Prüfung läuft', tone: 'muted' }
 }
 
-/** Read-only HM-Vorbefund am CRM-Anfrage-Detail. */
+function punktIstAusgefuellt(p: Punkt): boolean {
+  return Boolean(statusLabel(p.status) || p.notiz.trim() || p.foto_refs.length > 0)
+}
+
+function formatDatum(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('de-DE')
+}
+
+/** Read-only HM-Vorbefund am CRM-Anfrage-Detail — Mock-Card, nur ausgefüllte Punkte. */
 export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
   const [befund, setBefund] = useState<Befund | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -46,9 +58,7 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
       const supabase = createClient()
       const { data: head } = await supabase
         .from('lead_befunde')
-        .select(
-          'id, durchgefuehrt_von, durchgefuehrt_am, ergebnis, vorlage_key'
-        )
+        .select('id, durchgefuehrt_von, durchgefuehrt_am, ergebnis, vorlage_key')
         .eq('lead_id', leadId)
         .maybeSingle()
 
@@ -78,9 +88,7 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
           status: p.status != null ? String(p.status) : null,
           notiz: String(p.notiz ?? ''),
           foto_refs: Array.isArray(p.foto_refs)
-            ? (p.foto_refs as unknown[]).filter(
-                (u): u is string => typeof u === 'string'
-              )
+            ? (p.foto_refs as unknown[]).filter((u): u is string => typeof u === 'string')
             : [],
         })),
       })
@@ -91,50 +99,97 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
     }
   }, [leadId])
 
+  const ausgefuellt = useMemo(
+    () => (befund?.punkte ?? []).filter(punktIstAusgefuellt),
+    [befund]
+  )
+
   if (!loaded || !befund) return null
 
+  const ergebnis = ergebnisMeta(befund.ergebnis)
+  const metaParts = [
+    befund.durchgefuehrt_von.trim() || null,
+    befund.durchgefuehrt_am ? formatDatum(befund.durchgefuehrt_am) : null,
+    befund.vorlage_key?.trim() || null,
+  ].filter(Boolean)
+
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">Hausmeister-Vorbefund</h3>
-        <span className="text-xs text-muted-foreground">
-          {ergebnisLabel(befund.ergebnis)}
-        </span>
+    <div className="card">
+      <div className="card-h">
+        <div className="card-title title">Hausmeister-Vorbefund</div>
+        <span className={cn('hvk-badge', `hvk-badge--${ergebnis.tone}`)}>{ergebnis.label}</span>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {befund.durchgefuehrt_von || '—'}
-        {befund.durchgefuehrt_am
-          ? ` · ${new Date(befund.durchgefuehrt_am).toLocaleDateString('de-DE')}`
-          : ''}
-        {befund.vorlage_key ? ` · ${befund.vorlage_key}` : ''}
-      </p>
-      <ul className="space-y-2">
-        {befund.punkte.map((p) => (
-          <li key={p.id} className="text-sm border-t border-border/60 pt-2">
-            <div className="font-medium">{p.titel}</div>
-            <div className="text-xs text-muted-foreground">
-              {statusLabel(p.status)}
-              {p.notiz ? ` — ${p.notiz}` : ''}
+      <div className="card-b">
+        {metaParts.length > 0 ? (
+          <p
+            style={{
+              margin: '0 0 12px',
+              fontSize: 'var(--fs-meta)',
+              color: 'var(--text-3)',
+            }}
+          >
+            {metaParts.join(' · ')}
+          </p>
+        ) : null}
+
+        {ausgefuellt.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+            Keine ausgefüllten Prüfpunkte.
+          </p>
+        ) : (
+          <div className="detail-soft-block">
+            <div className="props">
+              {ausgefuellt.map((p) => {
+                const st = statusLabel(p.status)
+                const notiz = p.notiz.trim()
+                const valueParts = [st, notiz].filter(Boolean)
+                return (
+                  <div key={p.id} className="prop">
+                    <div className="prop-l">{p.titel}</div>
+                    <div className="prop-v">
+                      {valueParts.length > 0 ? valueParts.join(' — ') : null}
+                      {p.foto_refs.length > 0 ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 6,
+                            marginTop: valueParts.length ? 6 : 0,
+                          }}
+                        >
+                          {p.foto_refs.map((url) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'block',
+                                width: 48,
+                                height: 48,
+                                overflow: 'hidden',
+                                borderRadius: 'var(--r-md)',
+                                border: '1px solid var(--border)',
+                              }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt=""
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-            {p.foto_refs.length > 0 ? (
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {p.foto_refs.map((url) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block h-12 w-12 overflow-hidden rounded border"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="h-full w-full object-cover" />
-                  </a>
-                ))}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

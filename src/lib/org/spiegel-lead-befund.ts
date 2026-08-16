@@ -17,7 +17,7 @@ function parseFotoRefs(raw: unknown): string[] {
 
 /**
  * Spiegelt abgeschlossenen HM-Befund als auftrag_bautagebuch_eintraege (eintrag_typ=befund).
- * Auffällige Punkte + Notizen + Fotos — für Partner/CRM/Versicherungsakte.
+ * Ein Eintrag pro Prüfpunkt (Titel, Notiz, Fotos) — ohne Ergebnis/Vorlage-Meta.
  */
 export async function spiegelLeadBefundNachAuftrag(input: {
   leadId: string
@@ -31,7 +31,7 @@ export async function spiegelLeadBefundNachAuftrag(input: {
 
   const { data: befund } = await supabaseAdmin
     .from('lead_befunde')
-    .select('id, durchgefuehrt_von, durchgefuehrt_am, ergebnis, vorlage_key')
+    .select('id, durchgefuehrt_am')
     .eq('lead_id', leadId)
     .maybeSingle()
 
@@ -44,7 +44,6 @@ export async function spiegelLeadBefundNachAuftrag(input: {
     .select('id')
     .eq('auftrag_id', auftragId)
     .eq('eintrag_typ', 'befund')
-    .ilike('titel', 'Hausmeister-Vorbefund%')
     .limit(1)
     .maybeSingle()
 
@@ -62,40 +61,36 @@ export async function spiegelLeadBefundNachAuftrag(input: {
   const auffaellig = rows.filter(
     (p) => String(p.status ?? '').toLowerCase() === 'auffaellig'
   )
-  const relevant = auffaellig.length > 0 ? auffaellig : rows.filter((p) => p.notiz?.trim())
+  const withNotiz = rows.filter((p) => p.notiz?.trim())
+  const relevant =
+    auffaellig.length > 0
+      ? auffaellig
+      : withNotiz.length > 0
+        ? withNotiz
+        : rows.slice(0, 8)
 
-  const lines: string[] = []
-  const fotos: string[] = []
-  for (const p of relevant.length ? relevant : rows.slice(0, 8)) {
-    const st = String(p.status ?? '').trim() || 'offen'
-    const notiz = String(p.notiz ?? '').trim()
-    lines.push(`• ${p.titel} [${st}]${notiz ? ` — ${notiz}` : ''}`)
-    for (const f of parseFotoRefs(p.foto_refs)) fotos.push(f)
-  }
-
-  const von = String(befund.durchgefuehrt_von ?? '').trim()
-  const ergebnis = String(befund.ergebnis ?? '').trim()
-  const headerBits = [
-    von ? `Durchgeführt von: ${von}` : null,
-    ergebnis ? `Ergebnis: ${ergebnis}` : null,
-    befund.vorlage_key ? `Vorlage: ${befund.vorlage_key}` : null,
-  ].filter(Boolean)
-
-  const beschreibung = [...headerBits, '', ...lines].join('\n').trim() || null
   const datum =
     String(befund.durchgefuehrt_am ?? '').slice(0, 10) ||
     new Date().toISOString().slice(0, 10)
 
-  const { error } = await supabaseAdmin.from('auftrag_bautagebuch_eintraege').insert({
+  const payload = relevant.map((p) => ({
     auftrag_id: auftragId,
-    titel: 'Hausmeister-Vorbefund',
-    beschreibung,
+    titel: String(p.titel ?? '').trim() || 'Prüfpunkt',
+    beschreibung: String(p.notiz ?? '').trim() || null,
     datum,
-    foto_urls: fotos,
+    foto_urls: parseFotoRefs(p.foto_refs),
     fuer_kunde_freigegeben: false,
-    eintrag_typ: 'befund',
-  })
+    eintrag_typ: 'befund' as const,
+  }))
+
+  if (!payload.length) {
+    return { ok: true, inserted: 0 }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('auftrag_bautagebuch_eintraege')
+    .insert(payload)
 
   if (error) return { ok: false, message: error.message }
-  return { ok: true, inserted: 1 }
+  return { ok: true, inserted: payload.length }
 }

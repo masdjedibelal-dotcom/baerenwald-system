@@ -243,7 +243,10 @@ export function mailOrgAngebotZurInfo(
   }
 }
 
-/** Direktauftrag: HV nur zur Info — wir kümmern uns; Portal-Zugang wie gewohnt. */
+/**
+ * Direktauftrag-Info-Mail: nur wenn der Auftrag informativ ohne HV-Freigabe-Aktion
+ * durchgelaufen ist (Akut-Bypass). Nicht nach HV-Klick „Direkt Bärenwald“ / „Hausmeister“.
+ */
 export function mailOrgNotfallDirektInfo(
   data: {
     orgName: string
@@ -279,33 +282,14 @@ export function mailOrgNotfallDirektInfo(
   }
 }
 
-/** Abnahmeprotokoll liegt in den Unterlagen. */
-export function mailOrgAbnahmeDokument(
-  data: {
-    orgName: string
-    objektTitel: string
-    portalLink: string
-    abschlussberichtUrl?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const betreff = `Abnahmedokument verfügbar — ${data.objektTitel.trim() || 'Objekt'}`
-  const bericht = data.abschlussberichtUrl?.trim()
-    ? `<p>Optionaler Abschlussbericht: <a href="${esc(data.abschlussberichtUrl.trim())}">Bericht öffnen</a></p>`
-    : ''
-  const body = `
-    <p>Guten Tag,</p>
-    <p>für <strong>${esc(data.objektTitel)}</strong> liegt das <strong>Abnahmeprotokoll</strong> in den Unterlagen bereit.</p>
-    ${bericht}
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Abnahmedokument verfügbar', b, undefined, {
-      anrede: 'sie',
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
-    }),
-  }
+/** HV hat bereits freigegeben / Hausmeister / Direkt beauftragt — keine Info-Direktauftrag-Mail. */
+export function hvHatBereitsMeldungGewaehlt(hvMeldungStatus: string | null | undefined): boolean {
+  const s = (hvMeldungStatus ?? '').trim().toLowerCase()
+  return (
+    s === 'angebot_eingefordert' ||
+    s === 'hm_pruefung' ||
+    s === 'kleinreparatur'
+  )
 }
 
 export function mailOrgFreigabeErgebnis(

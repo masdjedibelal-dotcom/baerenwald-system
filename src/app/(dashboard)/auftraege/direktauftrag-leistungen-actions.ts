@@ -36,7 +36,7 @@ export async function createDirektauftragMitLeistungen(input: {
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from('leads')
     .select(
-      'id, kunde_id, auftraggeber_kunde_id, situation, funnel_daten, freigabe_bypass_grund, melder_einheit, bereiche'
+      'id, kunde_id, auftraggeber_kunde_id, situation, funnel_daten, freigabe_bypass_grund, melder_einheit, bereiche, hv_meldung_status'
     )
     .eq('id', leadId)
     .maybeSingle()
@@ -144,7 +144,12 @@ export async function createDirektauftragMitLeistungen(input: {
     console.warn('[createDirektauftragMitLeistungen] befund-spiegel:', e)
   }
 
-  if (istAkut) {
+  // Informative Direktauftrag-Mail nur bei Akut-Bypass ohne vorherige HV-Aktion.
+  // Nach „Direkt Bärenwald“ / „Hausmeister“ kommt die Portal-Mail „Wir kümmern uns …“.
+  const { hvHatBereitsMeldungGewaehlt } = await import(
+    '@/lib/email/meldung-mail-templates'
+  )
+  if (istAkut && !hvHatBereitsMeldungGewaehlt(lead.hv_meldung_status)) {
     try {
       const { mailOrgNotfallDirektInfo } = await import('@/lib/email/meldung-mail-templates')
       const { sendMail } = await import('@/lib/mail-service')

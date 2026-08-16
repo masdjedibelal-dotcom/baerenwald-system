@@ -163,7 +163,16 @@ export async function notfallDirektBeauftragen(
     return { ok: false, message: bannerErr.message }
   }
 
+  let hvStatusVorDirekt: string | null = null
   if (leadId) {
+    const { data: leadVor } = await supabaseAdmin
+      .from('leads')
+      .select('hv_meldung_status')
+      .eq('id', leadId)
+      .maybeSingle()
+    hvStatusVorDirekt =
+      (leadVor as { hv_meldung_status?: string } | null)?.hv_meldung_status ?? null
+
     await supabaseAdmin
       .from('leads')
       .update({
@@ -321,42 +330,47 @@ export async function notfallDirektBeauftragen(
     aenderungTyp: 'neu',
   })
 
-  // A3: HV nur zur Information (kein Freigabe-Request)
+  // A3: HV nur Info-Mail bei informativem Bypass — nicht nach HV „Direkt Bärenwald“ / „Hausmeister“.
   if (kundeId) {
-    const { data: hv } = await supabaseAdmin
-      .from('kunden')
-      .select('id, name, email, org_anzeigename, portal_modus')
-      .eq('id', kundeId)
-      .maybeSingle()
-    const hvEmail = (hv as { email?: string | null } | null)?.email?.trim()
-    if (hvEmail && (hv as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
-      const { getMailBranding } = await import('@/lib/get-mail-branding')
-      const { mailOrgNotfallDirektInfo } = await import('@/lib/email/meldung-mail-templates')
-      const { sendMail } = await import('@/lib/mail-service')
-      const { buildPortalLoginLink } = await import('@/lib/portal-utils')
-      const branding = await getMailBranding(supabaseAdmin)
-      const orgName =
-        (hv as { org_anzeigename?: string; name?: string }).org_anzeigename?.trim() ||
-        (hv as { name?: string }).name?.trim() ||
-        'Auftraggeber'
-      const tpl = mailOrgNotfallDirektInfo(
-        {
-          orgName,
-          objektTitel: titel,
-          portalLink: buildPortalLoginLink(),
-        },
-        branding
-      )
-      void sendMail({
-        typ: 'org_notfall_info',
-        an: hvEmail,
-        anName: orgName,
-        betreff: tpl.betreff,
-        html: tpl.html,
-        leadId: leadId ?? undefined,
-        kundeId,
-        auftragId,
-      })
+    const { hvHatBereitsMeldungGewaehlt } = await import(
+      '@/lib/email/meldung-mail-templates'
+    )
+    if (!hvHatBereitsMeldungGewaehlt(hvStatusVorDirekt)) {
+      const { data: hv } = await supabaseAdmin
+        .from('kunden')
+        .select('id, name, email, org_anzeigename, portal_modus')
+        .eq('id', kundeId)
+        .maybeSingle()
+      const hvEmail = (hv as { email?: string | null } | null)?.email?.trim()
+      if (hvEmail && (hv as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
+        const { getMailBranding } = await import('@/lib/get-mail-branding')
+        const { mailOrgNotfallDirektInfo } = await import('@/lib/email/meldung-mail-templates')
+        const { sendMail } = await import('@/lib/mail-service')
+        const { buildPortalLoginLink } = await import('@/lib/portal-utils')
+        const branding = await getMailBranding(supabaseAdmin)
+        const orgName =
+          (hv as { org_anzeigename?: string; name?: string }).org_anzeigename?.trim() ||
+          (hv as { name?: string }).name?.trim() ||
+          'Auftraggeber'
+        const tpl = mailOrgNotfallDirektInfo(
+          {
+            orgName,
+            objektTitel: titel,
+            portalLink: buildPortalLoginLink(),
+          },
+          branding
+        )
+        void sendMail({
+          typ: 'org_notfall_info',
+          an: hvEmail,
+          anName: orgName,
+          betreff: tpl.betreff,
+          html: tpl.html,
+          leadId: leadId ?? undefined,
+          kundeId,
+          auftragId,
+        })
+      }
     }
   }
 
