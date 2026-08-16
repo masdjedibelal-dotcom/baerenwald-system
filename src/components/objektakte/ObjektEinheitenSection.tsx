@@ -1,34 +1,49 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
-  createObjektMieter,
+  createEinheitBewohner,
+  createObjektEinheit,
   deleteEinheitBewohner,
+  deleteObjektEinheit,
   updateEinheitBewohner,
   updateObjektEinheit,
 } from '@/app/actions/objektakte-actions'
-import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
+import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
+import type { EntityMenuItem } from '@/lib/entity-menu'
+import type {
+  EinheitBewohner,
+  EinheitBewohnerRolle,
+  ObjektEinheit,
+} from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
-const COLS = 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 28px'
+const EINHEIT_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 72px 28px'
+const PERSON_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 44px'
 
-type MieterRow = EinheitBewohner & { einheitLabel: string; flaeche: number | null }
+type PersonForm = {
+  einheitId: string
+  rolle: EinheitBewohnerRolle
+  edit: EinheitBewohner | null
+}
 
 /**
- * Objekt-Tab „Mieter“: Mieter + Einheit gemeinsam (gleiche Daten wie HV-Portal).
- * Leer stehende Einheiten ohne Mieter werden nicht als eigene Zeilen geführt.
+ * Einheiten-Liste (listcard) → Detail im EditorSheet → Personen hinzufügen/bearbeiten im Sheet.
+ * Kein Accordion — gleiches Pattern wie Kontakte vor Ort.
  */
 export function ObjektEinheitenSection({
   kundeId,
   objektId,
-  einheiten,
-  bewohner: initial,
+  einheiten: initialEinheiten,
+  bewohner: initialBewohner,
   onChanged,
 }: {
   kundeId: string
@@ -37,148 +52,208 @@ export function ObjektEinheitenSection({
   bewohner: EinheitBewohner[]
   onChanged: () => void
 }) {
-  const [rows, setRows] = useState<EinheitBewohner[]>(() =>
-    initial.filter((b) => b.aktiv !== false)
+  const [einheiten, setEinheiten] = useState(() =>
+    initialEinheiten.filter((e) => e.aktiv !== false)
   )
-  const [modalOpen, setModalOpen] = useState(false)
-  const [edit, setEdit] = useState<EinheitBewohner | null>(null)
+  const [bewohner, setBewohner] = useState(() =>
+    initialBewohner.filter((b) => b.aktiv !== false)
+  )
   const [pending, startTransition] = useTransition()
+
+  const [detail, setDetail] = useState<ObjektEinheit | null>(null)
+
+  const [einheitFormOpen, setEinheitFormOpen] = useState(false)
+  const [einheitEdit, setEinheitEdit] = useState<ObjektEinheit | null>(null)
+  const [bezeichnung, setBezeichnung] = useState('')
+  const [etage, setEtage] = useState('')
+  const [m2, setM2] = useState('')
+  const [einheitDirty, setEinheitDirty] = useState(false)
+  const [einheitErr, setEinheitErr] = useState<string | null>(null)
+
+  const [personForm, setPersonForm] = useState<PersonForm | null>(null)
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
-  const [wohnung, setWohnung] = useState('')
-  const [flaeche, setFlaeche] = useState('')
-  const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
-  const [err, setErr] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
-  const [drawer, setDrawer] = useState<EinheitBewohner | null>(null)
+  const [telefon, setTelefon] = useState('')
+  const [seVerwaltung, setSeVerwaltung] = useState(false)
+  const [mieteHinweis, setMieteHinweis] = useState('')
+  const [personDirty, setPersonDirty] = useState(false)
+  const [personErr, setPersonErr] = useState<string | null>(null)
 
   useEffect(() => {
-    setRows(initial.filter((b) => b.aktiv !== false))
-  }, [initial])
+    setEinheiten(initialEinheiten.filter((e) => e.aktiv !== false))
+  }, [initialEinheiten])
 
-  const einheitById = useMemo(() => {
-    const m = new Map<string, ObjektEinheit>()
-    for (const e of einheiten) m.set(e.id, e)
-    return m
-  }, [einheiten])
+  useEffect(() => {
+    setBewohner(initialBewohner.filter((b) => b.aktiv !== false))
+  }, [initialBewohner])
 
-  const liste: MieterRow[] = useMemo(
-    () =>
-      rows.map((b) => {
-        const e = einheitById.get(b.objekt_einheit_id)
-        return {
-          ...b,
-          einheitLabel:
-            b.objekt_einheiten?.bezeichnung?.trim() ||
-            e?.bezeichnung?.trim() ||
-            '—',
-          flaeche: e?.wohnflaeche_m2 != null ? Number(e.wohnflaeche_m2) : null,
-        }
-      }),
-    [rows, einheitById]
-  )
+  useEffect(() => {
+    if (!detail) return
+    const next = einheiten.find((e) => e.id === detail.id) ?? null
+    setDetail(next)
+  }, [einheiten, detail?.id])
 
-  function splitName(full: string): { vor: string; nach: string } {
-    const parts = full.trim().split(/\s+/).filter(Boolean)
-    if (parts.length <= 1) return { vor: parts[0] ?? '', nach: '' }
-    return { vor: parts[0], nach: parts.slice(1).join(' ') }
+  const byEinheit = useMemo(() => {
+    const map = new Map<string, EinheitBewohner[]>()
+    for (const b of bewohner) {
+      const list = map.get(b.objekt_einheit_id) ?? []
+      list.push(b)
+      map.set(b.objekt_einheit_id, list)
+    }
+    return map
+  }, [bewohner])
+
+  function peopleFor(einheitId: string) {
+    return byEinheit.get(einheitId) ?? []
   }
 
-  function openNeu() {
-    setEdit(null)
-    setVorname('')
-    setNachname('')
-    setWohnung('')
-    setFlaeche('')
-    setTelefon('')
-    setEmail('')
-    setErr(null)
-    setDirty(false)
-    setModalOpen(true)
+  function metaFor(u: ObjektEinheit) {
+    const people = peopleFor(u.id)
+    const eigentuemer = people.filter((p) => p.rolle === 'eigentuemer').length
+    const mieter = people.filter((p) => p.rolle !== 'eigentuemer').length
+    return [
+      u.etage?.trim() ? `Etage ${u.etage.trim()}` : null,
+      u.wohnflaeche_m2 != null ? `${u.wohnflaeche_m2} m²` : null,
+      eigentuemer ? `${eigentuemer} Eigentümer` : null,
+      mieter ? `${mieter} Mieter` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
   }
 
-  function openEdit(b: EinheitBewohner) {
-    const { vor, nach } = splitName(b.name)
-    const e = einheitById.get(b.objekt_einheit_id)
-    setEdit(b)
-    setVorname(vor)
-    setNachname(nach)
-    setWohnung(
-      b.objekt_einheiten?.bezeichnung?.trim() || e?.bezeichnung?.trim() || ''
-    )
-    setFlaeche(e?.wohnflaeche_m2 != null ? String(e.wohnflaeche_m2) : '')
-    setTelefon(b.telefon ?? '')
-    setEmail(b.email ?? '')
-    setErr(null)
-    setDirty(false)
-    setModalOpen(true)
+  function openEinheitNeu() {
+    setEinheitEdit(null)
+    setBezeichnung('')
+    setEtage('')
+    setM2('')
+    setEinheitErr(null)
+    setEinheitDirty(false)
+    setEinheitFormOpen(true)
   }
 
-  function openEditFromDrawer(b: EinheitBewohner) {
-    setDrawer(null)
-    requestAnimationFrame(() => openEdit(b))
+  function openEinheitBearbeiten(u: ObjektEinheit) {
+    setEinheitEdit(u)
+    setBezeichnung(u.bezeichnung)
+    setEtage(u.etage?.trim() || '')
+    setM2(u.wohnflaeche_m2 != null ? String(u.wohnflaeche_m2) : '')
+    setEinheitErr(null)
+    setEinheitDirty(false)
+    setEinheitFormOpen(true)
   }
 
-  function fullName() {
-    return [vorname, nachname].map((s) => s.trim()).filter(Boolean).join(' ')
+  function openPersonForm(
+    einheitId: string,
+    rolle: EinheitBewohnerRolle,
+    edit: EinheitBewohner | null = null
+  ) {
+    if (edit) {
+      const parts = edit.name.trim().split(/\s+/).filter(Boolean)
+      setVorname(parts[0] ?? '')
+      setNachname(parts.slice(1).join(' '))
+      setEmail(edit.email ?? '')
+      setTelefon(edit.telefon ?? '')
+      setSeVerwaltung(Boolean(edit.sondereigentum_verwaltung))
+      setMieteHinweis(edit.miete_hinweis ?? '')
+    } else {
+      setVorname('')
+      setNachname('')
+      setEmail('')
+      setTelefon('')
+      setSeVerwaltung(false)
+      setMieteHinweis('')
+    }
+    setPersonErr(null)
+    setPersonDirty(false)
+    setPersonForm({ einheitId, rolle, edit })
   }
 
-  function speichern() {
-    setErr(null)
-    const name = fullName()
-    if (!name) {
-      setErr('Vor- und Nachname sind erforderlich.')
+  function speichernEinheit() {
+    const label = bezeichnung.trim()
+    if (!label) {
+      setEinheitErr('Bezeichnung ist erforderlich.')
       return
     }
-    const fl = Number(String(flaeche).replace(',', '.'))
-    const flaecheVal = Number.isFinite(fl) && fl > 0 ? fl : null
-
+    const fl = Number(String(m2).replace(',', '.'))
+    const flaeche = Number.isFinite(fl) && fl > 0 ? fl : null
+    setEinheitErr(null)
     startTransition(async () => {
-      if (edit) {
-        const r = await updateEinheitBewohner(kundeId, objektId, edit.id, {
-          name,
-          telefon,
-          email,
+      if (einheitEdit) {
+        const r = await updateObjektEinheit(kundeId, objektId, einheitEdit.id, {
+          bezeichnung: label,
+          etage: etage.trim() || null,
+          wohnflaeche_m2: flaeche,
         })
         if (!r.ok) {
-          setErr(r.message)
+          setEinheitErr(r.message)
           return
         }
-        const bez = wohnung.trim() || 'Allgemein'
-        const ur = await updateObjektEinheit(kundeId, objektId, edit.objekt_einheit_id, {
-          bezeichnung: bez,
-          wohnflaeche_m2: flaecheVal,
+        toast.success('Einheit gespeichert')
+      } else {
+        const r = await createObjektEinheit(kundeId, objektId, {
+          bezeichnung: label,
+          etage: etage.trim() || null,
+          wohnflaeche_m2: flaeche,
         })
-        if (!ur.ok) {
-          setErr(ur.message)
+        if (!r.ok) {
+          setEinheitErr(r.message)
           return
         }
-        toast.success('Gespeichert')
-        setModalOpen(false)
-        onChanged()
-        return
+        toast.success('Einheit angelegt')
+        setDetail(r.einheit)
       }
-
-      const r = await createObjektMieter(kundeId, objektId, {
-        name,
-        wohnung: wohnung.trim() || undefined,
-        telefon,
-        email,
-        wohnflaeche_m2: flaecheVal,
-      })
-      if (!r.ok) {
-        setErr(r.message)
-        return
-      }
-      toast.success('Mieter angelegt')
-      setModalOpen(false)
+      setEinheitFormOpen(false)
       onChanged()
     })
   }
 
-  function loeschen(b: EinheitBewohner) {
-    if (!confirm(`Mieter „${b.name}“ entfernen?`)) return
+  function speichernPerson() {
+    if (!personForm) return
+    const name = [vorname, nachname].map((s) => s.trim()).filter(Boolean).join(' ')
+    if (!name) {
+      setPersonErr('Vor- und Nachname sind erforderlich.')
+      return
+    }
+    setPersonErr(null)
+    const rolle = personForm.rolle
+    startTransition(async () => {
+      if (personForm.edit) {
+        const r = await updateEinheitBewohner(kundeId, objektId, personForm.edit.id, {
+          name,
+          email,
+          telefon,
+          rolle,
+          sondereigentum_verwaltung: rolle === 'eigentuemer' ? seVerwaltung : false,
+          miete_hinweis: rolle === 'mieter' ? mieteHinweis.trim() || null : null,
+        })
+        if (!r.ok) {
+          setPersonErr(r.message)
+          return
+        }
+        toast.success('Gespeichert')
+      } else {
+        const r = await createEinheitBewohner(kundeId, objektId, {
+          objekt_einheit_id: personForm.einheitId,
+          name,
+          email,
+          telefon,
+          rolle,
+          sondereigentum_verwaltung: rolle === 'eigentuemer' ? seVerwaltung : false,
+          miete_hinweis: rolle === 'mieter' ? mieteHinweis.trim() || null : null,
+        })
+        if (!r.ok) {
+          setPersonErr(r.message)
+          return
+        }
+        toast.success(`${EINHEIT_BEWOHNER_ROLLE_LABELS[rolle]} angelegt`)
+      }
+      setPersonForm(null)
+      onChanged()
+    })
+  }
+
+  function entfernenPerson(b: EinheitBewohner) {
+    if (!confirm(`„${b.name}“ wirklich entfernen?`)) return
     startTransition(async () => {
       const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
       if (!r.ok) {
@@ -186,118 +261,383 @@ export function ObjektEinheitenSection({
         return
       }
       toast.success('Entfernt')
-      setDrawer(null)
       onChanged()
     })
   }
 
-  const drawerEinheit = drawer ? einheitById.get(drawer.objekt_einheit_id) : null
-  const drawerEinheitLabel =
-    drawer?.objekt_einheiten?.bezeichnung?.trim() ||
-    drawerEinheit?.bezeichnung?.trim() ||
-    '—'
+  function entfernenEinheit(u: ObjektEinheit) {
+    if (
+      !confirm(
+        `Einheit „${u.bezeichnung}“ wirklich entfernen? Zugeordnete Personen werden mitentfernt.`
+      )
+    ) {
+      return
+    }
+    startTransition(async () => {
+      const r = await deleteObjektEinheit(kundeId, objektId, u.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      if (detail?.id === u.id) setDetail(null)
+      toast.success('Einheit entfernt')
+      onChanged()
+    })
+  }
 
-  const canSave = Boolean(vorname.trim() && nachname.trim())
+  function einheitMenu(u: ObjektEinheit): EntityMenuItem[] {
+    return [
+      { icon: 'eye', label: 'Details', onClick: () => setDetail(u) },
+      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openEinheitBearbeiten(u) },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => {
+          if (pending) return
+          entfernenEinheit(u)
+        },
+      },
+    ]
+  }
+
+  function personMenu(b: EinheitBewohner, rolle: EinheitBewohnerRolle): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openPersonForm(b.objekt_einheit_id, rolle, b),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => {
+          if (pending) return
+          entfernenPerson(b)
+        },
+      },
+    ]
+  }
+
+  const detailPeople = detail ? peopleFor(detail.id) : []
+  const detailEigentuemer = detailPeople.filter((p) => p.rolle === 'eigentuemer')
+  const detailMieter = detailPeople.filter((p) => p.rolle !== 'eigentuemer')
+  const personEinheitLabel =
+    personForm && einheiten.find((e) => e.id === personForm.einheitId)?.bezeichnung
+  const canSavePerson = Boolean(vorname.trim() && nachname.trim())
+
+  function renderPersonBlock(rolle: EinheitBewohnerRolle, people: EinheitBewohner[]) {
+    if (!detail) return null
+    const title = EINHEIT_BEWOHNER_ROLLE_LABELS[rolle]
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="form-section-h" style={{ margin: 0, border: 0, padding: 0, flex: 1 }}>
+            {title}
+          </div>
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="plus"
+            disabled={pending}
+            onClick={() => openPersonForm(detail.id, rolle)}
+          >
+            {title}
+          </MockBtn>
+        </div>
+        {people.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+            Noch keine {title}.
+          </p>
+        ) : (
+          <div className="listcard">
+            <div className="list-row head" style={{ gridTemplateColumns: PERSON_COLS }} aria-hidden>
+              <div>Name</div>
+              <div>Kontakt</div>
+              <div />
+            </div>
+            {people.map((b) => {
+              const kontakt =
+                [b.telefon?.trim(), b.email?.trim()].filter(Boolean).join(' · ') || '—'
+              const hint =
+                rolle === 'eigentuemer'
+                  ? b.sondereigentum_verwaltung
+                    ? 'SE-Verwaltung'
+                    : null
+                  : b.miete_hinweis?.trim() || null
+              return (
+                <div
+                  key={b.id}
+                  className="list-row"
+                  style={{ gridTemplateColumns: PERSON_COLS, cursor: 'default' }}
+                >
+                  <div className="lc-title" style={{ fontWeight: 600 }}>
+                    {b.name}
+                    {hint ? (
+                      <div
+                        className="lc-sub"
+                        style={{
+                          fontSize: 'var(--fs-meta)',
+                          fontWeight: 400,
+                          color: 'var(--text-3)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {hint}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div
+                    className="lc-sub"
+                    style={{ color: 'var(--text-2)' }}
+                    title={kontakt}
+                  >
+                    {kontakt}
+                  </div>
+                  <div
+                    className="row-actions always"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ justifyContent: 'flex-end' }}
+                  >
+                    <MockEntityRowMenu items={personMenu(b, rolle)} title={title} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-          paddingBottom: 8,
-          borderBottom: '0.5px solid var(--border)',
-        }}
+    <>
+      <MockCard
+        title={
+          einheiten.length
+            ? `Einheiten · ${einheiten.length}`
+            : 'Einheiten'
+        }
+        icon="building"
+        actions={
+          <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
+            Einheit
+          </MockBtn>
+        }
       >
-        <span
-          style={{
-            fontSize: 'var(--fs-meta)',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--text-3)',
-          }}
+        <p
+          className="mb-3 text-[length:var(--fs-meta)] leading-relaxed"
+          style={{ color: 'var(--text-3)' }}
         >
-          Mieter
-        </span>
-        <div style={{ flex: 1 }} />
-        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Mieter hinzufügen
-        </MockBtn>
-      </div>
-
-      {liste.length === 0 ? (
-        <MockEmpty
-          icon="users"
-          title="Noch keine Mieter"
-          hint="Mieter mit Einheit hinzufügen — auch aus dem HV-Portal"
-        />
-      ) : (
-        <div className="listcard">
-          <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-            <div>Mieter</div>
-            <div>Einheit</div>
-            <div>Kontakt</div>
-            <div />
+          Einheit öffnen → Eigentümer und Mieter verwalten (wie im HV-Portal).
+        </p>
+        {einheiten.length === 0 ? (
+          <MockEmpty
+            icon="building"
+            title="Noch keine Einheiten"
+            hint="Einheit anlegen — danach Eigentümer und Mieter zuordnen"
+          />
+        ) : (
+          <div className="listcard">
+            <div className="list-row head" style={{ gridTemplateColumns: EINHEIT_COLS }} aria-hidden>
+              <div>Einheit</div>
+              <div>Details</div>
+              <div>Status</div>
+              <div />
+            </div>
+            {einheiten.map((u) => {
+              const people = peopleFor(u.id)
+              const leer = people.length === 0
+              const meta = metaFor(u)
+              return (
+                <div
+                  key={u.id}
+                  role="button"
+                  tabIndex={0}
+                  className="list-row"
+                  style={{ gridTemplateColumns: EINHEIT_COLS, alignItems: 'center' }}
+                  onClick={() => setDetail(u)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      ev.preventDefault()
+                      setDetail(u)
+                    }
+                  }}
+                >
+                  <div className="lc-title" style={{ fontWeight: 600 }}>
+                    {u.bezeichnung}
+                  </div>
+                  <div
+                    className="lc-sub"
+                    style={{ color: 'var(--text-2)' }}
+                    title={meta || 'Keine Personen'}
+                  >
+                    {meta || 'Keine Personen'}
+                  </div>
+                  <div className="lc-pills">
+                    <MockBadge kind={leer ? 'warten' : 'aktiv'}>
+                      {leer ? 'leer' : 'belegt'}
+                    </MockBadge>
+                  </div>
+                  <div
+                    className="row-actions always"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ justifyContent: 'flex-end' }}
+                  >
+                    <MockEntityRowMenu items={einheitMenu(u)} title="Einheit" />
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          {liste.map((b) => (
-            <div
-              key={b.id}
-              role="button"
-              tabIndex={0}
-              className="list-row"
-              style={{ gridTemplateColumns: COLS, alignItems: 'center' }}
-              onClick={() => setDrawer(b)}
-              onKeyDown={(ev) => {
-                if (ev.key === 'Enter' || ev.key === ' ') {
-                  ev.preventDefault()
-                  setDrawer(b)
-                }
-              }}
-            >
-              <div className="lc-title" style={{ fontWeight: 600 }}>
-                {b.name}
-              </div>
-              <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>
-                {b.einheitLabel}
-                {b.flaeche != null ? (
-                  <span style={{ color: 'var(--text-3)' }}> · {b.flaeche} m²</span>
-                ) : null}
-              </div>
-              <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>
-                {[b.telefon, b.email].filter(Boolean).join(' · ') || '—'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--text-4)' }}>
-                <MockIcon ctx="default" n="chevron-right" size={16} />
+        )}
+      </MockCard>
+
+      {/* Detail: Einheit + Personen */}
+      <EditorSheet
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title={detail?.bezeichnung ?? 'Einheit'}
+        crumb="Einheiten >"
+        size="md"
+        footer={
+          detail ? (
+            <div className="kunde-create-footer">
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={pending}
+                onClick={() => openEinheitBearbeiten(detail)}
+              >
+                Bearbeiten
+              </button>
+              <MockBtn
+                kind="ghost"
+                disabled={pending}
+                onClick={() => entfernenEinheit(detail)}
+              >
+                Entfernen
+              </MockBtn>
+            </div>
+          ) : null
+        }
+      >
+        {detail ? (
+          <div className="space-y-5">
+            <div>
+              <div className="form-section-h">Einheit</div>
+              <p style={{ margin: '0 0 4px', fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
+                {[
+                  detail.etage?.trim() ? `Etage ${detail.etage.trim()}` : null,
+                  detail.wohnflaeche_m2 != null ? `${detail.wohnflaeche_m2} m²` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || 'Keine weiteren Angaben'}
+              </p>
+              <div className="vgid-chips" style={{ marginTop: 8 }}>
+                <span className="vgid-chip ghost">
+                  <MockIcon ctx="default" n="users" size={14} />
+                  {detailEigentuemer.length} Eigentümer
+                </span>
+                <span className="vgid-chip ghost">
+                  <MockIcon ctx="default" n="users" size={14} />
+                  {detailMieter.length} Mieter
+                </span>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            {renderPersonBlock('eigentuemer', detailEigentuemer)}
+            {renderPersonBlock('mieter', detailMieter)}
+          </div>
+        ) : null}
+      </EditorSheet>
 
+      {/* Anlegen / Bearbeiten Einheit */}
       <EditorSheet
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={edit ? 'Mieter bearbeiten' : 'Mieter hinzufügen'}
-        crumb="Mieter >"
-        dirty={dirty}
+        open={einheitFormOpen}
+        onClose={() => setEinheitFormOpen(false)}
+        title={einheitEdit ? 'Einheit bearbeiten' : 'Einheit anlegen'}
+        crumb="Einheiten >"
+        dirty={einheitDirty}
         size="md"
-        onConfirm={speichern}
-        confirmDisabled={pending || !canSave}
+        onConfirm={speichernEinheit}
+        confirmDisabled={pending || !bezeichnung.trim()}
         confirmBusy={pending}
       >
         <div className="kunde-create">
-          {err ? <p className="kunde-create__err">{err}</p> : null}
-          <MockFormSection title="Mieter" icon="users">
+          {einheitErr ? <p className="kunde-create__err">{einheitErr}</p> : null}
+          <MockFormSection title="Einheit" icon="building">
+            <MockField label="Bezeichnung" required full>
+              <input
+                className="input"
+                value={bezeichnung}
+                onChange={(e) => {
+                  setBezeichnung(e.target.value)
+                  setEinheitDirty(true)
+                }}
+                placeholder="z. B. WE 12"
+              />
+            </MockField>
+            <MockField label="Etage (optional)" full>
+              <input
+                className="input"
+                value={etage}
+                onChange={(e) => {
+                  setEtage(e.target.value)
+                  setEinheitDirty(true)
+                }}
+                placeholder="z. B. 3. OG"
+              />
+            </MockField>
+            <MockField label="Wohnfläche m² (optional)" full>
+              <input
+                className="input"
+                value={m2}
+                onChange={(e) => {
+                  setM2(e.target.value)
+                  setEinheitDirty(true)
+                }}
+                placeholder="z. B. 68"
+                inputMode="decimal"
+              />
+            </MockField>
+          </MockFormSection>
+        </div>
+      </EditorSheet>
+
+      {/* Anlegen / Bearbeiten Person */}
+      <EditorSheet
+        open={Boolean(personForm)}
+        onClose={() => setPersonForm(null)}
+        title={
+          personForm?.edit
+            ? `${EINHEIT_BEWOHNER_ROLLE_LABELS[personForm.rolle]} bearbeiten`
+            : personForm?.rolle === 'eigentuemer'
+              ? 'Eigentümer hinzufügen'
+              : 'Mieter hinzufügen'
+        }
+        crumb={personEinheitLabel ? `Einheiten › ${personEinheitLabel} >` : 'Einheiten >'}
+        dirty={personDirty}
+        size="md"
+        onConfirm={speichernPerson}
+        confirmDisabled={pending || !canSavePerson}
+        confirmBusy={pending}
+      >
+        <div className="kunde-create">
+          {personErr ? <p className="kunde-create__err">{personErr}</p> : null}
+          <MockFormSection
+            title={personForm ? EINHEIT_BEWOHNER_ROLLE_LABELS[personForm.rolle] : 'Person'}
+            icon="users"
+          >
             <MockField label="Vorname" required>
               <input
                 className="input"
                 value={vorname}
                 onChange={(e) => {
                   setVorname(e.target.value)
-                  setDirty(true)
+                  setPersonDirty(true)
                 }}
                 placeholder="Max"
                 autoComplete="given-name"
@@ -309,109 +649,71 @@ export function ObjektEinheitenSection({
                 value={nachname}
                 onChange={(e) => {
                   setNachname(e.target.value)
-                  setDirty(true)
+                  setPersonDirty(true)
                 }}
                 placeholder="Mustermann"
                 autoComplete="family-name"
               />
             </MockField>
-            <MockField label="E-Mail" full>
+            <MockField label="E-Mail (optional)" full>
               <input
                 className="input"
                 type="email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value)
-                  setDirty(true)
+                  setPersonDirty(true)
                 }}
                 placeholder="max@example.de"
                 autoComplete="email"
               />
             </MockField>
-            <MockField label="Telefon" full>
+            <MockField label="Telefon (optional)" full>
               <input
                 className="input"
                 type="tel"
                 value={telefon}
                 onChange={(e) => {
                   setTelefon(e.target.value)
-                  setDirty(true)
+                  setPersonDirty(true)
                 }}
                 placeholder="+49 …"
                 autoComplete="tel"
               />
             </MockField>
-          </MockFormSection>
-          <MockFormSection title="Einheit" icon="building">
-            <MockField label="Wohnung / Einheit" full>
-              <input
-                className="input"
-                value={wohnung}
-                onChange={(e) => {
-                  setWohnung(e.target.value)
-                  setDirty(true)
-                }}
-                placeholder="WE 01 · 3. OG li"
-              />
-            </MockField>
-            <MockField label="Fläche (m²)" full>
-              <input
-                className="input"
-                value={flaeche}
-                onChange={(e) => {
-                  setFlaeche(e.target.value)
-                  setDirty(true)
-                }}
-                placeholder="72"
-                inputMode="decimal"
-              />
-            </MockField>
+            {personForm?.rolle === 'eigentuemer' ? (
+              <MockField label="Sondereigentumsverwaltung" full>
+                <label
+                  className="flex items-center gap-2"
+                  style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={seVerwaltung}
+                    onChange={(e) => {
+                      setSeVerwaltung(e.target.checked)
+                      setPersonDirty(true)
+                    }}
+                  />
+                  HV führt SE-Aufträge (Freigabe über Schwelle beim Eigentümer)
+                </label>
+              </MockField>
+            ) : (
+              <MockField label="Miet-Hinweis (optional)" full>
+                <input
+                  className="input"
+                  value={mieteHinweis}
+                  onChange={(e) => {
+                    setMieteHinweis(e.target.value)
+                    setPersonDirty(true)
+                  }}
+                  placeholder="z. B. seit 2022"
+                />
+              </MockField>
+            )}
           </MockFormSection>
         </div>
       </EditorSheet>
-
-      <EditorSheet
-        open={Boolean(drawer)}
-        onClose={() => setDrawer(null)}
-        title={drawer?.name ?? 'Mieter'}
-        crumb="Mieter >"
-        size="md"
-        footer={
-          <div className="kunde-create-footer">
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => drawer && openEditFromDrawer(drawer)}
-              disabled={!drawer}
-            >
-              Bearbeiten
-            </button>
-            <MockBtn
-              kind="ghost"
-              disabled={!drawer || pending}
-              onClick={() => drawer && loeschen(drawer)}
-            >
-              Entfernen
-            </MockBtn>
-          </div>
-        }
-      >
-        {drawer ? (
-          <div className="space-y-3">
-            <div className="form-section-h">Kontakt</div>
-            <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', margin: 0 }}>
-              {[drawer.telefon, drawer.email].filter(Boolean).join(' · ') || 'Keine Kontaktdaten'}
-            </p>
-            <div className="form-section-h">Einheit</div>
-            <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', margin: 0 }}>
-              {drawerEinheitLabel}
-              {drawerEinheit?.wohnflaeche_m2 != null
-                ? ` · ${drawerEinheit.wohnflaeche_m2} m²`
-                : ''}
-            </p>
-          </div>
-        ) : null}
-      </EditorSheet>
-    </div>
+    </>
   )
 }

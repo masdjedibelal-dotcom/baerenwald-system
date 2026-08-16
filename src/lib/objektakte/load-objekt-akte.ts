@@ -140,7 +140,9 @@ export async function loadObjektAkteDetail(
   if (einheitIds.length) {
     const { data: bewohnerData, error: bewohnerErr } = await supabase
       .from('einheit_bewohner')
-      .select('*, objekt_einheiten(bezeichnung)')
+      .select(
+        '*, objekt_einheiten(bezeichnung, etage)'
+      )
       .eq('kunde_id', kid)
       .in('objekt_einheit_id', einheitIds)
       .eq('aktiv', true)
@@ -148,7 +150,24 @@ export async function loadObjektAkteDetail(
       .order('created_at', { ascending: true })
 
     if (bewohnerErr) {
-      console.warn('loadObjektAkteDetail bewohner:', bewohnerErr.message)
+      // etage-Embed optional (ältere DBs ohne Spalte)
+      if (/etage/i.test(bewohnerErr.message)) {
+        const fallback = await supabase
+          .from('einheit_bewohner')
+          .select('*, objekt_einheiten(bezeichnung)')
+          .eq('kunde_id', kid)
+          .in('objekt_einheit_id', einheitIds)
+          .eq('aktiv', true)
+          .is('anonymisiert_am', null)
+          .order('created_at', { ascending: true })
+        if (fallback.error) {
+          console.warn('loadObjektAkteDetail bewohner:', fallback.error.message)
+        } else {
+          bewohner = (fallback.data ?? []) as EinheitBewohner[]
+        }
+      } else {
+        console.warn('loadObjektAkteDetail bewohner:', bewohnerErr.message)
+      }
     } else {
       bewohner = (bewohnerData ?? []) as EinheitBewohner[]
     }

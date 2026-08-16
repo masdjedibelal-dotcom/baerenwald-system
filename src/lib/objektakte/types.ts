@@ -1,5 +1,7 @@
 export type ObjektKontaktRolle = 'hausmeister' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
 
+export type EinheitBewohnerRolle = 'mieter' | 'eigentuemer'
+
 export type ObjektKontakt = {
   id: string
   kunde_id: string
@@ -19,6 +21,7 @@ export type ObjektEinheit = {
   id: string
   kunde_objekt_id: string
   bezeichnung: string
+  etage?: string | null
   wohnflaeche_m2?: number | null
   sort_order: number
   aktiv: boolean
@@ -33,11 +36,14 @@ export type EinheitBewohner = {
   name: string
   telefon: string | null
   email: string | null
+  rolle?: EinheitBewohnerRolle | null
+  sondereigentum_verwaltung?: boolean | null
+  miete_hinweis?: string | null
   aktiv: boolean
   anonymisiert_am: string | null
   created_at: string
   updated_at: string
-  objekt_einheiten?: { bezeichnung: string } | null
+  objekt_einheiten?: { bezeichnung: string; etage?: string | null } | null
 }
 
 export type AktenNotiz = {
@@ -103,14 +109,31 @@ export type EinheitBewohnerInput = {
   name: string
   telefon?: string | null
   email?: string | null
+  rolle?: EinheitBewohnerRolle
+  sondereigentum_verwaltung?: boolean
+  miete_hinweis?: string | null
 }
 
-/** Mieter + Einheit gemeinsam anlegen (wie HV-Portal). */
+/** Einheit anlegen (Portal: Bezeichnung + optional Etage/m²). */
+export type ObjektEinheitInput = {
+  bezeichnung: string
+  etage?: string | null
+  wohnflaeche_m2?: number | null
+}
+
+/**
+ * Legacy: Mieter + Einheit gemeinsam (Anfrage / KundenObjektModal).
+ * Neue UI nutzt createObjektEinheit + createEinheitBewohner mit fester einheitId.
+ */
 export type ObjektMieterInput = {
   name: string
   /** Wohnungs-/Einheiten-Bezeichnung, Default „Allgemein“ */
   wohnung?: string | null
+  etage?: string | null
   telefon?: string | null
   email?: string | null
   wohnflaeche_m2?: number | null
+  rolle?: EinheitBewohnerRolle
+  sondereigentum_verwaltung?: boolean
+  miete_hinweis?: string | null
 }

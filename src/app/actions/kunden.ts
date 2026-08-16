@@ -72,6 +72,11 @@ function applyHausverwaltungDefaults(
     payload.notfall_direkt = true
     payload.kleinreparaturen_ohne_angebot = false
   }
+  // Registrierungs-/Stammadresse → Portal-Profil (org_*)
+  if (payload.strasse !== undefined) payload.org_strasse = payload.strasse
+  if (payload.hausnummer !== undefined) payload.org_hausnummer = payload.hausnummer
+  if (payload.plz !== undefined) payload.org_plz = payload.plz
+  if (payload.ort !== undefined) payload.org_ort = payload.ort
 }
 
 export async function saveKunde(
