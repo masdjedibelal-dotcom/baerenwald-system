@@ -32,6 +32,8 @@ import {
   loadRechnungWizardBootstrapStandalone,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
+import { RechnungEingangStammdatenCard } from '@/components/rechnungen/RechnungEingangStammdatenCard'
+import { RechnungEingangDokumenteCard } from '@/components/rechnungen/RechnungEingangDokumenteCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import {
   buildRechnungPhaseSheetProps,
@@ -70,6 +72,7 @@ import type {
   AngebotDetail,
   AuftragDetail,
   Gewerk,
+  Handwerker,
   LeadDetail,
   LeadNotizRow,
   Preisliste,
@@ -171,6 +174,7 @@ export function RechnungDetailClient({
   projektKontext,
   pipelineLead = null,
   lead = null,
+  handwerker = null,
   angebotDetail = null,
   auftragDetail = null,
   auftragRechnungen = [],
@@ -185,6 +189,7 @@ export function RechnungDetailClient({
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
   pipelineLead?: PipelineKontextLead | null
   lead?: LeadDetail | null
+  handwerker?: Handwerker | null
   angebotDetail?: AngebotDetail | null
   auftragDetail?: AuftragDetail | null
   /** Weitere Rechnungen desselben Auftrags (für Zahlplan-Tab) */
@@ -212,8 +217,26 @@ export function RechnungDetailClient({
     setDetail(initial)
   }, [initial])
 
+  const isEingehend = String(detail.richtung ?? '') === 'eingehend'
+
   useEffect(() => {
     const raw = searchParams.get('tab')
+    if (isEingehend) {
+      const tab = (raw ?? '').trim().toLowerCase()
+      if (tab === 'akte' || tab === 'dokumente' || tab === 'notizen') {
+        setMainTab('akte')
+        return
+      }
+      if (tab && tab !== 'uebersicht') {
+        const q = new URLSearchParams(searchParams.toString())
+        q.set('tab', 'uebersicht')
+        router.replace(`/rechnungen/${detail.id}?${q.toString()}`, { scroll: false })
+        setMainTab('uebersicht')
+        return
+      }
+      setMainTab('uebersicht')
+      return
+    }
     if (isLegacyDetailTabAlias(raw) || raw === 'auftragdetails' || raw === 'zahlplan') {
       const resolved = resolveRechnungDetailTabFromQuery(raw) ?? RECHNUNG_DETAIL_DEFAULT_TAB
       const q = new URLSearchParams(searchParams.toString())
@@ -224,15 +247,23 @@ export function RechnungDetailClient({
     }
     const tab = resolveRechnungDetailTabFromQuery(raw)
     if (tab) setMainTab(tab)
-  }, [searchParams, detail.id, router])
+  }, [searchParams, detail.id, router, isEingehend])
 
   const pos = normalizeAngebotPositionen(detail.positionen ?? [])
 
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
-  const isEingehend = String(detail.richtung ?? '') === 'eingehend'
-  const kundeName = detail.kunden?.name?.trim() || 'Rechnung'
-  const kundeEmail = detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
+  const partnerName =
+    handwerker?.firma?.trim() ||
+    [handwerker?.vorname, handwerker?.nachname].filter(Boolean).join(' ').trim() ||
+    handwerker?.name?.trim() ||
+    ''
+  const kundeName = isEingehend
+    ? partnerName || detail.rechnungsnummer?.trim() || 'Eingangsrechnung'
+    : detail.kunden?.name?.trim() || 'Rechnung'
+  const kundeEmail = isEingehend
+    ? handwerker?.email?.trim() || ''
+    : detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
   const kundeId = detail.kunden?.id ?? detail.kunde_id
 
   const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
@@ -255,11 +286,12 @@ export function RechnungDetailClient({
     [pos]
   )
 
-  const leadId = lead?.id ?? projektKontext?.lead?.id ?? null
+  const leadId = isEingehend ? null : lead?.id ?? projektKontext?.lead?.id ?? null
   const notizenRows: LeadNotizRow[] = lead?.lead_notizen ?? []
   const dokumenteRows = lead?.lead_dokumente ?? []
-  const kundeTel =
-    detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
+  const kundeTel = isEingehend
+    ? handwerker?.telefon?.trim() || ''
+    : detail.kunden?.telefon?.trim() || lead?.kontakt_telefon?.trim() || ''
   const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
     telefon: kundeTel,
     email: kundeEmail,
@@ -429,7 +461,11 @@ export function RechnungDetailClient({
     }
   }, [detail.status, pending, isEingehend])
 
-  const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
+  const projektTitelAnzeige = isEingehend
+    ? detail.rechnungsnummer?.trim() ||
+      partnerName ||
+      'Eingangsrechnung'
+    : rechnungTitelMeta(detail, belegTyp, lead)
   const rechnungStatus = rechnungStatusDisplay(detail.status, {
     ueberfaellig,
     eingehend: isEingehend,
@@ -452,7 +488,9 @@ export function RechnungDetailClient({
         ? `Überwiesen · ${formatDatum(detail.bezahlt_at.slice(0, 10))}`
         : undefined
 
-  const stammdatenInhalt = (
+  const stammdatenInhalt = isEingehend ? (
+    <RechnungEingangStammdatenCard handwerker={handwerker} />
+  ) : (
     <>
       <RechnungStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
       {lead ? <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} /> : null}
@@ -514,13 +552,15 @@ export function RechnungDetailClient({
   const uebersichtInhalt = (
     <div className="space-y-6">
       {stammdatenInhalt}
-      <VorgangPhasenVerlauf
-        kontext={projektKontext}
-        fromRef={{ kind: 'rechnung', id: detail.id }}
-        lead={lead}
-        extras={phasenExtras}
-        onSaved={() => refresh()}
-      />
+      {!isEingehend ? (
+        <VorgangPhasenVerlauf
+          kontext={projektKontext}
+          fromRef={{ kind: 'rechnung', id: detail.id }}
+          lead={lead}
+          extras={phasenExtras}
+          onSaved={() => refresh()}
+        />
+      ) : null}
     </div>
   )
 
@@ -537,7 +577,9 @@ export function RechnungDetailClient({
     />
   )
 
-  const dokumenteInhalt = (
+  const dokumenteInhalt = isEingehend ? (
+    <RechnungEingangDokumenteCard detail={detail} />
+  ) : (
     <RechnungDokumenteTab
       detail={detail}
       leadId={leadId}
@@ -564,65 +606,77 @@ export function RechnungDetailClient({
     </MockCard>
   )
 
-  const detailShellGroups: DetailShellGroup[] = [
-    {
-      id: 'uebersicht',
-      label: entityDetailTabLabel('uebersicht'),
-      icon: 'list-details',
-      render: () => uebersichtInhalt,
-    },
-    {
-      id: 'leistungen',
-      label: entityDetailTabLabel('leistungen'),
-      icon: 'tool',
-      count: positionenCount || undefined,
-      render: () => <div className="space-y-6">{leistungenInhalt}</div>,
-    },
-    {
-      id: 'zahlung',
-      label: entityDetailTabLabel('zahlung'),
-      icon: 'receipt',
-      render: () => (
-        <RechnungZahlplanTab
-          detail={detail}
-          auftragDetail={auftragDetail}
-          rechnungen={auftragRechnungen}
-          fallbackTitel={projektTitelAnzeige}
-          onEditInvoice={(rechnungId) => {
-            startTransition(async () => {
-              const res = detail.auftrag_id
-                ? await loadRechnungWizardBootstrap(rechnungId, detail.auftrag_id)
-                : await loadRechnungWizardBootstrapStandalone(rechnungId)
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              setWizardBootstrap(res.bootstrap)
-              setWizardKey((k) => k + 1)
-              setWizardOpen(true)
-            })
-          }}
-          onOpenWizard={(bootstrap) => {
-            setWizardBootstrap(bootstrap)
-            setWizardKey((k) => k + 1)
-            setWizardOpen(true)
-          }}
-          onRefresh={() => refresh()}
-        />
-      ),
-    },
-    {
-      id: 'akte',
-      label: entityDetailTabLabel('akte'),
-      icon: 'files',
-      render: () => (
-        <VorgangAkteTab
-          dateien={dokumenteInhalt}
-          notizen={notizenInhalt}
-        />
-      ),
-    },
-  ]
+  const detailShellGroups: DetailShellGroup[] = isEingehend
+    ? [
+        {
+          id: 'uebersicht',
+          label: entityDetailTabLabel('uebersicht'),
+          icon: 'list-details',
+          render: () => uebersichtInhalt,
+        },
+        {
+          id: 'akte',
+          label: entityDetailTabLabel('akte'),
+          icon: 'files',
+          render: () => dokumenteInhalt,
+        },
+      ]
+    : [
+        {
+          id: 'uebersicht',
+          label: entityDetailTabLabel('uebersicht'),
+          icon: 'list-details',
+          render: () => uebersichtInhalt,
+        },
+        {
+          id: 'leistungen',
+          label: entityDetailTabLabel('leistungen'),
+          icon: 'tool',
+          count: positionenCount || undefined,
+          render: () => <div className="space-y-6">{leistungenInhalt}</div>,
+        },
+        {
+          id: 'zahlung',
+          label: entityDetailTabLabel('zahlung'),
+          icon: 'receipt',
+          render: () => (
+            <RechnungZahlplanTab
+              detail={detail}
+              auftragDetail={auftragDetail}
+              rechnungen={auftragRechnungen}
+              fallbackTitel={projektTitelAnzeige}
+              onEditInvoice={(rechnungId) => {
+                startTransition(async () => {
+                  const res = detail.auftrag_id
+                    ? await loadRechnungWizardBootstrap(rechnungId, detail.auftrag_id)
+                    : await loadRechnungWizardBootstrapStandalone(rechnungId)
+                  if (!res.ok) {
+                    toast.error(res.message)
+                    return
+                  }
+                  setWizardBootstrap(res.bootstrap)
+                  setWizardKey((k) => k + 1)
+                  setWizardOpen(true)
+                })
+              }}
+              onOpenWizard={(bootstrap) => {
+                setWizardBootstrap(bootstrap)
+                setWizardKey((k) => k + 1)
+                setWizardOpen(true)
+              }}
+              onRefresh={() => refresh()}
+            />
+          ),
+        },
+        {
+          id: 'akte',
+          label: entityDetailTabLabel('akte'),
+          icon: 'files',
+          render: () => (
+            <VorgangAkteTab dateien={dokumenteInhalt} notizen={notizenInhalt} />
+          ),
+        },
+      ]
 
   const crumbTitle = projektTitelAnzeige
 

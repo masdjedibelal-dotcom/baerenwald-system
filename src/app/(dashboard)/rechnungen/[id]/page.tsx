@@ -18,7 +18,7 @@ import {
   type RechnungKorrekturSibling,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
-import type { Gewerk, LeadDetail, Preisliste, Rechnung } from '@/lib/types'
+import type { Gewerk, Handwerker, LeadDetail, Preisliste, Rechnung } from '@/lib/types'
 
 export default async function RechnungDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -48,7 +48,11 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     zahlungsplan_abschlag_id?: string | null
     rechnung_art?: string | null
     abschlag_index?: number | null
+    richtung?: string | null
+    handwerker_id?: string | null
   }
+
+  const isEingehend = String(rec.richtung ?? '') === 'eingehend'
 
   const projektKontext = await loadProjektKontext(supabase, {
     activeKind: 'rechnung',
@@ -59,7 +63,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     angebotId: rec.angebot_id,
   })
 
-  const leadId = projektKontext.lead?.id ?? null
+  const leadId = isEingehend ? null : projektKontext.lead?.id ?? null
   const angebotId = rec.angebot_id ?? projektKontext.angebote[0]?.id ?? null
   const auftragId = rec.auftrag_id ?? projektKontext.auftrag?.id ?? null
 
@@ -69,8 +73,9 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     anlass?: string | null
   } | null = null
   let lead: LeadDetail | null = null
+  let handwerker: Handwerker | null = null
 
-  const [leadBundle, angebotDetail, auftragDetail, auftragRechnungenRaw, siblingRes] =
+  const [leadBundle, angebotDetail, auftragDetail, auftragRechnungenRaw, siblingRes, hwRes] =
     await Promise.all([
       leadId
         ? loadAnfrageDetail(supabase, leadId).then((leadDetail) => ({
@@ -91,46 +96,67 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
               anlass?: string | null
             } | null,
           }),
-      angebotId ? loadAngebotDetail(supabase, angebotId) : Promise.resolve(null),
+      isEingehend || !angebotId
+        ? Promise.resolve(null)
+        : loadAngebotDetail(supabase, angebotId),
       // Rechnung braucht keinen Full-Auftrag mit Bautagebuch/Baustelle
-      auftragId ? loadAuftragDetail(auftragId, { mode: 'shell' }) : Promise.resolve(null),
-      auftragId ? loadRechnungenForAuftrag(auftragId) : Promise.resolve([]),
-      auftragId
+      isEingehend || !auftragId
+        ? Promise.resolve(null)
+        : loadAuftragDetail(auftragId, { mode: 'shell' }),
+      isEingehend || !auftragId
+        ? Promise.resolve([])
+        : loadRechnungenForAuftrag(auftragId),
+      isEingehend
+        ? Promise.resolve({ data: [] as RechnungKorrekturSibling[] })
+        : auftragId
+          ? supabase
+              .from('rechnungen')
+              .select(
+                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
+              )
+              .eq('auftrag_id', auftragId)
+          : supabase
+              .from('rechnungen')
+              .select(
+                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
+              )
+              .eq('kunde_id', rec.kunde_id)
+              .order('created_at', { ascending: false })
+              .limit(80),
+      isEingehend && rec.handwerker_id
         ? supabase
-            .from('rechnungen')
+            .from('handwerker')
             .select(
-              'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
+              'id, name, firma, vorname, nachname, email, telefon, whatsapp, webseite, adresse, strasse, hausnummer, plz, ort, iban, steuernummer, ustid, aktiv, notizen, created_at, gewerke, subkategorie, ist_fachbetrieb, compliance_status, partner_kategorie_id'
             )
-            .eq('auftrag_id', auftragId)
-        : supabase
-            .from('rechnungen')
-            .select(
-              'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
-            )
-            .eq('kunde_id', rec.kunde_id)
-            .order('created_at', { ascending: false })
-            .limit(80),
+            .eq('id', rec.handwerker_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
 
   lead = leadBundle.lead
   pipelineLead = leadBundle.pipelineLead
+  handwerker = (hwRes.data as Handwerker | null) ?? null
 
   const auftragRechnungen = (auftragRechnungenRaw ?? []) as RechnungAuswahlZeile[]
   const siblings = (siblingRes.data ?? []) as RechnungKorrekturSibling[]
 
-  const nachfolgerRechnungId = findeNachfolgerRechnungId(
-    {
-      id: params.id,
-      created_at: rec.created_at,
-      zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
-      rechnung_art: rec.rechnung_art,
-      abschlag_index: rec.abschlag_index,
-    },
-    siblings
-  )
+  const nachfolgerRechnungId = isEingehend
+    ? null
+    : findeNachfolgerRechnungId(
+        {
+          id: params.id,
+          created_at: rec.created_at,
+          zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
+          rechnung_art: rec.rechnung_art,
+          abschlag_index: rec.abschlag_index,
+        },
+        siblings
+      )
 
-  const darfStornoZurueck =
-    rechnungDarfStornoZurueckgenommenWerden(rec.status, params.id, siblings)
+  const darfStornoZurueck = isEingehend
+    ? false
+    : rechnungDarfStornoZurueckgenommenWerden(rec.status, params.id, siblings)
 
   return (
     <RechnungDetailClient
@@ -142,6 +168,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       projektKontext={projektKontext}
       pipelineLead={pipelineLead}
       lead={lead}
+      handwerker={handwerker}
       angebotDetail={angebotDetail}
       auftragDetail={auftragDetail}
       auftragRechnungen={auftragRechnungen}

@@ -426,6 +426,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
     richtung: 'ausgehend' | 'eingehend'
     handwerker_id: string | null
     handwerker_name: string | null
+    angebot_handwerker_id: string | null
   }
 
   const rechnungenAll: RechnungNorm[] = rechnungen.map((r) => {
@@ -459,6 +460,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       richtung,
       handwerker_id: r.handwerker_id?.trim() || null,
       handwerker_name: hwName,
+      angebot_handwerker_id: r.angebot_handwerker_id?.trim() || null,
     }
   })
 
@@ -818,6 +820,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       standalone: !r.lead_id,
       ersetzt_durch: r.ersetzt_durch ?? null,
       rechnungRichtung: 'eingehend',
+      angebotHandwerkerId: r.angebot_handwerker_id,
     })
   }
 

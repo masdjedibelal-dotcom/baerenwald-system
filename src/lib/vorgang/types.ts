@@ -114,6 +114,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   ersetzt_durch?: string | null
   /** ausgehend (Default) | eingehend (Partner-Rechnung). */
   rechnungRichtung?: 'ausgehend' | 'eingehend'
+  /** Nur eingehend: angebot_handwerker.id für Ensure/Deep-Link. */
+  angebotHandwerkerId?: string | null
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

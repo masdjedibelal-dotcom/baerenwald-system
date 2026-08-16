@@ -41,7 +41,11 @@ import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
-import type { HwEingangsrechnungListeRow } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
+import {
+  hwRechnungStatusLabel,
+  type HwEingangsrechnungListeRow,
+  type HwRechnungStatus,
+} from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
@@ -421,8 +425,64 @@ export function VorgaengeListeClient({
         (r) => (kundeId != null && r.kundeId === kundeId) || (leadIds != null && leadIds.has(r.leadId))
       )
     }
+
+    // Fallback: Partner-PDFs ohne Rechnungs-Vorgang als klickbare Eingehend-Zeilen
+    const knownAh = new Set(
+      next
+        .filter((r) => r.rechnungRichtung === 'eingehend')
+        .map((r) => r.angebotHandwerkerId?.trim() || '')
+        .filter(Boolean)
+    )
+    const orphans: VorgangListeRow[] = []
+    for (const hw of hwEingangsrechnungen) {
+      const ahId = hw.zuweisungId?.trim()
+      if (!ahId || knownAh.has(ahId)) continue
+      const st: HwRechnungStatus = hw.status
+      const unter =
+        st === 'bezahlt' ? 'bezahlt' : st === 'abgelehnt' ? 'storniert' : 'gesendet'
+      orphans.push({
+        phase: 'rechnung',
+        unterstatus: unter,
+        unterstatusLabel: hwRechnungStatusLabel(st),
+        needsAction: st === 'eingereicht',
+        actor: st === 'eingereicht' ? 'bw' : null,
+        badges: {},
+        ueberfaellig: false,
+        kanalMeta: 'Eingehend · Partner',
+        titel: hw.auftragTitel?.trim()
+          ? `Eingangsrechnung · ${hw.auftragTitel.trim()}`
+          : `Eingangsrechnung · ${hw.handwerkerName}`,
+        entityId: ahId,
+        entityType: 'rechnung',
+        updatedAt: hw.eingereichtAt || new Date().toISOString(),
+        leadId: '',
+        kundeId: null,
+        kundeName: hw.handwerkerName,
+        wertLabel:
+          hw.betragBrutto == null
+            ? null
+            : `${Math.round(hw.betragBrutto).toLocaleString('de-DE')} €`,
+        detailHref: `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(ahId)}`,
+        handwerkerIds: hw.handwerkerId ? [hw.handwerkerId] : [],
+        ist_wiederkehrend: false,
+        wiederkehr_turnus: null,
+        standalone: true,
+        ersetzt_durch: null,
+        rechnungRichtung: 'eingehend',
+        angebotHandwerkerId: ahId,
+      })
+    }
+    if (orphans.length) next = [...next, ...orphans]
+
     return next
-  }, [localRows, restrictPartnerName, restrictHandwerkerId, restrictKundeId, restrictLeadIds])
+  }, [
+    localRows,
+    restrictPartnerName,
+    restrictHandwerkerId,
+    restrictKundeId,
+    restrictLeadIds,
+    hwEingangsrechnungen,
+  ])
 
   const lifecycleCounts = useMemo(() => {
     const scope =
@@ -489,7 +549,7 @@ export function VorgaengeListeClient({
     if (showHwEingang) {
       return [
         { value: 'gesendet', label: 'Offen' },
-        { value: 'bezahlt', label: 'Bezahlt' },
+        { value: 'bezahlt', label: 'Überwiesen' },
         { value: 'storniert', label: 'Abgelehnt' },
       ]
     }
@@ -511,9 +571,6 @@ export function VorgaengeListeClient({
       .sort((a, b) => a[1].localeCompare(b[1], 'de'))
       .map(([value, label]) => ({ value, label }))
   }, [lifecycleRows, filter, showHwEingang])
-
-  /** @deprecated Legacy-Prop — Eingang läuft über VorgangListeRow.rechnungRichtung */
-  void hwEingangsrechnungen
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -708,7 +765,22 @@ export function VorgaengeListeClient({
     setPageIndex,
   } = useListPage(filtered, 12, paginationResetKey)
 
-  function openDetail(href: string) {
+  function openDetail(v: VorgangListeRow | string) {
+    if (typeof v === 'string') {
+      const href = v.trim()
+      if (!href) {
+        toast.error('Kein Detail-Link vorhanden.')
+        return
+      }
+      router.push(href)
+      return
+    }
+    const href = v.detailHref?.trim()
+    if (!href) {
+      toast.error('Kein Detail-Link vorhanden.')
+      return
+    }
+    // Eingangsrechnung: detailHref ist /rechnungen/{id} oder Ensure-Deep-Link (?hw=)
     router.push(href)
   }
 
@@ -1226,7 +1298,7 @@ export function VorgaengeListeClient({
               } else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
-            const edit = () => openDetail(v.detailHref)
+            const edit = () => openDetail(v)
             const row = (
               <div
                 className={cn(
@@ -1235,13 +1307,13 @@ export function VorgaengeListeClient({
                   ersetzt && 'vg-row--ersetzt',
                   flashKeys[key] && 'vg-row--flash'
                 )}
-                onClick={() => openDetail(v.detailHref)}
+                onClick={() => openDetail(v)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    openDetail(v.detailHref)
+                    openDetail(v)
                   }
                 }}
               >
