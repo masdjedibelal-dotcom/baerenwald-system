@@ -105,6 +105,8 @@ export type Kunde = {
   freigabe_modus?: FreigabeModus | null
   freigabe_schwelle_eur?: number | null
   notfall_direkt?: boolean | null
+  /** HV: Whitelist Sofortmaßnahme-Fall-IDs; leer = nichts geht direkt */
+  akut_fall_ids?: string[] | null
   /** HV: Kleinreparaturen bis Schwelle ohne vorheriges Angebot */
   kleinreparaturen_ohne_angebot?: boolean | null
   /** HV: neue Meldungen (nicht akut) automatisch in HM-Prüfung */

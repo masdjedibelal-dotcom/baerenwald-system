@@ -70,6 +70,7 @@ function applyHausverwaltungDefaults(
     payload.freigabe_schwelle_eur = 500
     // Explizit true: Akut/Notfall → Direktauftrag (kein NULL-Drift mit „unset = an“)
     payload.notfall_direkt = true
+    payload.akut_fall_ids = []
     payload.kleinreparaturen_ohne_angebot = false
   }
   // Registrierungs-/Stammadresse → Portal-Profil (org_*)
