@@ -199,16 +199,37 @@ export async function POST(req: Request) {
         : typ === 'angebot'
           ? 'Partner-Angebot liegt unter Akte → Dokumente.'
           : typ === 'rechnung'
-            ? 'Partner-Rechnung liegt unter Akte → Dokumente.'
+            ? 'Partner-Rechnung unter Vorgänge → Rechnung → Eingehend.'
             : 'Neuer Partner-Upload.')
 
-  const href = auftragId
-    ? `/auftraege/${auftragId}?tab=akte`
-    : typ === 'compliance' || isDelete
-      ? `/handwerker/${handwerkerId}?tab=compliance`
-      : anfrageId
-        ? `/angebote`
-        : `/handwerker/${handwerkerId}`
+  let ensuredRechnungId: string | null = null
+  if (typ === 'rechnung' && anfrageId) {
+    try {
+      const { ensurePartnerEingangsRechnungVorgang } = await import(
+        '@/lib/rechnungen/ensure-partner-eingangsrechnung-vorgang'
+      )
+      const ensured = await ensurePartnerEingangsRechnungVorgang(anfrageId)
+      if (ensured.ok) ensuredRechnungId = ensured.rechnungId
+      else console.warn('[partner-dokument-upload] Eingangs-Vorgang:', ensured.error)
+    } catch (e) {
+      console.warn('[partner-dokument-upload] Eingangs-Vorgang', e)
+    }
+  }
+
+  const href =
+    typ === 'rechnung'
+      ? ensuredRechnungId
+        ? `/rechnungen/${ensuredRechnungId}`
+        : anfrageId
+          ? `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(anfrageId)}`
+          : `/vorgaenge?tab=rechnung&richtung=eingehend`
+      : auftragId
+        ? `/auftraege/${auftragId}?tab=akte`
+        : typ === 'compliance' || isDelete
+          ? `/handwerker/${handwerkerId}?tab=compliance`
+          : anfrageId
+            ? `/angebote`
+            : `/handwerker/${handwerkerId}`
 
   void sendCrmPushToStaff({
     typ: pushTyp,
@@ -218,5 +239,5 @@ export async function POST(req: Request) {
     tag: `partner-${typ}-${dokumentId || slotId || anfrageId || handwerkerId}`,
   }).catch((e) => console.warn('[partner-dokument-upload] push', e))
 
-  return NextResponse.json({ ok: true, auftragId })
+  return NextResponse.json({ ok: true, auftragId, rechnungId: ensuredRechnungId })
 }

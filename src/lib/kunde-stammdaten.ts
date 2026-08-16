@@ -35,6 +35,17 @@ export function istKundeHausverwaltungTyp(typ: string | null | undefined): boole
   return t === 'hausverwaltung' || t === 'verwaltung'
 }
 
+/**
+ * Portal-Stubs für HV-Objektakte (Mieter / Eigentümer / Hausmeister).
+ * Keine CRM-Kunden — nur Login unter der jeweiligen HV.
+ */
+export function istHvPortalRollenKunde(
+  portalModus: string | null | undefined
+): boolean {
+  const m = (portalModus ?? '').toLowerCase()
+  return m === 'eigentuemer' || m === 'mieter' || m === 'hausmeister'
+}
+
 /** Nur Gewerbe / Gastro (ohne Hausverwaltung). */
 export function istKundeNurGewerbeTyp(typ: string | null | undefined): boolean {
   return (typ ?? '').toLowerCase() === 'gewerbe'

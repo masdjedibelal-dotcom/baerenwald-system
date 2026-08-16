@@ -42,9 +42,36 @@ export async function setHwEingangsrechnungStatus(
 
   if (error) return { ok: false, message: error.message }
 
+  const rechnungStatus =
+    status === 'bezahlt' ? 'bezahlt' : status === 'abgelehnt' ? 'storniert' : 'gesendet'
+  const { data: recRow } = await supabaseAdmin
+    .from('rechnungen')
+    .update({
+      status: rechnungStatus,
+      bezahlt_at: status === 'bezahlt' ? now : null,
+      updated_at: now,
+    })
+    .eq('angebot_handwerker_id', id)
+    .select('id, handwerker_id, auftrag_id, rechnungsnummer')
+    .maybeSingle()
+
+  if (status === 'bezahlt' && recRow?.id) {
+    const { syncEingangsrechnungUeberwiesen } = await import(
+      '@/lib/rechnungen/sync-eingangsrechnung-ueberwiesen'
+    )
+    await syncEingangsrechnungUeberwiesen({
+      rechnungId: String(recRow.id),
+      angebotHandwerkerId: id,
+      handwerkerId: (recRow.handwerker_id as string | null) ?? null,
+      auftragId: (recRow.auftrag_id as string | null) ?? null,
+      rechnungsnummer: (recRow.rechnungsnummer as string | null) ?? null,
+    })
+  }
+
   const angebotId = String((row as { angebot_id: string }).angebot_id)
   revalidatePath('/vorgaenge')
   revalidatePath('/rechnungen')
+  if (recRow?.id) revalidatePath(`/rechnungen/${recRow.id}`)
   revalidatePath(`/angebote/${angebotId}`)
 
   const { data: auf } = await supabaseAdmin

@@ -1,4 +1,5 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { istHvPortalRollenKunde } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
 import type { Kunde } from '@/lib/types'
 
@@ -14,18 +15,41 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
     db
       .from('kunden')
       .select(
-        'id, name, vorname, nachname, email, telefon, ort, typ, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
+        'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
       )
       .order('created_at', { ascending: false })
       .limit(500)
   )
-  const kunden = kundenRes.data
   if (kundenRes.error) {
+    // Ältere DBs ohne portal_modus
+    if (/portal_modus/i.test(kundenRes.error.message)) {
+      const retry = await withCrmReadFallback(async (db) =>
+        db
+          .from('kunden')
+          .select(
+            'id, name, vorname, nachname, email, telefon, ort, typ, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
+          )
+          .order('created_at', { ascending: false })
+          .limit(500)
+      )
+      if (retry.error) {
+        console.warn('loadKundenListe', retry.error.message)
+        return []
+      }
+      return finalizeKundenListe((retry.data ?? []) as Kunde[])
+    }
     console.warn('loadKundenListe', kundenRes.error.message)
     return []
   }
 
-  const ids = (kunden ?? []).map((k) => (k as Kunde).id).filter(Boolean)
+  const filtered = ((kundenRes.data ?? []) as (Kunde & { portal_modus?: string | null })[]).filter(
+    (k) => !istHvPortalRollenKunde(k.portal_modus)
+  )
+  return finalizeKundenListe(filtered)
+}
+
+async function finalizeKundenListe(kunden: Kunde[]): Promise<KundeListeZeile[]> {
+  const ids = kunden.map((k) => k.id).filter(Boolean)
   if (!ids.length) return []
 
   const supabase = createClient()
@@ -82,13 +106,10 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
     umsatzByKunde.set(id, (umsatzByKunde.get(id) ?? 0) + (Number(r.brutto) || 0))
   }
 
-  return (kunden ?? []).map((k) => {
-    const row = k as Kunde
-    return {
-      ...row,
-      anzahl_leads: leadCount.get(row.id) ?? 0,
-      anzahl_auftraege: aufCount.get(row.id) ?? 0,
-      gesamt_umsatz: umsatzByKunde.get(row.id) ?? row.gesamt_umsatz ?? 0,
-    }
-  })
+  return kunden.map((row) => ({
+    ...row,
+    anzahl_leads: leadCount.get(row.id) ?? 0,
+    anzahl_auftraege: aufCount.get(row.id) ?? 0,
+    gesamt_umsatz: umsatzByKunde.get(row.id) ?? row.gesamt_umsatz ?? 0,
+  }))
 }

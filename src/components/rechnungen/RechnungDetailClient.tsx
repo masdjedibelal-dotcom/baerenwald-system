@@ -230,12 +230,14 @@ export function RechnungDetailClient({
 
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
+  const isEingehend = String(detail.richtung ?? '') === 'eingehend'
   const kundeName = detail.kunden?.name?.trim() || 'Rechnung'
   const kundeEmail = detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
   const kundeId = detail.kunden?.id ?? detail.kunde_id
 
   const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
   const ueberfaellig =
+    !isEingehend &&
     tageUeberfaellig > 0 &&
     detail.status !== 'bezahlt' &&
     detail.status !== 'storniert' &&
@@ -266,18 +268,29 @@ export function RechnungDetailClient({
     onSaved: () => refresh(),
   })
 
-  async function setStatus(s: RechnungStatus, opts?: { notifyKunde?: boolean }) {
+  async function setStatus(
+    s: RechnungStatus,
+    opts?: { notifyKunde?: boolean; notifyPartner?: boolean }
+  ) {
     const r = await updateRechnungStatus(detail.id, s, opts)
     if (!r.ok) {
       toast.error(r.message)
       return
     }
     if (s === 'bezahlt') {
-      toast.success(
-        r.zahlungsbestaetigungGesendet
-          ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
-          : 'Als bezahlt markiert (ohne Kunden-Mail)'
-      )
+      if (isEingehend) {
+        toast.success(
+          r.partnerUeberwiesenNotified
+            ? 'Als überwiesen markiert — Partner benachrichtigt'
+            : 'Als überwiesen markiert'
+        )
+      } else {
+        toast.success(
+          r.zahlungsbestaetigungGesendet
+            ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
+            : 'Als bezahlt markiert (ohne Kunden-Mail)'
+        )
+      }
     }
     setDetail((d) => ({
       ...d,
@@ -343,8 +356,12 @@ export function RechnungDetailClient({
   }
 
   const primaryAction = useMemo((): DetailActionDef | null => {
-    const cta = primaryCta('rechnung', detail.status, { ueberfaellig })
+    const cta = primaryCta('rechnung', detail.status, {
+      ueberfaellig,
+      eingehend: isEingehend,
+    })
     if (cta?.id === 'rechnung_versenden') {
+      if (isEingehend) return null
       return { label: cta.label, icon: cta.icon, onClick: handleSenden, disabled: pending }
     }
     if (cta?.id === 'als_bezahlt' && belegTyp === 'rechnung') {
@@ -352,14 +369,22 @@ export function RechnungDetailClient({
         label: cta.label,
         icon: cta.icon,
         onClick: () => {
-          void actionBusy.run('Wird als bezahlt markiert…', async () => {
-            await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
-          })
+          void actionBusy.run(
+            isEingehend ? 'Wird als überwiesen markiert…' : 'Wird als bezahlt markiert…',
+            async () => {
+              if (isEingehend) {
+                await setStatus('bezahlt', { notifyPartner: true })
+              } else {
+                await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
+              }
+            }
+          )
         },
         disabled: pending,
       }
     }
     if (cta?.id === 'bewertung_einholen') {
+      if (isEingehend) return null
       return {
         label: cta.label,
         icon: cta.icon,
@@ -390,9 +415,11 @@ export function RechnungDetailClient({
     handleSenden,
     belegTyp,
     kundeEmail,
+    isEingehend,
   ])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
+    if (isEingehend) return null
     if (rechnungKorrekturModus(detail.status) === 'gesperrt') return null
     return {
       label: 'Rechnung bearbeiten',
@@ -400,10 +427,13 @@ export function RechnungDetailClient({
       onClick: handleKorrigieren,
       disabled: pending,
     }
-  }, [detail.status, pending])
+  }, [detail.status, pending, isEingehend])
 
   const projektTitelAnzeige = rechnungTitelMeta(detail, belegTyp, lead)
-  const rechnungStatus = rechnungStatusDisplay(detail.status, { ueberfaellig })
+  const rechnungStatus = rechnungStatusDisplay(detail.status, {
+    ueberfaellig,
+    eingehend: isEingehend,
+  })
   const headMeta = useMemo(() => {
     const parts: string[] = []
     if (projektTitelAnzeige && projektTitelAnzeige !== '—') parts.push(projektTitelAnzeige)
@@ -413,8 +443,14 @@ export function RechnungDetailClient({
   }, [projektTitelAnzeige, detail.brutto, detail.faellig_am])
   const headSub =
     detail.status === 'gesendet'
-      ? gesendetDetailSubline(detail.gesendet_at, detail.updated_at)
-      : undefined
+      ? isEingehend
+        ? detail.gesendet_at
+          ? `Eingegangen · ${formatDatum(detail.gesendet_at.slice(0, 10))}`
+          : 'Eingegangen'
+        : gesendetDetailSubline(detail.gesendet_at, detail.updated_at)
+      : detail.status === 'bezahlt' && isEingehend && detail.bezahlt_at
+        ? `Überwiesen · ${formatDatum(detail.bezahlt_at.slice(0, 10))}`
+        : undefined
 
   const stammdatenInhalt = (
     <>
@@ -424,6 +460,9 @@ export function RechnungDetailClient({
   )
 
   const artKurz = (() => {
+    if (isEingehend) {
+      return 'Eingangsrechnung · Partner'
+    }
     const art = String(
       (detail as { rechnung_art?: string | null }).rechnung_art ?? ''
     ).toLowerCase()
@@ -440,11 +479,13 @@ export function RechnungDetailClient({
     const faelligTxt = detail.faellig_am ? `fällig ${formatDatum(detail.faellig_am)}` : null
     const kopf = faelligTxt ? `${artKurz} - ${faelligTxt}` : artKurz
     const sub = detail.bezahlt_at
-      ? `bezahlt am ${formatDatum(detail.bezahlt_at.slice(0, 10))}`
+      ? `${isEingehend ? 'überwiesen' : 'bezahlt'} am ${formatDatum(detail.bezahlt_at.slice(0, 10))}`
       : ueberfaellig
         ? 'überfällig'
         : detail.status === 'gesendet'
-          ? 'gestellt'
+          ? isEingehend
+            ? 'eingegangen'
+            : 'gestellt'
           : undefined
     return {
       rechnung: {
@@ -467,6 +508,7 @@ export function RechnungDetailClient({
     ueberfaellig,
     zahlungszielFallback,
     rechnungStatus.label,
+    isEingehend,
   ])
 
   const uebersichtInhalt = (
@@ -588,7 +630,11 @@ export function RechnungDetailClient({
     <EntityDetailLayout
       phase="rechnung"
       projektKontext={projektKontext}
-      crumbBackHref="/vorgaenge?tab=rechnung&lifecycle=offen"
+      crumbBackHref={
+        isEingehend
+          ? '/vorgaenge?tab=rechnung&richtung=eingehend'
+          : '/vorgaenge?tab=rechnung&lifecycle=offen'
+      }
       crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Rechnungen"
       breadcrumbTitle={crumbTitle}

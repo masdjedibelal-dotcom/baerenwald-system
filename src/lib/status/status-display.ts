@@ -95,12 +95,15 @@ export function auftragStatusDisplay(status: AuftragStatus | string): StatusDisp
 /** Nutzer-sichtbares Label + semantische Farbe für Rechnung. */
 export function rechnungStatusDisplay(
   status: RechnungStatus | string,
-  opts?: { ueberfaellig?: boolean }
+  opts?: { ueberfaellig?: boolean; eingehend?: boolean }
 ): StatusDisplay {
   if (opts?.ueberfaellig) {
     return { label: 'Überfällig', variant: 'warning' }
   }
   const key = status as RechnungStatus
+  if (opts?.eingehend && key === 'bezahlt') {
+    return { label: 'Überwiesen', variant: 'success' }
+  }
   const label =
     key in RECHNUNG_STATUS_LABELS ? RECHNUNG_STATUS_LABELS[key] : String(status)
   const variant = key in RECHNUNG_VARIANT ? RECHNUNG_VARIANT[key] : 'neutral'

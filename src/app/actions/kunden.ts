@@ -326,19 +326,31 @@ export async function searchKundenGlobal(
   if (q.length < 2) return []
   const pct = `%${q}%`
   const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>>()
+  const { istHvPortalRollenKunde } = await import('@/lib/kunde-stammdaten')
 
   for (const column of ['name', 'email'] as const) {
     const { data } = await withCrmReadFallback(async (db) =>
-      db.from('kunden').select('id, name, vorname, nachname, typ, email').ilike(column, pct).limit(4)
+      db
+        .from('kunden')
+        .select('id, name, vorname, nachname, typ, email, portal_modus')
+        .ilike(column, pct)
+        .limit(8)
     )
     for (const row of data ?? []) {
-      if (row?.id) {
-        byId.set(row.id as string, row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>)
+      if (!row?.id) continue
+      if (istHvPortalRollenKunde((row as { portal_modus?: string | null }).portal_modus)) {
+        continue
       }
+      byId.set(
+        row.id as string,
+        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>
+      )
+      if (byId.size >= 8) break
     }
+    if (byId.size >= 8) break
   }
 
-  return Array.from(byId.values())
+  return Array.from(byId.values()).slice(0, 8)
 }
 
 /** Stammdaten-Kopie für Listen-⋯-Menü. */

@@ -324,7 +324,7 @@ export async function searchMieterFuerHv(
   const [{ data: kunden }, { data: objekte }] = await Promise.all([
     supabase
       .from('kunden')
-      .select('id, name, vorname, nachname, email, telefon')
+      .select('id, name, vorname, nachname, email, telefon, portal_modus')
       .eq('typ', 'privat')
       .or(
         `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern}`
@@ -338,6 +338,8 @@ export async function searchMieterFuerHv(
   const seen = new Set<string>()
 
   for (const k of kunden ?? []) {
+    const modus = String((k as { portal_modus?: string | null }).portal_modus ?? '').toLowerCase()
+    if (modus === 'eigentuemer' || modus === 'mieter' || modus === 'hausmeister') continue
     const id = k.id as string
     if (!id || seen.has(id)) continue
     seen.add(id)

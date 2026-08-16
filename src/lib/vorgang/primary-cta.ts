@@ -45,6 +45,8 @@ export type PrimaryCtaContext = {
    * → Primary „Direkt Auftrag“ statt „Angebot annehmen“.
    */
   unterSchwelleDirektAuftrag?: boolean
+  /** Partner-Eingangsrechnung: CTA „Als überwiesen markieren“ statt „Als bezahlt“ */
+  eingehend?: boolean
 }
 
 function norm(status: string | null | undefined): string {
@@ -171,9 +173,13 @@ export function primaryCta(
     return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
   }
   if (ui === 'versendet' || ui === 'ueberfaellig') {
+    if (ctx.eingehend) {
+      return { id: 'als_bezahlt', label: 'Als überwiesen markieren', icon: 'check' }
+    }
     return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
   }
   if (ui === 'bezahlt') {
+    if (ctx.eingehend) return null
     return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
   }
   return null

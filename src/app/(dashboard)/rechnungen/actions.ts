@@ -532,12 +532,18 @@ export async function nehmeRechnungStornoZurueck(
 }
 
 export type UpdateRechnungStatusResult =
-  | { ok: true; zahlungsbestaetigungGesendet?: boolean }
+  | {
+      ok: true
+      zahlungsbestaetigungGesendet?: boolean
+      partnerUeberwiesenNotified?: boolean
+    }
   | { ok: false; message: string }
 
 export type UpdateRechnungStatusOptions = {
   /** Zahlungsbestätigung an Kunden — Standard: aus (nur Status ändern). */
   notifyKunde?: boolean
+  /** Eingangsrechnung: Partner „Rechnung wurde überwiesen“ — Standard: aus. */
+  notifyPartner?: boolean
 }
 
 async function sendZahlungsbestaetigungForRechnung(
@@ -673,11 +679,15 @@ export async function updateRechnungStatus(
 
   const { data: before } = await supabase
     .from('rechnungen')
-    .select('status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer')
+    .select(
+      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id'
+    )
     .eq('id', id)
     .maybeSingle()
   if (!before) return { ok: false, message: 'Rechnung nicht gefunden' }
   if (before.status === status) return { ok: true }
+
+  const isEingehend = String(before.richtung ?? '') === 'eingehend'
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
   if (status === 'gesendet') patch.gesendet_at = new Date().toISOString()
@@ -685,7 +695,7 @@ export async function updateRechnungStatus(
   const { error } = await supabase.from('rechnungen').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
 
-  if (status === 'bezahlt') {
+  if (status === 'bezahlt' && !isEingehend) {
     const { data: r } = await supabase.from('rechnungen').select('kunde_id').eq('id', id).maybeSingle()
     if (r?.kunde_id) {
       await updateGesamtUmsatz(r.kunde_id as string)
@@ -693,6 +703,7 @@ export async function updateRechnungStatus(
   }
 
   if (
+    !isEingehend &&
     (status === 'gesendet' || status === 'bezahlt') &&
     before.status !== 'gesendet' &&
     before.status !== 'bezahlt'
@@ -709,7 +720,26 @@ export async function updateRechnungStatus(
   }
 
   let zahlungsbestaetigungGesendet = false
+  let partnerUeberwiesenNotified = false
+
   if (
+    isEingehend &&
+    status === 'bezahlt' &&
+    before.status !== 'bezahlt' &&
+    before.status !== 'storniert'
+  ) {
+    const { syncEingangsrechnungUeberwiesen } = await import(
+      '@/lib/rechnungen/sync-eingangsrechnung-ueberwiesen'
+    )
+    const sync = await syncEingangsrechnungUeberwiesen({
+      rechnungId: id,
+      angebotHandwerkerId: (before.angebot_handwerker_id as string | null) ?? null,
+      handwerkerId: (before.handwerker_id as string | null) ?? null,
+      auftragId: (before.auftrag_id as string | null) ?? null,
+      rechnungsnummer: (before.rechnungsnummer as string | null) ?? null,
+    })
+    partnerUeberwiesenNotified = sync.partnerNotified
+  } else if (
     notifyKunde &&
     status === 'bezahlt' &&
     before.status !== 'bezahlt' &&
@@ -729,7 +759,7 @@ export async function updateRechnungStatus(
   const auftragId = (before.auftrag_id as string | null | undefined) ?? null
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
 
-  return { ok: true, zahlungsbestaetigungGesendet }
+  return { ok: true, zahlungsbestaetigungGesendet, partnerUeberwiesenNotified }
 }
 
 /** Zahlungsbestätigung nachträglich senden (Rechnung muss bereits bezahlt sein). */

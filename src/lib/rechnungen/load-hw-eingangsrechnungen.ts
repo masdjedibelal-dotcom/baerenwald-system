@@ -34,7 +34,7 @@ export function normalizeHwRechnungStatus(raw: string | null | undefined): HwRec
 }
 
 export function hwRechnungStatusLabel(status: HwRechnungStatus): string {
-  if (status === 'bezahlt') return 'Bezahlt'
+  if (status === 'bezahlt') return 'Überwiesen'
   if (status === 'abgelehnt') return 'Abgelehnt'
   return 'Offen'
 }
@@ -56,6 +56,7 @@ type RawZuweisung = {
   handwerker?: {
     id: string
     name: string | null
+    firma?: string | null
     email: string | null
     telefon: string | null
     iban: string | null
@@ -66,7 +67,6 @@ type RawZuweisung = {
   angebote?: {
     id: string
     angebotsnr: string | null
-    titel: string | null
     kunde_id: string | null
     kunden?: { id: string; name: string | null; vorname: string | null; nachname: string | null } | null
   } | null
@@ -100,11 +100,11 @@ export async function loadHwEingangsrechnungen(
       hw_rechnung_betrag_brutto,
       hw_preis_brutto,
       handwerker:handwerker_id (
-        id, name, email, telefon, iban, steuernummer, ustid
+        id, name, firma, email, telefon, iban, steuernummer, ustid
       ),
       gewerke:gewerk_id ( id, name ),
       angebote:angebot_id (
-        id, angebotsnr, titel, kunde_id,
+        id, angebotsnr, kunde_id,
         kunden:kunde_id ( id, name, vorname, nachname )
       )
     `
@@ -154,7 +154,7 @@ export async function loadHwEingangsrechnungen(
       angebotId: r.angebot_id,
       auftragId: auf?.id ?? null,
       handwerkerId: r.handwerker_id,
-      handwerkerName: hw?.name?.trim() || 'Handwerker',
+      handwerkerName: hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker',
       handwerkerEmail: hw?.email?.trim() || null,
       handwerkerTelefon: hw?.telefon?.trim() || null,
       iban: hw?.iban?.trim() || null,
@@ -162,7 +162,7 @@ export async function loadHwEingangsrechnungen(
       ustid: hw?.ustid?.trim() || null,
       gewerkName: r.gewerke?.name?.trim() || null,
       kundeName: kundeNameFromEmbed(ang?.kunden ?? null),
-      auftragTitel: auf?.titel?.trim() || ang?.titel?.trim() || null,
+      auftragTitel: auf?.titel?.trim() || null,
       angebotsnr: ang?.angebotsnr?.trim() || null,
       betragBrutto: betrag,
       pdfPath: String(r.hw_rechnung_pdf_url).trim(),

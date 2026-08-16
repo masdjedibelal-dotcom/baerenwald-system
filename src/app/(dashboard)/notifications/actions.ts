@@ -168,7 +168,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'handwerker_einreichung':
       return 'Der Partner hat ein Angebot / Konditionen im Portal eingereicht — bitte prüfen.'
     case 'hw_rechnung_eingegangen':
-      return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Rechnungen eingehend prüfen.'
+      return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Vorgänge → Rechnung → Eingehend prüfen.'
     case 'vorgang_angenommen':
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
@@ -531,14 +531,24 @@ async function collectCrmNotificationItems(opts?: {
       const subtitle = [gw?.name?.trim(), nr ? `Angebot ${nr}` : null]
         .filter(Boolean)
         .join(' · ')
+
+      let href = `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(String(row.id))}`
+      try {
+        const { ensurePartnerEingangsRechnungVorgang } = await import(
+          '@/lib/rechnungen/ensure-partner-eingangsrechnung-vorgang'
+        )
+        const ensured = await ensurePartnerEingangsRechnungVorgang(String(row.id))
+        if (ensured.ok) href = `/rechnungen/${ensured.rechnungId}`
+      } catch {
+        /* Liste bleibt nutzbar auch ohne Vorgang-Ensure */
+      }
+
       items.push({
         sourceKey: `hw_rechnung_eingegangen:${row.id}`,
         typ: 'hw_rechnung_eingegangen',
         title: `${hwName}: Rechnung eingegangen`,
         subtitle: subtitle || null,
-        href: ang?.id
-          ? `/angebote/${ang.id}?tab=handwerker`
-          : '/vorgaenge?phase=rechnung&richtung=eingehend',
+        href,
         createdAt: String(row.hw_rechnung_eingereicht_at),
         gelesen: false,
       })
@@ -986,7 +996,10 @@ async function collectCrmNotificationItems(opts?: {
         typ: notifTyp,
         title,
         subtitle: (row.beschreibung as string)?.trim() || (row.titel as string)?.trim() || null,
-        href: `/auftraege/${auftragId}?tab=akte`,
+        href:
+          tlTyp === 'partner_rechnung'
+            ? `/vorgaenge?tab=rechnung&richtung=eingehend`
+            : `/auftraege/${auftragId}?tab=akte`,
         createdAt: (row.created_at as string) || since,
         gelesen: false,
       })

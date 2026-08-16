@@ -1,8 +1,8 @@
 'use client'
 
 import { useLocalTransition } from '@/components/ui/action-busy'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   MockBadge,
@@ -53,6 +53,7 @@ export function HwEingangsrechnungenListe({
   filterKey?: string
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [pending, startTransition] = useLocalTransition()
   const [active, setActive] = useState<HwEingangsrechnungListeRow | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -62,6 +63,27 @@ export function HwEingangsrechnungenListe({
     40,
     filterKey
   )
+
+  // Notification-Deep-Link: ?hw=<zuweisungId>
+  useEffect(() => {
+    const hwId = searchParams.get('hw')?.trim()
+    if (!hwId) return
+    const match = rows.find((r) => r.zuweisungId === hwId)
+    if (match) setActive(match)
+  }, [searchParams, rows])
+
+  function clearHwParam() {
+    const params = new URLSearchParams(searchParams.toString())
+    if (!params.has('hw')) return
+    params.delete('hw')
+    const qs = params.toString()
+    router.replace(qs ? `/vorgaenge?${qs}` : '/vorgaenge', { scroll: false })
+  }
+
+  function closeDetail() {
+    setActive(null)
+    clearHwParam()
+  }
 
   function runStatus(id: string, status: HwRechnungStatus) {
     startTransition(async () => {
@@ -188,7 +210,7 @@ export function HwEingangsrechnungenListe({
                     disabled={pending}
                     onClick={() => runStatus(r.zuweisungId, 'bezahlt')}
                   >
-                    Bezahlt
+                    Als überwiesen
                   </MockBtn>
                 ) : null}
               </div>
@@ -210,7 +232,7 @@ export function HwEingangsrechnungenListe({
 
       <Modal
         open={active != null}
-        onClose={() => setActive(null)}
+        onClose={closeDetail}
         title="Eingangsrechnung · Partner"
         size="md"
       >
@@ -257,24 +279,31 @@ export function HwEingangsrechnungenListe({
                 </div>
               </div>
             </div>
+
+            <div className="rounded-lg border border-bw-border bg-bw-surface-2/40 px-3 py-3">
+              <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Dokument</div>
+              <div className="mt-1 font-medium">Rechnung vom Handwerker</div>
+              <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+                PDF wie vom Partner eingereicht — auch unter Auftrag → Dokumente.
+              </p>
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={pdfBusy}
+                  onClick={() => void openPdf(active)}
+                >
+                  {pdfBusy ? 'Lädt…' : 'Rechnung öffnen'}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2 border-t border-bw-border pt-3">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={pdfBusy}
-                onClick={() => void openPdf(active)}
-              >
-                PDF öffnen
-              </Button>
               {active.auftragHref ? (
-                <Link href={active.auftragHref} className="btn secondary">
-                  Zum Auftrag
+                <Link href={`${active.auftragHref}?tab=akte`} className="btn secondary">
+                  Zum Auftrag · Dokumente
                 </Link>
-              ) : (
-                <Link href={active.angebotHref} className="btn secondary">
-                  Zum Angebot
-                </Link>
-              )}
+              ) : null}
               {active.status === 'eingereicht' ? (
                 <>
                   <Button
@@ -283,7 +312,7 @@ export function HwEingangsrechnungenListe({
                     disabled={pending}
                     onClick={() => runStatus(active.zuweisungId, 'bezahlt')}
                   >
-                    Als bezahlt
+                    Als überwiesen
                   </Button>
                   <Button
                     type="button"

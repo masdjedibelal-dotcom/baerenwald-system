@@ -31,7 +31,7 @@ export type LeadKanal =
   | 'org_funnel'
   | 'org_service'
 
-export type PortalModus = 'privat' | 'organisation'
+export type PortalModus = 'privat' | 'organisation' | 'eigentuemer' | 'mieter' | 'hausmeister'
 export type FreigabeModus = 'direkt' | 'freigabe'
 export type LeadAnlass = 'meldung' | 'projekt' | 'servicepaket' | 'sonstiges'
 export type LeadErfassungVon = 'melder' | 'organisation' | 'crm'
@@ -1276,6 +1276,10 @@ export type Rechnung = {
   angebot_id: string | null
   auftrag_id: string | null
   kunde_id: string
+  /** ausgehend (Kundenrechnung) | eingehend (Partner-Eingang) */
+  richtung?: 'ausgehend' | 'eingehend' | null
+  handwerker_id?: string | null
+  angebot_handwerker_id?: string | null
   rechnungsnummer: string
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null

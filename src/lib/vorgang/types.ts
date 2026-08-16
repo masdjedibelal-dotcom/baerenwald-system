@@ -112,6 +112,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   kontaktEmail?: string | null
   /** Ersetzt-Kette (Angebot/Rechnung). */
   ersetzt_durch?: string | null
+  /** ausgehend (Default) | eingehend (Partner-Rechnung). */
+  rechnungRichtung?: 'ausgehend' | 'eingehend'
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'
