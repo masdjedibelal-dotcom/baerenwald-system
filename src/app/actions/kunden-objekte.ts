@@ -223,6 +223,14 @@ export async function deleteKundenObjekt(
   kundeId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+
+  const {
+    collectPortalKundeIdsForObjekt,
+    cleanupOrphanHvPortalKunden,
+  } = await import('@/lib/objektakte/cleanup-orphan-portal-kunden')
+
+  const portalKundeIds = await collectPortalKundeIdsForObjekt(supabase, objektId)
+
   const { error } = await supabase
     .from('kunden_objekte')
     .delete()
@@ -231,8 +239,11 @@ export async function deleteKundenObjekt(
 
   if (error) return { ok: false, message: error.message }
 
+  await cleanupOrphanHvPortalKunden(supabase, portalKundeIds)
+
   revalidatePath(`/kunden/${kundeId}`)
   revalidatePath('/anfragen')
+  revalidatePath('/kunden')
   return { ok: true }
 }
 

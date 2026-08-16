@@ -60,6 +60,11 @@ import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempf
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
+import type { BewohnerPrivatkundeLink } from '@/app/actions/objektakte-actions'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import Link from 'next/link'
+import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
+import type { EinheitBewohnerRolle } from '@/lib/objektakte/types'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -98,12 +103,14 @@ export function KundeDetailClient({
   customValues: initialValues,
   kundenObjekte = [],
   vorgaengeRows = [],
+  bewohnerLinks = [],
 }: {
   kunde: KundeDetailPayload
   customFieldDefs: CustomFieldDefinition[]
   customValues: CustomFieldValueRow[]
   kundenObjekte?: KundenObjekt[]
   vorgaengeRows?: VorgangListeRow[]
+  bewohnerLinks?: BewohnerPrivatkundeLink[]
 }) {
   const router = useRouter()
   const { refresh, generation } = useCrmRefresh()
@@ -374,6 +381,59 @@ export function KundeDetailClient({
 
   const fixedOverview = (
     <div className="space-y-4">
+      {bewohnerLinks.length > 0 ? (
+        <MockCard title="Verknüpft mit Objektakte" icon="building">
+          <p
+            className="mb-3 text-[length:var(--fs-meta)] leading-relaxed"
+            style={{ color: 'var(--text-3)' }}
+          >
+            Dieser Privatkunde stammt aus einer Einheit einer Hausverwaltung. Portal-Zugang bleibt
+            über die HV — eigene Vorgänge nur im CRM.
+          </p>
+          <ul className="space-y-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {bewohnerLinks.map((l) => {
+              const rolleLabel =
+                l.rolle === 'eigentuemer' || l.rolle === 'mieter'
+                  ? EINHEIT_BEWOHNER_ROLLE_LABELS[l.rolle as EinheitBewohnerRolle]
+                  : l.rolle || 'Person'
+              return (
+                <li
+                  key={l.bewohnerId}
+                  style={{
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    background: 'var(--bg-soft)',
+                  }}
+                >
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--fs-text)' }}>
+                    {rolleLabel}: {l.bewohnerName}
+                  </p>
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: 'var(--fs-meta)',
+                      color: 'var(--text-3)',
+                    }}
+                  >
+                    {l.einheitBezeichnung} ·{' '}
+                    <Link
+                      href={`/kunden/${l.hvKundeId}/objekte/${l.objektId}`}
+                      className="text-bw-link hover:underline"
+                    >
+                      {l.objektTitel}
+                    </Link>
+                    {' · '}
+                    <Link href={`/kunden/${l.hvKundeId}`} className="text-bw-link hover:underline">
+                      {l.hvName}
+                    </Link>
+                  </p>
+                </li>
+              )
+            })}
+          </ul>
+        </MockCard>
+      ) : null}
       <EntityKundenStammdatenCard
         kundeId={kunde.id}
         kundeTyp={kunde.typ}
@@ -431,16 +491,19 @@ export function KundeDetailClient({
       ) : null}
       {zeigtOrganisationTab ? (
         <FreigabeSettingsCard
+          showHmAuto
           value={{
             notfall_direkt: kunde.notfall_direkt ?? true,
             freigabe_schwelle_eur:
               kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
+            hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
           }}
           onSave={async (next) =>
             saveKundeFreigabeRegeln(kunde.id, {
               notfall_direkt: Boolean(next.notfall_direkt),
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
               freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
+              hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
             })
           }
           onSaved={() => refresh()}

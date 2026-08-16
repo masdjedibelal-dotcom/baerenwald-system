@@ -1,3 +1,5 @@
+import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
+
 export type ObjektKontaktRolle = 'hausmeister' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
 
 export type EinheitBewohnerRolle = 'mieter' | 'eigentuemer'
@@ -39,6 +41,8 @@ export type EinheitBewohner = {
   rolle?: EinheitBewohnerRolle | null
   sondereigentum_verwaltung?: boolean | null
   miete_hinweis?: string | null
+  /** Verknüpfter Privatkunde (CRM-Stamm / Portal-Login). */
+  portal_kunde_id?: string | null
   aktiv: boolean
   anonymisiert_am: string | null
   created_at: string
@@ -94,6 +98,8 @@ export type ObjektAkteDetailPayload = ObjektAkteReadOnlyPayload & {
   kontakte: ObjektKontakt[]
   einheiten: ObjektEinheit[]
   bewohner: EinheitBewohner[]
+  orgHausmeisterListe: OrgHausmeister[]
+  hausmeisterAmObjekt: HausmeisterAmObjekt | null
 }
 
 export type ObjektKontaktInput = {

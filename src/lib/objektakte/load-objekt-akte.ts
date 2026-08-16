@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { listOrgHausmeister, loadHausmeisterForObjekt } from '@/lib/org/org-hausmeister'
 import type {
   AktenNotiz,
   EinheitBewohner,
@@ -117,21 +118,24 @@ export async function loadObjektAkteDetail(
 
   const supabase = createClient()
 
-  const [kontakteRes, einheitenRes, readOnly] = await Promise.all([
-    supabase
-      .from('objekt_kontakte')
-      .select('*')
-      .eq('kunde_objekt_id', oid)
-      .eq('aktiv', true)
-      .order('sort_order', { ascending: true }),
-    supabase
-      .from('objekt_einheiten')
-      .select('*')
-      .eq('kunde_objekt_id', oid)
-      .eq('aktiv', true)
-      .order('sort_order', { ascending: true }),
-    loadReadOnlyAkte(supabase, kid, oid),
-  ])
+  const [kontakteRes, einheitenRes, readOnly, orgHausmeisterListe, hausmeisterAmObjekt] =
+    await Promise.all([
+      supabase
+        .from('objekt_kontakte')
+        .select('*')
+        .eq('kunde_objekt_id', oid)
+        .eq('aktiv', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('objekt_einheiten')
+        .select('*')
+        .eq('kunde_objekt_id', oid)
+        .eq('aktiv', true)
+        .order('sort_order', { ascending: true }),
+      loadReadOnlyAkte(supabase, kid, oid),
+      listOrgHausmeister(kid),
+      loadHausmeisterForObjekt(oid),
+    ])
 
   const einheiten = (einheitenRes.data ?? []) as ObjektEinheit[]
   const einheitIds = einheiten.map((e) => e.id)
@@ -184,6 +188,8 @@ export async function loadObjektAkteDetail(
     kontakte: (kontakteRes.data ?? []) as ObjektKontakt[],
     einheiten,
     bewohner,
+    orgHausmeisterListe,
+    hausmeisterAmObjekt,
     ...readOnly,
   }
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { loadBewohnerLinksForPrivatkunde } from '@/app/actions/objektakte-actions'
 import { KundeDetailClient } from '@/components/kunden/KundeDetailClient'
 import { loadKundeDetail } from '@/lib/kunden/load-kunde-detail'
 import { getCustomFields, getCustomValues } from '@/lib/custom-fields'
@@ -22,11 +23,12 @@ export default async function KundeDetailPage({ params }: { params: Promise<{ id
   const kunde = await loadKundeDetail(id)
   if (!kunde) notFound()
 
-  const [customFieldDefs, customValues, kundenObjekte, vorgaenge] = await Promise.all([
+  const [customFieldDefs, customValues, kundenObjekte, vorgaenge, bewohnerLinks] = await Promise.all([
     getCustomFields('kunde'),
     getCustomValues(id),
     istKundeGewerbeTyp(kunde.typ) ? fetchKundenObjekte(id) : Promise.resolve([]),
     loadVorgaengeListe(),
+    loadBewohnerLinksForPrivatkunde(id),
   ])
 
   return (
@@ -38,6 +40,7 @@ export default async function KundeDetailPage({ params }: { params: Promise<{ id
         customValues={customValues}
         kundenObjekte={kundenObjekte}
         vorgaengeRows={vorgaenge.rows}
+        bewohnerLinks={bewohnerLinks}
       />
     </div>
   )

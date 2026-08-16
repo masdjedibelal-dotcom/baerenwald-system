@@ -142,14 +142,14 @@ const KUNDE_DETAIL_SELECT_BASE = `
 
 const KUNDE_ORG_FIELDS = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
       kleinreparaturen_ohne_angebot,
       ist_spam, spam_markiert_am,
     `
 
 const KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
       ist_spam, spam_markiert_am,
     `
 
@@ -193,6 +193,19 @@ async function fetchKundeDetailRow(
 
   if (isMissingKundeColumnError(full.error)) {
     const msg = (full.error.message ?? '').toLowerCase()
+    if (msg.includes('hm_auto_zuweisen')) {
+      console.warn(
+        '[loadKundeDetail] Spalte hm_auto_zuweisen fehlt — Fallback ohne Flag:',
+        full.error.message
+      )
+      const withoutHm = KUNDE_DETAIL_SELECT.replace(/,?\s*hm_auto_zuweisen/g, '')
+      const midHm = await withCrmReadFallback(async (db) =>
+        db.from('kunden').select(withoutHm).eq('id', id).maybeSingle()
+      )
+      if (!midHm.error) {
+        return { data: (midHm.data as KundeDetailPayload | null) ?? null, error: null }
+      }
+    }
     if (msg.includes('kleinreparaturen_ohne_angebot')) {
       console.warn(
         '[loadKundeDetail] Spalte kleinreparaturen_ohne_angebot fehlt — Fallback ohne Flag:',

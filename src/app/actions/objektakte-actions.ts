@@ -536,3 +536,270 @@ export async function deleteObjektEinheit(
   revalidateObjektAkte(kundeId, objektId)
   return { ok: true }
 }
+
+export type PrivatkundeFromBewohnerResult =
+  | { ok: true; kundeId: string; created: boolean }
+  | {
+      ok: false
+      code: 'already_linked' | 'email_exists' | 'email_hv' | 'error'
+      message: string
+      existingKundeId?: string
+      existingKundeName?: string
+      existingKundeTyp?: string
+      linkedKundeId?: string
+    }
+
+function splitBewohnerName(full: string): { vorname: string | null; nachname: string | null } {
+  const parts = full.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { vorname: null, nachname: null }
+  if (parts.length === 1) return { vorname: parts[0], nachname: null }
+  return { vorname: parts[0], nachname: parts.slice(1).join(' ') }
+}
+
+async function loadBewohnerForObjekt(
+  hvKundeId: string,
+  objektId: string,
+  bewohnerId: string
+): Promise<EinheitBewohner | null> {
+  if (!(await assertObjektGehoertKunde(hvKundeId, objektId))) return null
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('einheit_bewohner')
+    .select('*, objekt_einheiten!inner(id, bezeichnung, kunde_objekt_id)')
+    .eq('id', bewohnerId)
+    .eq('kunde_id', hvKundeId)
+    .eq('aktiv', true)
+    .maybeSingle()
+  if (!data) return null
+  const einheit = data.objekt_einheiten as
+    | { id: string; bezeichnung: string; kunde_objekt_id: string }
+    | { id: string; bezeichnung: string; kunde_objekt_id: string }[]
+    | null
+  const einheitRow = Array.isArray(einheit) ? einheit[0] : einheit
+  if (!einheitRow || einheitRow.kunde_objekt_id !== objektId) return null
+  return data as EinheitBewohner
+}
+
+/**
+ * Bewohner → Privatkunde (CRM-Stamm). Setzt portal_kunde_id.
+ * Portal bleibt HV-Kontext; keine Multi-Objekt-Logik.
+ */
+export async function createPrivatkundeFromBewohner(
+  hvKundeId: string,
+  objektId: string,
+  bewohnerId: string,
+  opts?: { linkExistingKundeId?: string }
+): Promise<PrivatkundeFromBewohnerResult> {
+  const bewohner = await loadBewohnerForObjekt(hvKundeId, objektId, bewohnerId)
+  if (!bewohner) {
+    return { ok: false, code: 'error', message: 'Person nicht gefunden.' }
+  }
+
+  const linked = bewohner.portal_kunde_id?.trim()
+  if (linked) {
+    return {
+      ok: false,
+      code: 'already_linked',
+      message: 'Bereits mit einem Privatkunden verknüpft.',
+      linkedKundeId: linked,
+    }
+  }
+
+  const supabase = createClient()
+  const { istKundeHausverwaltungTyp, kundeDisplayName } = await import('@/lib/kunde-stammdaten')
+
+  const linkId = opts?.linkExistingKundeId?.trim()
+  if (linkId) {
+    const { data: existing } = await supabase
+      .from('kunden')
+      .select('id, name, vorname, nachname, typ, email')
+      .eq('id', linkId)
+      .maybeSingle()
+    if (!existing) {
+      return { ok: false, code: 'error', message: 'Kunde nicht gefunden.' }
+    }
+    if (istKundeHausverwaltungTyp(existing.typ as string)) {
+      return {
+        ok: false,
+        code: 'email_hv',
+        message:
+          'Diese E-Mail gehört einer Hausverwaltung — bitte nicht als Privatkunde verknüpfen.',
+        existingKundeId: existing.id as string,
+        existingKundeName: kundeDisplayName(existing),
+        existingKundeTyp: String(existing.typ ?? ''),
+      }
+    }
+    const { error } = await supabase
+      .from('einheit_bewohner')
+      .update({ portal_kunde_id: linkId, updated_at: new Date().toISOString() })
+      .eq('id', bewohnerId)
+      .eq('kunde_id', hvKundeId)
+    if (error) return { ok: false, code: 'error', message: error.message }
+    revalidateObjektAkte(hvKundeId, objektId)
+    revalidatePath(`/kunden/${linkId}`)
+    return { ok: true, kundeId: linkId, created: false }
+  }
+
+  const email = bewohner.email?.trim() || null
+  if (email) {
+    const { data: byMail } = await supabase
+      .from('kunden')
+      .select('id, name, vorname, nachname, typ, email')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle()
+    if (byMail?.id) {
+      if (istKundeHausverwaltungTyp(byMail.typ as string)) {
+        return {
+          ok: false,
+          code: 'email_hv',
+          message:
+            'Diese E-Mail gehört einer Hausverwaltung. Privatkunde nicht anlegen — Mail prüfen.',
+          existingKundeId: byMail.id as string,
+          existingKundeName: kundeDisplayName(byMail),
+          existingKundeTyp: String(byMail.typ ?? ''),
+        }
+      }
+      return {
+        ok: false,
+        code: 'email_exists',
+        message: 'Es gibt bereits einen Kunden mit dieser E-Mail. Verknüpfen?',
+        existingKundeId: byMail.id as string,
+        existingKundeName: kundeDisplayName(byMail),
+        existingKundeTyp: String(byMail.typ ?? ''),
+      }
+    }
+  }
+
+  const { vorname, nachname } = splitBewohnerName(bewohner.name)
+  const { data: created, error: createErr } = await supabase
+    .from('kunden')
+    .insert({
+      name: null,
+      vorname,
+      nachname,
+      email,
+      telefon: bewohner.telefon?.trim() || null,
+      typ: 'privat',
+      portal_modus: 'privat',
+      adresse: null,
+      plz: null,
+      ort: null,
+      notizen: null,
+    })
+    .select('id')
+    .single()
+
+  if (createErr || !created?.id) {
+    return {
+      ok: false,
+      code: 'error',
+      message: createErr?.message ?? 'Privatkunde konnte nicht angelegt werden.',
+    }
+  }
+
+  const newId = created.id as string
+  const { error: linkErr } = await supabase
+    .from('einheit_bewohner')
+    .update({ portal_kunde_id: newId, updated_at: new Date().toISOString() })
+    .eq('id', bewohnerId)
+    .eq('kunde_id', hvKundeId)
+
+  if (linkErr) {
+    return { ok: false, code: 'error', message: linkErr.message }
+  }
+
+  revalidateObjektAkte(hvKundeId, objektId)
+  revalidatePath(`/kunden/${newId}`)
+  return { ok: true, kundeId: newId, created: true }
+}
+
+/** Bestehenden Kunden mit Bewohner verknüpfen (nach email_exists). */
+export async function linkPrivatkundeToBewohner(
+  hvKundeId: string,
+  objektId: string,
+  bewohnerId: string,
+  privatKundeId: string
+): Promise<PrivatkundeFromBewohnerResult> {
+  return createPrivatkundeFromBewohner(hvKundeId, objektId, bewohnerId, {
+    linkExistingKundeId: privatKundeId,
+  })
+}
+
+export type BewohnerPrivatkundeLink = {
+  bewohnerId: string
+  bewohnerName: string
+  rolle: string | null
+  einheitId: string
+  einheitBezeichnung: string
+  objektId: string
+  objektTitel: string
+  hvKundeId: string
+  hvName: string
+}
+
+/** Rückwärts: Privatkunde → verknüpfte Bewohner-Zeilen (für Kunden-Detail). */
+export async function loadBewohnerLinksForPrivatkunde(
+  privatKundeId: string
+): Promise<BewohnerPrivatkundeLink[]> {
+  const kid = privatKundeId.trim()
+  if (!kid) return []
+
+  const supabase = createClient()
+  const { data: rows, error } = await supabase
+    .from('einheit_bewohner')
+    .select('id, name, rolle, kunde_id, objekt_einheit_id')
+    .eq('portal_kunde_id', kid)
+    .eq('aktiv', true)
+    .is('anonymisiert_am', null)
+
+  if (error) {
+    console.warn('loadBewohnerLinksForPrivatkunde:', error.message)
+    return []
+  }
+  if (!rows?.length) return []
+
+  const einheitIds = [...new Set(rows.map((r) => r.objekt_einheit_id as string).filter(Boolean))]
+  const { data: einheiten } = await supabase
+    .from('objekt_einheiten')
+    .select('id, bezeichnung, kunde_objekt_id')
+    .in('id', einheitIds)
+
+  const objektIds = [
+    ...new Set((einheiten ?? []).map((e) => e.kunde_objekt_id as string).filter(Boolean)),
+  ]
+  const { data: objekte } = objektIds.length
+    ? await supabase.from('kunden_objekte').select('id, titel, kunde_id').in('id', objektIds)
+    : { data: [] as { id: string; titel: string; kunde_id: string }[] }
+
+  const hvIds = [...new Set((objekte ?? []).map((o) => o.kunde_id as string).filter(Boolean))]
+  const { data: hvs } = hvIds.length
+    ? await supabase.from('kunden').select('id, name, vorname, nachname, typ').in('id', hvIds)
+    : { data: [] as { id: string; name: string | null; vorname: string | null; nachname: string | null; typ: string | null }[] }
+
+  const { kundeDisplayName } = await import('@/lib/kunde-stammdaten')
+  const einheitById = new Map((einheiten ?? []).map((e) => [e.id as string, e]))
+  const objektById = new Map((objekte ?? []).map((o) => [o.id as string, o]))
+  const hvById = new Map((hvs ?? []).map((h) => [h.id as string, h]))
+
+  const out: BewohnerPrivatkundeLink[] = []
+  for (const row of rows) {
+    const einheit = einheitById.get(row.objekt_einheit_id as string)
+    if (!einheit) continue
+    const objekt = objektById.get(einheit.kunde_objekt_id as string)
+    if (!objekt) continue
+    const hv = hvById.get(objekt.kunde_id as string)
+    out.push({
+      bewohnerId: row.id as string,
+      bewohnerName: (row.name as string) || '—',
+      rolle: (row.rolle as string | null) ?? null,
+      einheitId: einheit.id as string,
+      einheitBezeichnung: (einheit.bezeichnung as string) || '—',
+      objektId: objekt.id as string,
+      objektTitel: (objekt.titel as string) || '—',
+      hvKundeId: (hv?.id as string) ?? (objekt.kunde_id as string),
+      hvName: hv ? kundeDisplayName(hv) : '—',
+    })
+  }
+  return out
+}

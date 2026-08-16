@@ -2,6 +2,7 @@
 
 import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
@@ -12,8 +13,10 @@ import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
   createEinheitBewohner,
   createObjektEinheit,
+  createPrivatkundeFromBewohner,
   deleteEinheitBewohner,
   deleteObjektEinheit,
+  linkPrivatkundeToBewohner,
   updateEinheitBewohner,
   updateObjektEinheit,
 } from '@/app/actions/objektakte-actions'
@@ -52,6 +55,7 @@ export function ObjektEinheitenSection({
   bewohner: EinheitBewohner[]
   onChanged: () => void
 }) {
+  const router = useRouter()
   const [einheiten, setEinheiten] = useState(() =>
     initialEinheiten.filter((e) => e.aktiv !== false)
   )
@@ -79,6 +83,14 @@ export function ObjektEinheitenSection({
   const [mieteHinweis, setMieteHinweis] = useState('')
   const [personDirty, setPersonDirty] = useState(false)
   const [personErr, setPersonErr] = useState<string | null>(null)
+
+  const [privatkundeTarget, setPrivatkundeTarget] = useState<EinheitBewohner | null>(null)
+  const [privatkundeConflict, setPrivatkundeConflict] = useState<{
+    bewohner: EinheitBewohner
+    existingKundeId: string
+    existingKundeName: string
+    message: string
+  } | null>(null)
 
   useEffect(() => {
     setEinheiten(initialEinheiten.filter((e) => e.aktiv !== false))
@@ -303,23 +315,85 @@ export function ObjektEinheitenSection({
   }
 
   function personMenu(b: EinheitBewohner, rolle: EinheitBewohnerRolle): EntityMenuItem[] {
-    return [
+    const linkedId = b.portal_kunde_id?.trim()
+    const items: EntityMenuItem[] = [
       {
         icon: 'pencil',
         label: 'Bearbeiten',
         onClick: () => openPersonForm(b.objekt_einheit_id, rolle, b),
       },
-      'sep',
-      {
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () => {
-          if (pending) return
-          entfernenPerson(b)
-        },
-      },
     ]
+    if (linkedId) {
+      items.push({
+        icon: 'user',
+        label: 'Privatkunde öffnen',
+        onClick: () => router.push(`/kunden/${linkedId}`),
+      })
+    } else {
+      items.push({
+        icon: 'user-plus',
+        label: 'Als Privatkunde anlegen',
+        onClick: () => setPrivatkundeTarget(b),
+      })
+    }
+    items.push('sep', {
+      icon: 'trash',
+      label: 'Löschen',
+      danger: true,
+      onClick: () => {
+        if (pending) return
+        entfernenPerson(b)
+      },
+    })
+    return items
+  }
+
+  function anlegenPrivatkunde(b: EinheitBewohner) {
+    startTransition(async () => {
+      const r = await createPrivatkundeFromBewohner(kundeId, objektId, b.id)
+      if (r.ok) {
+        toast.success(r.created ? 'Privatkunde angelegt' : 'Verknüpft')
+        setPrivatkundeTarget(null)
+        setPrivatkundeConflict(null)
+        onChanged()
+        router.push(`/kunden/${r.kundeId}`)
+        return
+      }
+      if (r.code === 'already_linked' && r.linkedKundeId) {
+        toast.success('Bereits verknüpft')
+        setPrivatkundeTarget(null)
+        router.push(`/kunden/${r.linkedKundeId}`)
+        return
+      }
+      if (r.code === 'email_exists' && r.existingKundeId) {
+        setPrivatkundeTarget(null)
+        setPrivatkundeConflict({
+          bewohner: b,
+          existingKundeId: r.existingKundeId,
+          existingKundeName: r.existingKundeName ?? 'Kunde',
+          message: r.message,
+        })
+        return
+      }
+      toast.error(r.message)
+      setPrivatkundeTarget(null)
+    })
+  }
+
+  function verknuepfenPrivatkunde() {
+    if (!privatkundeConflict) return
+    const { bewohner: b, existingKundeId } = privatkundeConflict
+    startTransition(async () => {
+      const r = await linkPrivatkundeToBewohner(kundeId, objektId, b.id, existingKundeId)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Mit bestehendem Kunden verknüpft')
+      setPrivatkundeConflict(null)
+      onChanged()
+      router.push(`/kunden/${r.kundeId}`)
+    })
   }
 
   const detailPeople = detail ? peopleFor(detail.id) : []
@@ -368,6 +442,7 @@ export function ObjektEinheitenSection({
                     ? 'SE-Verwaltung'
                     : null
                   : b.miete_hinweis?.trim() || null
+              const linked = Boolean(b.portal_kunde_id?.trim())
               return (
                 <div
                   key={b.id}
@@ -375,7 +450,10 @@ export function ObjektEinheitenSection({
                   style={{ gridTemplateColumns: PERSON_COLS, cursor: 'default' }}
                 >
                   <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {b.name}
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      {b.name}
+                      {linked ? <MockBadge kind="aktiv">Privatkunde</MockBadge> : null}
+                    </span>
                     {hint ? (
                       <div
                         className="lc-sub"
@@ -713,6 +791,65 @@ export function ObjektEinheitenSection({
             )}
           </MockFormSection>
         </div>
+      </EditorSheet>
+
+      <EditorSheet
+        open={Boolean(privatkundeTarget)}
+        onClose={() => setPrivatkundeTarget(null)}
+        title="Als Privatkunde anlegen"
+        crumb="Einheiten >"
+        size="md"
+        onConfirm={() => privatkundeTarget && anlegenPrivatkunde(privatkundeTarget)}
+        confirmDisabled={pending || !privatkundeTarget}
+        confirmBusy={pending}
+        compose
+        composeLabel="Anlegen"
+      >
+        {privatkundeTarget ? (
+          <div className="space-y-3">
+            <p style={{ margin: 0, fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.45 }}>
+              Legt einen eigenen CRM-Kunden für{' '}
+              <strong>{privatkundeTarget.name}</strong> an — für Anfragen, Aufträge und
+              Rechnungen im CRM.
+            </p>
+            <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)', lineHeight: 1.45 }}>
+              Die Person bleibt weiterhin in der Objektakte der HV. Im Portal gibt es keine
+              eigenen Vorgänge außerhalb der Hausverwaltung.
+            </p>
+            <div className="form-section-h">Übernahme</div>
+            <p style={{ margin: 0, fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
+              {[privatkundeTarget.email, privatkundeTarget.telefon].filter(Boolean).join(' · ') ||
+                'Keine Kontaktdaten — nur Name wird übernommen.'}
+            </p>
+          </div>
+        ) : null}
+      </EditorSheet>
+
+      <EditorSheet
+        open={Boolean(privatkundeConflict)}
+        onClose={() => setPrivatkundeConflict(null)}
+        title="Kunde verknüpfen?"
+        crumb="Einheiten >"
+        size="md"
+        onConfirm={verknuepfenPrivatkunde}
+        confirmDisabled={pending || !privatkundeConflict}
+        confirmBusy={pending}
+        compose
+        composeLabel="Verknüpfen"
+      >
+        {privatkundeConflict ? (
+          <div className="space-y-3">
+            <p style={{ margin: 0, fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.45 }}>
+              {privatkundeConflict.message}
+            </p>
+            <p style={{ margin: 0, fontSize: 'var(--fs-text)', color: 'var(--text)', fontWeight: 600 }}>
+              {privatkundeConflict.existingKundeName}
+            </p>
+            <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+              Person: {privatkundeConflict.bewohner.name}
+            </p>
+          </div>
+        ) : null}
       </EditorSheet>
     </>
   )

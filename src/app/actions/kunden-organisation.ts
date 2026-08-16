@@ -115,6 +115,7 @@ export async function saveKundeFreigabeRegeln(
     freigabe_schwelle_eur?: number | null
     notfall_direkt: boolean
     freigabe_modus?: FreigabeModus
+    hm_auto_zuweisen?: boolean
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = kundeId?.trim()
@@ -136,14 +137,28 @@ export async function saveKundeFreigabeRegeln(
         ? 'direkt'
         : 'freigabe'
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     freigabe_modus: freigabeModus,
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
   }
+  if (input.hm_auto_zuweisen !== undefined) {
+    payload.hm_auto_zuweisen = Boolean(input.hm_auto_zuweisen)
+  }
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
-  if (error) return { ok: false, message: error.message }
+  if (error) {
+    if (/hm_auto_zuweisen/i.test(error.message)) {
+      const { hm_auto_zuweisen: _drop, ...withoutHm } = payload
+      void _drop
+      const retry = await withCrmReadFallback(async (db) =>
+        db.from('kunden').update(withoutHm).eq('id', id)
+      )
+      if (retry.error) return { ok: false, message: retry.error.message }
+    } else {
+      return { ok: false, message: error.message }
+    }
+  }
 
   revalidatePath('/kunden')
   revalidatePath(`/kunden/${id}`)

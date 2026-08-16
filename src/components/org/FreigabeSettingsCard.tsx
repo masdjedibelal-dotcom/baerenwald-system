@@ -16,6 +16,8 @@ export type FreigabeSettingsValue = {
   /** null nur bei Objekt-Erben */
   notfall_direkt: boolean | null
   freigabe_schwelle_eur: number | null
+  /** Nur HV-Kunde (Org), nicht Objekt-Override */
+  hm_auto_zuweisen?: boolean | null
 }
 
 function snapSchwelle(raw: number): number {
@@ -49,6 +51,8 @@ type Props = {
   /** Objekt: true = DB NULL (erben) */
   erben?: boolean
   onErbenChange?: (erben: boolean) => void
+  /** HV-Kunde: Hausmeister-Auto-Zuweisung anzeigen/speichern */
+  showHmAuto?: boolean
   onSave: (next: FreigabeSettingsValue) => Promise<{ ok: true } | { ok: false; message: string }>
   onSaved?: () => void
   className?: string
@@ -60,6 +64,7 @@ export function FreigabeSettingsCard({
   kundeDefaults,
   erben = false,
   onErbenChange,
+  showHmAuto = false,
   onSave,
   onSaved,
   className,
@@ -72,6 +77,7 @@ export function FreigabeSettingsCard({
   const [akut, setAkut] = useState(parsed.akut)
   const [schwelleAn, setSchwelleAn] = useState(parsed.schwelleAn)
   const [schwelle, setSchwelle] = useState(parsed.schwelle)
+  const [hmAuto, setHmAuto] = useState(Boolean(value.hm_auto_zuweisen))
 
   useEffect(() => {
     if (skipSyncRef.current) {
@@ -84,18 +90,24 @@ export function FreigabeSettingsCard({
     setSchwelle(next.schwelle)
   }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, erben])
 
+  useEffect(() => {
+    setHmAuto(Boolean(value.hm_auto_zuweisen))
+  }, [value.hm_auto_zuweisen])
+
   const disabled = erben || pending
   const baseline = parseEditorState(erben && kundeDefaults ? kundeDefaults : value)
   const dirty =
     !erben &&
     (akut !== baseline.akut ||
       schwelleAn !== baseline.schwelleAn ||
-      (schwelleAn && schwelle !== baseline.schwelle))
+      (schwelleAn && schwelle !== baseline.schwelle) ||
+      (showHmAuto && hmAuto !== Boolean(value.hm_auto_zuweisen)))
 
   function buildPayload(): FreigabeSettingsValue {
     return {
       notfall_direkt: akut,
       freigabe_schwelle_eur: schwelleAn ? snapSchwelle(schwelle) || null : null,
+      ...(showHmAuto ? { hm_auto_zuweisen: hmAuto } : {}),
     }
   }
 
@@ -219,6 +231,27 @@ export function FreigabeSettingsCard({
               <span>0 €</span>
               <span>5.000 €</span>
             </div>
+          </div>
+        ) : null}
+
+        {showHmAuto && !erben ? (
+          <div className="freigabe-settings-card__row">
+            <div className="freigabe-settings-card__row-text">
+              <div className="freigabe-settings-card__label">Automatisch an Hausmeister</div>
+              <div className="freigabe-settings-card__hint">
+                {hmAuto
+                  ? 'Aktiv: Neue Meldungen (nicht Sofortmaßnahme) gehen direkt in die Hausmeister-Prüfung.'
+                  : 'Aus: Hausmeister-Pfad manuell am Vorgang starten.'}
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hmAuto}
+              className={cn('switch', hmAuto && 'on')}
+              disabled={pending}
+              onClick={() => setHmAuto((v) => !v)}
+            />
           </div>
         ) : null}
       </div>

@@ -11,6 +11,7 @@ import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
+import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeisterCard'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
@@ -172,10 +173,18 @@ export function ObjektAkteDetailClient({
         />
       ) : null}
 
+      <ObjektHausmeisterCard
+        kundeId={kunde.id}
+        objektId={objekt.id}
+        liste={akte.orgHausmeisterListe}
+        amObjekt={akte.hausmeisterAmObjekt}
+        onChanged={refresh}
+      />
+
       <ObjektKontakteSection
         kundeId={kunde.id}
         objektId={objekt.id}
-        kontakte={akte.kontakte}
+        kontakte={akte.kontakte.filter((k) => k.rolle !== 'hausmeister')}
         onChanged={refresh}
       />
     </div>

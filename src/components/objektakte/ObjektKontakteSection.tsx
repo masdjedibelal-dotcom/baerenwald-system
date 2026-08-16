@@ -23,7 +23,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { ObjektKontakt, ObjektKontaktInput, ObjektKontaktRolle } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 
-const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.map((r) => ({
+const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.filter((r) => r !== 'hausmeister').map((r) => ({
   value: r,
   label: OBJEKT_KONTAKT_ROLLE_LABELS[r],
 }))
@@ -46,7 +46,7 @@ export function ObjektKontakteSection({
   const [edit, setEdit] = useState<ObjektKontakt | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const [rolle, setRolle] = useState<ObjektKontaktRolle>('hausmeister')
+  const [rolle, setRolle] = useState<ObjektKontaktRolle>('beirat')
   const [name, setName] = useState('')
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
@@ -60,7 +60,7 @@ export function ObjektKontakteSection({
 
   function openNeu() {
     setEdit(null)
-    setRolle('hausmeister')
+    setRolle('beirat')
     setName('')
     setTelefon('')
     setEmail('')
