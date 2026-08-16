@@ -13,6 +13,7 @@ import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
+import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsort'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
@@ -97,6 +98,7 @@ export function HvMeldungKontextCards({
   if (resolvePipelineKontext(lead) !== 'hv_meldung') return null
 
   const objekt = lead.kunden_objekte
+  const leistungsort = resolveLeadLeistungsort(lead)
   const agKundeId = lead.auftraggeber_kunde_id ?? lead.auftraggeber?.id ?? null
   const objektHref =
     objekt?.id && agKundeId ? `/kunden/${agKundeId}/objekte/${objekt.id}` : null
@@ -251,10 +253,10 @@ export function HvMeldungKontextCards({
               ) : null}
             </div>
             <div className="props">
-              <PropRow label="Straße" value={objekt?.strasse?.trim() || '—'} />
-              <PropRow label="Hausnummer" value={objekt?.hausnummer?.trim() || '—'} />
-              <PropRow label="PLZ" value={objekt?.plz?.trim() || '—'} />
-              <PropRow label="Ort" value={objekt?.ort?.trim() || '—'} />
+              <PropRow label="Straße" value={leistungsort.strasse || '—'} />
+              <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
+              <PropRow label="PLZ" value={leistungsort.plz || '—'} />
+              <PropRow label="Ort" value={leistungsort.ort || '—'} />
             </div>
           </div>
         </div>

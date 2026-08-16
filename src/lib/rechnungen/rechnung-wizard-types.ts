@@ -174,6 +174,8 @@ export type RechnungAuswahlZeile = {
   beleg_typ?: string | null
   bezug_rechnung_id?: string | null
   created_at?: string | null
+  /** ausgehend (Kunde) | eingehend (Partner) — null = Legacy ausgehend */
+  richtung?: 'ausgehend' | 'eingehend' | string | null
   /** Mahnwesen / RateDrawer */
   erinnerung_7_sent_at?: string | null
   erinnerung_21_sent_at?: string | null

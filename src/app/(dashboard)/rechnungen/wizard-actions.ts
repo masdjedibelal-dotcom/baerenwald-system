@@ -324,10 +324,16 @@ async function rechnungenAbschlagLinks(
   const { data } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer'
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung'
     )
     .eq('auftrag_id', auftragId)
-  return (data ?? []) as import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]
+  const rows = (data ?? []) as Array<
+    import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink & {
+      richtung?: string | null
+    }
+  >
+  // Nur Kundenrechnungen — Partner-Eingang zählt nicht gegen Zahlplan / VK
+  return rows.filter((r) => String(r.richtung ?? '') !== 'eingehend')
 }
 
 function berechneZahlungsplanMitIst(

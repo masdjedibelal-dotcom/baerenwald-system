@@ -221,6 +221,9 @@ export type Lead = {
   zeitraum_bis?: string | null
   vor_ort_notizen?: string | null
   plz: string | null
+  /** Ausführungsort (Melde/Funnel); Leistungsort-UI fällt darauf zurück wenn Objekt leer */
+  strasse?: string | null
+  hausnummer?: string | null
   zeitraum: string | null
   kundentyp: string | null
   funnel_daten: unknown

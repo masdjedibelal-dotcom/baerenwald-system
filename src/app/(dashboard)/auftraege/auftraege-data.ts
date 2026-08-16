@@ -286,7 +286,7 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, beleg_typ, bezug_rechnung_id, created_at, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, reklamation_am, reklamation_grund'
+      'id, rechnungsnummer, status, brutto, rechnungsdatum, faellig_am, pdf_url, gesendet_at, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, beleg_typ, bezug_rechnung_id, created_at, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, reklamation_am, reklamation_grund, richtung'
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
@@ -306,7 +306,10 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
     }
     return fallback ?? []
   }
-  return data ?? []
+  // Partner-Eingangsrechnungen gehören nicht zur Kundenabrechnung am Auftrag
+  return (data ?? []).filter(
+    (r) => String((r as { richtung?: string | null }).richtung ?? '') !== 'eingehend'
+  )
 }
 
 export async function listFormularTemplates(): Promise<FormularTemplate[]> {

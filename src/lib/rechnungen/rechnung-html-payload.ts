@@ -124,11 +124,14 @@ export async function loadVorherigeAbschlaegeFuerSchluss(
   const { data } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer'
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung'
     )
     .eq('auftrag_id', auftragId)
-  return ((data ?? []) as RechnungAbschlagLink[]).filter(
-    (r) => r.id !== ausserRechnungId && r.status !== 'storniert'
+  return ((data ?? []) as Array<RechnungAbschlagLink & { richtung?: string | null }>).filter(
+    (r) =>
+      r.id !== ausserRechnungId &&
+      r.status !== 'storniert' &&
+      String(r.richtung ?? '') !== 'eingehend'
   )
 }
 

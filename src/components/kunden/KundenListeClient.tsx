@@ -56,10 +56,20 @@ const KUNDEN_COLS: ResizableColDef[] = [
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
 type SortCol = 'name' | 'typ' | 'telefon' | 'email'
 
-function kundeTypLabel(typ: string | null | undefined): string {
+/** Listen-Filter-Bucket: Legacy-Typen (z. B. eigentuemer) → Privat. */
+function kundeTypFilterBucket(
+  typ: string | null | undefined
+): Exclude<TypListenFilter, 'alle'> {
   const t = (typ || '').toLowerCase()
-  if (t === 'gewerbe') return 'Gewerbe'
-  if (t === 'hausverwaltung') return 'Hausverwaltung'
+  if (t === 'gewerbe') return 'gewerbe'
+  if (t === 'hausverwaltung' || t === 'verwaltung') return 'hausverwaltung'
+  return 'privat'
+}
+
+function kundeTypLabel(typ: string | null | undefined): string {
+  const bucket = kundeTypFilterBucket(typ)
+  if (bucket === 'gewerbe') return 'Gewerbe'
+  if (bucket === 'hausverwaltung') return 'Hausverwaltung'
   return 'Privat'
 }
 
@@ -113,9 +123,9 @@ export function KundenListeClient({
     let gewerbe = 0
     let hausverwaltung = 0
     for (const k of kunden) {
-      const t = (k.typ || '').toLowerCase()
-      if (t === 'gewerbe') gewerbe++
-      else if (t === 'hausverwaltung') hausverwaltung++
+      const bucket = kundeTypFilterBucket(k.typ)
+      if (bucket === 'gewerbe') gewerbe++
+      else if (bucket === 'hausverwaltung') hausverwaltung++
       else privat++
     }
     return { alle: kunden.length, privat, gewerbe, hausverwaltung }
@@ -125,7 +135,7 @@ export function KundenListeClient({
     const needle = query.trim().toLowerCase()
     const nameNeedle = fName.trim().toLowerCase()
     return kunden.filter((k) => {
-      if (typFilter !== 'alle' && (k.typ || '').toLowerCase() !== typFilter) return false
+      if (typFilter !== 'alle' && kundeTypFilterBucket(k.typ) !== typFilter) return false
       if (nameNeedle && !kundeListenName(k).toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
       const pool = [kundeListenName(k), k.name, k.email ?? '', k.telefon ?? '', k.kundennummer ?? '']

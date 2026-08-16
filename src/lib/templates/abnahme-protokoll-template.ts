@@ -153,14 +153,14 @@ function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
   const an = partyBox('Auftragnehmer', [
     { label: 'Firma', value: p.firmenname },
     { label: 'Adresse', value: p.firmen_adresse.replace(/\n/g, ', ') },
-    { label: 'Vertreten durch', value: p.meta.vertreter_an },
+    { label: 'Handwerker vor Ort', value: p.meta.vertreter_an },
     { label: 'Telefon', value: p.firmen_telefon ?? '' },
     { label: 'E-Mail', value: p.firmen_email ?? '' },
   ])
   const ag = partyBox('Auftraggeber / Kunde', [
     { label: 'Name', value: p.kunde_name },
     { label: 'Adresse', value: p.kunde_adresse.replace(/\n/g, ', ') },
-    { label: 'Ansprechpartner', value: p.meta.ansprechpartner_kunde },
+    { label: 'Kunde vor Ort', value: p.meta.ansprechpartner_kunde },
     { label: 'Anwesend bei Übergabe', value: p.meta.anwesend_uebergabe },
   ])
   const fotos = fotosHtml(p.meta.uebergabe_foto_urls, p.meta.uebergabe_foto_captions)
@@ -332,27 +332,53 @@ function rechtHtml(text: string): string {
     <ul style="margin:0;padding-left:18px;font-size:8.5pt;line-height:1.45;color:${TEXT};">${lis}</ul>`
 }
 
+function safeImgSrc(raw: string | null | undefined): string | null {
+  const s = (raw ?? '').trim()
+  if (!s) return null
+  if (s.startsWith('data:image/')) return s.replace(/"/g, '')
+  if (/^https?:\/\//i.test(s)) return s.replace(/"/g, '&quot;')
+  return null
+}
+
 function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
-  const block = (title: string, name: string, ortDatum: string) =>
-    `<div style="flex:1;min-width:0;page-break-inside:avoid;">
+  const hwName =
+    p.meta.hw_unterschrift_name?.trim() || p.meta.vertreter_an.trim() || ''
+  const kundeName =
+    p.meta.kunde_unterschrift_name?.trim() ||
+    p.meta.ansprechpartner_kunde.trim() ||
+    p.kunde_name
+  const hwSig = safeImgSrc(p.meta.signature_hw_url)
+  const kundeSig = safeImgSrc(p.meta.signature_kunde_url)
+
+  const block = (
+    title: string,
+    name: string,
+    ortDatum: string,
+    signatureSrc: string | null
+  ) => {
+    const sigArea = signatureSrc
+      ? `<div style="border-bottom:1px solid ${TEXT};min-height:48px;margin:12px 0 4px;display:flex;align-items:flex-end;justify-content:flex-start;">
+          <img src="${signatureSrc}" alt="Unterschrift" style="max-height:46px;max-width:100%;width:auto;object-fit:contain;display:block;" />
+        </div>`
+      : `<div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>`
+    return `<div style="flex:1;min-width:0;page-break-inside:avoid;">
       <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">${esc(title)}</div>
       <div style="border-bottom:1px solid ${TEXT};min-height:20px;margin-bottom:4px;font-size:9pt;color:${TEXT};">${esc(ortDatum.trim() || ' ')}</div>
       <div style="font-size:7.5pt;color:${MUTED};">Ort, Datum</div>
-      <div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>
+      ${sigArea}
       <div style="font-size:7.5pt;color:${MUTED};">Unterschrift${name ? ` · ${esc(name)}` : ''}</div>
     </div>`
+  }
+
   return `${sectionHeading('6', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
-      ${block('Auftragnehmer', p.meta.vertreter_an, p.meta.unterschrift_ort_datum_an)}
-      ${block(
-        'Auftraggeber',
-        p.meta.ansprechpartner_kunde || p.kunde_name,
-        p.meta.unterschrift_ort_datum_ag
-      )}
+      ${block('Auftragnehmer', hwName, p.meta.unterschrift_ort_datum_an, hwSig)}
+      ${block('Auftraggeber', kundeName, p.meta.unterschrift_ort_datum_ag, kundeSig)}
       ${block(
         'Anwesend bei Übergabe',
         p.meta.anwesend_uebergabe,
-        p.meta.unterschrift_ort_datum_anwesend
+        p.meta.unterschrift_ort_datum_anwesend,
+        null
       )}
     </div>`
 }
@@ -386,7 +412,6 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
       <div style="flex:1;min-width:0;">
         ${angebotLogoKopfHtml(footerProps)}
         <h1 style="font-size:16pt;font-weight:700;color:${ACCENT};margin:8px 0 2px;letter-spacing:0.02em;">ABNAHMEPROTOKOLL</h1>
-        <p style="margin:0;font-size:8.5pt;color:${MUTED};letter-spacing:0.06em;text-transform:uppercase;">Garten- und Landschaftsbau</p>
       </div>
       ${firmKontaktKopf(p)}
     </div>

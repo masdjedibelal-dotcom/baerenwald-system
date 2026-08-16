@@ -24,6 +24,10 @@ type Props = {
   onChanged: () => void
 }
 
+/**
+ * Hausmeister am Objekt — analog HV-Portal:
+ * ohne Zuordnung → neu anlegen; optional bestehenden Org-HM zuweisen.
+ */
 export function ObjektHausmeisterCard({
   kundeId,
   objektId,
@@ -50,24 +54,19 @@ export function ObjektHausmeisterCard({
 
   function openSheet() {
     setErr(null)
+    // Wie Portal: am Objekt schon HM → bearbeiten; sonst → neu anlegen
     if (amObjekt && !amObjekt.isLegacy) {
       setMode('existing')
       setHmId(amObjekt.id)
       setName(amObjekt.name)
       setEmail(amObjekt.email ?? '')
       setPortalZugang(Boolean(amObjekt.portal_zugang))
-    } else if (amObjekt?.isLegacy || liste.length === 0) {
+    } else {
       setMode('new')
       setHmId('')
-      setName(amObjekt?.name ?? '')
-      setEmail(amObjekt?.email ?? '')
+      setName(amObjekt?.isLegacy ? amObjekt.name : '')
+      setEmail(amObjekt?.isLegacy ? amObjekt.email ?? '' : '')
       setPortalZugang(false)
-    } else {
-      setMode('existing')
-      setHmId(liste[0]!.id)
-      setName(liste[0]!.name)
-      setEmail(liste[0]!.email ?? '')
-      setPortalZugang(Boolean(liste[0]!.portal_zugang))
     }
     setSheetOpen(true)
   }
@@ -93,13 +92,26 @@ export function ObjektHausmeisterCard({
 
   function speichern() {
     setErr(null)
+    if (mode === 'new' && !name.trim()) {
+      setErr('Bitte Name eingeben.')
+      return
+    }
+    if (mode === 'new' && portalZugang && !email.trim()) {
+      setErr('E-Mail ist für Portal-Zugang erforderlich.')
+      return
+    }
+    if (mode === 'existing' && !hmId) {
+      setErr('Bitte Hausmeister wählen.')
+      return
+    }
+
     startTransition(async () => {
       const invite = mode === 'new' ? portalZugang : false
       const r = await saveObjektHausmeister(kundeId, objektId, {
         hausmeisterId: mode === 'existing' ? hmId : null,
-        name: mode === 'new' || mode === 'existing' ? name : undefined,
+        name: name.trim() || undefined,
         email: mode === 'new' ? (portalZugang ? email : null) : email || null,
-        portalZugang: mode === 'new' ? portalZugang : portalZugang,
+        portalZugang,
         invite,
       })
       if (!r.ok) {
@@ -107,7 +119,7 @@ export function ObjektHausmeisterCard({
         toast.error(r.message)
         return
       }
-      toast.success('Hausmeister gespeichert')
+      toast.success(mode === 'new' ? 'Hausmeister angelegt' : 'Hausmeister gespeichert')
       setSheetOpen(false)
       if (r.inviteMailto) {
         window.location.href = r.inviteMailto
@@ -153,12 +165,21 @@ export function ObjektHausmeisterCard({
   }
 
   const selectOptions = [
+    { value: '__new__', label: '＋ Neu anlegen' },
     ...liste.map((h) => ({
       value: h.id,
       label: h.portal_zugang ? `${h.name} · Portal` : h.name,
     })),
-    { value: '__new__', label: '＋ Neu anlegen' },
   ]
+
+  const ctaLabel =
+    amObjekt && !amObjekt.isLegacy
+      ? 'Bearbeiten'
+      : amObjekt?.isLegacy
+        ? 'Als Org-HM speichern'
+        : liste.length > 0
+          ? 'Anlegen / Zuweisen'
+          : 'Anlegen'
 
   return (
     <>
@@ -167,14 +188,14 @@ export function ObjektHausmeisterCard({
         icon="key"
         actions={
           <MockBtn sm kind="ghost" onClick={openSheet} disabled={pending}>
-            {amObjekt && !amObjekt.isLegacy ? 'Bearbeiten' : 'Zuweisen'}
+            {ctaLabel}
           </MockBtn>
         }
       >
         {!amObjekt ? (
           <MockEmpty
             title="Kein Hausmeister"
-            hint="Pflicht für Meldungen — bitte zuweisen oder neu anlegen."
+            hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen."
           />
         ) : (
           <div className="space-y-2" style={{ fontSize: 'var(--fs-body)' }}>
@@ -219,7 +240,7 @@ export function ObjektHausmeisterCard({
       <EditorSheet
         open={sheetOpen}
         onClose={() => !pending && setSheetOpen(false)}
-        title="Hausmeister"
+        title={mode === 'new' ? 'Hausmeister anlegen' : 'Hausmeister zuweisen'}
         footer={
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <MockBtn sm kind="ghost" disabled={pending} onClick={() => setSheetOpen(false)}>
@@ -232,66 +253,43 @@ export function ObjektHausmeisterCard({
         }
       >
         <div className="space-y-3">
-          {liste.length > 0 || mode === 'existing' ? (
+          {liste.length > 0 ? (
             <Select
-              label="Hausmeister"
+              label="Auswahl"
               value={mode === 'new' ? '__new__' : hmId}
               options={selectOptions}
               onChange={(e) => onSelectChange(e.target.value)}
             />
           ) : null}
 
-          {mode === 'new' || mode === 'existing' ? (
+          {mode === 'new' ? (
             <>
-              {mode === 'new' ? (
-                <Input
-                  label="Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Max Mustermann"
-                  autoComplete="name"
+              <Input
+                label="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Max Mustermann"
+                autoComplete="name"
+                required
+              />
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--text-2)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={portalZugang}
+                  onChange={(e) => setPortalZugang(e.target.checked)}
+                  style={{ marginTop: 2 }}
                 />
-              ) : null}
-
-              {mode === 'new' ? (
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--text-2)',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={portalZugang}
-                    onChange={(e) => setPortalZugang(e.target.checked)}
-                    style={{ marginTop: 2 }}
-                  />
-                  <span>Portal-Zugang — Einladung per E-Mail nach Speichern</span>
-                </label>
-              ) : (
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--text-2)',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={portalZugang}
-                    onChange={(e) => setPortalZugang(e.target.checked)}
-                    style={{ marginTop: 2 }}
-                  />
-                  <span>Portal-Zugang</span>
-                </label>
-              )}
-
-              {(mode === 'new' ? portalZugang : true) ? (
+                <span>Portal-Zugang — Einladung per E-Mail nach Speichern</span>
+              </label>
+              {portalZugang ? (
                 <Input
                   label="E-Mail"
                   type="email"
@@ -299,20 +297,46 @@ export function ObjektHausmeisterCard({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@firma.de"
                   autoComplete="email"
-                  disabled={mode === 'existing' && !portalZugang}
-                />
-              ) : null}
-
-              {mode === 'existing' ? (
-                <Input
-                  label="Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
+                  required
                 />
               ) : null}
             </>
-          ) : null}
+          ) : (
+            <>
+              <Input
+                label="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--text-2)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={portalZugang}
+                  onChange={(e) => setPortalZugang(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>Portal-Zugang</span>
+              </label>
+              <Input
+                label="E-Mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@firma.de"
+                autoComplete="email"
+                disabled={!portalZugang}
+              />
+            </>
+          )}
 
           {err ? (
             <p style={{ color: 'var(--danger)', fontSize: 'var(--fs-meta)', margin: 0 }}>{err}</p>

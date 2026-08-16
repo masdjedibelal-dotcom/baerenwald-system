@@ -167,7 +167,7 @@ export function AbnahmeprotokollCreateWizard({
   function validateAngaben(): string | null {
     if (!abnahmeDatum.trim()) return 'Bitte Übergabedatum angeben.'
     if (!meta.uebergabe_ort.trim()) return 'Bitte Übergabeort angeben.'
-    if (!meta.vertreter_an.trim()) return 'Bitte Vertreter (Auftragnehmer) angeben.'
+    if (!meta.vertreter_an.trim()) return 'Bitte Handwerker vor Ort angeben.'
     if (!meta.projektbezeichnung.trim()) return 'Bitte Projektbezeichnung angeben.'
     if (ausgewaehlt === 0) return 'Mindestens eine Leistung für die Abnahme auswählen (OK).'
     return null
@@ -569,9 +569,9 @@ export function AbnahmeprotokollCreateWizard({
           sheetTitle="Personen bearbeiten"
           overview={
             <dl className="space-y-2.5">
-              <MobileOverviewField label="Vertreter AN" value={meta.vertreter_an.trim() || '—'} />
+              <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an.trim() || '—'} />
               <MobileOverviewField
-                label="Kunde"
+                label="Kunde vor Ort"
                 value={meta.ansprechpartner_kunde.trim() || '—'}
               />
               <MobileOverviewField
@@ -583,13 +583,13 @@ export function AbnahmeprotokollCreateWizard({
         >
           <div className="space-y-3">
             <Input
-              label="Vertreten durch (Auftragnehmer)"
+              label="Handwerker vor Ort"
               value={meta.vertreter_an}
               onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
               placeholder="Name"
             />
             <Input
-              label="Ansprechpartner Kunde"
+              label="Kunde vor Ort"
               value={meta.ansprechpartner_kunde}
               onChange={(e) => patchMeta({ ansprechpartner_kunde: e.target.value })}
             />
@@ -852,7 +852,7 @@ export function AbnahmeprotokollCreateWizard({
             label="Übergabe"
             value={`${abnahmeDatum}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
           />
-          <MobileOverviewField label="Vertreter" value={meta.vertreter_an || '—'} />
+          <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an || '—'} />
           <MobileOverviewField label="Projekt" value={meta.projektbezeichnung || '—'} />
           <MobileOverviewField label="Leistungen im PDF" value={`${ausgewaehlt} Punkte`} />
           <MobileOverviewField

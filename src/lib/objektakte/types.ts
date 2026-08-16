@@ -128,8 +128,8 @@ export type ObjektEinheitInput = {
 }
 
 /**
- * Legacy: Mieter + Einheit gemeinsam (Anfrage / KundenObjektModal).
- * Neue UI nutzt createObjektEinheit + createEinheitBewohner mit fester einheitId.
+ * Legacy: Mieter + Einheit gemeinsam (HV-Anfrage).
+ * Objekt-UI: createObjektEinheit + createEinheitBewohner mit fester einheitId.
  */
 export type ObjektMieterInput = {
   name: string

@@ -18,10 +18,9 @@ import type { KundeAnsprechpartner } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
-/** Typische Rollen in einer Hausverwaltung. */
+/** Typische Rollen in einer Hausverwaltung (kein Objekt-Hausmeister — der gehört ans Objekt). */
 export const ANSPRECHPARTNER_ROLLEN = [
   { value: '', label: 'Rolle wählen…' },
-  { value: 'Hausmeister', label: 'Hausmeister' },
   { value: 'Objektleiter', label: 'Objektleiter' },
   { value: 'Verwaltung', label: 'Verwaltung' },
   { value: 'Buchhaltung', label: 'Buchhaltung' },

@@ -1164,6 +1164,7 @@ export async function updateAbnahmeMaengel(input: {
     punkte,
     maengel: normalizeMaengel(maengel),
     notizen: summary.notizen,
+    meta: summary.meta,
     protokollTyp: countOffeneMaengel(maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
   })
   if (!pdf.ok) return pdf
@@ -1188,6 +1189,7 @@ export async function regenerateAbnahmeprotokollPdf(
     punkte: prepared.punkte,
     maengel: prepared.maengel,
     notizen: summary.notizen,
+    meta: summary.meta,
     protokollTyp: countOffeneMaengel(prepared.maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
   })
   if (!pdf.ok) return pdf

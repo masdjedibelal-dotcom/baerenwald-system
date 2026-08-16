@@ -170,10 +170,14 @@ export function ObjektKontakteSection({
         }
       >
         <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
-          Hausmeister, Beirat, Notfallkontakte — für die Disposition.
+          Beirat, Notfall, Dienstleister — der Hausmeister steht in der Karte darüber und bleibt hiervon unberührt.
         </p>
         {liste.length === 0 ? (
-          <MockEmpty icon="user" title="Noch keine Kontakte" hint="Kontakt hinzufügen" />
+          <MockEmpty
+            icon="user"
+            title="Noch keine Kontakte"
+            hint="Kontakt hinzufügen — Hausmeister bitte in der Karte darüber anlegen."
+          />
         ) : (
           <div className="listcard">
             <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>

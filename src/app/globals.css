@@ -56,7 +56,7 @@
 
     /*
      * Typo-Skala — Spec §14: Meta · Text · Titel · Überschrift
-     * --app-font-scale: CRM-weit (Desktop + Mobil). 1.14 ≈ +14 % zur Basis (5 % unter 1.2).
+     * --app-font-scale: CRM-weit. Desktop: min. +10 % gegenüber 1.14 und wächst mit Viewport.
      */
     --app-font-scale: 1.14;
     --fs-meta: calc(12px * var(--app-font-scale));
@@ -196,6 +196,33 @@
     --type-caption1: calc(0.75rem * var(--app-font-scale, 1));
   }
 
+  /*
+   * Desktop: Typo +10 % (Floor 1.25) und leicht mit Viewport mitwachsen.
+   * ~1024px → 1.25 · ~1440px → ~1.27 · ~1920px → ~1.32 · Cap 1.42
+   * Basis-px etwas angehoben — Desktop war bisher kleiner als Mobil.
+   */
+  @media (min-width: 768px) {
+    :root {
+      --app-font-scale: clamp(
+        1.25,
+        calc(1.22 + (100vw - 1024px) / 9000),
+        1.42
+      );
+      --fs-meta: calc(12.5px * var(--app-font-scale));
+      --fs-text: calc(14px * var(--app-font-scale));
+      --fs-title: calc(16px * var(--app-font-scale));
+      --fs-head: calc(20px * var(--app-font-scale));
+      --placeholder-size: calc(12.5px * var(--app-font-scale));
+      --app-text-base: calc(14.5px * var(--app-font-scale));
+      --app-text-sm: calc(13.5px * var(--app-font-scale));
+      --app-text-xs: calc(12px * var(--app-font-scale));
+    }
+
+    body {
+      font-size: calc(14.5px * var(--app-font-scale, 1));
+    }
+  }
+
   /* Mobil: Typo + Lesekomfort (Kontrast, Luft, klare Schichten) */
   @media (max-width: 767px) {
     :root {
@@ -281,7 +308,7 @@
       'Helvetica Neue',
       Arial,
       sans-serif;
-    /* scale=1.2 → CRM-weit +20 % Lesbarkeit */
+    /* Desktop-Skalierung über --app-font-scale (s. Media Query ≥768px) */
     font-size: calc(14px * var(--app-font-scale, 1));
     letter-spacing: -0.01em;
     color: var(--text);

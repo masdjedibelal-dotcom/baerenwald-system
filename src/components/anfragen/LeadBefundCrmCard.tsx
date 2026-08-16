@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { befundVorlageLabelDe } from '@/lib/anfragen/befund-vorlage-label'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
@@ -47,7 +48,7 @@ function formatDatum(iso: string): string {
   return d.toLocaleDateString('de-DE')
 }
 
-/** Read-only HM-Vorbefund am CRM-Anfrage-Detail — Mock-Card, nur ausgefüllte Punkte. */
+/** Read-only HM-Vorbefund am CRM-Anfrage-Detail — nur wenn Inhalt (Ergebnis oder Punkte). */
 export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
   const [befund, setBefund] = useState<Befund | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -104,13 +105,18 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
     [befund]
   )
 
-  if (!loaded || !befund) return null
+  const hatInhalt = Boolean(
+    befund && ((befund.ergebnis ?? '').trim() || ausgefuellt.length > 0)
+  )
+
+  if (!loaded || !befund || !hatInhalt) return null
 
   const ergebnis = ergebnisMeta(befund.ergebnis)
+  const vorlageLabel = befundVorlageLabelDe(befund.vorlage_key)
   const metaParts = [
     befund.durchgefuehrt_von.trim() || null,
     befund.durchgefuehrt_am ? formatDatum(befund.durchgefuehrt_am) : null,
-    befund.vorlage_key?.trim() || null,
+    vorlageLabel,
   ].filter(Boolean)
 
   return (
@@ -134,7 +140,7 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
 
         {ausgefuellt.length === 0 ? (
           <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-            Keine ausgefüllten Prüfpunkte.
+            Noch keine Prüfpunkte ausgefüllt.
           </p>
         ) : (
           <div className="detail-soft-block">

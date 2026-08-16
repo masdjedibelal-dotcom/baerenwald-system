@@ -21,6 +21,7 @@ import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { groessePropLabel } from '@/lib/vorab-formular-config'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
+import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsort'
 import {
   BEREICH_LABELS,
   anfragePreisDetailLabel,
@@ -324,6 +325,8 @@ export function buildAnfragePhaseSheetProps(lead: {
     hausnummer?: string | null
   } | null
   auftraggeber?: { name?: string | null; org_anzeigename?: string | null } | null
+  strasse?: string | null
+  hausnummer?: string | null
   kunden_objekte?: {
     titel?: string | null
     strasse?: string | null
@@ -467,6 +470,16 @@ export function buildAnfragePhaseSheetProps(lead: {
 
       if (lead.kunden_objekte) {
         push('Objekt', formatAnfragePhaseObjektZeile(lead.kunden_objekte))
+      }
+
+      const lo = resolveLeadLeistungsort(lead)
+      const loStrasse = [lo.strasse, lo.hausnummer].filter(Boolean).join(' ')
+      const loOrt = [lo.plz, lo.ort].filter(Boolean).join(' ')
+      if (loStrasse || loOrt) {
+        push(
+          'Leistungsort',
+          [loStrasse || null, loOrt || null].filter(Boolean).join(', ')
+        )
       }
 
       push('Einheit', lead.melder_einheit)

@@ -1,23 +1,17 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
-import { createObjektMieter } from '@/app/actions/objektakte-actions'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
 
-type DraftMieter = {
-  key: string
-  name: string
-  bezeichnung: string
-  flaeche: string
-}
-
-/** Objekt anlegen — Objektdaten + optionale Mieter (mit Einheit). */
+/**
+ * Objekt anlegen/bearbeiten — nur Objektdaten.
+ * Einheiten sowie Mieter/Eigentümer danach in der Objektakte (wie HV-Portal).
+ */
 export function KundenObjektModal({
   open,
   onClose,
@@ -42,7 +36,6 @@ export function KundenObjektModal({
   const [ort, setOrt] = useState('')
   const [baujahr, setBaujahr] = useState('')
   const [gesamtflaeche, setGesamtflaeche] = useState('')
-  const [mieter, setMieter] = useState<DraftMieter[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
 
@@ -58,7 +51,6 @@ export function KundenObjektModal({
       setOrt(editObjekt.ort ?? '')
       setBaujahr('')
       setGesamtflaeche('')
-      setMieter([])
     } else {
       setTitel('')
       setStrasse('')
@@ -67,7 +59,6 @@ export function KundenObjektModal({
       setOrt('')
       setBaujahr('')
       setGesamtflaeche('')
-      setMieter([])
     }
     setErr(null)
     setDirty(false)
@@ -76,43 +67,6 @@ export function KundenObjektModal({
   function mark<T>(setter: (v: T) => void, v: T) {
     setter(v)
     setDirty(true)
-  }
-
-  const flaecheSumme = useMemo(() => {
-    let sum = 0
-    for (const e of mieter) {
-      const n = Number(String(e.flaeche).replace(',', '.'))
-      if (Number.isFinite(n)) sum += n
-    }
-    const g = Number(String(gesamtflaeche).replace(',', '.'))
-    if (Number.isFinite(g) && g > 0) return { min: 0, max: g }
-    return { min: 0, max: sum }
-  }, [mieter, gesamtflaeche])
-
-  function addMieter() {
-    mark(setMieter, [
-      ...mieter,
-      {
-        key: `m-${Date.now()}-${mieter.length}`,
-        name: '',
-        bezeichnung: '',
-        flaeche: '',
-      },
-    ])
-  }
-
-  function patchMieter(key: string, patch: Partial<DraftMieter>) {
-    mark(
-      setMieter,
-      mieter.map((e) => (e.key === key ? { ...e, ...patch } : e))
-    )
-  }
-
-  function removeMieter(key: string) {
-    mark(
-      setMieter,
-      mieter.filter((e) => e.key !== key)
-    )
   }
 
   function speichern() {
@@ -169,20 +123,6 @@ export function KundenObjektModal({
       if (!r.ok) {
         setErr(r.message)
         return
-      }
-
-      for (const m of mieter) {
-        const name = m.name.trim()
-        if (!name) continue
-        const fl = Number(String(m.flaeche).replace(',', '.'))
-        const cr = await createObjektMieter(kundeId, r.objekt.id, {
-          name,
-          wohnung: m.bezeichnung.trim() || undefined,
-          wohnflaeche_m2: Number.isFinite(fl) && fl > 0 ? fl : null,
-        })
-        if (!cr.ok) {
-          toast.error(cr.message)
-        }
       }
 
       onSaved(r.objekt)
@@ -284,77 +224,17 @@ export function KundenObjektModal({
         </MockFormSection>
 
         {!isEdit ? (
-          <div className="form-section">
-            <div
-              className="form-section-h"
-              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-            >
-              <MockIcon ctx="default" n="users" size={13} />
-              <span style={{ flex: 1 }}>Mieter</span>
-              <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                {flaecheSumme.min} – {Math.round(flaecheSumme.max)} m²
-              </span>
-            </div>
-            {mieter.length === 0 ? (
-              <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '4px 0 12px' }}>
-                Noch keine Mieter — unten hinzufügen (Name + Einheit).
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                {mieter.map((m) => (
-                  <div
-                    key={m.key}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1.2fr 1fr 80px 36px',
-                      gap: 8,
-                      alignItems: 'end',
-                    }}
-                  >
-                    <MockField label="Mieter">
-                      <input
-                        className="input"
-                        value={m.name}
-                        onChange={(ev) => patchMieter(m.key, { name: ev.target.value })}
-                        placeholder="Max Mustermann"
-                      />
-                    </MockField>
-                    <MockField label="Einheit">
-                      <input
-                        className="input"
-                        value={m.bezeichnung}
-                        onChange={(ev) =>
-                          patchMieter(m.key, { bezeichnung: ev.target.value })
-                        }
-                        placeholder="WE 01"
-                      />
-                    </MockField>
-                    <MockField label="m²">
-                      <input
-                        className="input"
-                        value={m.flaeche}
-                        onChange={(ev) => patchMieter(m.key, { flaeche: ev.target.value })}
-                        placeholder="72"
-                        inputMode="decimal"
-                      />
-                    </MockField>
-                    <button
-                      type="button"
-                      className="qa-btn"
-                      title="Entfernen"
-                      aria-label="Mieter entfernen"
-                      onClick={() => removeMieter(m.key)}
-                    >
-                      <MockIcon ctx="default" n="x" size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button type="button" className="btn ghost sm" onClick={addMieter}>
-              + Mieter hinzufügen
-            </button>
-          </div>
+          <p
+            style={{
+              fontSize: 'var(--fs-meta)',
+              color: 'var(--text-3)',
+              margin: '4px 0 0',
+              lineHeight: 1.45,
+            }}
+          >
+            Nach dem Anlegen: Einheit anlegen, danach Eigentümer und Mieter zuordnen
+            (wie im HV-Portal).
+          </p>
         ) : null}
       </div>
     </EditorSheet>

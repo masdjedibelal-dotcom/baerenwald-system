@@ -95,11 +95,13 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
   const { data: rechnungen } = await supabase
     .from('rechnungen')
     .select(
-      'id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, beleg_typ'
+      'id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, beleg_typ, richtung'
     )
     .eq('auftrag_id', auftragId)
 
-  let bestehend: RechnungAbschlagLink[] = (rechnungen ?? []).map((r) => ({
+  let bestehend: RechnungAbschlagLink[] = (rechnungen ?? [])
+    .filter((r) => String((r as { richtung?: string | null }).richtung ?? '') !== 'eingehend')
+    .map((r) => ({
     id: r.id as string,
     status: r.status as string | null,
     zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id as string | null,

@@ -1,7 +1,9 @@
 'use client'
 
-import { Camera } from 'lucide-react'
+import { useState } from 'react'
+import { Camera, X } from 'lucide-react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { eintragTypLabel, type PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { formatDatum } from '@/lib/utils'
@@ -22,8 +24,12 @@ function eintragZeit(e: BautagebuchListenEintrag): string {
   }
 }
 
+function eintragVolltext(e: BautagebuchListenEintrag): string {
+  return (e.beschreibung?.trim() || e.beschreibung_roh?.trim() || '').trim()
+}
+
 function eintragTitel(e: BautagebuchListenEintrag): string {
-  const body = e.beschreibung?.trim() || e.beschreibung_roh?.trim() || ''
+  const body = eintragVolltext(e)
   if (body) {
     const first = body.split(/\n+/)[0]?.trim() ?? ''
     if (first.length > 0 && first.length <= 72) return first
@@ -33,10 +39,13 @@ function eintragTitel(e: BautagebuchListenEintrag): string {
 }
 
 function eintragText(e: BautagebuchListenEintrag): string {
-  const body = e.beschreibung?.trim() || e.beschreibung_roh?.trim() || ''
+  const body = eintragVolltext(e)
   if (!body) return ''
   const lines = body.split(/\n+/).map((l) => l.trim()).filter(Boolean)
-  if (lines.length <= 1) return ''
+  if (lines.length <= 1) {
+    // Lange Einzeiler: Vorschau kürzen, Detail im Sheet
+    return body.length > 160 ? `${body.slice(0, 157)}…` : ''
+  }
   return lines.slice(1).join(' ').slice(0, 220)
 }
 
@@ -51,7 +60,7 @@ function typChipClass(typ: string): string {
 
 /**
  * Bautagebuch = Portal-Updates als Inserat-Cards.
- * Start / Fortschritt / Ergebnis sind getrennte Einträge — Typ-Badge macht das klar.
+ * Klick öffnet Sheet mit vollem Text + Fotos (Zoom).
  */
 export function AuftragBautagebuchSection({
   eintraege,
@@ -64,6 +73,9 @@ export function AuftragBautagebuchSection({
   onAdd: () => void
   onAnfordern?: () => void
 }) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+
   const sorted = [...eintraege]
     .filter((e) => String(e.typ).toLowerCase() !== 'weitere_arbeit')
     .sort((a, b) => {
@@ -71,6 +83,14 @@ export function AuftragBautagebuchSection({
       const tb = b.ereignis_zeit || b.created_at || ''
       return tb.localeCompare(ta)
     })
+
+  const active = openId ? sorted.find((e) => e.id === openId) ?? null : null
+  const activeFotos = (active?.eintrag_fotos ?? []).filter((f) => f.display_url)
+  const activeText = active ? eintragVolltext(active) : ''
+  const activeStunden =
+    active?.zeit_minuten != null && active.zeit_minuten > 0
+      ? `${Math.floor(active.zeit_minuten / 60)}:${String(active.zeit_minuten % 60).padStart(2, '0')} Std.`
+      : null
 
   return (
     <section className="bt-feed" aria-label="Bautagebuch">
@@ -119,63 +139,160 @@ export function AuftragBautagebuchSection({
               String(e.erfasst_von ?? '').includes('partner') ||
               String(e.erfasst_von ?? '').includes('eigenbetrieb')
             return (
-              <li
-                key={e.id}
-                className={cn('bt-inserat', !hasFotoSlot && 'bt-inserat--text-only')}
-              >
-                {hasFotoSlot ? (
-                  <div className="bt-inserat__media" aria-hidden>
-                    {cover ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cover} alt="" />
-                    ) : (
-                      <div className="bt-inserat__media-empty">
-                        <Camera className="h-7 w-7 opacity-35" />
-                        <span className="bt-inserat__media-hint">Foto nicht ladbar</span>
-                      </div>
-                    )}
-                    {visibleFotos.length > 1 ? (
-                      <span className="bt-inserat__count">+{visibleFotos.length - 1}</span>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="bt-inserat__body">
-                  <div className="bt-inserat__head">
-                    <span className={cn('bt-inserat__typ', typChipClass(e.typ))}>
-                      {eintragTypLabel(e.typ)}
-                    </span>
-                    {vonPartner ? (
-                      <span className="bt-inserat__src">Handwerker</span>
-                    ) : (
-                      <span className="bt-inserat__src">CRM</span>
-                    )}
-                  </div>
-                  <div className="bt-inserat__title">{eintragTitel(e)}</div>
-                  {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
-                  <div className="bt-inserat__meta">
-                    <span>{eintragZeit(e)}</span>
-                    {e.handwerkerName?.trim() ? (
-                      <span className="bt-inserat__chip">{e.handwerkerName.trim()}</span>
-                    ) : null}
-                    {e.leistungName?.trim() ? (
-                      <span className="bt-inserat__chip bt-inserat__chip--muted">
-                        {e.leistungName.trim()}
+              <li key={e.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    'bt-inserat',
+                    'bt-inserat--clickable',
+                    !hasFotoSlot && 'bt-inserat--text-only'
+                  )}
+                  onClick={() => {
+                    setLightboxUrl(null)
+                    setOpenId(e.id)
+                  }}
+                >
+                  {hasFotoSlot ? (
+                    <div className="bt-inserat__media" aria-hidden>
+                      {cover ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cover} alt="" />
+                      ) : (
+                        <div className="bt-inserat__media-empty">
+                          <Camera className="h-7 w-7 opacity-35" />
+                          <span className="bt-inserat__media-hint">Foto nicht ladbar</span>
+                        </div>
+                      )}
+                      {visibleFotos.length > 1 ? (
+                        <span className="bt-inserat__count">+{visibleFotos.length - 1}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="bt-inserat__body">
+                    <div className="bt-inserat__head">
+                      <span className={cn('bt-inserat__typ', typChipClass(e.typ))}>
+                        {eintragTypLabel(e.typ)}
                       </span>
-                    ) : (
-                      <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
-                    )}
-                    {stunden ? (
-                      <span className="bt-inserat__zeit" title="Erfasste Zeit">
-                        {stunden}
-                      </span>
-                    ) : null}
+                      {vonPartner ? (
+                        <span className="bt-inserat__src">Handwerker</span>
+                      ) : (
+                        <span className="bt-inserat__src">CRM</span>
+                      )}
+                    </div>
+                    <div className="bt-inserat__title">{eintragTitel(e)}</div>
+                    {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
+                    <div className="bt-inserat__meta">
+                      <span>{eintragZeit(e)}</span>
+                      {e.handwerkerName?.trim() ? (
+                        <span className="bt-inserat__chip">{e.handwerkerName.trim()}</span>
+                      ) : null}
+                      {e.leistungName?.trim() ? (
+                        <span className="bt-inserat__chip bt-inserat__chip--muted">
+                          {e.leistungName.trim()}
+                        </span>
+                      ) : (
+                        <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
+                      )}
+                      {stunden ? (
+                        <span className="bt-inserat__zeit" title="Erfasste Zeit">
+                          {stunden}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                </button>
               </li>
             )
           })}
         </ul>
       )}
+
+      <EditorSheet
+        open={Boolean(active)}
+        onClose={() => {
+          setLightboxUrl(null)
+          setOpenId(null)
+        }}
+        title={active ? eintragTypLabel(active.typ) : 'Eintrag'}
+        subtitle={active ? eintragZeit(active) : null}
+        size="md"
+      >
+        {active ? (
+          <div className="bt-eintrag-sheet">
+            <div className="bt-eintrag-sheet__meta">
+              {String(active.erfasst_von ?? '').includes('partner') ||
+              String(active.erfasst_von ?? '').includes('eigenbetrieb') ? (
+                <span className="bt-inserat__src">Handwerker</span>
+              ) : (
+                <span className="bt-inserat__src">CRM</span>
+              )}
+              {active.handwerkerName?.trim() ? (
+                <span className="bt-inserat__chip">{active.handwerkerName.trim()}</span>
+              ) : null}
+              {active.leistungName?.trim() ? (
+                <span className="bt-inserat__chip bt-inserat__chip--muted">
+                  {active.leistungName.trim()}
+                </span>
+              ) : null}
+              {activeStunden ? (
+                <span className="bt-inserat__zeit">{activeStunden}</span>
+              ) : null}
+            </div>
+
+            {activeText ? (
+              <p className="bt-eintrag-sheet__text">{activeText}</p>
+            ) : (
+              <p className="bt-eintrag-sheet__empty">Kein Text hinterlegt.</p>
+            )}
+
+            {activeFotos.length > 0 ? (
+              <div className="bt-eintrag-sheet__fotos" aria-label="Fotos">
+                {activeFotos.map((f) => (
+                  <button
+                    key={f.id ?? f.display_url}
+                    type="button"
+                    className="bt-eintrag-sheet__foto"
+                    onClick={() => setLightboxUrl(f.display_url!)}
+                    aria-label="Foto vergrößern"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.display_url!} alt="" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </EditorSheet>
+
+      {lightboxUrl ? (
+        <div
+          className="bt-foto-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(ev) => {
+            if (ev.key === 'Escape') setLightboxUrl(null)
+          }}
+        >
+          <button
+            type="button"
+            className="bt-foto-lightbox__close"
+            aria-label="Schließen"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <X size={20} strokeWidth={2} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="bt-foto-lightbox__img"
+            onClick={(ev) => ev.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -11,6 +11,7 @@ import {
   notifyPartnerUnified,
   partnerVorgangLink,
 } from '@/lib/partner/notify-partner-unified'
+import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
@@ -38,8 +39,10 @@ export type WeitereArbeitInPruefungRow = {
   handwerker_name: string | null
   created_at: string
   preis_partner?: number | null
+  stundensatz?: number | null
   menge?: number | null
   einheit?: string | null
+  foto_urls?: string[]
 }
 
 async function crmAuth() {
@@ -91,25 +94,57 @@ export async function listWeitereArbeitInPruefung(
   const { data } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
-      'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, preis_partner, menge, einheit, created_at, handwerker:handwerker_id(name)'
+      'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, preis_partner, stundensatz, menge, einheit, created_at, handwerker:handwerker_id(name)'
     )
     .eq('auftrag_id', auftragId)
     .eq('anerkennung_status', 'in_pruefung')
     .order('created_at', { ascending: false })
 
-  return (data ?? []).map((r) => {
+  const rows = data ?? []
+  if (!rows.length) return []
+
+  const ids = rows.map((r) => String(r.id))
+  const fotoByPos = new Map<string, string[]>()
+
+  const { data: eintraege } = await supabaseAdmin
+    .from('position_eintraege')
+    .select('position_id, eintrag_fotos(storage_path)')
+    .in('position_id', ids)
+
+  for (const e of eintraege ?? []) {
+    const posId = String(e.position_id)
+    const fotosRaw = Array.isArray(e.eintrag_fotos) ? e.eintrag_fotos : []
+    for (const f of fotosRaw) {
+      const path = String(
+        (f as { storage_path?: string | null }).storage_path ?? ''
+      ).trim()
+      if (!path) continue
+      const url =
+        (await signedHandwerkerUploadUrl(path)) ??
+        (/^https?:\/\//i.test(path) ? path : null)
+      if (!url) continue
+      const list = fotoByPos.get(posId) ?? []
+      if (!list.includes(url)) list.push(url)
+      fotoByPos.set(posId, list)
+    }
+  }
+
+  return rows.map((r) => {
     const hw = r.handwerker as { name?: string | null } | { name?: string | null }[] | null
     const name = Array.isArray(hw) ? hw[0]?.name : hw?.name
+    const id = String(r.id)
     return {
-      id: String(r.id),
+      id,
       leistung_name: String(r.leistung_name ?? ''),
       beschreibung: (r.beschreibung as string | null) ?? null,
       handwerker_id: (r.handwerker_id as string | null) ?? null,
       handwerker_name: name ?? null,
       created_at: String(r.created_at ?? ''),
       preis_partner: r.preis_partner != null ? Number(r.preis_partner) : null,
+      stundensatz: r.stundensatz != null ? Number(r.stundensatz) : null,
       menge: r.menge != null ? Number(r.menge) : null,
       einheit: (r.einheit as string | null) ?? null,
+      foto_urls: fotoByPos.get(id) ?? [],
     }
   })
 }

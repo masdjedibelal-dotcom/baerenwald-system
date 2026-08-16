@@ -1,9 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
+
 /**
- * Nach Objekt-Löschung: Portal-Stubs (Eigentümer/Mieter/Hausmeister-Login) aufräumen,
+ * Nach Objekt-/HV-Löschung: Portal-Stubs (Eigentümer/Mieter/Hausmeister-Login) aufräumen,
  * die keine Akte mehr und keine eigenen CRM-Vorgänge haben.
- * CRM-Privatkunden (portal_modus=privat aus „Als Privatkunde anlegen“) bleiben.
+ * CRM-Privatkunden (portal_modus=privat) bleiben.
+ * Auth-User der Stubs werden mitgelöscht (sonst „E-Mail bereits registriert“).
  */
 export async function cleanupOrphanHvPortalKunden(
   db: SupabaseClient,
@@ -13,11 +16,12 @@ export async function cleanupOrphanHvPortalKunden(
   if (!ids.length) return { deleted: [] }
 
   const deleted: string[] = []
+  const admin = getSupabaseAdmin()
 
   for (const kid of ids) {
     const { data: kunde } = await db
       .from('kunden')
-      .select('id, portal_modus, typ')
+      .select('id, portal_modus, typ, auth_user_id')
       .eq('id', kid)
       .maybeSingle()
     if (!kunde) continue
@@ -58,14 +62,42 @@ export async function cleanupOrphanHvPortalKunden(
     if ((bew ?? 0) > 0 || (eo ?? 0) > 0 || (hmLinks ?? 0) > 0) continue
     if ((leads ?? 0) > 0 || (auftraege ?? 0) > 0 || (rechnungen ?? 0) > 0) continue
 
+    const authUserId = String(
+      (kunde as { auth_user_id?: string | null }).auth_user_id ?? ''
+    ).trim()
+
     const { error } = await db.from('kunden').delete().eq('id', kid)
-    if (!error) deleted.push(kid)
+    if (error) {
+      console.warn('[cleanupOrphanHvPortalKunden]', kid, error.message)
+      continue
+    }
+    deleted.push(kid)
+
+    if (authUserId) {
+      try {
+        const { error: authDelErr } = await admin.auth.admin.deleteUser(authUserId)
+        if (authDelErr) {
+          // Auth oft noch von Timeline/Rechnungen referenziert → E-Mail freigeben
+          console.warn(
+            '[cleanupOrphanHvPortalKunden] auth delete:',
+            authUserId,
+            authDelErr.message
+          )
+          await admin.auth.admin.updateUserById(authUserId, {
+            email: `deleted-${authUserId.slice(0, 8)}@invalid.local`,
+            ban_duration: '876600h',
+          })
+        }
+      } catch (e) {
+        console.warn('[cleanupOrphanHvPortalKunden] auth cleanup:', authUserId, e)
+      }
+    }
   }
 
   return { deleted }
 }
 
-/** portal_kunde_ids aller Bewohner an einem Objekt (vor Cascade-Delete). */
+/** portal_kunde_ids aller Bewohner/HM an einem Objekt (vor Cascade-Delete). */
 export async function collectPortalKundeIdsForObjekt(
   db: SupabaseClient,
   objektId: string
@@ -89,6 +121,15 @@ export async function collectPortalKundeIdsForObjekt(
       const id = (b.portal_kunde_id as string | null)?.trim()
       if (id) ids.add(id)
     }
+  }
+
+  const { data: eo } = await db
+    .from('eigentuemer_objekte')
+    .select('kunde_id')
+    .eq('kunde_objekt_id', objektId)
+  for (const row of eo ?? []) {
+    const id = String((row as { kunde_id?: string }).kunde_id ?? '').trim()
+    if (id) ids.add(id)
   }
 
   // Hausmeister-Portal-Stubs am Objekt (vor Cascade der Zuordnung)
@@ -117,6 +158,45 @@ export async function collectPortalKundeIdsForObjekt(
         .eq('org_hausmeister_id', h.id as string)
         .neq('kunde_objekt_id', objektId)
       if ((count ?? 0) === 0) ids.add(pid)
+    }
+  }
+
+  return [...ids]
+}
+
+/**
+ * Vor HV-Kunden-Löschung: alle Portal-Stub-IDs einsammeln
+ * (org_hausmeister + Bewohner/Eigentümer an Objekten).
+ * Muss VOR Cascade laufen — danach sind org_hausmeister-Zeilen weg.
+ */
+export async function collectPortalKundeIdsForOrg(
+  db: SupabaseClient,
+  orgKundeId: string
+): Promise<string[]> {
+  const oid = orgKundeId.trim()
+  if (!oid) return []
+
+  const ids = new Set<string>()
+
+  const { data: hms } = await db
+    .from('org_hausmeister')
+    .select('portal_kunde_id')
+    .eq('org_kunde_id', oid)
+    .not('portal_kunde_id', 'is', null)
+  for (const h of hms ?? []) {
+    const pid = String((h as { portal_kunde_id?: string | null }).portal_kunde_id ?? '').trim()
+    if (pid) ids.add(pid)
+  }
+
+  const { data: objekte } = await db
+    .from('kunden_objekte')
+    .select('id')
+    .eq('kunde_id', oid)
+  for (const o of objekte ?? []) {
+    const objId = String((o as { id?: string }).id ?? '').trim()
+    if (!objId) continue
+    for (const pid of await collectPortalKundeIdsForObjekt(db, objId)) {
+      ids.add(pid)
     }
   }
 

@@ -42,12 +42,18 @@ function schaetzungAnfrage(row: PartnerPositionsAnfrageRow): string | null {
 
 function schaetzungRegie(row: WeitereArbeitInPruefungRow): string | null {
   const parts: string[] = []
-  if (row.preis_partner != null && row.preis_partner > 0) {
+  const satz =
+    row.stundensatz != null && row.stundensatz > 0
+      ? row.stundensatz
+      : row.preis_partner != null && row.preis_partner > 0
+        ? row.preis_partner
+        : null
+  if (satz != null) {
     parts.push(
-      row.preis_partner.toLocaleString('de-DE', {
+      `${satz.toLocaleString('de-DE', {
         style: 'currency',
         currency: 'EUR',
-      })
+      })}/h`
     )
   }
   if (row.menge != null && row.menge > 0) {
@@ -79,6 +85,7 @@ export function AuftragPartnerPositionsPruefungPanel({
   const [initialLoading, setInitialLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [action, setAction] = useState<PendingAction | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const reload = useCallback(() => {
     void Promise.all([
@@ -208,6 +215,7 @@ export function AuftragPartnerPositionsPruefungPanel({
                   ''
                 )
                 .trim() || null
+            const fotos = (row.foto_urls ?? []).filter(Boolean)
             return (
               <li key={`r-${row.id}`} className="hw-pruef-banner__item">
                 <div className="hw-pruef-banner__item-main">
@@ -224,6 +232,22 @@ export function AuftragPartnerPositionsPruefungPanel({
                       .join(' · ')}
                   </p>
                   {begr ? <p className="hw-pruef-banner__body">{begr}</p> : null}
+                  {fotos.length > 0 ? (
+                    <div className="hw-pruef-banner__fotos" aria-label="Fotos">
+                      {fotos.map((url) => (
+                        <button
+                          key={url}
+                          type="button"
+                          className="hw-pruef-banner__foto"
+                          onClick={() => setLightboxUrl(url)}
+                          aria-label="Foto vergrößern"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 {!disabled ? (
                   <div className="hw-pruef-banner__actions">
@@ -277,6 +301,29 @@ export function AuftragPartnerPositionsPruefungPanel({
           </p>
         ) : null}
       </EditorSheet>
+
+      {lightboxUrl ? (
+        <div
+          className="bt-foto-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto vergrößert"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLightboxUrl(null)
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="bt-foto-lightbox__img" src={lightboxUrl} alt="" />
+          <button
+            type="button"
+            className="bt-foto-lightbox__close"
+            onClick={() => setLightboxUrl(null)}
+          >
+            Schließen
+          </button>
+        </div>
+      ) : null}
     </>
   )
 }

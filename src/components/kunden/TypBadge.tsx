@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 
 const LABELS: Record<string, string> = {
   privat: 'Privat',
+  eigentuemer: 'Privat',
   gewerbe: 'Gewerbe',
   hausverwaltung: 'Hausverwaltung',
   sonstiges: 'Sonstiges',
@@ -11,11 +12,11 @@ const LABELS: Record<string, string> = {
 
 export function TypBadge({ typ }: { typ: string }) {
   const t = (typ || 'privat').toLowerCase()
-  const label = LABELS[t] ?? typ
+  const label = LABELS[t] ?? (t === 'verwaltung' ? 'Hausverwaltung' : typ)
   const cls =
     t === 'gewerbe'
       ? 'bg-blue-100 text-blue-900'
-      : t === 'hausverwaltung'
+      : t === 'hausverwaltung' || t === 'verwaltung'
         ? 'bg-violet-100 text-violet-900'
         : t === 'sonstiges'
           ? 'bg-bw-bg text-bw-mid'

@@ -1,5 +1,6 @@
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
+import { isAusgehendeRechnung } from '@/lib/rechnungen/rechnung-richtung'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { Angebot, AngebotHandwerkerRow, AuftragDetail, LeadDokumentRow } from '@/lib/types'
@@ -9,11 +10,13 @@ import {
 } from '@/lib/partner/partner-hw-dokument-typen'
 import { normalizeUrlList } from '@/lib/utils'
 
-/** Versendet / bezahlt / storniert-mit-Versand — Entwürfe bleiben draußen. */
+/** Versendet / bezahlt / storniert-mit-Versand — Entwürfe + Partner-Eingang bleiben draußen. */
 export function rechnungIstAlsAkteUnterlage(r: {
   status?: string | null
   gesendet_at?: string | null
+  richtung?: string | null
 }): boolean {
+  if (!isAusgehendeRechnung(r)) return false
   const st = (r.status ?? '').toLowerCase()
   if (st === 'entwurf') return false
   if (st === 'gesendet' || st === 'bezahlt' || st === 'versendet') return true
@@ -233,20 +236,8 @@ export function handwerkerDokumentZeilen(rows: AngebotHandwerkerRow[]): AuftragD
         quelle: 'handwerker',
       })
     })
-
-    const rechnungPath = row.hw_rechnung_pdf_url?.trim()
-    if (rechnungPath) {
-      out.push({
-        id: `hw-${row.id}-rechnung`,
-        name: partnerHwDokumentListenName('rechnung'),
-        beschreibung,
-        datum: row.hw_rechnung_eingereicht_at ?? '',
-        fuerKunde: false,
-        href: '#',
-        storagePath: rechnungPath,
-        quelle: 'handwerker',
-      })
-    }
+    // Partner-Rechnung gehört nicht in die Vorgangs-Dokumente —
+    // nur unter Vorgänge → Rechnung → Eingehend (CRM).
   }
   return out
 }
