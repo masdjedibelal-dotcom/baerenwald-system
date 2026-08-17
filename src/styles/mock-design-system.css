@@ -17538,6 +17538,21 @@ textarea.input:focus {
   font-weight: 500;
 }
 .zahlplan-foot__offen b { font-weight: 700; }
+.zahlungsziel-inline {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.zahlungsziel-inline__bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.zahlungsziel-inline__bar .props {
+  flex: 1;
+  min-width: 0;
+}
 .list-row.zahlplan-row {
   grid-template-columns: 1fr 110px 120px 120px 34px;
   cursor: default;

@@ -1,7 +1,7 @@
 'use client'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
@@ -144,6 +144,7 @@ export function VorgangZahlungTab({
   onOpenWizard,
   onRefresh,
   readOnly = false,
+  afterTable,
 }: {
   variant: VorgangZahlungVariant
   auftragId?: string | null
@@ -161,6 +162,8 @@ export function VorgangZahlungTab({
   onRefresh?: () => void
   /** Angebot: Vorschlag ohne RE-Aktionen */
   readOnly?: boolean
+  /** z. B. Zahlungsziel unter der Rechnungstabelle (Rechnungsdetail) */
+  afterTable?: ReactNode
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -706,6 +709,7 @@ export function VorgangZahlungTab({
               </MockBtn>
             ) : null}
           </div>
+          {afterTable}
         </MockCard>
         {canEditPlan ? (
           <AbschlagsplanEditorModal
@@ -861,6 +865,8 @@ export function VorgangZahlungTab({
             </span>
           </div>
         </div>
+
+        {afterTable}
 
       </MockCard>
 

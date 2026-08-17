@@ -381,7 +381,7 @@ function addGewerkPositionen(
 /**
  * Umsatz nach Gewerk (Katalog aus Angebot/Rechnung-Select):
  * - abgeschlossene Aufträge/Leads über Angebotspositionen
- * - plus Rechnungspositionen (nicht storniert)
+ * - plus Rechnungspositionen nur ohne Auftrag (Direktrechnungen)
  * Aggregiert nach gewerk_id/slug → `gewerke.name`, nicht nach Block-Titel.
  */
 export function buildGewerkUmsatz(
@@ -393,6 +393,7 @@ export function buildGewerkUmsatz(
   rechnungen: Array<{
     positionen?: unknown
     status?: string | null
+    auftrag_id?: string | null
   }> = [],
   gewerkeKatalog: DashboardGewerkKatalog[] = []
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
@@ -410,6 +411,7 @@ export function buildGewerkUmsatz(
 
   for (const r of rechnungen) {
     if (String(r.status ?? '').toLowerCase() === 'storniert') continue
+    if ((r.auftrag_id ?? '').trim()) continue
     addGewerkPositionen(map, r.positionen, lookup)
   }
 

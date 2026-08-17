@@ -9,10 +9,12 @@ import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
   isPhaseWinningRechnung,
+  mapAngebotStatusEinfach,
   resolveSatellitenRechnungVorgang,
   resolveStandaloneDirektrechnung,
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
+import { parseVorgangWertLabelEuro } from '@/lib/vorgang/vorgaenge-liste-summe'
 import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import { unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { resolveListeWiederkehr } from '@/lib/vorgang/wiederkehrend'
@@ -581,20 +583,12 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       return `${Math.round(Number(rechnung.brutto)).toLocaleString('de-DE')} €`
     }
 
-    const angebotBetragLabel = (
-      ang:
-        | {
-            gesamt_fix?: number | null
-            gesamt_min?: number | null
-            gesamt_max?: number | null
-          }
-        | null
-        | undefined
-    ): string | null => {
-      if (!ang) return null
-      const label = betragAnzeigeBrutto(ang.gesamt_fix, ang.gesamt_min, ang.gesamt_max)
-      return label === '—' ? null : label
-    }
+    const leadListenSummeEuro = computeLeadListenSummeEuro({
+      lead,
+      angebote: angeboteByLead.get(lead.id) ?? [],
+      auftraege: auftraegeByLead.get(lead.id) ?? [],
+      rechnungen: leadRechnungen,
+    })
 
     const wertLabelForPhase = (phase: VorgangPhase, entityId: string): string | null => {
       if (phase === 'anfrage') {
@@ -667,6 +661,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       kundeId,
       kundeName,
       wertLabel: wertLabelForPhase(resolved.phase, resolved.entityId),
+      listenSummeEuro: leadListenSummeEuro,
+      listeSummeZaehlen: true,
       detailHref: listDetailHref,
       handwerkerIds,
       ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
@@ -717,6 +713,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
           kundeId,
           kundeName,
           wertLabel: wertLabelForRechnung(r.id),
+          listenSummeEuro: leadListenSummeEuro,
+          listeSummeZaehlen: false,
           detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
           handwerkerIds,
           ist_wiederkehrend: satWieder.ist_wiederkehrend,
@@ -753,6 +751,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       r.brutto == null
         ? null
         : `${Math.round(Number(r.brutto)).toLocaleString('de-DE')} €`
+    const listenSummeEuro =
+      r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
       ...resolved,
       titel,
@@ -762,6 +762,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       kundeId: r.kunde_id,
       kundeName: r.kunde_name,
       wertLabel,
+      listenSummeEuro,
+      listeSummeZaehlen: true,
       detailHref: detailHrefForPhase('rechnung', r.id, ''),
       handwerkerIds: [],
       ist_wiederkehrend: Boolean(r.ist_wiederkehrend),
@@ -791,6 +793,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       r.brutto == null
         ? null
         : `${Math.round(Number(r.brutto)).toLocaleString('de-DE')} €`
+    const listenSummeEuro =
+      r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
       phase: 'rechnung',
       unterstatus: unter,
@@ -813,6 +817,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       kundeId: r.kunde_id,
       kundeName: r.handwerker_name || r.kunde_name,
       wertLabel,
+      listenSummeEuro,
+      listeSummeZaehlen: true,
       detailHref: detailHrefForPhase('rechnung', r.id, r.lead_id ?? ''),
       handwerkerIds: r.handwerker_id ? [r.handwerker_id] : [],
       ist_wiederkehrend: false,
@@ -827,6 +833,105 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
   rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
   return { rows, error: null }
+}
+
+function angebotBetragLabel(
+  ang:
+    | {
+        gesamt_fix?: number | null
+        gesamt_min?: number | null
+        gesamt_max?: number | null
+      }
+    | null
+    | undefined
+): string | null {
+  if (!ang) return null
+  const label = betragAnzeigeBrutto(ang.gesamt_fix, ang.gesamt_min, ang.gesamt_max)
+  return label === '—' ? null : label
+}
+
+function euroFromAngebotRow(
+  ang:
+    | {
+        gesamt_fix?: number | null
+        gesamt_min?: number | null
+        gesamt_max?: number | null
+      }
+    | null
+    | undefined
+): number | null {
+  return parseVorgangWertLabelEuro(angebotBetragLabel(ang))
+}
+
+function computeLeadListenSummeEuro(input: {
+  lead: {
+    kanal: LeadKanal
+    budget_ca: number | null
+    preis_min: number | null
+    preis_max: number | null
+    funnel_daten: unknown
+  }
+  angebote: Array<{
+    id: string
+    status: string
+    status_einfach: string | null
+    gesamt_fix: number | null
+    gesamt_min: number | null
+    gesamt_max: number | null
+  }>
+  auftraege: Array<{
+    id: string
+    status: string
+    angebot_id: string | null
+  }>
+  rechnungen: Array<{
+    id: string
+    status: string
+    rechnung_art?: string | null
+    brutto?: number | null
+    created_at: string
+    updated_at?: string | null
+  }>
+}): number | null {
+  for (const auf of input.auftraege) {
+    if (auf.status === 'storniert') continue
+    const linked = auf.angebot_id
+      ? input.angebote.find((a) => a.id === auf.angebot_id)
+      : null
+    let euro = euroFromAngebotRow(linked)
+    if (euro == null) {
+      for (const ang of input.angebote) {
+        euro = euroFromAngebotRow(ang)
+        if (euro != null) break
+      }
+    }
+    if (euro != null) return euro
+  }
+
+  for (const ang of input.angebote) {
+    const st = mapAngebotStatusEinfach({ ...ang, created_at: '' })
+    if (st === 'abgelehnt' || st === 'ersetzt' || st === 'storniert') continue
+    const euro = euroFromAngebotRow(ang)
+    if (euro != null) return euro
+  }
+
+  const winning = input.rechnungen.filter(isPhaseWinningRechnung)
+  if (winning.length) {
+    const newest = [...winning].sort((a, b) =>
+      (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at)
+    )[0]
+    const brutto = Number(newest?.brutto)
+    if (Number.isFinite(brutto) && brutto > 0) return Math.round(brutto)
+  }
+
+  const label = resolveLeadPreisAnzeige(
+    input.lead.kanal,
+    input.lead.budget_ca,
+    input.lead.preis_min,
+    input.lead.preis_max,
+    input.lead.funnel_daten
+  )
+  return parseVorgangWertLabelEuro(label === '—' ? null : label)
 }
 
 function pickEmbedLeadId(

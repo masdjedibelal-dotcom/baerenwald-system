@@ -38,6 +38,10 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import {
+  berechneVorgaengeListenSumme,
+  parseVorgangWertLabelEuro,
+} from '@/lib/vorgang/vorgaenge-liste-summe'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
@@ -173,15 +177,7 @@ function isVorgangErledigt(row: VorgangListeRow): boolean {
 
 /** Parse Anzeige „1.234 €“ / „207 – 813 €“ → Euro-Zahl für Wert-Filter/Sort. */
 function wertEuro(row: VorgangListeRow): number | null {
-  if (!row.wertLabel) return null
-  const matches = [...row.wertLabel.matchAll(/(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?)/g)]
-  if (!matches.length) return null
-  const nums = matches
-    .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')))
-    .filter((n) => Number.isFinite(n))
-  if (!nums.length) return null
-  // Bei von–bis die Obergrenze für Sortierung/Filter nutzen
-  return Math.max(...nums)
+  return parseVorgangWertLabelEuro(row.wertLabel)
 }
 
 function toExportRow(row: VorgangListeRow): Record<string, unknown> {
@@ -462,6 +458,9 @@ export function VorgaengeListeClient({
           hw.betragBrutto == null
             ? null
             : `${Math.round(hw.betragBrutto).toLocaleString('de-DE')} €`,
+        listenSummeEuro:
+          hw.betragBrutto == null ? null : Math.round(hw.betragBrutto),
+        listeSummeZaehlen: true,
         detailHref: `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(ahId)}`,
         handwerkerIds: hw.handwerkerId ? [hw.handwerkerId] : [],
         ist_wiederkehrend: false,
@@ -1404,13 +1403,11 @@ export function VorgaengeListeClient({
             <div className="vg-aggregate__sum">
               <span>Summe</span>
               <b>
-                {filtered
-                  .reduce((s, r) => s + (wertEuro(r) ?? 0), 0)
-                  .toLocaleString('de-DE', {
-                    style: 'currency',
-                    currency: 'EUR',
-                    maximumFractionDigits: 0,
-                  })}
+                {berechneVorgaengeListenSumme(filtered).toLocaleString('de-DE', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  maximumFractionDigits: 0,
+                })}
               </b>
             </div>
             {selectedCount > 0 ? (

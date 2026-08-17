@@ -116,6 +116,10 @@ export type VorgangListeRow = ResolvedVorgang & {
   rechnungRichtung?: 'ausgehend' | 'eingehend'
   /** Nur eingehend: angebot_handwerker.id für Ensure/Deep-Link. */
   angebotHandwerkerId?: string | null
+  /** Geschäftsvolumen für Listen-Summe (einmal pro Lead/Vorgang). */
+  listenSummeEuro?: number | null
+  /** false = Abschlags-Satellit — nicht separat in der Summe zählen. */
+  listeSummeZaehlen?: boolean
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

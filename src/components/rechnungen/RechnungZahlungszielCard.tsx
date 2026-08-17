@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { updateRechnungZahlungsziel } from '@/app/(dashboard)/rechnungen/actions'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
@@ -11,9 +10,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/components/ui/app-toast'
 import { useTransition } from '@/components/ui/action-busy'
-import {
-  rechnungZahlungszielIstBearbeitbar,
-} from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
+import { rechnungZahlungszielIstBearbeitbar } from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
 import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import {
   zahlfristAnzeigeText,
@@ -36,6 +33,7 @@ function zahlungszielTageAnzeige(
   return diff > 0 ? diff : fallback
 }
 
+/** Zahlungsziel unter der Rechnungstabelle im Tab „Zahlung“. */
 export function RechnungZahlungszielCard({
   detail,
   zahlungszielFallback = 14,
@@ -130,31 +128,37 @@ export function RechnungZahlungszielCard({
 
   return (
     <>
-      <MockCard
-        title="Zahlung"
-        icon="receipt"
-        actions={
-          bearbeitbar ? (
-            <MockBtn kind="ghost" icon="pencil" onClick={openSheet} disabled={pending}>
-              Bearbeiten
-            </MockBtn>
-          ) : null
-        }
-      >
-        <div className="props">
-          <MockProp label="Zahlungsziel">
-            {detail.zahlungsbedingungen?.trim()
-              ? zahlfristAnzeigeText(zahlfristInit.seg, detail.faellig_am ?? zahlfristInit.datum)
-              : `${zielTage} Tage`}
-          </MockProp>
-          <MockProp label="Fällig am">
-            <span style={ueberfaellig ? { color: 'var(--danger, #c0392b)', fontWeight: 600 } : undefined}>
-              {detail.faellig_am ? formatDatum(detail.faellig_am) : '—'}
-            </span>
-          </MockProp>
-          <MockProp label="Status">{zahlungsText}</MockProp>
+      <div className="zahlungsziel-inline">
+        <div className="zahlungsziel-inline__bar">
+          <div className="props">
+            <MockProp label="Zahlungsziel">
+              {detail.zahlungsbedingungen?.trim()
+                ? zahlfristAnzeigeText(zahlfristInit.seg, detail.faellig_am ?? zahlfristInit.datum)
+                : `${zielTage} Tage`}
+            </MockProp>
+            <MockProp label="Fällig am">
+              <span
+                style={
+                  ueberfaellig ? { color: 'var(--danger, #c0392b)', fontWeight: 600 } : undefined
+                }
+              >
+                {detail.faellig_am ? formatDatum(detail.faellig_am) : '—'}
+              </span>
+            </MockProp>
+            <MockProp label="Status">{zahlungsText}</MockProp>
+          </div>
+          {bearbeitbar ? (
+            <MockBtn
+              sm
+              kind="ghost"
+              icon="pencil"
+              title="Zahlungsziel bearbeiten"
+              onClick={openSheet}
+              disabled={pending}
+            />
+          ) : null}
         </div>
-      </MockCard>
+      </div>
 
       <EditorSheet
         open={sheetOpen}

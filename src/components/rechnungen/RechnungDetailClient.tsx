@@ -45,7 +45,6 @@ import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
-import { RechnungZahlungszielCard } from '@/components/rechnungen/RechnungZahlungszielCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -586,13 +585,6 @@ export function RechnungDetailClient({
     <div className="space-y-6">
       {stammdatenInhalt}
       {!isEingehend ? (
-        <RechnungZahlungszielCard
-          detail={detail}
-          zahlungszielFallback={zahlungszielFallback}
-          onSaved={() => refresh()}
-        />
-      ) : null}
-      {!isEingehend ? (
         <VorgangPhasenVerlauf
           kontext={projektKontext}
           fromRef={{ kind: 'rechnung', id: detail.id }}
@@ -685,6 +677,7 @@ export function RechnungDetailClient({
               auftragDetail={auftragDetail}
               rechnungen={auftragRechnungen}
               fallbackTitel={projektTitelAnzeige}
+              zahlungszielFallback={zahlungszielFallback}
               onEditInvoice={(rechnungId) => {
                 startTransition(async () => {
                   const res = detail.auftrag_id

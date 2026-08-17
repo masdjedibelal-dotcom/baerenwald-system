@@ -150,7 +150,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, positionen')
+          .select('id, status, created_at, auftrag_id, positionen')
           .neq('status', 'storniert')
           .order('created_at', { ascending: false })
           .limit(800)
@@ -210,6 +210,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     id: string
     status: string
     created_at: string
+    auftrag_id?: string | null
     positionen?: unknown
   }>
 
@@ -318,6 +319,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
+      auftrag_id: r.auftrag_id,
     })),
     gewerkeKatalog
   )
