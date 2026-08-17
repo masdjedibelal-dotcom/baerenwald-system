@@ -522,7 +522,10 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           zt,
           zeile
         ),
-        faellig_am: normalizeFaelligAmYmd(zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am),
+        faellig_am:
+          normalizeFaelligAmYmd(
+            zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am
+          ) ?? metaDefaults.faellig_am,
       }
       modus = 'abschlag'
       zahlungsplan = gespeicherterPlan
@@ -621,7 +624,10 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
             zt,
             zeile
           ),
-          faellig_am: normalizeFaelligAmYmd(zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am),
+          faellig_am:
+          normalizeFaelligAmYmd(
+            zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am
+          ) ?? metaDefaults.faellig_am,
         }
         modus = 'abschlag'
         abschlag = {

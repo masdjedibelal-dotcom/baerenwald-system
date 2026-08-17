@@ -1,5 +1,5 @@
-import { auftragNetto } from '@/lib/dashboard/dashboard-analytics'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
+import { kundeUmsatzEvents } from '@/lib/kunden/kunde-umsatz'
 
 export type KundeWirtschaftZeitraum = '6m' | '12m' | 'year' | 'all'
 
@@ -69,35 +69,9 @@ function inBounds(iso: string | null | undefined, start: Date | null, end: Date)
   return true
 }
 
-function rechnungDatum(r: {
-  bezahlt_at?: string | null
-  rechnungsdatum?: string | null
-}): string | null {
-  return r.bezahlt_at?.trim() || r.rechnungsdatum?.trim() || null
-}
-
-function auftragWert(a: NonNullable<KundeDetailPayload['auftraege']>[number]): number {
-  return auftragNetto(a)
-}
-
-/** Umsatzpunkte: bezahlte Rechnungen, sonst Auftragsvolumen nach created_at. */
+/** Umsatzpunkte: Auftragssumme je Auftrag + bezahlte Direktrechnungen (ohne Doppelzählung). */
 function umsatzEvents(kunde: KundeDetailPayload): Array<{ at: string; betrag: number }> {
-  const events: Array<{ at: string; betrag: number }> = []
-  const paid = (kunde.rechnungen ?? []).filter((r) => r.status === 'bezahlt')
-  if (paid.length > 0) {
-    for (const r of paid) {
-      const at = rechnungDatum(r)
-      const betrag = Number(r.brutto) || 0
-      if (at && betrag > 0) events.push({ at, betrag })
-    }
-    return events
-  }
-  for (const a of kunde.auftraege ?? []) {
-    if (a.status === 'storniert') continue
-    const betrag = auftragWert(a)
-    if (betrag > 0 && a.created_at) events.push({ at: a.created_at, betrag })
-  }
-  return events
+  return kundeUmsatzEvents(kunde.auftraege ?? [], kunde.rechnungen ?? [])
 }
 
 function sumInRange(

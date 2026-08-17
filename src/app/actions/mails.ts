@@ -20,6 +20,11 @@ import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 import { cronMahnungFuerRechnung, tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
+import {
+  berechneMahnungBetragKontext,
+  loadGeschwisterMapFuerMahnung,
+  mahnungBetragMailFelder,
+} from '@/lib/rechnungen/mahnung-betrag'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
@@ -226,6 +231,8 @@ type RechnungRow = {
   erinnerung_21_sent_at: string | null
   intern_warnung_30_at: string | null
   kunde_id: string | null
+  auftrag_id: string | null
+  rechnung_art: string | null
   beleg_typ: string | null
   richtung: string | null
   kunden: { name: string; email: string | null } | { name: string; email: string | null }[] | null
@@ -251,7 +258,7 @@ export async function sendZahlungserinnerungen(): Promise<{
   const { data: rows, error } = await supabaseAdmin
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, beleg_typ, richtung, kunden(name, email, typ)'
+      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, auftrag_id, rechnung_art, beleg_typ, richtung, kunden(name, email, typ)'
     )
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
@@ -265,10 +272,28 @@ export async function sendZahlungserinnerungen(): Promise<{
   const list = (rows ?? []) as RechnungRow[]
   const ergebnis: { id: string; aktion: string }[] = []
 
+  const geschwisterMap = await loadGeschwisterMapFuerMahnung(
+    supabaseAdmin,
+    list.map((r) => r.auftrag_id).filter(Boolean) as string[]
+  )
+
   for (const r of list) {
     if (!r.faellig_am) continue
     if (String(r.beleg_typ ?? 'rechnung') === 'gutschrift') continue
     if (String(r.richtung ?? '') === 'eingehend') continue
+
+    const mahnKontext = berechneMahnungBetragKontext(
+      {
+        id: r.id,
+        brutto: r.brutto,
+        rechnung_art: r.rechnung_art,
+      },
+      r.auftrag_id ? (geschwisterMap.get(r.auftrag_id) ?? []) : []
+    )
+    if (mahnKontext.skipMahnung) {
+      ergebnis.push({ id: r.id, aktion: 'nichts_offen' })
+      continue
+    }
 
     const aktion = cronMahnungFuerRechnung(r)
     if (!aktion) continue
@@ -277,7 +302,7 @@ export async function sendZahlungserinnerungen(): Promise<{
     const name = kunde?.name ?? 'Kundin/Kunde'
     const email = kunde?.email?.trim() ?? ''
     const kundeTyp = (kunde as { typ?: string | null } | null)?.typ ?? null
-    const brutto = r.brutto ?? 0
+    const betragFelder = mahnungBetragMailFelder(mahnKontext)
     const tage = tageUeberfaellig(r.faellig_am)
     const faelligEff = effektivesFaelligAmYmd(r.faellig_am) ?? r.faellig_am
     const faelligFmt = formatDeDate(faelligEff)
@@ -295,7 +320,7 @@ export async function sendZahlungserinnerungen(): Promise<{
           {
             name,
             nummer: r.rechnungsnummer,
-            brutto,
+            ...betragFelder,
             faelligAm: faelligFmt,
             zahlbarBis: zahlbarBisFmt,
             tageUeberfaellig: tage,

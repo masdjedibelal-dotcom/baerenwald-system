@@ -20,6 +20,11 @@ import {
   zahlungserinnerungZahlbarBis,
   type ZahlungserinnerungStufe,
 } from '@/lib/mail/zahlungserinnerung-mail'
+import {
+  mahnungBetragKontextFuerRechnung,
+  mahnungBetragMailFelder,
+} from '@/lib/rechnungen/mahnung-betrag'
+import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-mail'
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -1363,11 +1368,13 @@ export async function previewRechnungKundeMail(input: {
 }
 
 type ZahlungserinnerungRechnungRow = {
+  id: string
   rechnungsnummer: string | null
   status: string | null
   beleg_typ: string | null
   auftrag_id: string | null
   kunde_id: string | null
+  rechnung_art: string | null
   faellig_am: string | null
   brutto: number | null
   erinnerung_7_sent_at: string | null
@@ -1387,11 +1394,13 @@ async function loadRechnungFuerZahlungserinnerung(
         .from('rechnungen')
         .select(
           `
+      id,
       rechnungsnummer,
       status,
       beleg_typ,
       auftrag_id,
       kunde_id,
+      rechnung_art,
       faellig_am,
       brutto,
       erinnerung_7_sent_at,
@@ -1427,7 +1436,8 @@ function buildZahlungserinnerungVorschau(
   rec: ZahlungserinnerungRechnungRow,
   rechnungsnummer: string,
   stufe: ZahlungserinnerungStufe,
-  branding: Awaited<ReturnType<typeof getMailBranding>>
+  branding: Awaited<ReturnType<typeof getMailBranding>>,
+  betragFelder: ReturnType<typeof mahnungBetragMailFelder>
 ) {
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
@@ -1439,7 +1449,7 @@ function buildZahlungserinnerungVorschau(
     {
       name: kunde?.name?.trim() || 'Kundin/Kunde',
       nummer: rechnungsnummer,
-      brutto: Number(rec.brutto ?? 0),
+      ...betragFelder,
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       zahlbarBis: formatDatumDeFromIso(zahlbarBisIso),
       tageUeberfaellig: Math.max(0, tageSeitFaelligkeitRechnung(rec.faellig_am)),
@@ -1484,12 +1494,24 @@ export async function previewZahlungserinnerungMail(
   const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
   if (!loaded.ok) return loaded
 
+  const mahnKontext = await mahnungBetragKontextFuerRechnung(supabaseAdmin, {
+    id: rechnungId,
+    auftrag_id: loaded.rec.auftrag_id,
+    brutto: loaded.rec.brutto,
+    rechnung_art: loaded.rec.rechnung_art,
+  })
+  if (mahnKontext.skipMahnung) {
+    return { ok: false, message: 'Für diese Rechnung ist kein offener Betrag mehr — keine Mahnung nötig.' }
+  }
+
   const branding = await getMailBranding(supabaseAdmin)
+  const betragFelder = mahnungBetragMailFelder(mahnKontext)
   const preview = buildZahlungserinnerungVorschau(
     loaded.rec,
     loaded.rechnungsnummer,
     stufe,
-    branding
+    branding,
+    betragFelder
   )
 
   return {
@@ -1520,15 +1542,27 @@ export async function sendZahlungserinnerungMail(
   const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
   if (!loaded.ok) return loaded
 
+  const mahnKontext = await mahnungBetragKontextFuerRechnung(supabaseAdmin, {
+    id: rechnungId,
+    auftrag_id: loaded.rec.auftrag_id,
+    brutto: loaded.rec.brutto,
+    rechnung_art: loaded.rec.rechnung_art,
+  })
+  if (mahnKontext.skipMahnung) {
+    return { ok: false, message: 'Für diese Rechnung ist kein offener Betrag mehr — keine Mahnung nötig.' }
+  }
+
   const toList = options.to.map((v) => v.trim()).filter(Boolean)
   if (!toList.length) return { ok: false, message: 'Bitte mindestens eine Empfänger-Adresse angeben.' }
 
   const branding = await getMailBranding(supabaseAdmin)
+  const betragFelder = mahnungBetragMailFelder(mahnKontext)
   const preview = buildZahlungserinnerungVorschau(
     loaded.rec,
     loaded.rechnungsnummer,
     options.stufe,
-    branding
+    branding,
+    betragFelder
   )
 
   const pdf = await persistPdfForRechnung(rechnungId)

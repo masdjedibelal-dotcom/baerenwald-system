@@ -980,24 +980,54 @@ export function buildZahlungserinnerungMail(
   const nr = esc(data.nummer)
   const faellig = esc(data.faelligAm)
   const zahlbarBis = esc(data.zahlbarBis)
-  const bruttoFmt = data.brutto.toLocaleString('de-DE', {
+  const offenerBetrag = data.offenerBetrag ?? data.brutto
+  const offenFmt = offenerBetrag.toLocaleString('de-DE', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+  const geldFmt = (n: number) =>
+    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   const stufeTitel = data.stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung'
+
+  const bereitsGezahlt = data.bereitsGezahlt?.filter((z) => z.brutto > 0) ?? []
+  const hatAbschlagHinweis = bereitsGezahlt.length > 0
+
+  const bereitsGezahltHtml = hatAbschlagHinweis
+    ? `
+      <div style="background:#F3F4F6;border-radius:8px;padding:14px 16px;margin:0 0 16px;font-size:14px;border-left:4px solid #2E7D52;">
+        <p style="margin:0 0 8px;font-weight:700;color:#1A3D2B;">Bereits gezahlt (Abschlagsrechnungen)</p>
+        <ul style="margin:0 0 10px;padding-left:20px;color:#374151;">
+          ${bereitsGezahlt
+            .map(
+              (z) =>
+                `<li>${esc(z.label)}: <strong>${esc(geldFmt(z.brutto))} €</strong></li>`
+            )
+            .join('')}
+        </ul>
+        <p style="margin:0;color:#374151;">Summe bereits gezahlt: <strong>${esc(geldFmt(data.bereitsGezahltBrutto ?? bereitsGezahlt.reduce((s, z) => s + z.brutto, 0)))} €</strong></p>
+      </div>`
+    : ''
 
   const einleitung =
     data.stufe === 1
       ? mailText(
           anrede,
-          `unsere Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`,
-          `unsere Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`
+          hatAbschlagHinweis
+            ? `unsere Rechnung <strong>${nr}</strong> war am <strong>${faellig}</strong> fällig. Für diese Rechnung sind noch <strong>${offenFmt} €</strong> offen (siehe unten). Bereits geleistete Abschlagszahlungen sind berücksichtigt.`
+            : `unsere Rechnung <strong>${nr}</strong> über <strong>${offenFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`,
+          hatAbschlagHinweis
+            ? `unsere Rechnung <strong>${nr}</strong> war am <strong>${faellig}</strong> fällig. Für diese Rechnung sind noch <strong>${offenFmt} €</strong> offen (siehe unten). Bereits geleistete Abschlagszahlungen sind berücksichtigt.`
+            : `unsere Rechnung <strong>${nr}</strong> über <strong>${offenFmt} €</strong> war am <strong>${faellig}</strong> fällig und ist bei uns noch nicht eingegangen.`
         )
       : mailText(
           anrede,
-          `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> noch offen.`,
-          `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${bruttoFmt} €</strong> noch offen.`
+          hatAbschlagHinweis
+            ? `trotz unserer ersten Zahlungserinnerung ist für die Rechnung <strong>${nr}</strong> noch <strong>${offenFmt} €</strong> offen. Bereits geleistete Abschlagszahlungen sind berücksichtigt.`
+            : `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${offenFmt} €</strong> noch offen.`,
+          hatAbschlagHinweis
+            ? `trotz unserer ersten Zahlungserinnerung ist für die Rechnung <strong>${nr}</strong> noch <strong>${offenFmt} €</strong> offen. Bereits geleistete Abschlagszahlungen sind berücksichtigt.`
+            : `trotz unserer ersten Zahlungserinnerung ist die Rechnung <strong>${nr}</strong> über <strong>${offenFmt} €</strong> noch offen.`
         )
 
   const bitte =
@@ -1024,12 +1054,13 @@ export function buildZahlungserinnerungMail(
     html: mailHtmlBase(
       `
       <h2 style="color:#2E7D52;margin:0 0 16px;">${stufeTitel}</h2>
+      ${bereitsGezahltHtml}
       <p>${begruessung}</p>
       <p>${einleitung}</p>
       <p>${bitte}</p>
       <div style="background:#EAF3DE;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px;">
         <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="color:#2E7D52;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;color:#1A3D2B;">${bruttoFmt} €</td></tr>
+        <tr><td style="color:#2E7D52;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;color:#1A3D2B;">${offenFmt} €</td></tr>
         <tr><td style="color:#2E7D52;padding:4px 0;">Zahlbar bis:</td><td style="font-weight:600;color:#1A3D2B;"><strong>${zahlbarBis}</strong></td></tr>
         <tr><td style="color:#2E7D52;padding:4px 0;">IBAN:</td><td style="color:#1A3D2B;">${esc(iban)}</td></tr>
         <tr><td style="color:#2E7D52;padding:4px 0;">Verwendungszweck:</td><td style="color:#1A3D2B;">${nr}</td></tr>
@@ -1037,7 +1068,7 @@ export function buildZahlungserinnerungMail(
       </div>
       <p style="font-size:13px;color:#6B7280;">${bereits}</p>
     `,
-      `${stufeTitel}: ${bruttoFmt} € offen`,
+      `${stufeTitel}: ${offenFmt} € offen`,
       b,
       undefined,
       { anrede }
@@ -1058,6 +1089,9 @@ export function mailZahlungserinnerung(
     iban: string
     anrede?: MailAnrede
     kundeTyp?: string | null
+    offenerBetrag?: number
+    bereitsGezahltBrutto?: number
+    bereitsGezahlt?: Array<{ label: string; brutto: number; rechnungsnummer?: string }>
   },
   b: MailBranding
 ): { betreff: string; html: string } {

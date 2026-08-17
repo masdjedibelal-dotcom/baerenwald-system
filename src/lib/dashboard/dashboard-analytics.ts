@@ -217,6 +217,7 @@ export function buildUmsatzverlauf(
     status?: string | null
     created_at: string
     netto?: number | null
+    auftrag_id?: string | null
   }> = [],
   monateCount = 6,
   now = new Date()
@@ -247,6 +248,7 @@ export function buildUmsatzverlauf(
 
   for (const r of rechnungen) {
     if (String(r.status ?? '').toLowerCase() === 'storniert') continue
+    if ((r.auftrag_id ?? '').trim()) continue
     const created = new Date(r.created_at)
     if (Number.isNaN(created.getTime())) continue
     const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
@@ -495,7 +497,7 @@ export function buildHandwerkerRanking(
     .slice(0, 8)
 }
 
-/** Top-Kunden: nur Aufträge + Rechnungen (keine Anfragen/Angebote). */
+/** Top-Kunden: Auftragssumme pro Auftrag; nur Rechnungen ohne Auftrag extra (keine Doppelzählung). */
 export function buildKundenRanking(
   rows: Array<{
     kunde_id: string
@@ -504,12 +506,14 @@ export function buildKundenRanking(
     auftrag_netto?: number
     rechnung_id?: string | null
     rechnung_netto?: number
+    /** Rechnung gehört zu diesem Auftrag → nicht zum Umsatz zählen. */
+    rechnung_auftrag_id?: string | null
   }>
 ): RankingZeile[] {
   type Acc = {
     name: string
     auftraege: Set<string>
-    rechnungen: Set<string>
+    freieRechnungen: Set<string>
     umsatz: number
   }
   const map = new Map<string, Acc>()
@@ -520,7 +524,7 @@ export function buildKundenRanking(
       acc = {
         name: r.kunde_name,
         auftraege: new Set(),
-        rechnungen: new Set(),
+        freieRechnungen: new Set(),
         umsatz: 0,
       }
       map.set(r.kunde_id, acc)
@@ -532,8 +536,9 @@ export function buildKundenRanking(
       acc.umsatz += Number(r.auftrag_netto) || 0
     }
     const rechnungId = (r.rechnung_id ?? '').trim()
-    if (rechnungId && !acc.rechnungen.has(rechnungId)) {
-      acc.rechnungen.add(rechnungId)
+    const linkedAuftrag = (r.rechnung_auftrag_id ?? '').trim()
+    if (rechnungId && !linkedAuftrag && !acc.freieRechnungen.has(rechnungId)) {
+      acc.freieRechnungen.add(rechnungId)
       acc.umsatz += Number(r.rechnung_netto) || 0
     }
   }
@@ -543,7 +548,7 @@ export function buildKundenRanking(
       id,
       name: a.name,
       sub: '',
-      vorgaenge: a.auftraege.size + a.rechnungen.size,
+      vorgaenge: a.auftraege.size + a.freieRechnungen.size,
       umsatz: a.umsatz,
     }))
     .filter((r) => r.vorgaenge > 0)

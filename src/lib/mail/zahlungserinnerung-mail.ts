@@ -38,4 +38,9 @@ export type ZahlungserinnerungMailInput = {
   iban: string
   anrede?: import('@/lib/mail/anrede').MailAnrede
   kundeTyp?: string | null
+  /** Offener Betrag dieser Rechnung (Standard = brutto) */
+  offenerBetrag?: number
+  /** Bereits bezahlte Abschläge desselben Auftrags */
+  bereitsGezahltBrutto?: number
+  bereitsGezahlt?: Array<{ label: string; brutto: number; rechnungsnummer?: string }>
 }
