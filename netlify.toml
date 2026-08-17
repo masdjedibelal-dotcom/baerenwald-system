@@ -11,9 +11,11 @@
   package = "@netlify/plugin-nextjs"
 
 # Puppeteer / @sparticuz/chromium für Angebot-PDF beim Mail-Versand
-# Cron: netlify/functions/cron-*.mjs mit export const config.schedule
+# Cron: eine Scheduled Function netlify/functions/cron-dispatcher.mjs (0,30 * * * * UTC)
+# Env >4KB: docs/NETLIFY-DEPLOY.md (Scopes in Netlify UI)
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
   included_files = [
     "node_modules/@sparticuz/chromium/bin/**",
     "node_modules/@sparticuz/chromium/build/**",
