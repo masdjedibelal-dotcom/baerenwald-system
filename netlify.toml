@@ -11,38 +11,11 @@
   package = "@netlify/plugin-nextjs"
 
 # Puppeteer / @sparticuz/chromium für Angebot-PDF beim Mail-Versand
+# Cron: netlify/functions/cron-*.mjs mit export const config.schedule
 [functions]
+  directory = "netlify/functions"
   included_files = [
     "node_modules/@sparticuz/chromium/bin/**",
     "node_modules/@sparticuz/chromium/build/**",
     "scripts/ki-analyse/**",
   ]
-
-# Cron-Jobs (ersetzt ehem. vercel.json) — CRON_SECRET in Netlify setzen
-[[scheduled]]
-  path = "/api/cron/einbehalte"
-  schedule = "30 7 * * *"
-
-[[scheduled]]
-  path = "/api/cron/rechnungen"
-  schedule = "0 8 * * *"
-
-[[scheduled]]
-  path = "/api/cron/datenschutz"
-  schedule = "0 8 1 * *"
-
-[[scheduled]]
-  path = "/api/cron/angebot-nachfass"
-  schedule = "0 9 * * *"
-
-[[scheduled]]
-  path = "/api/cron/copilot-briefing"
-  schedule = "30 7 * * 1-6"
-
-[[scheduled]]
-  path = "/api/cron/ki-hub-analyze"
-  schedule = "0 7 * * 1-6"
-
-[[scheduled]]
-  path = "/api/cron/ki-hub-metrics"
-  schedule = "30 6 * * *"

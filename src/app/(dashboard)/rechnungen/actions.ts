@@ -680,7 +680,7 @@ export async function updateRechnungStatus(
   const { data: before } = await supabase
     .from('rechnungen')
     .select(
-      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id'
+      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id, gesendet_at, bezahlt_at'
     )
     .eq('id', id)
     .maybeSingle()
@@ -690,8 +690,13 @@ export async function updateRechnungStatus(
   const isEingehend = String(before.richtung ?? '') === 'eingehend'
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
-  if (status === 'gesendet') patch.gesendet_at = new Date().toISOString()
-  if (status === 'bezahlt') patch.bezahlt_at = new Date().toISOString()
+  // Storno zurücknehmen darf das echte Versanddatum nicht auf „heute“ überschreiben.
+  if (status === 'gesendet' && !before.gesendet_at) {
+    patch.gesendet_at = new Date().toISOString()
+  }
+  if (status === 'bezahlt' && !before.bezahlt_at) {
+    patch.bezahlt_at = new Date().toISOString()
+  }
   const { error } = await supabase.from('rechnungen').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
 
@@ -847,7 +852,7 @@ export async function sendRechnung(
   if (!pdf.ok) return pdf
 
   /** Storno-Gutschrift zur gleichen Planzeile (nach „Stornieren & neu stellen“) mitversenden. */
-  type StornoAnhang = { id: string; nr: string; buffer: Buffer }
+  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
   let stornoAnhang: StornoAnhang | null = null
   const belegTyp = String(rec.beleg_typ ?? 'rechnung')
   if (belegTyp !== 'gutschrift') {
@@ -863,7 +868,7 @@ export async function sendRechnung(
     async function loadGutschriftAnhang(origId: string): Promise<StornoAnhang | null> {
       const { data: gs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, status')
+        .select('id, rechnungsnummer, status, bezug_rechnung_id')
         .eq('bezug_rechnung_id', origId)
         .eq('beleg_typ', 'gutschrift')
         .in('status', ['entwurf', 'gesendet'])
@@ -873,10 +878,18 @@ export async function sendRechnung(
       if (!gs?.id) return null
       const gsPdf = await persistPdfForRechnung(String(gs.id))
       if (!gsPdf.ok) return null
+      let bezugRechnungsnummer: string | null = null
+      const { data: origRow } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', origId)
+        .maybeSingle()
+      bezugRechnungsnummer = String(origRow?.rechnungsnummer ?? '').trim() || null
       return {
         id: String(gs.id),
         nr: String(gs.rechnungsnummer ?? 'Gutschrift').trim() || 'Gutschrift',
         buffer: gsPdf.buffer,
+        bezugRechnungsnummer,
       }
     }
 
@@ -956,10 +969,6 @@ export async function sendRechnung(
     fallback: '',
   })
 
-  const stornoHinweis = stornoAnhang
-    ? `Im Anhang: Storno-Gutschrift ${stornoAnhang.nr} und die korrigierte Rechnung ${rechnungsnummer}.`
-    : null
-
   /** Optional: Abschlussbericht mit Rechnung versenden. */
   let abschlussAnhang: { filename: string; buffer: Buffer } | null = null
   if (options?.mitAbschlussbericht && rec.auftrag_id) {
@@ -1006,9 +1015,9 @@ export async function sendRechnung(
     ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
     : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
-  const mailEinleitung = [stornoHinweis, abschlussHinweis, mailEinleitungBase]
-    .filter(Boolean)
-    .join('\n\n') || null
+  const mailEinleitung = stornoAnhang
+    ? mailEinleitungBase
+    : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
 
   const tpl = buildRechnungMail(
     {
@@ -1022,6 +1031,8 @@ export async function sendRechnung(
       mailBetreff: (rec.mail_betreff as string | null)?.trim() || null,
       reverseCharge: Boolean(rec.reverse_charge_13b),
       mitStornoAnhang: Boolean(stornoAnhang),
+      stornoGutschriftNummer: stornoAnhang?.nr ?? null,
+      stornoBezugRechnungsnummer: stornoAnhang?.bezugRechnungsnummer ?? null,
       mitAbschlussberichtAnhang: Boolean(abschlussAnhang),
     },
     branding
@@ -1492,7 +1503,6 @@ export async function sendZahlungserinnerungMail(
   const now = new Date().toISOString()
   const supabase = createClient()
   const patch: Record<string, unknown> = {
-    faellig_am: preview.zahlbarBisIso,
     updated_at: now,
   }
   if (options.stufe === 1) patch.erinnerung_7_sent_at = now

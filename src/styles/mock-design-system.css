@@ -19445,7 +19445,7 @@ body.has-blocking-overlay .app {
 /* Phase 7 — Zahlung-Tab / RateDrawer */
 .zahlung-tab-hint {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-bottom: 12px;
   padding: 10px 12px;

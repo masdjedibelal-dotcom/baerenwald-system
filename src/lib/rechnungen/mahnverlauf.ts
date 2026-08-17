@@ -47,6 +47,48 @@ export function tageSeitFaelligkeitRechnung(faelligAm: string | null | undefined
   return Math.floor((today.getTime() - due.getTime()) / 86400000)
 }
 
+/** Erste Erinnerung: erster Kalendertag nach Ablauf des Zahlungsziels (Fälligkeit). */
+export const MAHNUNG_STUFE1_AB_TAGE_UEBERFAELLIG = 1
+/** Zweite Erinnerung: 7 Tage nach der ersten, falls weiter unbezahlt. */
+export const MAHNUNG_STUFE2_TAGE_NACH_ERSTER = 7
+/** Interne Warnung ab 30 Tagen über Fälligkeit. */
+export const MAHNUNG_INTERN_TAGE_UEBERFAELLIG = 30
+
+function tageSeitZeitpunkt(iso: string | null | undefined): number {
+  if (!iso) return 0
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  return Math.floor((today.getTime() - d.getTime()) / 86400000)
+}
+
+export type CronMahnungAktion = 'stufe1' | 'stufe2' | 'intern30'
+
+/**
+ * Eine Aktion pro Lauf — nie Stufe 1 und 2 am selben Tag.
+ * Fälligkeit = Zahlungsziel der Rechnung, wird nicht verschoben.
+ */
+export function cronMahnungFuerRechnung(r: {
+  faellig_am: string | null
+  erinnerung_7_sent_at: string | null
+  erinnerung_21_sent_at: string | null
+  intern_warnung_30_at: string | null
+}): CronMahnungAktion | null {
+  const tage = tageSeitFaelligkeitRechnung(r.faellig_am)
+  if (tage < MAHNUNG_STUFE1_AB_TAGE_UEBERFAELLIG) return null
+  if (!r.erinnerung_7_sent_at) return 'stufe1'
+  if (
+    !r.erinnerung_21_sent_at &&
+    tageSeitZeitpunkt(r.erinnerung_7_sent_at) >= MAHNUNG_STUFE2_TAGE_NACH_ERSTER
+  ) {
+    return 'stufe2'
+  }
+  if (!r.intern_warnung_30_at && tage >= MAHNUNG_INTERN_TAGE_UEBERFAELLIG) return 'intern30'
+  return null
+}
+
 export function rechnungHatMahnverlauf(ctx: RechnungMahnKontext): boolean {
   if ((ctx.beleg_typ ?? 'rechnung') === 'gutschrift') return false
   return Boolean(
@@ -124,14 +166,14 @@ export function buildRechnungMahnverlauf(ctx: RechnungMahnKontext): MahnverlaufS
       label: '1. Zahlungserinnerung',
       sentAt: ctx.erinnerung_7_sent_at ?? null,
       state: stufeState(ctx.erinnerung_7_sent_at, 1),
-      hint: 'Freundliche Erinnerung per E-Mail (kein neuer Beleg).',
+      hint: 'Automatisch am Tag nach Ablauf des Zahlungsziels, wenn nicht als bezahlt markiert.',
     },
     {
       id: 'stufe2',
       label: '2. Zahlungserinnerung',
       sentAt: ctx.erinnerung_21_sent_at ?? null,
       state: stufeState(ctx.erinnerung_21_sent_at, 2),
-      hint: 'Zweite Erinnerung — weiterhin dieselbe Rechnungsnummer.',
+      hint: 'Zweite Erinnerung 7 Tage nach der ersten — dieselbe Rechnungsnummer.',
     },
     {
       id: 'intern30',

@@ -18,6 +18,7 @@ import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungspla
 import { loadRechnungWizardBootstrap as loadWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
+  abschlagWeichtVonAktuellerAuftragssummeAb,
   berechneZahlungsplan,
   emptyZahlungsplan,
   parseZahlungsplan,
@@ -185,6 +186,8 @@ export function VorgangZahlungTab({
         zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id ?? null,
         rechnung_art: r.rechnung_art ?? null,
         faellig_am: r.faellig_am ?? null,
+        rechnungsnummer: r.rechnungsnummer ?? null,
+        beleg_typ: r.beleg_typ ?? null,
       })) as RechnungAbschlagLink[],
     [rechnungen]
   )
@@ -208,6 +211,11 @@ export function VorgangZahlungTab({
     kontext?.gesamtBrutto ??
     gesamtBruttoHint ??
     (gesamtNetto > 0 ? Math.round(gesamtNetto * 1.19 * 100) / 100 : 0)
+
+  const abschlagSummeAbweichungen = useMemo(() => {
+    if (variant === 'angebot' || !hasPlan) return []
+    return abschlagWeichtVonAktuellerAuftragssummeAb(plan, gesamtNetto, abschlagLinks)
+  }, [variant, hasPlan, plan, gesamtNetto, abschlagLinks])
 
   const rows: RateRow[] = useMemo(() => {
     // Mit Zahlungsplan: immer Plan-Raten (auch auf Rechnung-Detail) — Gutschriften hängen als Belege
@@ -760,6 +768,32 @@ export function VorgangZahlungTab({
         ) : (
           <div style={{ height: 8 }} aria-hidden />
         )}
+
+        {abschlagSummeAbweichungen.length > 0 ? (
+          <div className="zahlung-tab-hint">
+            <MockIcon ctx="btn" n="info" size={15} />
+            <span>
+              {abschlagSummeAbweichungen.length === 1 ? (
+                <>
+                  {abschlagSummeAbweichungen[0]!.rechnungsnummer
+                    ? `${abschlagSummeAbweichungen[0]!.rechnungsnummer} `
+                    : 'Dieser Abschlag '}
+                  bleibt bei {formatEurBetrag(abschlagSummeAbweichungen[0]!.gestelltBrutto)}{' '}
+                  — laut aktueller Auftragssumme wären es{' '}
+                  {formatEurBetrag(abschlagSummeAbweichungen[0]!.sollBrutto)}. Gestellte
+                  Rechnungen werden nicht umgeschrieben. Schlussrechnung gleicht die Differenz
+                  aus. Soll der Abschlag selbst passen: stornieren und die Rate neu stellen.
+                </>
+              ) : (
+                <>
+                  {abschlagSummeAbweichungen.length} gestellte Abschläge sitzen noch auf der
+                  alten Auftragssumme. Gestellte Rechnungen bleiben. Schlussrechnung gleicht
+                  ab — oder betroffene Abschläge stornieren und die Rate neu stellen.
+                </>
+              )}
+            </span>
+          </div>
+        ) : null}
 
         {nurEinzel ? (
           <div className="zahlung-tab-hint">

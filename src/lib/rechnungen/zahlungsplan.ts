@@ -344,6 +344,47 @@ export function berechneZahlungsplan(
   return { gesamtNetto, gesamtBrutto, zeilen }
 }
 
+export type AbschlagAuftragSummeAbweichung = {
+  zeileId: string
+  titel: string
+  rechnungsnummer: string | null
+  gestelltBrutto: number
+  sollBrutto: number
+}
+
+/**
+ * Gestellter Abschlag weicht von % der *aktuellen* Auftragssumme ab.
+ * Schlussrate und Entwürfe/Stornos zählen nicht — die bleiben bewusst auf Ist-Betrag.
+ */
+export function abschlagWeichtVonAktuellerAuftragssummeAb(
+  plan: Zahlungsplan,
+  gesamtNetto: number,
+  links: RechnungAbschlagLink[],
+  mwstSatz = 19
+): AbschlagAuftragSummeAbweichung[] {
+  const soll = berechneZahlungsplan(plan, gesamtNetto, mwstSatz)
+  const out: AbschlagAuftragSummeAbweichung[] = []
+  for (const z of soll.zeilen) {
+    if (z.istSchluss) continue
+    const link = rechnungFuerAbschlagZeile(z.id, links)
+    if (!link) continue
+    const st = String(link.status ?? '').toLowerCase()
+    if (st === 'storniert' || st === 'entwurf') continue
+    if (String(link.beleg_typ ?? 'rechnung') === 'gutschrift') continue
+    const gestellt = Number(link.brutto)
+    if (!Number.isFinite(gestellt)) continue
+    if (Math.abs(gestellt - z.brutto) <= 0.05) continue
+    out.push({
+      zeileId: z.id,
+      titel: z.titel?.trim() || `Abschlag ${z.index}`,
+      rechnungsnummer: link.rechnungsnummer?.trim() || null,
+      gestelltBrutto: gestellt,
+      sollBrutto: z.brutto,
+    })
+  }
+  return out
+}
+
 /**
  * Prüft, ob Abschläge die Auftragssumme (VK netto) überschreiten können.
  * Typisch: mehrere %- oder Betragszeilen ohne Deckel (z. B. 60 %+60 %+Rest → 120 %).

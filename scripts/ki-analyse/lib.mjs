@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
+import { assertNotProdWrite } from '../lib/prod-guard.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 export const CRM_ROOT = join(__dirname, '..', '..')
@@ -26,6 +27,7 @@ export function createAdminClient() {
   if (!url || !key) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY in .env.local nötig.')
   }
+  assertNotProdWrite({ supabaseUrl: url }, 'NEXT_PUBLIC_SUPABASE_URL')
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   })

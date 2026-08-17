@@ -51,6 +51,19 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
   const start = String(auftrag.start_datum ?? '').trim().slice(0, 10)
   const end = String(auftrag.end_datum ?? '').trim().slice(0, 10)
 
+  const { data: rechnungen } = await supabase
+    .from('rechnungen')
+    .select('id, status, rechnung_art, beleg_typ, richtung')
+    .eq('auftrag_id', id)
+
+  const gestellteAbschlaege = (rechnungen ?? []).filter((r) => {
+    if (String(r.richtung ?? '') === 'eingehend') return false
+    if (String(r.beleg_typ ?? 'rechnung') === 'gutschrift') return false
+    if (String(r.rechnung_art ?? '') !== 'abschlag') return false
+    const st = String(r.status ?? '').toLowerCase()
+    return st === 'gesendet' || st === 'versendet' || st === 'bezahlt'
+  }).length
+
   return {
     ok: true,
     angebotId,
@@ -58,7 +71,7 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
     bootstrap: {
       ...loaded.bootstrap,
       bereitsGesendet: true,
-      auftragKorrektur: { auftragId: id },
+      auftragKorrektur: { auftragId: id, gestellteAbschlaege },
       meta: {
         ...loaded.bootstrap.meta,
         // Korrektur: neues Angebotsdatum in der Vorschau → Gültigkeit ab heute

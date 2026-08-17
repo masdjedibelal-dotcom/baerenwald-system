@@ -3,7 +3,7 @@
 Next.js 14 CRM — Deployment ausschließlich über **Netlify** (`netlify.toml`, `@netlify/plugin-nextjs`).
 
 ## Lokal starten
-
+1
 ```bash
 npm install
 cp .env.example .env.local   # Werte ausfüllen
