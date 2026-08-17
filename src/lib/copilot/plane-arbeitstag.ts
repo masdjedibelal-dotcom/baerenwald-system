@@ -8,6 +8,7 @@ import {
   getOffeneRechnungen,
 } from '@/lib/copilot/tools'
 import { listTodosCopilot } from '@/lib/copilot/todo-copilot'
+import { istUeberfaelligYmd } from '@/lib/dates/werktag'
 
 /** Kurzer Arbeitsplan aus Live-CRM-Daten — für Planung im Assistenten. */
 export async function planeArbeitstag() {
@@ -27,7 +28,7 @@ export async function planeArbeitstag() {
       id: string
       rechnungsnummer?: string
     }>
-  ).filter((r) => r.faellig_am && r.faellig_am.slice(0, 10) < heute)
+  ).filter((r) => r.faellig_am && istUeberfaelligYmd(r.faellig_am))
 
   const todoList = 'todos' in todos && Array.isArray(todos.todos) ? todos.todos : []
 

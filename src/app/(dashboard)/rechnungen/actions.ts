@@ -33,6 +33,12 @@ import {
   rechnungUpdateMitSchemaFallback,
 } from '@/lib/rechnungen/rechnung-speichern'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import {
+  berechneRechnungZahlungszielUpdate,
+  mahnungFelderBeiFaelligkeitAenderung,
+  rechnungZahlungszielIstBearbeitbar,
+} from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
+import type { ZahlfristSeg } from '@/lib/zahlfrist'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
@@ -265,6 +271,64 @@ export async function updateRechnungEntwurf(
   revalidatePath(`/rechnungen/${id}`)
   revalidatePath('/vorgaenge')
   return { ok: true }
+}
+
+/** Fälligkeit / Zahlungsziel nachträglich — ohne Storno (Entwurf + versendet). */
+export async function updateRechnungZahlungsziel(input: {
+  rechnungId: string
+  zahlfrist: ZahlfristSeg
+  zahlfristDatum?: string
+}): Promise<{ ok: true; faellig_am: string } | { ok: false; message: string }> {
+  const rechnungId = input.rechnungId?.trim()
+  if (!rechnungId) return { ok: false, message: 'Rechnung fehlt.' }
+
+  const supabase = createClient()
+  const { data: rec, error: loadErr } = await supabase
+    .from('rechnungen')
+    .select('id, status, beleg_typ, richtung, faellig_am, rechnungsdatum, created_at, zahlungsbedingungen')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden.' }
+
+  if (
+    !rechnungZahlungszielIstBearbeitbar({
+      status: rec.status as string,
+      beleg_typ: rec.beleg_typ as string,
+      richtung: rec.richtung as string,
+    })
+  ) {
+    return { ok: false, message: 'Zahlungsziel kann für diese Rechnung nicht mehr geändert werden.' }
+  }
+
+  const rechnungsdatum =
+    String(rec.rechnungsdatum ?? '').trim().slice(0, 10) ||
+    String(rec.created_at ?? '').trim().slice(0, 10) ||
+    new Date().toISOString().slice(0, 10)
+
+  const { faellig_am, zahlungsbedingungen } = berechneRechnungZahlungszielUpdate({
+    zahlfrist: input.zahlfrist,
+    zahlfristDatum: input.zahlfristDatum?.trim()?.slice(0, 10) ?? '',
+    rechnungsdatum,
+    bisherigeZahlungsbedingungen: rec.zahlungsbedingungen as string | null,
+  })
+
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({
+      faellig_am,
+      zahlungsbedingungen,
+      ...mahnungFelderBeiFaelligkeitAenderung(faellig_am, rec.faellig_am as string | null),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', rechnungId)
+
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath('/vorgaenge')
+  return { ok: true, faellig_am }
 }
 
 /** Gutschrift zur Originalrechnung (negative Beträge, neue Nummer GS-BW-…). */
@@ -1298,18 +1362,6 @@ export async function previewRechnungKundeMail(input: {
   return { ok: true, html: tpl.html, betreff: tpl.betreff }
 }
 
-function tageSeitFaelligkeitYmd(faelligAm: string | null): number {
-  if (!faelligAm) return 0
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, m, d] = parts
-  const due = new Date(y, m - 1, d)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
-}
-
 type ZahlungserinnerungRechnungRow = {
   rechnungsnummer: string | null
   status: string | null
@@ -1390,7 +1442,7 @@ function buildZahlungserinnerungVorschau(
       brutto: Number(rec.brutto ?? 0),
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       zahlbarBis: formatDatumDeFromIso(zahlbarBisIso),
-      tageUeberfaellig: Math.max(0, tageSeitFaelligkeitYmd(rec.faellig_am)),
+      tageUeberfaellig: Math.max(0, tageSeitFaelligkeitRechnung(rec.faellig_am)),
       stufe,
       iban,
       anrede,

@@ -6,6 +6,7 @@ import { MockProp } from '@/components/mock-ui/MockProp'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import type { LeadDetail, Rechnung, RechnungBelegTyp } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
+import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 
 function artLabel(detail: Rechnung, belegTyp: RechnungBelegTyp): string {
   if (belegTyp === 'gutschrift') return RECHNUNG_BELEG_TYP_LABELS.gutschrift
@@ -35,18 +36,6 @@ function zahlungszielTage(
   return diff > 0 ? diff : fallback
 }
 
-function tageSeitFaelligkeit(faelligAm: string | null): number {
-  if (!faelligAm) return 0
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, m, d] = parts
-  const due = new Date(y!, m! - 1, d!)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
-}
-
 /** Details: Rechnungsdaten · Zahlungsstatus (Leistungen → shared LeistungenTab). */
 export function RechnungDetailsTab({
   detail,
@@ -59,7 +48,7 @@ export function RechnungDetailsTab({
   const belegTyp: RechnungBelegTyp =
     detail.beleg_typ === 'gutschrift' ? 'gutschrift' : 'rechnung'
 
-  const tageUeber = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
+  const tageUeber = detail.faellig_am ? tageSeitFaelligkeitRechnung(detail.faellig_am) : 0
   const ueberfaellig =
     tageUeber > 0 &&
     detail.status !== 'bezahlt' &&

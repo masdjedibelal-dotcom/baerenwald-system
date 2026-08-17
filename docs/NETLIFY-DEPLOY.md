@@ -38,7 +38,7 @@ Eine Scheduled Function **`cron-dispatcher`** (Schedule `0,30 * * * *` UTC) ruft
 
 | Job | Route | UTC |
 |---|---|---|
-| Rechnungen / Mahnung | `/api/cron/rechnungen` | 23:00 |
+| Rechnungen / Mahnung | `/api/cron/rechnungen` | 23:30 UTC (~01:30 MESZ) |
 | KI-Hub Metriken | `/api/cron/ki-hub-metrics` | 06:30 |
 | KI-Hub Analyse | `/api/cron/ki-hub-analyze` | 07:00 Mo–Sa |
 | Copilot Briefing | `/api/cron/copilot-briefing` | 07:30 Mo–Sa |

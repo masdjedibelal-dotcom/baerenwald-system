@@ -2,6 +2,7 @@ import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-p
 import { berechneRechnung, type RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 
 function neueZahlungsplanId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -90,7 +91,8 @@ function plusDaysIso(days: number): string {
   const d = new Date()
   d.setHours(12, 0, 0, 0)
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  const raw = d.toISOString().slice(0, 10)
+  return effektivesFaelligAmYmd(raw) ?? raw
 }
 
 export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {

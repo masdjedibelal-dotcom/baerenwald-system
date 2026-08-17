@@ -3,6 +3,8 @@
  * Es werden keine eigenen Rechnungsobjekte angelegt.
  */
 
+import { tageSeitEffektiverFaelligkeit, tageZwischenYmd, ymdAusIsoInZezone, heuteYmdInZezone } from '@/lib/dates/werktag'
+
 export type MahnverlaufStufeId = 'rechnung' | 'stufe1' | 'stufe2' | 'intern30'
 
 export type MahnverlaufStufeState = 'done' | 'active' | 'open' | 'skipped'
@@ -31,20 +33,9 @@ export type RechnungListeMahnKontext = Pick<
   'status' | 'erinnerung_7_sent_at' | 'erinnerung_21_sent_at'
 >
 
-function parseYmdLocal(ymd: string): Date {
-  const p = ymd.split('-').map((x) => parseInt(x, 10))
-  if (p.length !== 3 || p.some((n) => Number.isNaN(n))) return new Date(NaN)
-  return new Date(p[0], p[1] - 1, p[2])
-}
-
+/** Tage seit effektiver Fälligkeit (Sa/So → Montag). */
 export function tageSeitFaelligkeitRechnung(faelligAm: string | null | undefined): number {
-  if (!faelligAm) return 0
-  const due = parseYmdLocal(faelligAm)
-  if (Number.isNaN(due.getTime())) return 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
+  return tageSeitEffektiverFaelligkeit(faelligAm)
 }
 
 /** Erste Erinnerung: erster Kalendertag nach Ablauf des Zahlungsziels (Fälligkeit). */
@@ -56,19 +47,16 @@ export const MAHNUNG_INTERN_TAGE_UEBERFAELLIG = 30
 
 function tageSeitZeitpunkt(iso: string | null | undefined): number {
   if (!iso) return 0
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  d.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - d.getTime()) / 86400000)
+  const ymd = ymdAusIsoInZezone(iso)
+  if (!ymd) return 0
+  return tageZwischenYmd(ymd, heuteYmdInZezone())
 }
 
 export type CronMahnungAktion = 'stufe1' | 'stufe2' | 'intern30'
 
 /**
  * Eine Aktion pro Lauf — nie Stufe 1 und 2 am selben Tag.
- * Fälligkeit = Zahlungsziel der Rechnung, wird nicht verschoben.
+ * Fälligkeit = Zahlungsziel; fällt sie auf Sa/So, gilt der nächste Werktag.
  */
 export function cronMahnungFuerRechnung(r: {
   faellig_am: string | null
@@ -166,7 +154,7 @@ export function buildRechnungMahnverlauf(ctx: RechnungMahnKontext): MahnverlaufS
       label: '1. Zahlungserinnerung',
       sentAt: ctx.erinnerung_7_sent_at ?? null,
       state: stufeState(ctx.erinnerung_7_sent_at, 1),
-      hint: 'Automatisch am Tag nach Ablauf des Zahlungsziels, wenn nicht als bezahlt markiert.',
+      hint: 'Automatisch am Tag nach Ablauf des Zahlungsziels (Fälligkeit auf Werktag), wenn nicht bezahlt.',
     },
     {
       id: 'stufe2',

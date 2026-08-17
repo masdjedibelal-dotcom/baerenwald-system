@@ -45,9 +45,11 @@ import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
+import { RechnungZahlungszielCard } from '@/components/rechnungen/RechnungZahlungszielCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
@@ -133,18 +135,6 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
   }
   if (RECHNUNG_DETAIL_TAB_IDS.has(tab as RechnungDetailTab)) return tab as RechnungDetailTab
   return RECHNUNG_DETAIL_DEFAULT_TAB
-}
-
-function tageSeitFaelligkeit(faelligAm: string | null): number {
-  if (!faelligAm) return 0
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, m, d] = parts
-  const due = new Date(y!, m! - 1, d!)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
 }
 
 function rechnungTitelMeta(
@@ -268,7 +258,7 @@ export function RechnungDetailClient({
     : detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
   const kundeId = detail.kunden?.id ?? detail.kunde_id
 
-  const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
+  const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeitRechnung(detail.faellig_am) : 0
   const ueberfaellig =
     !isEingehend &&
     tageUeberfaellig > 0 &&
@@ -595,6 +585,13 @@ export function RechnungDetailClient({
   const uebersichtInhalt = (
     <div className="space-y-6">
       {stammdatenInhalt}
+      {!isEingehend ? (
+        <RechnungZahlungszielCard
+          detail={detail}
+          zahlungszielFallback={zahlungszielFallback}
+          onSaved={() => refresh()}
+        />
+      ) : null}
       {!isEingehend ? (
         <VorgangPhasenVerlauf
           kontext={projektKontext}

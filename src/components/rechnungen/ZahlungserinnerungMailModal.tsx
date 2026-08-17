@@ -193,7 +193,7 @@ export function ZahlungserinnerungMailModal({
 
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             {stufe === 1
-              ? 'Geht automatisch am Tag nach Ablauf des Zahlungsziels, wenn nicht bezahlt. Das Fälligkeitsdatum der Rechnung bleibt.'
+              ? 'Geht automatisch am Tag nach Ablauf des Zahlungsziels (Fälligkeit auf Werktag), wenn nicht bezahlt.'
               : 'Zweite Erinnerung — 7 Tage nach der ersten, falls weiter unbezahlt.'}{' '}
             In der Mail: Zahlbar bis <strong>{mail.zahlbarBisLabel}</strong>
             {erinnerung7SentAt ? (

@@ -1,4 +1,5 @@
 import { addDaysYmd } from '@/lib/angebot-einfach'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 
 export type ZahlungserinnerungStufe = 1 | 2
 
@@ -7,17 +8,19 @@ export const ZAHLUNGSERINNERUNG_FRIST_TAGE = 7
 
 /**
  * Neue Fälligkeit nach Zahlungserinnerung:
- * bisherige Fälligkeit + 7 Tage (bei fehlender Fälligkeit: Absendedatum + 7).
+ * effektive Fälligkeit + 7 Tage (Sa/So → Werktag).
  */
 export function zahlungserinnerungZahlbarBis(
   bisherigeFaelligAmIso: string | null | undefined,
   absendeYmd?: string
 ): string {
-  const basis =
+  const basisRaw =
     bisherigeFaelligAmIso?.trim()?.slice(0, 10) ||
     absendeYmd?.trim()?.slice(0, 10) ||
     new Date().toISOString().slice(0, 10)
-  return addDaysYmd(basis, ZAHLUNGSERINNERUNG_FRIST_TAGE)
+  const basis = effektivesFaelligAmYmd(basisRaw) ?? basisRaw
+  const verlaengert = addDaysYmd(basis, ZAHLUNGSERINNERUNG_FRIST_TAGE)
+  return effektivesFaelligAmYmd(verlaengert) ?? verlaengert
 }
 
 export function zahlungserinnerungBetreff(stufe: ZahlungserinnerungStufe, nummer: string): string {

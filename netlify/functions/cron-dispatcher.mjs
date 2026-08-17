@@ -2,7 +2,8 @@ import { invokeCrmCron } from '../../lib/netlify/invoke-crm-cron.mjs'
 
 /** UTC-Zeitpläne — früher je eigene netlify/functions/cron-*.mjs */
 const JOBS = [
-  { id: 'rechnungen', path: '/api/cron/rechnungen', hour: 23, minute: 0, dom: null, dow: null },
+  /** 23:30 UTC ≈ 01:30 Europe/Berlin (Sommer); 00:30 im Winter (MEZ) */
+  { id: 'rechnungen', path: '/api/cron/rechnungen', hour: 23, minute: 30, dom: null, dow: null },
   { id: 'ki-hub-metrics', path: '/api/cron/ki-hub-metrics', hour: 6, minute: 30, dom: null, dow: null },
   {
     id: 'ki-hub-analyze',

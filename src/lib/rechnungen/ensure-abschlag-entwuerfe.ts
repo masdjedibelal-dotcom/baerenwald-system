@@ -1,8 +1,4 @@
-/**
- * Beim Anlegen/Speichern eines Abschlagsplans: alle Raten als RE-Entwürfe anlegen.
- * Versand erfolgt einzeln („Nächsten Abschlag senden“).
- */
-
+import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
 import {
   auftragSummenAusPositionen,
   berechneBereitsGestellt,
@@ -191,7 +187,7 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
       positionen: zeilenPos,
       leistungszeitraum_von: leistungVon,
       leistungszeitraum_bis: leistungBis,
-      faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || heute,
+      faellig_am: normalizeFaelligAmYmd(zeile.faellig_am?.trim()?.slice(0, 10) || heute) ?? heute,
       rechnungsdatum: heute,
       reverse_charge_13b: false,
       hinweis_35a: null as boolean | null,

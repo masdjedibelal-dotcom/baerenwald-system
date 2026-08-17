@@ -1,4 +1,5 @@
 /** Mock-Segmente für Zahlfrist / Zahlungsziel (Angebot + Rechnung). */
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 export type ZahlfristSeg = '7' | '14' | '30' | 'datum'
 
 export const ZAHLFRIST_SEG_OPTIONS: Array<{ value: ZahlfristSeg; label: string }> = [
@@ -66,10 +67,11 @@ export function patchZahlungsbedingungenMitZahlfrist(
   return neu
 }
 
-/** Fälligkeitsdatum aus Segment (bei „Datum“ = freies Datum). */
+/** Fälligkeitsdatum aus Segment (bei „Datum“ = freies Datum). Sa/So → nächster Werktag. */
 export function faelligAmFromZahlfrist(seg: ZahlfristSeg, datumYmd: string, from = new Date()): string {
-  if (seg === 'datum') return datumYmd?.trim() || plusDaysIso(7, from)
-  return plusDaysIso(Number(seg) || 7, from)
+  const raw =
+    seg === 'datum' ? datumYmd?.trim() || plusDaysIso(7, from) : plusDaysIso(Number(seg) || 7, from)
+  return effektivesFaelligAmYmd(raw) ?? raw
 }
 
 /** Segment aus gespeichertem Fälligkeitsdatum (relativ zu heute) ableiten. */

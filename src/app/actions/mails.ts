@@ -18,7 +18,8 @@ import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
-import { cronMahnungFuerRechnung } from '@/lib/rechnungen/mahnverlauf'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
+import { cronMahnungFuerRechnung, tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
@@ -213,14 +214,7 @@ export async function sendBesichtigungTerminBestaetigung(input: {
 }
 
 function tageUeberfaellig(faelligAm: string): number {
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, mo, d] = parts
-  const due = new Date(y, mo - 1, d)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
+  return tageSeitFaelligkeitRechnung(faelligAm)
 }
 
 type RechnungRow = {
@@ -251,7 +245,6 @@ export async function sendZahlungserinnerungen(): Promise<{
   bearbeitet: number
   details: { id: string; aktion: string }[]
 }> {
-  const heute = new Date().toISOString().slice(0, 10)
   const branding = await getMailBranding(supabaseAdmin)
   const iban = branding.iban || process.env.EMAIL_FIRMEN_IBAN || ''
 
@@ -263,7 +256,6 @@ export async function sendZahlungserinnerungen(): Promise<{
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
     .not('faellig_am', 'is', null)
-    .lt('faellig_am', heute)
 
   if (error) {
     console.error('[sendZahlungserinnerungen]', error.message)
@@ -287,7 +279,8 @@ export async function sendZahlungserinnerungen(): Promise<{
     const kundeTyp = (kunde as { typ?: string | null } | null)?.typ ?? null
     const brutto = r.brutto ?? 0
     const tage = tageUeberfaellig(r.faellig_am)
-    const faelligFmt = formatDeDate(r.faellig_am)
+    const faelligEff = effektivesFaelligAmYmd(r.faellig_am) ?? r.faellig_am
+    const faelligFmt = formatDeDate(faelligEff)
 
     try {
       if (aktion === 'stufe1' || aktion === 'stufe2') {

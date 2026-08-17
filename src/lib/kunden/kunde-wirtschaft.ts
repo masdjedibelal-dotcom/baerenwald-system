@@ -181,7 +181,7 @@ export function buildKundeWirtschaft(
   }
 
   const offenerBetrag = (kunde.rechnungen ?? [])
-    .filter((r) => r.status !== 'bezahlt' && r.status !== 'storniert')
+    .filter((r) => r.status === 'gesendet')
     .reduce((s, r) => s + (Number(r.brutto) || 0), 0)
 
   const auftraege = kunde.auftraege ?? []
