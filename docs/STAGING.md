@@ -8,7 +8,8 @@ Staging ist ein **eigenes** Supabase-Projekt. Prod ist ab jetzt **read-only**.
 | Prod (READ-ONLY) | `wnotlydvhsmfkhexgeol` |
 | Staging-Project-Ref | `soqownnkxmtfgvsbrgsl` |
 | Staging-Projekt-ID | `2503565e-8a02-4af4-bed6-e240a544235d` |
-| Schema-Weg | A — `pg_dump --schema-only` von Prod, Restore nach Staging (keine Zeilen) |
+| Staging-Website (Portal) | `https://staging--baerenwald.netlify.app` |
+| Staging-CRM | `https://staging--baerenwald-backend.netlify.app` |
 
 Phase A–E (Env-Kanon, Mail-Catch, noindex) ist **nicht** Teil dieses Schritts.
 
@@ -104,7 +105,9 @@ Auf der Staging-Loginseite vorausgefüllt, nur wenn die App an `soqownnkxmtfgvsb
 | Privat / Gewerbe | `familie.berger@example.test` · `cafe.giesing@example.test` | `StagingTest!2026` |
 | Partner | `partner-elektro@example.test` · `-maler` · `-sanitaer` · `-dach` · `-boden` | `StagingTest!2026` |
 
-Alle Kunden und Handwerker auf Staging bekommen ein Portal-Konto (`auth_user_id`, E-Mail bestätigt). Im CRM steht dann **Portal aktiv** mit Login. Nachziehen ohne kompletten Seed:
+Alle Kunden und Handwerker auf Staging bekommen ein Portal-Konto (`auth_user_id`, E-Mail bestätigt). Im CRM steht dann **Portal aktiv** mit Login — der Link geht auf **https://staging--baerenwald.netlify.app**, nicht auf die Live-Website.
+
+Nachziehen ohne kompletten Seed:
 
 ```bash
 node --env-file=.env.staging scripts/staging/register-portal-users.mjs
