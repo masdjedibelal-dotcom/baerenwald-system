@@ -14,6 +14,9 @@ export type HwKonditionenPosition = {
   hw_netto: number
   mwst_satz: number
   geaendert: boolean
+  menge?: number
+  einheit?: string
+  gewerk_name?: string
 }
 
 export type HwKonditionenJson = {
@@ -48,18 +51,31 @@ export function parseHwKonditionen(raw: unknown): HwKonditionenJson | null {
   for (const item of posRaw) {
     if (!item || typeof item !== 'object') continue
     const p = item as Record<string, unknown>
-    const hw = num(p.hw_netto)
-    if (hw < 0) continue
+    const menge = Math.max(num(p.menge) || 1, 0.0001)
+    const einzel = num(p.einzelpreis_netto)
+    const gesamt = num(p.gesamt_netto)
+    const hwRaw = num(p.hw_netto)
+    const hwZeile = hwRaw > 0 ? hwRaw : gesamt > 0 ? gesamt : einzel > 0 ? round2(einzel * menge) : 0
+    if (hwZeile < 0) continue
+    const leistung =
+      String(p.leistung ?? p.leistung_name ?? '')
+        .trim() || 'Leistung'
+    const einheitRaw = typeof p.einheit === 'string' ? p.einheit.trim() : ''
+    const gewerkName =
+      typeof p.gewerk_name === 'string' ? p.gewerk_name.trim() : ''
     positionen.push({
       position_id: String(p.position_id ?? '').trim(),
-      leistung: String(p.leistung ?? 'Leistung').trim() || 'Leistung',
+      leistung,
       beschreibung:
         typeof p.beschreibung === 'string' ? p.beschreibung.trim() || undefined : undefined,
       ek_netto:
         p.ek_netto == null ? null : num(p.ek_netto) > 0 ? round2(num(p.ek_netto)) : null,
-      hw_netto: round2(hw),
+      hw_netto: round2(hwZeile),
       mwst_satz: resolveMwstSatz(p),
       geaendert: Boolean(p.geaendert),
+      menge,
+      einheit: einheitRaw || undefined,
+      gewerk_name: gewerkName || undefined,
     })
   }
 

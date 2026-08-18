@@ -7,6 +7,13 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[context.staging.environment]
+  NEXT_PUBLIC_SITE_URL = "https://staging--baerenwald.netlify.app"
+  NEXT_PUBLIC_WEBSEITE_URL = "https://staging--baerenwald.netlify.app"
+  FRONTEND_URL = "https://staging--baerenwald.netlify.app"
+  CRM_PUBLIC_URL = "https://staging--baerenwald-backend.netlify.app"
+  NEXT_PUBLIC_APP_URL = "https://staging--baerenwald-backend.netlify.app"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 

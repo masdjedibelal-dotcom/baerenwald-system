@@ -1,9 +1,10 @@
 import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
+import { ohnePartnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
 
 export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undefined): boolean {
-  return (rows ?? []).length > 0
+  return ohnePartnerLvZuweisungen(rows).length > 0
 }
 
 export function handwerkerZuweisungAktiv(z: AngebotHandwerkerRow): boolean {
@@ -43,11 +44,15 @@ export function handwerkerPipelineErledigt(rows: AngebotHandwerkerRow[] | null |
   return handwerkerFreigabeErledigt(list)
 }
 
+function zuweisungenMitLv(rows: AngebotHandwerkerRow[] | null | undefined): AngebotHandwerkerRow[] {
+  return (rows ?? []).filter((r) => r.ohne_lv !== true)
+}
+
 export function darfAngebotAnKundeSenden(
   rows: AngebotHandwerkerRow[] | null | undefined,
   angebotStatus?: string | null
 ): boolean {
-  const list = rows ?? []
+  const list = zuweisungenMitLv(rows)
   if (!list.length) return true
   if (angebotStatus === 'handwerker_akzeptiert') return true
   return handwerkerFreigabeErledigt(list)
@@ -77,7 +82,7 @@ export function handwerkerSendenBlockierHinweis(
 ): string {
   const orgHinweis = orgFreigabeBlockierHinweis(orgStatus)
   if (orgHinweis) return orgHinweis
-  const list = rows ?? []
+  const list = zuweisungenMitLv(rows)
   if (!list.length) {
     return 'Bitte zuerst Handwerker zuweisen und Partner-Angebot einholen.'
   }

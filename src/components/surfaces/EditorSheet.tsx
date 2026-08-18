@@ -349,8 +349,8 @@ export function EditorSheet({
         size === 'lg' && 'editor-sheet--lg',
         isRecessed && 'editor-sheet--recessed',
         isStacked && layout === 'bottom' && 'editor-sheet--stack-bottom',
-        /* Fallback falls CSS-Build margin/justify droppt: Panel rechts ankern */
-        layout === 'slide' && 'absolute right-0 top-0 ml-auto',
+        /* Fallback falls CSS-Build Höhe/Anker droppt: Panel rechts, volle Viewport-Höhe */
+        layout === 'slide' && 'absolute right-0 top-0 bottom-0 h-full ml-auto',
         className
       )}
       role="dialog"

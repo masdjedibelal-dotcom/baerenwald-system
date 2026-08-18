@@ -52,6 +52,7 @@ export function DirektBeauftragenWizard({
   lead,
   gewerke = [],
   preislisten = [],
+  initialLines,
   firm: _firm,
   onClose,
   onDone,
@@ -59,12 +60,15 @@ export function DirektBeauftragenWizard({
   lead: LeadDetail
   gewerke?: Gewerk[]
   preislisten?: Preisliste[]
+  initialLines?: PosBoardLine[]
   firm?: FirmenEinstellungen
   onClose: () => void
   onDone: (auftragId: string) => void
 }) {
   const [pending, startTransition] = useLocalTransition()
-  const [lines, setLines] = useState<PosBoardLine[]>(() => seedLinesFromLead(lead))
+  const [lines, setLines] = useState<PosBoardLine[]>(() =>
+    initialLines && initialLines.length > 0 ? initialLines : seedLinesFromLead(lead)
+  )
   const istAkut = leadIstAkut(lead)
   const titel = useMemo(() => vorhabenTitel(lead), [lead])
   const gewerkNamen = useMemo(

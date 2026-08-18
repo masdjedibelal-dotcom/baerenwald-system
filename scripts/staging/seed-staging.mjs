@@ -16,6 +16,7 @@ import {
   assertStagingWriteTarget,
   STAGING_PROJECT_REF_CANON,
 } from '../lib/prod-guard.mjs'
+import { registerAllPortalUsers } from './register-portal-users.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CRM_ROOT = join(__dirname, '../..')
@@ -164,10 +165,38 @@ const mieterAuthId = await ensureAuthUser({
   email: 'mieter-muster@example.test',
   userMetadata: { name: 'Mia Muster' },
 })
+const hvWestAuthId = await ensureAuthUser({
+  email: 'hv-west@example.test',
+  userMetadata: { name: 'HV Muster West' },
+})
+const bergerAuthId = await ensureAuthUser({
+  email: 'familie.berger@example.test',
+  userMetadata: { name: 'Familie Berger' },
+})
+const cafeAuthId = await ensureAuthUser({
+  email: 'cafe.giesing@example.test',
+  userMetadata: { name: 'Café Giesing GmbH' },
+})
 const partnerAuthIds = {
   elektro: await ensureAuthUser({
     email: 'partner-elektro@example.test',
     userMetadata: { name: 'Elektro Muster GmbH' },
+  }),
+  maler: await ensureAuthUser({
+    email: 'partner-maler@example.test',
+    userMetadata: { name: 'Maler Weiß & Sohn' },
+  }),
+  sanitaer: await ensureAuthUser({
+    email: 'partner-sanitaer@example.test',
+    userMetadata: { name: 'Sanitär Klar' },
+  }),
+  dach: await ensureAuthUser({
+    email: 'partner-dach@example.test',
+    userMetadata: { name: 'Dach & Fassade Huber' },
+  }),
+  boden: await ensureAuthUser({
+    email: 'partner-boden@example.test',
+    userMetadata: { name: 'Boden Schmidt' },
   }),
 }
 
@@ -291,8 +320,9 @@ const hvWestId = await upsertBy(
     org_kennung: 'staging-muster-west',
     org_anzeigename: 'Musterverwaltung West',
     freigabe_modus: 'freigabe',
+    auth_user_id: hvWestAuthId,
     quelle: 'staging-seed',
-    notizen: 'STAGING HV West ohne Login',
+    notizen: 'STAGING HV West',
   }
 )
 
@@ -334,6 +364,7 @@ const bergerId = await upsertBy(
     ort: 'München',
     adresse: 'Tegernseer Landstraße 88',
     portal_modus: 'privat',
+    auth_user_id: bergerAuthId,
     quelle: 'staging-seed',
     notizen: 'STAGING Privatkunde Berger',
   }
@@ -353,6 +384,7 @@ const cafeId = await upsertBy(
     ort: 'München',
     adresse: 'Giesinger Bahnhofplatz 1',
     portal_modus: 'privat',
+    auth_user_id: cafeAuthId,
     quelle: 'staging-seed',
     notizen: 'STAGING Gewerbe Café',
   }
@@ -441,6 +473,7 @@ const handwerkerSpecs = [
     hausnummer: '4',
     gewerke: ['maler'],
     fachbetrieb: false,
+    auth_user_id: partnerAuthIds.maler,
   },
   {
     email: 'partner-sanitaer@example.test',
@@ -452,6 +485,7 @@ const handwerkerSpecs = [
     hausnummer: '12',
     gewerke: ['sanitaer'],
     fachbetrieb: true,
+    auth_user_id: partnerAuthIds.sanitaer,
   },
   {
     email: 'partner-dach@example.test',
@@ -463,6 +497,7 @@ const handwerkerSpecs = [
     hausnummer: '9',
     gewerke: ['dach'],
     fachbetrieb: true,
+    auth_user_id: partnerAuthIds.dach,
   },
   {
     email: 'partner-boden@example.test',
@@ -474,6 +509,7 @@ const handwerkerSpecs = [
     hausnummer: '3',
     gewerke: ['boden'],
     fachbetrieb: false,
+    auth_user_id: partnerAuthIds.boden,
   },
 ]
 
@@ -646,13 +682,13 @@ for (const spec of leadSpecs) {
 }
 console.log('  vorgänge: 7 (neu, kontaktiert, termin, angebot, auftrag, abgeschlossen, abgebrochen)')
 
-void hvWestId
+console.log('  Portal-Konten für alle Kunden/Handwerker …')
+await registerAllPortalUsers(admin)
 
 console.log('')
 console.log('Seed fertig.')
 console.log(`  CRM-Admin  ${STAGING_ADMIN_EMAIL}  /  ${STAGING_ADMIN_PASSWORD}`)
-console.log('  HV Nord    hv-nord@example.test')
-console.log('  HV Süd     hv-sued@example.test')
-console.log('  Mieter     mieter-muster@example.test')
-console.log('  Partner    partner-elektro@example.test')
+console.log('  HV         hv-nord / hv-sued / hv-west @example.test')
+console.log('  Kunden     mieter-muster / familie.berger / cafe.giesing @example.test')
+console.log('  Partner    partner-elektro / -maler / -sanitaer / -dach / -boden @example.test')
 console.log(`  Passwort aller Test-Logins: ${STAGING_PASSWORD}`)

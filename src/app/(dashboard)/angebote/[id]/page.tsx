@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotDetailPageClient } from '@/components/angebote/AngebotDetailPageClient'
@@ -37,6 +37,13 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
   )
 
   if (error || !data) notFound()
+
+  const internEinholung = (data as { ist_partner_einholung?: boolean | null; lead_id?: string | null })
+    .ist_partner_einholung === true
+  const internLeadId = (data as { lead_id?: string | null }).lead_id?.trim()
+  if (internEinholung && internLeadId) {
+    redirect(`/anfragen/${internLeadId}?tab=leistungen`)
+  }
 
   const detail: AngebotDetail = {
     ...(data as AngebotDetail),

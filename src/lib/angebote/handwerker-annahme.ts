@@ -43,6 +43,19 @@ function one<T>(x: T | T[] | null | undefined): T | null {
   return Array.isArray(x) ? (x[0] as T) ?? null : x
 }
 
+function hrefCrmNachHwAntwort(opts: {
+  leadId?: string | null
+  angebotId?: string | null
+  partnerEinholung?: boolean
+}): string {
+  const leadId = opts.leadId?.trim() || null
+  const angebotId = opts.angebotId?.trim() || null
+  if (opts.partnerEinholung && leadId) return `/anfragen/${leadId}?tab=leistungen`
+  if (angebotId) return `/angebote/${angebotId}?tab=leistungen`
+  if (leadId) return `/anfragen/${leadId}?tab=leistungen`
+  return '/vorgaenge'
+}
+
 export type AcceptHandwerkerZuweisungInput = {
   zuweisungId: string
   angebotId?: string | null
@@ -93,9 +106,10 @@ export async function acceptHandwerkerZuweisung(
       handwerker_id,
       status,
       antwort_at,
+      ohne_lv,
       handwerker(name),
       gewerke(name),
-      angebote(id, lead_id)
+      angebote(id, lead_id, ist_partner_einholung)
     `
     )
     .eq('id', zuweisungId)
@@ -114,13 +128,20 @@ export async function acceptHandwerkerZuweisung(
   }
 
   const st = normalizeHwZuweisungStatus(raw.status as string)
-  const angebotEarly = one(raw.angebote as { id: string; lead_id: string | null } | null)
+  const angebotEarly = one(
+    raw.angebote as
+      | { id: string; lead_id: string | null; ist_partner_einholung?: boolean | null }
+      | null
+  )
   const hwEarly = one(raw.handwerker as { name: string } | null)
   const gwEarly = one(raw.gewerke as { name: string } | null)
+  const partnerEinholung =
+    Boolean(raw.ohne_lv) || angebotEarly?.ist_partner_einholung === true
 
   if (st === antwort || (antwort === 'akzeptiert' && isHwZuweisungAkzeptiertLenient(st))) {
     // Portal kann Shared-DB schon geschrieben haben — Push trotzdem, sonst bleibt CRM stumm.
-    if (input.notify !== false && input.quelle === 'portal') {
+    // Partner-Einholung: Einreichung ist die einzige Meldung, keine Extra-Zusage.
+    if (input.notify !== false && input.quelle === 'portal' && !(antwort === 'akzeptiert' && partnerEinholung)) {
       const leadId = angebotEarly?.lead_id ?? null
       const angebotId = String(raw.angebot_id ?? angebotEarly?.id ?? '')
       const handwerkerName = hwEarly?.name?.trim() || 'Handwerker'
@@ -133,11 +154,7 @@ export async function acceptHandwerkerZuweisung(
               ? `${handwerkerName} hat zugesagt`
               : `${handwerkerName} hat abgelehnt`,
           body: gewerkName,
-          url: angebotId
-            ? `/angebote/${angebotId}`
-            : leadId
-              ? `/anfragen/${leadId}`
-              : '/vorgaenge',
+          url: hrefCrmNachHwAntwort({ leadId, angebotId, partnerEinholung }),
           tag: `hw-antwort-${zuweisungId}`,
         })
       } catch (e) {
@@ -194,8 +211,8 @@ export async function acceptHandwerkerZuweisung(
 
   const notify = input.notify !== false
 
-  // V1/Q1: Kanonische Angebot-Pipeline
-  if (antwort === 'akzeptiert' && angebotId) {
+  // V1/Q1: Kanonische Angebot-Pipeline — nicht für intern Partner-Einholung
+  if (antwort === 'akzeptiert' && angebotId && !partnerEinholung) {
     await supabaseAdmin
       .from('angebote')
       .update({ status: ANGEBOT_STATUS_HW_AKZEPTIERT, updated_at: now })
@@ -203,7 +220,7 @@ export async function acceptHandwerkerZuweisung(
       .not('status', 'in', '("kunde_akzeptiert","beauftragt","storniert","abgelehnt")')
   }
 
-  if (antwort === 'akzeptiert' && raw.gewerk_id && angebotId) {
+  if (antwort === 'akzeptiert' && raw.gewerk_id && angebotId && !partnerEinholung) {
     const { data: parallel } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id, handwerker_id, status, handwerker(name)')
@@ -241,7 +258,7 @@ export async function acceptHandwerkerZuweisung(
     }
   }
 
-  if (notify && leadId && angebotId) {
+  if (notify && leadId && angebotId && !(partnerEinholung && antwort === 'akzeptiert')) {
     // Q3: exakt dieselben Titel wie Legacy-Token (CRM-UI/Filter)
     const titel =
       antwort === 'akzeptiert' ? 'Handwerker hat zugesagt' : 'Handwerker hat abgelehnt'
@@ -263,13 +280,14 @@ export async function acceptHandwerkerZuweisung(
     })
   }
 
-  if (notify) {
+  if (notify && !(partnerEinholung && antwort === 'akzeptiert')) {
     const { data: einRows } = await supabaseAdmin.from('einstellungen').select('key, value')
     const einMap = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
     const internTo = einMap.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://crm.baerenwaldmuenchen.de'
-    const dashboardUrl = angebotId ? `${baseUrl}/angebote/${angebotId}` : `${baseUrl}/angebote`
+    const dashboardPath = hrefCrmNachHwAntwort({ leadId, angebotId, partnerEinholung })
+    const dashboardUrl = `${baseUrl}${dashboardPath}`
 
     try {
       await sendCrmPushToStaff({
@@ -279,11 +297,7 @@ export async function acceptHandwerkerZuweisung(
             ? `${handwerkerName} hat zugesagt`
             : `${handwerkerName} hat abgelehnt`,
         body: [gewerkName, grundLabel].filter(Boolean).join(' · ') || gewerkName,
-        url: angebotId
-          ? `/angebote/${angebotId}`
-          : leadId
-            ? `/anfragen/${leadId}`
-            : '/vorgaenge',
+        url: dashboardPath,
         tag: `hw-antwort-${zuweisungId}`,
       })
     } catch (e) {

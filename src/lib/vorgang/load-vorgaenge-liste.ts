@@ -1,5 +1,6 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
+import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
@@ -179,7 +180,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
           db
             .from('angebote')
             .select(
-              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan'
+              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
@@ -336,25 +337,28 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
   }
 
   const leads = filterOutLegacyDemoLeads(leadsRes.data as unknown as LeadRow[])
-  const angebote = (angeboteRes.data ?? []) as Array<{
-    id: string
-    lead_id: string
-    status: string
-    status_einfach: string | null
-    gesendet_am: string | null
-    gesendet_kunde_at: string | null
-    leistungsumfang: string | null
-    notizen: string | null
-    gesamt_fix: number | null
-    gesamt_min: number | null
-    gesamt_max: number | null
-    created_at: string
-    updated_at: string | null
-    ist_wiederkehrend?: boolean | null
-    wiederkehr_turnus?: string | null
-    ersetzt_durch?: string | null
-    zahlungsplan?: unknown
-  }>
+  const angebote = filterKundenAngebote(
+    (angeboteRes.data ?? []) as Array<{
+      id: string
+      lead_id: string
+      status: string
+      status_einfach: string | null
+      gesendet_am: string | null
+      gesendet_kunde_at: string | null
+      leistungsumfang: string | null
+      notizen: string | null
+      gesamt_fix: number | null
+      gesamt_min: number | null
+      gesamt_max: number | null
+      created_at: string
+      updated_at: string | null
+      ist_wiederkehrend?: boolean | null
+      wiederkehr_turnus?: string | null
+      ersetzt_durch?: string | null
+      zahlungsplan?: unknown
+      ist_partner_einholung?: boolean | null
+    }>
+  )
   const auftraege = (auftraegeRes.data ?? []) as Array<{
     id: string
     lead_id: string

@@ -9,6 +9,7 @@ import type {
   ProjektKontext,
   ProjektRechnungKurz,
 } from '@/lib/crm/projekt-kontext-types'
+import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 
 type LoadProjektKontextInput = {
   activeKind: ProjektKetteKind
@@ -21,7 +22,7 @@ type LoadProjektKontextInput = {
 }
 
 const ANGEBOT_KURZ_SELECT =
-  'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max, pdf_url'
+  'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max, pdf_url, ist_partner_einholung'
 
 const RECHNUNG_KURZ_SELECT =
   'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
@@ -172,7 +173,9 @@ export async function loadProjektKontext(
     }
   }
 
-  const angebote = (angeboteRes.data ?? []) as ProjektAngebotKurz[]
+  const angebote = filterKundenAngebote(
+    (angeboteRes.data ?? []) as (ProjektAngebotKurz & { ist_partner_einholung?: boolean | null })[]
+  )
 
   let auftrag: ProjektKontext['auftrag'] = null
   if (auftragRes.data) {

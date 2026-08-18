@@ -3,6 +3,7 @@ import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { buildAngebotIdsMitAuftrag } from '@/lib/crm/pipeline-liste-filter'
 import { buildAngebotIdsMitRechnung } from '@/lib/crm/projekt-pipeline'
 import type { AngebotListeEintrag } from '@/lib/types'
+import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 
 export const ANGEBOTE_LISTE_SELECT = `
       id,
@@ -19,6 +20,7 @@ export const ANGEBOTE_LISTE_SELECT = `
       nachgefasst_am,
       created_at,
       leistungsumfang,
+      ist_partner_einholung,
       leads(
         id,
         kontakt_name,
@@ -66,7 +68,11 @@ export async function loadAngeboteListe(): Promise<{
   )
 
   return {
-    angebote: (angeboteRes.data ?? []) as unknown as AngebotListeEintrag[],
+    angebote: filterKundenAngebote(
+      (angeboteRes.data ?? []) as unknown as (AngebotListeEintrag & {
+        ist_partner_einholung?: boolean | null
+      })[]
+    ),
     angebotIdsMitAuftrag,
     angebotIdsMitRechnung,
     error: auftragRes.error?.message ?? rechnungRes.error?.message ?? null,

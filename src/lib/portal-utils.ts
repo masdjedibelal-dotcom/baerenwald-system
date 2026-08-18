@@ -1,4 +1,5 @@
 import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
+import { isStagingSupabase, STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
 
 /** Kundenportal vs. Auftraggeber-Portal — steuert Button- und P.S.-Text in Mails. */
 export type PortalMailAudience = 'privat' | 'organisation'
@@ -75,6 +76,16 @@ export function defaultPartnerPortalInviteText(): string {
 }
 
 export function publicWebsiteBaseUrl(): string {
+  if (isStagingSupabase()) {
+    const env = (
+      process.env.FRONTEND_URL ??
+      process.env.NEXT_PUBLIC_WEBSEITE_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      ''
+    ).replace(/\/$/, '')
+    if (env.includes('staging--')) return env
+    return STAGING_WEBSITE_ORIGIN
+  }
   return (
     process.env.FRONTEND_URL ??
     process.env.NEXT_PUBLIC_WEBSEITE_URL ??

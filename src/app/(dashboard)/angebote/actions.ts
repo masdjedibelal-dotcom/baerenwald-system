@@ -33,6 +33,11 @@ import { getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import {
+  loescheAngebotHandwerkerAusserPartnerLv,
+  partnerLvHandwerkerIdsFuerLead,
+  reparentPartnerEinholungenZuKundenangebot,
+} from '@/lib/angebote/partner-einholung-server'
 import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
@@ -485,8 +490,10 @@ export async function createAngebot(
     return positionen
   }
   const hwZu = handwerkerZuweisungenFromPositionen(hwQuelle(), input.handwerker_aufgabe_notizen)
+  const lvHwIds = input.lead_id ? await partnerLvHandwerkerIdsFuerLead(input.lead_id) : new Set<string>()
   for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
+    if (lvHwIds.has(z.handwerker_id)) continue
     await supabase.from('angebot_handwerker').insert({
       angebot_id: id,
       gewerk_id: z.gewerk_id,
@@ -498,6 +505,7 @@ export async function createAngebot(
   }
 
   if (input.lead_id) {
+    await reparentPartnerEinholungenZuKundenangebot(input.lead_id, id)
     await markLeadAngeboteErsetzt(supabase, input.lead_id, id)
 
     if (input.ist_wiederkehrend !== undefined) {
@@ -789,7 +797,7 @@ export async function updateAngebot(
     })
   }
 
-  await supabase.from('angebot_handwerker').delete().eq('angebot_id', angebotId)
+  await loescheAngebotHandwerkerAusserPartnerLv(angebotId)
 
   const hwPosMerged = (): AngebotPosition[] => {
     const vb = variantenForHw?.b?.positionen ?? []
@@ -798,8 +806,10 @@ export async function updateAngebot(
     return positionen
   }
   const hwZu = handwerkerZuweisungenFromPositionen(hwPosMerged(), input.handwerker_aufgabe_notizen)
+  const lvHwIds = leadId ? await partnerLvHandwerkerIdsFuerLead(leadId) : new Set<string>()
   for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
+    if (lvHwIds.has(z.handwerker_id)) continue
     const key = `${z.gewerk_id}|${z.handwerker_id}`
     const prev = prevHwMap.get(key)
     await supabase.from('angebot_handwerker').insert({
@@ -816,6 +826,7 @@ export async function updateAngebot(
   }
 
   if (leadId) {
+    await reparentPartnerEinholungenZuKundenangebot(leadId, angebotId)
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
     const freigabeSync = await syncAngebotMitOrgFreigabe({
@@ -1319,6 +1330,7 @@ export async function loescheHandwerkerAnfrage(input: {
       status,
       hw_eingereicht_at,
       hw_status,
+      ohne_lv,
       handwerker(name),
       gewerke(name),
       angebote(id, lead_id)
@@ -1360,13 +1372,16 @@ export async function loescheHandwerkerAnfrage(input: {
       lead_id: leadId,
       angebot_id: angebotId,
       typ: 'handwerker',
-      titel: 'Handwerker-Anfrage gelöscht',
+      titel: (zu as { ohne_lv?: boolean | null }).ohne_lv
+        ? 'LV-Anfrage gelöscht'
+        : 'Handwerker-Anfrage gelöscht',
       beschreibung: `${(hw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${(gw as { name?: string } | null)?.name?.trim() || 'Gewerk'}`,
     })
   }
 
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/angebote')
+  if (leadId) revalidatePath(`/anfragen/${leadId}`)
   return { ok: true }
 }
 

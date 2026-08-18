@@ -501,6 +501,8 @@ export type Angebot = {
   wichtige_hinweise?: string | null
   /** Kunden-Mail: du | sie */
   anrede?: 'du' | 'sie' | string | null
+  /** Intern: Partner-Angebote einholen ohne Kunden-LV. Nicht in Kunden-Angebotslisten. */
+  ist_partner_einholung?: boolean | null
   /** Vereinfachter CRM-Status */
   status_einfach?:
     | 'entwurf'
@@ -571,6 +573,8 @@ export type AngebotHandwerkerRow = {
   hw_crm_notiz?: string | null
   hw_crm_antwort_at?: string | null
   hw_konditionen?: unknown
+  /** Partner erstellt oder lädt eigenes Angebot — kein LV von Bärenwald. */
+  ohne_lv?: boolean | null
   handwerker?: {
     id: string
     name: string

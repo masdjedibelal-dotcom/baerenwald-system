@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import { LeistungenTab, leistungenFromAngebotPositionen } from '@/components/leistungen'
+import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
+import { partnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
@@ -165,6 +167,11 @@ export function AngebotLeistungenTab({
 
   const projektName = useMemo(() => projektTitel(detail, lead), [detail, lead])
 
+  const lvRows = useMemo(
+    () => partnerLvZuweisungen(detail.angebot_handwerker),
+    [detail.angebot_handwerker]
+  )
+
   return (
     <>
       <LeistungenTab
@@ -195,6 +202,15 @@ export function AngebotLeistungenTab({
                 },
               ]
             : undefined
+        }
+        belowTable={
+          lvRows.length ? (
+            <AnfragePartnerEinholungCards
+              rows={lvRows}
+              showCta={false}
+              onDeleted={onSaved}
+            />
+          ) : null
         }
       />
 

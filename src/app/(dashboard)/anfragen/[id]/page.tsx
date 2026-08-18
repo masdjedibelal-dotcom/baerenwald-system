@@ -10,6 +10,7 @@ import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helper
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { handwerkerPipelineErledigt } from '@/lib/angebote/angebot-handwerker-flow'
 import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
+import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 import type { AngebotHandwerkerRow, Handwerker, KundenObjekt, LeadDetail } from '@/lib/types'
 
 /** Schwere Client-Bundle (Wizard, PDF) aus Page-Chunk auslagern — verhindert ChunkLoadError bei HMR. */
@@ -82,21 +83,28 @@ export default async function AnfrageDetailPage({
         id,
         status,
         gesendet_kunde_at,
+        ist_partner_einholung,
         angebot_handwerker(id, status, hw_status, hw_eingereicht_at)
       `
       )
       .eq('lead_id', params.id)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(8),
   ])
 
-  const latestAngebot = latestAngebotRes.data as {
-    id: string
-    status: string
-    gesendet_kunde_at?: string | null
-    angebot_handwerker?: AngebotHandwerkerRow[] | null
-  } | null
+  const latestAngebot = filterKundenAngebote(
+    (Array.isArray(latestAngebotRes.data)
+      ? latestAngebotRes.data
+      : latestAngebotRes.data
+        ? [latestAngebotRes.data]
+        : []) as Array<{
+      id: string
+      status: string
+      gesendet_kunde_at?: string | null
+      ist_partner_einholung?: boolean | null
+      angebot_handwerker?: AngebotHandwerkerRow[] | null
+    }>
+  )[0] ?? null
 
   const angebotFlowSnapshot = latestAngebot
     ? {
@@ -147,7 +155,12 @@ export default async function AnfrageDetailPage({
   }
 
   if (angeboteFromLead && angeboteFromLead.length) {
-    const sorted = [...angeboteFromLead].sort(
+    const sorted = filterKundenAngebote(
+      [...angeboteFromLead].map((a) => ({
+        ...a,
+        ist_partner_einholung: (a as { ist_partner_einholung?: boolean | null }).ist_partner_einholung,
+      }))
+    ).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
     const angebotKopieVon =
@@ -175,7 +188,9 @@ export default async function AnfrageDetailPage({
 
   const { data: angebotRows } = await supabase
     .from('angebote')
-    .select('id, status, status_einfach, gesamt_fix, gesamt_min, gesamt_max, created_at, angebotsnr, pdf_url')
+    .select(
+      'id, status, status_einfach, gesamt_fix, gesamt_min, gesamt_max, created_at, angebotsnr, pdf_url, ist_partner_einholung'
+    )
     .eq('lead_id', params.id)
     .order('created_at', { ascending: false })
 
@@ -187,7 +202,13 @@ export default async function AnfrageDetailPage({
   return (
     <AnfrageDetailClient
       lead={{ ...lead, leads_status_history: history } as LeadDetail}
-      angeboteListe={(angebotRows ?? []) as never}
+      angeboteListe={
+        filterKundenAngebote(
+          (angebotRows ?? []) as Array<{
+            ist_partner_einholung?: boolean | null
+          }>
+        ) as never
+      }
       wizardGewerke={gewerke}
       wizardPreislisten={preislisten}
       wizardFirm={firm}

@@ -27,7 +27,11 @@ export function ChunkLoadRecovery() {
 
     window.addEventListener('unhandledrejection', onRejection)
     window.addEventListener('error', onError)
+    const clearTimer = window.setTimeout(() => {
+      sessionStorage.removeItem(RELOAD_KEY)
+    }, 8_000)
     return () => {
+      window.clearTimeout(clearTimer)
       window.removeEventListener('unhandledrejection', onRejection)
       window.removeEventListener('error', onError)
     }
