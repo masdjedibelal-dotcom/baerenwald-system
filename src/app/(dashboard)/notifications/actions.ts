@@ -133,7 +133,7 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'handwerker_angenommen':
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
-      return 'Angebot öffnen'
+      return 'Vorgang öffnen'
     case 'hw_rechnung_eingegangen':
       return 'Rechnung öffnen'
     case 'vorgang_angenommen':
@@ -289,8 +289,36 @@ function hrefVorgang(opts: {
   const q = tab ? `?tab=${encodeURIComponent(tab)}` : ''
   if (opts.auftragId?.trim()) return `/auftraege/${opts.auftragId.trim()}${q}`
   if (opts.angebotId?.trim()) return `/angebote/${opts.angebotId.trim()}${q}`
-  if (opts.leadId?.trim()) return `/anfragen/${opts.leadId.trim()}`
+  if (opts.leadId?.trim()) return `/anfragen/${opts.leadId.trim()}${q}`
   return '/vorgaenge'
+}
+
+/** Partner-Einholung: Anfrage → Leistungen, nicht das interne Angebot (Karte über dem Vorgang). */
+function hrefHwPartnerVorgang(opts: {
+  auftragId?: string | null
+  angebotId?: string | null
+  leadId?: string | null
+  partnerEinholung?: boolean
+}): string {
+  if (opts.auftragId?.trim()) {
+    return hrefVorgang({ auftragId: opts.auftragId, tab: 'leistungen' })
+  }
+  if (opts.partnerEinholung) {
+    return hrefVorgang({ leadId: opts.leadId, tab: 'leistungen' })
+  }
+  return hrefVorgang({
+    angebotId: opts.angebotId,
+    leadId: opts.leadId,
+    tab: 'leistungen',
+  })
+}
+
+function timestampsClose(a: string | null | undefined, b: string | null | undefined, ms = 15_000): boolean {
+  if (!a?.trim() || !b?.trim()) return false
+  const da = new Date(a).getTime()
+  const db = new Date(b).getTime()
+  if (!Number.isFinite(da) || !Number.isFinite(db)) return false
+  return Math.abs(da - db) < ms
 }
 
 async function currentUserId(): Promise<string | null> {
@@ -315,10 +343,10 @@ async function collectCrmNotificationItems(opts?: {
   const since = sinceIso()
   const items: CrmNotificationItem[] = []
 
-  const hwSelect = `id, status, antwort_at, hw_eingereicht_at, angebot_id,
+  const hwSelect = `id, status, antwort_at, hw_eingereicht_at, angebot_id, ohne_lv,
        handwerker:handwerker_id(name),
        gewerke:gewerk_id(name),
-       angebote:angebot_id(id, lead_id, angebotsnr)`
+       angebote:angebot_id(id, lead_id, angebotsnr, ist_partner_einholung)`
 
   type HwZuweisungRow = {
     id: string
@@ -326,11 +354,22 @@ async function collectCrmNotificationItems(opts?: {
     antwort_at?: string | null
     hw_eingereicht_at?: string | null
     angebot_id?: string | null
+    ohne_lv?: boolean | null
     handwerker?: { name?: string | null } | { name?: string | null }[] | null
     gewerke?: { name?: string | null } | { name?: string | null }[] | null
     angebote?:
-      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
-      | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
+      | {
+          id?: string
+          lead_id?: string | null
+          angebotsnr?: string | null
+          ist_partner_einholung?: boolean | null
+        }
+      | {
+          id?: string
+          lead_id?: string | null
+          angebotsnr?: string | null
+          ist_partner_einholung?: boolean | null
+        }[]
       | null
   }
 
@@ -629,8 +668,18 @@ async function collectCrmNotificationItems(opts?: {
     for (const row of hwZuweisungen) {
       const angebot = one(
         row.angebote as
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
+          | {
+              id?: string
+              lead_id?: string | null
+              angebotsnr?: string | null
+              ist_partner_einholung?: boolean | null
+            }
+          | {
+              id?: string
+              lead_id?: string | null
+              angebotsnr?: string | null
+              ist_partner_einholung?: boolean | null
+            }[]
           | null
       )
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
@@ -638,11 +687,12 @@ async function collectCrmNotificationItems(opts?: {
       const angebotId = (row.angebot_id as string | null)?.trim() || angebot?.id?.trim() || null
       const leadId = angebot?.lead_id?.trim() || null
       const auftragId = angebotId ? auftragByAngebot.get(angebotId) ?? null : null
-      const href = hrefVorgang({
+      const partnerEinholung = Boolean(row.ohne_lv) || angebot?.ist_partner_einholung === true
+      const href = hrefHwPartnerVorgang({
         auftragId,
         angebotId,
         leadId,
-        tab: auftragId ? 'leistungen' : null,
+        partnerEinholung,
       })
       const hwName = hw?.name?.trim() || 'Handwerker'
       const gewerkName = gewerk?.name?.trim()
@@ -650,18 +700,23 @@ async function collectCrmNotificationItems(opts?: {
       const sub = [gewerkName, angebotsnr].filter(Boolean).join(' · ')
 
       const antwortAt = (row.antwort_at as string | null)?.trim()
+      const eingereichtAt = (row.hw_eingereicht_at as string | null)?.trim()
       const st = normalizeHwZuweisungStatus(row.status as string)
+      const gleicheEinreichung = timestampsClose(antwortAt, eingereichtAt)
       if (antwortAt && antwortAt >= since) {
         if (isHwZuweisungAkzeptiertLenient(st)) {
-          items.push({
-            sourceKey: `handwerker_angenommen:${row.id}`,
-            typ: 'handwerker_angenommen',
-            title: `${hwName} hat zugesagt`,
-            subtitle: sub || null,
-            href,
-            createdAt: antwortAt,
-            gelesen: false,
-          })
+          // Einholung / gleichzeitiges Einreichen = nur „Angebot erstellt“, keine Extra-Zusage.
+          if (!partnerEinholung && !gleicheEinreichung) {
+            items.push({
+              sourceKey: `handwerker_angenommen:${row.id}`,
+              typ: 'handwerker_angenommen',
+              title: `${hwName} hat zugesagt`,
+              subtitle: sub || null,
+              href,
+              createdAt: antwortAt,
+              gelesen: false,
+            })
+          }
         } else if (st === 'abgelehnt') {
           items.push({
             sourceKey: `handwerker_abgelehnt:${row.id}`,
@@ -675,14 +730,15 @@ async function collectCrmNotificationItems(opts?: {
         }
       }
 
-      const eingereichtAt = (row.hw_eingereicht_at as string | null)?.trim()
       if (eingereichtAt && eingereichtAt >= since) {
         items.push({
           sourceKey: `handwerker_einreichung:${row.id}`,
           typ: 'handwerker_einreichung',
-          title: `${hwName} hat Angebot eingereicht`,
+          title: partnerEinholung
+            ? `${hwName} hat Angebot erstellt`
+            : `${hwName} hat Angebot eingereicht`,
           subtitle: sub || null,
-          href: hrefVorgang({ angebotId, leadId, auftragId: null }),
+          href,
           createdAt: eingereichtAt,
           gelesen: false,
         })

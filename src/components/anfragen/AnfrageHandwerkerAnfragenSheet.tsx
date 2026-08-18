@@ -8,7 +8,11 @@ import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/ac
 import { anfrageHandwerkerAnfragen } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
+import { PosBoard } from '@/components/posboard/PosBoard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { posBoardToPartnerLvVorgabe } from '@/lib/angebote/partner-lv'
+import { type PosBoardLine } from '@/lib/posboard/pos-board-line'
+import type { Preisliste } from '@/lib/types'
 import { BEREICH_LABELS } from '@/lib/utils'
 
 function gewerkeLabel(h: HandwerkerGewerkListeEintrag): string {
@@ -27,6 +31,7 @@ export function AnfrageHandwerkerAnfragenSheet({
   titelDefault,
   beschreibungDefault,
   gewerke = [],
+  preislisten = [],
   onDone,
 }: {
   open: boolean
@@ -35,6 +40,7 @@ export function AnfrageHandwerkerAnfragenSheet({
   titelDefault: string
   beschreibungDefault: string
   gewerke?: { id: string; name: string; slug: string }[]
+  preislisten?: Preisliste[]
   onDone: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -45,6 +51,7 @@ export function AnfrageHandwerkerAnfragenSheet({
   const [titel, setTitel] = useState(titelDefault)
   const [beschreibung, setBeschreibung] = useState(beschreibungDefault)
   const [notiz, setNotiz] = useState('')
+  const [positionen, setPositionen] = useState<PosBoardLine[]>([])
 
   useEffect(() => {
     if (!open) {
@@ -53,6 +60,7 @@ export function AnfrageHandwerkerAnfragenSheet({
       setPickerOpen(false)
       setDirty(false)
       setNotiz('')
+      setPositionen([])
       return
     }
     setTitel(titelDefault)
@@ -96,6 +104,7 @@ export function AnfrageHandwerkerAnfragenSheet({
         titel: titel.trim(),
         beschreibung: beschreibung.trim(),
         notiz: notiz.trim(),
+        positionen: posBoardToPartnerLvVorgabe(positionen),
       })
       if (!res.ok) {
         toast.error(res.message)
@@ -116,7 +125,7 @@ export function AnfrageHandwerkerAnfragenSheet({
       <EditorSheet
         open={open}
         onClose={onClose}
-        title="Handwerker vorab anfragen"
+        title="LV anfragen"
         context="detail"
         dirty={dirty}
         size="lg"
@@ -229,6 +238,22 @@ export function AnfrageHandwerkerAnfragenSheet({
             disabled={pending}
           />
         </label>
+
+        <div className="hw-anfrage-field">
+          <span className="hw-anfrage-label">Leistungen</span>
+          <PosBoard
+            positionen={positionen}
+            onChange={(next) => {
+              setDirty(true)
+              setPositionen(next)
+            }}
+            showUst={false}
+            showTotals={false}
+            title=""
+            preislisten={preislisten}
+            gewerke={gewerke.map((g) => g.name).filter(Boolean)}
+          />
+        </div>
       </EditorSheet>
 
       <HandwerkerSuchenSheet

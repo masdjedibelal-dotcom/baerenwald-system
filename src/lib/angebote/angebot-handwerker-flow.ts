@@ -1,9 +1,10 @@
 import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
+import { ohnePartnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
 
 export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undefined): boolean {
-  return (rows ?? []).length > 0
+  return ohnePartnerLvZuweisungen(rows).length > 0
 }
 
 export function handwerkerZuweisungAktiv(z: AngebotHandwerkerRow): boolean {

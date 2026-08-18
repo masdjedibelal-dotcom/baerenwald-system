@@ -89,18 +89,29 @@ export async function POST(req: Request) {
   }
   const hwName = String(hw.name ?? '').trim() || 'Handwerker'
 
+  let angebotId: string | null = null
+  let leadId: string | null = null
+  let partnerEinholung = false
+
   if (!auftragId && anfrageId) {
     const { data: ah } = await supabaseAdmin
       .from('angebot_handwerker')
-      .select('id, angebot_id')
+      .select('id, angebot_id, ohne_lv, angebote:angebot_id(id, lead_id, ist_partner_einholung)')
       .eq('id', anfrageId)
       .maybeSingle()
-    const angId = String(ah?.angebot_id ?? '').trim()
-    if (angId) {
+    const ang = Array.isArray(ah?.angebote) ? ah?.angebote[0] : ah?.angebote
+    const angRec = ang as
+      | { id?: string; lead_id?: string | null; ist_partner_einholung?: boolean | null }
+      | null
+      | undefined
+    angebotId = String(ah?.angebot_id ?? angRec?.id ?? '').trim() || null
+    leadId = angRec?.lead_id?.trim() || null
+    partnerEinholung = Boolean(ah?.ohne_lv) || angRec?.ist_partner_einholung === true
+    if (angebotId) {
       const { data: auf } = await supabaseAdmin
         .from('auftraege')
         .select('id')
-        .eq('angebot_id', angId)
+        .eq('angebot_id', angebotId)
         .neq('status', 'storniert')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -223,13 +234,23 @@ export async function POST(req: Request) {
         : anfrageId
           ? `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(anfrageId)}`
           : `/vorgaenge?tab=rechnung&richtung=eingehend`
-      : auftragId
-        ? `/auftraege/${auftragId}?tab=akte`
-        : typ === 'compliance' || isDelete
-          ? `/handwerker/${handwerkerId}?tab=compliance`
-          : anfrageId
-            ? `/angebote`
-            : `/handwerker/${handwerkerId}`
+      : typ === 'angebot'
+        ? partnerEinholung && leadId
+          ? `/anfragen/${leadId}?tab=leistungen`
+          : auftragId
+            ? `/auftraege/${auftragId}?tab=leistungen`
+            : angebotId
+              ? `/angebote/${angebotId}?tab=leistungen`
+              : leadId
+                ? `/anfragen/${leadId}?tab=leistungen`
+                : '/vorgaenge'
+        : auftragId
+          ? `/auftraege/${auftragId}?tab=akte`
+          : typ === 'compliance' || isDelete
+            ? `/handwerker/${handwerkerId}?tab=compliance`
+            : anfrageId
+              ? `/angebote`
+              : `/handwerker/${handwerkerId}`
 
   void sendCrmPushToStaff({
     typ: pushTyp,

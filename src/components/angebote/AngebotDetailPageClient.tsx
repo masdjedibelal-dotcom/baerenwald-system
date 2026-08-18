@@ -722,7 +722,7 @@ export function AngebotDetailPageClient({
         </p>
       ) : null}
 
-      {hatAngebotHandwerker(detail.angebot_handwerker) ? (
+      {hatAngebotHandwerker(detail.angebot_handwerker) && !detail.ist_partner_einholung ? (
         <AngebotHandwerkerPartnerSection
           detail={detail}
           auftragId={auftragId}

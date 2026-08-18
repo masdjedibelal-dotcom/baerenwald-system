@@ -74,6 +74,7 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
 
   const posAll = normalizeAngebotPositionen(detail.positionen)
   const posFiltered = posAll.filter((p) => p.gewerk_id === row.gewerk_id)
+  const ohneLv = Boolean((zuRaw as { ohne_lv?: boolean | null }).ohne_lv)
   const hwName = row.handwerker?.name ?? 'Handwerkerin'
   const hwEmail = row.handwerker?.email?.trim() || ''
   const gewerkName = row.gewerke?.name ?? 'Gewerk'
@@ -88,7 +89,9 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
       gewerk: gewerkName,
       plz,
       zeitraum: zeitraum || undefined,
-      positionen: (posFiltered.length ? posFiltered : posAll).map((p) => ({
+      positionen: ohneLv
+        ? []
+        : (posFiltered.length ? posFiltered : posAll).map((p) => ({
         leistung: p.leistung,
         beschreibung: p.beschreibung || p.leistung,
         menge: p.menge || 1,

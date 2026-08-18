@@ -17,6 +17,7 @@ import type { AngebotDetail, AngebotHandwerkerRow } from '@/lib/types'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
 import { handwerkerZuweisungAktiv } from '@/lib/angebote/angebot-handwerker-flow'
+import { ohnePartnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import type { AngebotPosition } from '@/lib/types'
@@ -361,7 +362,9 @@ export function AngebotHandwerkerPartnerSection({
   const router = useRouter()
   const [wizardBootstrap, setWizardBootstrap] = useState<ProjektVertragWizardBootstrap | null>(null)
   const [wizardPending, startWizardTransition] = useTransition()
-  const rows = (detail.angebot_handwerker ?? []).filter(handwerkerZuweisungAktiv)
+  const rows = ohnePartnerLvZuweisungen(detail.angebot_handwerker ?? []).filter(
+    handwerkerZuweisungAktiv
+  )
   const kundeHatAngenommen = isAngenommenesAngebotStatus(detail.status, detail.status_einfach)
   const angebotTitel =
     detail.notizen?.trim()?.slice(0, 80) ||

@@ -41,6 +41,15 @@ import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
 import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import {
+  defaultWizardMeta,
+  initialDokumentTypFromLead,
+} from '@/lib/angebote/angebot-wizard-types'
+import {
+  collectEingereichtePartnerLv,
+  partnerLvZeilenToAngebotPositionen,
+  partnerLvZeilenToPosBoardLines,
+} from '@/lib/angebote/partner-lv'
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
@@ -426,6 +435,47 @@ export function AnfrageDetailClient({
     [ensureWizardData]
   )
 
+  const partnerLvZeilen = useMemo(
+    () => collectEingereichtePartnerLv(einholungRows),
+    [einholungRows]
+  )
+  const partnerLvAngebotPositionen = useMemo(
+    () => partnerLvZeilenToAngebotPositionen(partnerLvZeilen, liveGewerke),
+    [partnerLvZeilen, liveGewerke]
+  )
+  const partnerLvPosBoard = useMemo(
+    () => partnerLvZeilenToPosBoardLines(partnerLvZeilen),
+    [partnerLvZeilen]
+  )
+
+  const openNeuesKundenAngebot = useCallback(() => {
+    if (!partnerLvAngebotPositionen.length) {
+      openAngebotWizard(null)
+      return
+    }
+    const kunde = lead.kunden
+    const kundeTyp =
+      kunde && !Array.isArray(kunde) && 'typ' in kunde
+        ? ((kunde as { typ?: string | null }).typ ?? null)
+        : null
+    openAngebotWizard({
+      angebotId: null,
+      angebotsnr: null,
+      positionen: partnerLvAngebotPositionen,
+      meta: defaultWizardMeta(
+        kundenName(lead),
+        leadVorhabenTitel(lead),
+        '',
+        undefined,
+        kundeTyp,
+        liveFirm ?? undefined
+      ),
+      dokumentTyp: initialDokumentTypFromLead(lead.bereiche, lead.situation),
+      projektbeschreibung: null,
+      projektFotos: [],
+    })
+  }, [partnerLvAngebotPositionen, openAngebotWizard, lead, liveFirm])
+
   const openWeitereRechnung = useCallback(() => {
     startTransition(async () => {
       const ok = await ensureWizardData()
@@ -512,19 +562,19 @@ export function AnfrageDetailClient({
     }
     if (angebotWizardQueryHandledRef.current) return
     angebotWizardQueryHandledRef.current = true
-    openAngebotWizard(null)
+    openNeuesKundenAngebot()
     router.replace(`/anfragen/${lead.id}`, { scroll: false })
-  }, [angebotWizardInitial, lead.id, openAngebotWizard, router])
+  }, [angebotWizardInitial, lead.id, openNeuesKundenAngebot, router])
 
   const hasAngebote = angeboteListe.length > 0
 
   const openAngebotAuswahl = useCallback(() => {
     if (angeboteListe.length === 0) {
-      openAngebotWizard(null)
+      openNeuesKundenAngebot()
       return
     }
     setAngebotAuswahlOpen(true)
-  }, [angeboteListe.length, openAngebotWizard])
+  }, [angeboteListe.length, openNeuesKundenAngebot])
 
   const matrixCta = primaryCta('anfrage', lead.status)
   const istAkut = leadIstAkut(lead)
@@ -545,8 +595,8 @@ export function AnfrageDetailClient({
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
     if (href) router.push(`${href}#angebot-versand-handwerker`)
-    else openAngebotWizard(null)
-  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, openAngebotWizard, router])
+    else openNeuesKundenAngebot()
+  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, openNeuesKundenAngebot, router])
 
   const openAngebotAnKunde = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -740,8 +790,13 @@ export function AnfrageDetailClient({
 
   const leistungRows = leistungenFromAnfrage(lead.funnel_daten)
   const hatLeistungen = leistungRows.length > 0
+  const internEinholungRows = einholungRows.filter((r) => r.ist_intern_gehaeuse !== false)
   const hatPartnerEinholung = einholungRows.length > 0
-  const openHandwerkerVorabAnfragen = () => setAnfragenOpen(true)
+  const openHandwerkerVorabAnfragen = () => {
+    void ensureWizardData().then((ok) => {
+      if (ok) setAnfragenOpen(true)
+    })
+  }
 
   const leistungenInhalt = (
     <LeistungenTab
@@ -765,13 +820,17 @@ export function AnfrageDetailClient({
           ? 'Direkt beauftragen'
           : wartetAufHvFreigabe
             ? 'Warte auf HV / Hausmeister'
-            : 'Handwerker vorab anfragen'
+            : 'LV anfragen'
       }
       emptyTitle="Noch keine Leistungen"
       belowTable={
         <AnfragePartnerEinholungCards
-          rows={einholungRows}
+          rows={internEinholungRows}
           onAnfragen={openHandwerkerVorabAnfragen}
+          onDeleted={() => {
+            loadEinholungen()
+            refresh()
+          }}
           showCta={
             istAkut || wartetAufHvFreigabe
               ? hatPartnerEinholung
@@ -980,7 +1039,7 @@ export function AnfrageDetailClient({
         angebote={angeboteListe}
         onNeuesAngebot={() => {
           setAngebotAuswahlOpen(false)
-          openAngebotWizard(null)
+          openNeuesKundenAngebot()
         }}
         onWeiterbearbeiten={(bootstrap) => {
           setAngebotAuswahlOpen(false)
@@ -1009,6 +1068,7 @@ export function AnfrageDetailClient({
         titelDefault={vorhabenTitel}
         beschreibungDefault={leadBeschreibung(lead)}
         gewerke={liveGewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug }))}
+        preislisten={livePreislisten}
         onDone={() => {
           loadEinholungen()
           refresh()
@@ -1040,6 +1100,7 @@ export function AnfrageDetailClient({
           lead={lead}
           gewerke={liveGewerke}
           preislisten={livePreislisten}
+          initialLines={partnerLvPosBoard}
           firm={liveFirm}
           onClose={() => setDirektWizardOpen(false)}
           onDone={(auftragId) => {

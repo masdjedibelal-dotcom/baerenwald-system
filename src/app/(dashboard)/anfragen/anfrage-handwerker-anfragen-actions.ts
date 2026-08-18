@@ -6,6 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { loadAngebotDetailAdmin } from '@/app/(dashboard)/angebote/actions'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
+import {
+  partnerLvVorgabeToAngebotPositionen,
+  type PartnerLvVorgabe,
+} from '@/lib/angebote/partner-lv'
+import { latestKundenAngebotIdFuerLead } from '@/lib/angebote/partner-einholung'
 import type { AngebotHandwerkerRow } from '@/lib/types'
 
 const AH_SELECT = `
@@ -72,6 +77,7 @@ async function ensureInternAngebot(opts: {
   kundeId: string | null
   titel: string
   beschreibung: string
+  positionen: Record<string, unknown>[]
 }): Promise<{ ok: true; angebotId: string } | { ok: false; message: string }> {
   const { data: existing } = await supabaseAdmin
     .from('angebote')
@@ -88,6 +94,7 @@ async function ensureInternAngebot(opts: {
       .update({
         leistungsumfang: opts.titel,
         projektbeschreibung: opts.beschreibung || null,
+        ...(opts.positionen.length > 0 ? { positionen: opts.positionen } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
@@ -102,7 +109,7 @@ async function ensureInternAngebot(opts: {
       status: 'entwurf',
       status_einfach: 'entwurf',
       ist_partner_einholung: true,
-      positionen: [],
+      positionen: opts.positionen,
       leistungsumfang: opts.titel,
       projektbeschreibung: opts.beschreibung || null,
       angebotsnr: null,
@@ -123,6 +130,7 @@ export async function anfrageHandwerkerAnfragen(input: {
   titel: string
   beschreibung: string
   notiz: string
+  positionen?: PartnerLvVorgabe[]
 }): Promise<{ ok: true; gesendet: number } | { ok: false; message: string }> {
   const auth = await requireUser()
   if (!auth.ok) return auth
@@ -145,13 +153,26 @@ export async function anfrageHandwerkerAnfragen(input: {
 
   if (leadErr || !lead) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
+  const { data: gewerkRows } = await supabaseAdmin
+    .from('gewerke')
+    .select('id, name, slug')
+    .eq('aktiv', true)
+  const internPositionen = partnerLvVorgabeToAngebotPositionen(
+    input.positionen ?? [],
+    (gewerkRows ?? []) as Array<{ id: string; name: string; slug?: string }>
+  )
+
   const intern = await ensureInternAngebot({
     leadId,
     kundeId: leadVertragsKundeId(lead),
     titel,
     beschreibung,
+    positionen: internPositionen,
   })
   if (!intern.ok) return intern
+
+  const attachAngebotId =
+    (await latestKundenAngebotIdFuerLead(leadId)) ?? intern.angebotId
 
   const zuweisungIds: string[] = []
 
@@ -163,9 +184,10 @@ export async function anfrageHandwerkerAnfragen(input: {
 
     const { data: existingRows } = await supabaseAdmin
       .from('angebot_handwerker')
-      .select('id, status')
-      .eq('angebot_id', intern.angebotId)
+      .select('id, status, angebot_id, angebote!inner(lead_id)')
       .eq('handwerker_id', hwId)
+      .eq('ohne_lv', true)
+      .eq('angebote.lead_id', leadId)
 
     const existing = (existingRows ?? []).find((r) => {
       const st = String(r.status ?? '').toLowerCase()
@@ -179,6 +201,7 @@ export async function anfrageHandwerkerAnfragen(input: {
           aufgabe_notiz: notiz || null,
           ohne_lv: true,
           gewerk_id: gewerkId,
+          angebot_id: attachAngebotId,
         })
         .eq('id', existing.id)
       zuweisungIds.push(String(existing.id))
@@ -188,7 +211,7 @@ export async function anfrageHandwerkerAnfragen(input: {
     const { data: inserted, error: insErr } = await supabaseAdmin
       .from('angebot_handwerker')
       .insert({
-        angebot_id: intern.angebotId,
+        angebot_id: attachAngebotId,
         handwerker_id: hwId,
         gewerk_id: gewerkId,
         status: 'ausstehend',
@@ -204,7 +227,7 @@ export async function anfrageHandwerkerAnfragen(input: {
     zuweisungIds.push(String(inserted.id))
   }
 
-  const detail = await loadAngebotDetailAdmin(intern.angebotId)
+  const detail = await loadAngebotDetailAdmin(attachAngebotId)
   if (!detail) return { ok: false, message: 'Angebot nicht gefunden.' }
 
   const byId = new Map((detail.angebot_handwerker ?? []).map((z) => [z.id, z]))
@@ -223,6 +246,9 @@ export async function anfrageHandwerkerAnfragen(input: {
   }
 
   revalidatePath(`/anfragen/${leadId}`)
+  if (attachAngebotId !== intern.angebotId) {
+    revalidatePath(`/angebote/${attachAngebotId}`)
+  }
   return { ok: true, gesendet }
 }
 
@@ -230,6 +256,8 @@ export type AnfragePartnerEinholungRow = AngebotHandwerkerRow & {
   leistungsumfang?: string | null
   projektbeschreibung?: string | null
   angebot_gesendet_kunde_at?: string | null
+  /** Noch am internen Gehäuse — nach Kundenangebot-Speichern false (Karte wandert). */
+  ist_intern_gehaeuse?: boolean
 }
 
 export async function listAnfragePartnerEinholungen(
@@ -261,6 +289,7 @@ export async function listAnfragePartnerEinholungen(
       leistungsumfang?: string | null
       projektbeschreibung?: string | null
       gesendet_kunde_at?: string | null
+      ist_partner_einholung?: boolean | null
     } | null
     const { angebote: _drop, ...rest } = rec
     rows.push({
@@ -270,6 +299,7 @@ export async function listAnfragePartnerEinholungen(
       leistungsumfang: ang?.leistungsumfang ?? null,
       projektbeschreibung: ang?.projektbeschreibung ?? null,
       angebot_gesendet_kunde_at: ang?.gesendet_kunde_at ?? null,
+      ist_intern_gehaeuse: ang?.ist_partner_einholung === true,
     })
   }
 

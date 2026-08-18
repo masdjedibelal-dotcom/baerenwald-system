@@ -4,9 +4,10 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
-import { getHandwerkerEinreichungPdfUrl } from '@/app/(dashboard)/angebote/actions'
+import { getHandwerkerEinreichungPdfUrl, loescheHandwerkerAnfrage } from '@/app/(dashboard)/angebote/actions'
 import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import type { AnfragePartnerEinholungRow } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
+import { darfPartnerLvAnfrageLoeschen } from '@/lib/angebote/partner-einholung'
 import {
   hasHwEinreichung,
   hwStatusBadgeClass,
@@ -34,9 +35,16 @@ function statusClass(z: AnfragePartnerEinholungRow): string {
   return 'bg-bw-bg-soft text-bw-text-muted'
 }
 
-function EinholungCard({ z }: { z: AnfragePartnerEinholungRow }) {
+function EinholungCard({
+  z,
+  onDeleted,
+}: {
+  z: AnfragePartnerEinholungRow
+  onDeleted?: () => void
+}) {
   const [pending, startTransition] = useLocalTransition()
   const eingereicht = hasHwEinreichung(z)
+  const kannLoeschen = darfPartnerLvAnfrageLoeschen(z)
   const konditionen = parseHwKonditionen(z.hw_konditionen)
   const unterlagePaths = parseHwAnhangStoragePaths(
     z.hw_angebot_anhang_urls,
@@ -97,6 +105,39 @@ function EinholungCard({ z }: { z: AnfragePartnerEinholungRow }) {
           ))}
         </div>
       ) : null}
+
+      {kannLoeschen ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          loading={pending}
+          className="text-danger"
+          onClick={() => {
+            if (
+              !window.confirm(
+                `LV-Anfrage an ${name} löschen? Der Vorgang verschwindet auch im Partner-Portal.`
+              )
+            ) {
+              return
+            }
+            startTransition(async () => {
+              const res = await loescheHandwerkerAnfrage({
+                angebotId: z.angebot_id,
+                zuweisungId: z.id,
+              })
+              if (!res.ok) {
+                toast.error(res.message)
+                return
+              }
+              toast.success('LV-Anfrage gelöscht')
+              onDeleted?.()
+            })
+          }}
+        >
+          LV-Anfrage löschen
+        </Button>
+      ) : null}
     </Card>
   )
 }
@@ -105,34 +146,36 @@ export function AnfragePartnerEinholungCards({
   rows,
   onAnfragen,
   showCta = false,
+  onDeleted,
 }: {
   rows: AnfragePartnerEinholungRow[]
-  onAnfragen: () => void
+  onAnfragen?: () => void
   /** Nur wenn der Empty-CTA nicht schon denselben Button zeigt. */
   showCta?: boolean
+  onDeleted?: () => void
 }) {
   if (!rows.length && !showCta) return null
 
-  const cta = (
+  const cta = onAnfragen ? (
     <Button type="button" variant="secondary" size="sm" onClick={onAnfragen}>
-      Handwerker vorab anfragen
+      LV anfragen
     </Button>
-  )
+  ) : null
 
   if (!rows.length) {
-    return <div>{cta}</div>
+    return showCta && cta ? <div>{cta}</div> : null
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
-          Partner
+          LV-Anfrage
         </p>
-        {cta}
+        {showCta ? cta : null}
       </div>
       {rows.map((z) => (
-        <EinholungCard key={z.id} z={z} />
+        <EinholungCard key={z.id} z={z} onDeleted={onDeleted} />
       ))}
     </div>
   )
