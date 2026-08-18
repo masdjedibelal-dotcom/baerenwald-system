@@ -10,7 +10,7 @@ import {
   partnerLvVorgabeToAngebotPositionen,
   type PartnerLvVorgabe,
 } from '@/lib/angebote/partner-lv'
-import { latestKundenAngebotIdFuerLead } from '@/lib/angebote/partner-einholung'
+import { latestKundenAngebotIdFuerLead } from '@/lib/angebote/partner-einholung-server'
 import type { AngebotHandwerkerRow } from '@/lib/types'
 
 const AH_SELECT = `

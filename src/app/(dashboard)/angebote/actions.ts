@@ -37,7 +37,7 @@ import {
   loescheAngebotHandwerkerAusserPartnerLv,
   partnerLvHandwerkerIdsFuerLead,
   reparentPartnerEinholungenZuKundenangebot,
-} from '@/lib/angebote/partner-einholung'
+} from '@/lib/angebote/partner-einholung-server'
 import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
