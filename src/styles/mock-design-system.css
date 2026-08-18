@@ -12208,6 +12208,19 @@ textarea.input:focus {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Desktop-Slide: Beschreibung/Notiz füllen den restlichen Body statt grauer Leere */
+.editor-sheet--slide .hw-anfrage-body .hw-anfrage-field:has(textarea) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.editor-sheet--slide .hw-anfrage-body textarea.input {
+  flex: 1 1 auto;
+  min-height: 88px;
+  resize: none;
 }
 
 .hw-anfrage-field {
@@ -19369,7 +19382,12 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet--slide {
   /* ml-auto + absolute right: unabhängig vom Flex-Justify am Overlay */
-  @apply absolute right-0 top-0 ml-auto h-full w-full max-w-[420px] border-l border-[var(--border)];
+  @apply absolute right-0 top-0 ml-auto w-full max-w-[420px] border-l border-[var(--border)];
+  /* Raw: @apply h-full fällt im CSS-Build oft weg. top + bottom spannt auf den Overlay. */
+  bottom: 0;
+  height: auto;
+  max-height: none;
+  overflow: hidden;
 }
 .editor-sheet--slide.editor-sheet--lg {
   @apply max-w-[560px];

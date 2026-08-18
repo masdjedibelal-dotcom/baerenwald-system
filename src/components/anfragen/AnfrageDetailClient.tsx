@@ -738,10 +738,15 @@ export function AnfrageDetailClient({
     </>
   )
 
+  const leistungRows = leistungenFromAnfrage(lead.funnel_daten)
+  const hatLeistungen = leistungRows.length > 0
+  const hatPartnerEinholung = einholungRows.length > 0
+  const openHandwerkerVorabAnfragen = () => setAnfragenOpen(true)
+
   const leistungenInhalt = (
     <LeistungenTab
       phase="anfrage"
-      rows={leistungenFromAnfrage(lead.funnel_daten)}
+      rows={leistungRows}
       onOpenDokument={
         istAkut
           ? openDirektBeauftragen
@@ -751,22 +756,27 @@ export function AnfrageDetailClient({
                   description:
                     'HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach kannst du disponieren.',
                 })
-            : !hatAuftrag
-              ? openDirektBeauftragen
-              : openAngebotErstellen
+            : hatPartnerEinholung
+              ? undefined
+              : openHandwerkerVorabAnfragen
       }
       dokumentActionLabel={
         istAkut
           ? 'Direkt beauftragen'
           : wartetAufHvFreigabe
             ? 'Warte auf HV / Hausmeister'
-            : 'Angebot erstellen'
+            : 'Handwerker vorab anfragen'
       }
       emptyTitle="Noch keine Leistungen"
       belowTable={
         <AnfragePartnerEinholungCards
           rows={einholungRows}
-          onAnfragen={() => setAnfragenOpen(true)}
+          onAnfragen={openHandwerkerVorabAnfragen}
+          showCta={
+            istAkut || wartetAufHvFreigabe
+              ? hatPartnerEinholung
+              : hatLeistungen || hatPartnerEinholung
+          }
         />
       }
     />

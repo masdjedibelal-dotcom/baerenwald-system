@@ -104,19 +104,32 @@ function EinholungCard({ z }: { z: AnfragePartnerEinholungRow }) {
 export function AnfragePartnerEinholungCards({
   rows,
   onAnfragen,
+  showCta = false,
 }: {
   rows: AnfragePartnerEinholungRow[]
   onAnfragen: () => void
+  /** Nur wenn der Empty-CTA nicht schon denselben Button zeigt. */
+  showCta?: boolean
 }) {
+  if (!rows.length && !showCta) return null
+
+  const cta = (
+    <Button type="button" variant="secondary" size="sm" onClick={onAnfragen}>
+      Handwerker vorab anfragen
+    </Button>
+  )
+
+  if (!rows.length) {
+    return <div>{cta}</div>
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
           Partner
         </p>
-        <Button type="button" variant="secondary" size="sm" onClick={onAnfragen}>
-          Handwerker anfragen
-        </Button>
+        {cta}
       </div>
       {rows.map((z) => (
         <EinholungCard key={z.id} z={z} />

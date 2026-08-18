@@ -33,6 +33,7 @@
     "db:storage-buckets": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/storage-buckets-crm-setup.sql",
     "staging:buckets": "./scripts/staging/apply-storage-buckets-staging.sh",
     "staging:seed": "node --env-file=.env.staging scripts/staging/seed-staging.mjs",
+    "staging:register-portals": "node --env-file=.env.staging scripts/staging/register-portal-users.mjs",
     "db:hw-rechnung-einreichung": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260603120500_portal_handwerker_rechnung_einreichung.sql",
     "db:angebot-handwerker-gaps": "node --env-file=.env.local scripts/apply-gap-repair.mjs",
     "docs:screenshots": "node --env-file=.env.local scripts/docs-screenshots/capture.mjs",

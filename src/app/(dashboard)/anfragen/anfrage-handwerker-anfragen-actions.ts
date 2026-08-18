@@ -194,7 +194,6 @@ export async function anfrageHandwerkerAnfragen(input: {
         status: 'ausstehend',
         aufgabe_notiz: notiz || null,
         ohne_lv: true,
-        hw_rechnung_reverse_charge_13b: false,
       })
       .select('id')
       .single()

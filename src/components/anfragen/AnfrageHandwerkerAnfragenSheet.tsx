@@ -116,7 +116,7 @@ export function AnfrageHandwerkerAnfragenSheet({
       <EditorSheet
         open={open}
         onClose={onClose}
-        title="Handwerker anfragen"
+        title="Handwerker vorab anfragen"
         context="detail"
         dirty={dirty}
         size="lg"
