@@ -11,6 +11,7 @@ import type {
   LeadTimelineRow,
   OrgFreigabeLogRow,
 } from '@/lib/types'
+import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 
 const SELECT_FULL = `
   *,
@@ -27,7 +28,8 @@ const SELECT_FULL = `
     angebotsnr,
     pdf_url,
     gesendet_am,
-    gesendet_kunde_at
+    gesendet_kunde_at,
+    ist_partner_einholung
   ),
   leads_status_history(*),
   kalender_termine(*),
@@ -155,6 +157,14 @@ export async function loadAnfrageDetail(
       loadLeadOrgKontextOptional(supabase, lead),
     ])
     lead = { ...lead, lead_timeline: timeline, lead_dokumente: dokumente, ...orgKontext }
+    if (Array.isArray(lead.angebote)) {
+      lead = {
+        ...lead,
+        angebote: filterKundenAngebote(
+          lead.angebote as Array<{ ist_partner_einholung?: boolean | null }>
+        ) as LeadDetail['angebote'],
+      }
+    }
     return enrichLeadDetailUserNames(supabase, lead)
   }
 

@@ -54,8 +54,6 @@ export function rechnungMaterialFingerprint(s: RechnungMaterialSnapshot): string
     rechnungsdatum: normText(s.rechnungsdatum).slice(0, 10),
     leistungszeitraum_von: normText(s.leistungszeitraum_von).slice(0, 10),
     leistungszeitraum_bis: normText(s.leistungszeitraum_bis).slice(0, 10),
-    faellig_am: normText(s.faellig_am).slice(0, 10),
-    zahlungsbedingungen: normText(s.zahlungsbedingungen),
     einleitung: normText(s.einleitung),
     hinweise: normText(s.hinweise),
   })

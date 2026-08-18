@@ -1232,7 +1232,7 @@ export function RechnungWizard({
             }}
           />
           <p className="full m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-            Ändern setzt die nächste Rechnung fortlaufend darüber (z.&nbsp;B. 2070 → danach 2071).
+            Vorschau der nächsten Nummer — vergeben wird sie erst beim Versand, damit Entwürfe keine Lücken erzeugen.
           </p>
           <SheetEditableField
             label="Rechnungstitel"

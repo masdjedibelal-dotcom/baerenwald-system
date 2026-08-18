@@ -1,5 +1,7 @@
 /** Dashboard-Badge-/KPI-Mapping 1:1 Mock-Wortlaut → CRM-Status */
 
+import { istUeberfaelligYmd } from '@/lib/dates/werktag'
+
 export type DashboardBadge = { kind: string; label: string }
 
 const LEAD_BADGE: Record<string, DashboardBadge> = {
@@ -65,9 +67,7 @@ export function rechnungDashboardBadge(input: {
   if (st === 'entwurf') return { kind: 'fertig', label: 'Entwurf' }
   // gestellt/gesendet → Mock „Versendet“; Überfällig wenn Fälligkeit überschritten
   if (st === 'gesendet') {
-    const f = input.faellig_am?.slice(0, 10)
-    const heute = new Date().toISOString().slice(0, 10)
-    if (f && f < heute) return { kind: 'storniert', label: 'Überfällig' }
+    if (istUeberfaelligYmd(input.faellig_am)) return { kind: 'storniert', label: 'Überfällig' }
     return { kind: 'warten', label: 'Versendet' }
   }
   return { kind: 'plain', label: input.status || '—' }
@@ -129,10 +129,7 @@ export function isUeberfaelligeRechnung(input: {
 }): boolean {
   const st = String(input.status ?? '').toLowerCase()
   if (st !== 'gesendet') return false
-  const f = input.faellig_am?.slice(0, 10)
-  if (!f) return false
-  const heute = new Date().toISOString().slice(0, 10)
-  return f < heute
+  return istUeberfaelligYmd(input.faellig_am)
 }
 
 /** Angebot beim Kunden — keine Annahme/Ablehnung (W2-02). */

@@ -20,6 +20,11 @@ import {
   zahlungserinnerungZahlbarBis,
   type ZahlungserinnerungStufe,
 } from '@/lib/mail/zahlungserinnerung-mail'
+import {
+  mahnungBetragKontextFuerRechnung,
+  mahnungBetragMailFelder,
+} from '@/lib/rechnungen/mahnung-betrag'
+import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-mail'
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -33,18 +38,19 @@ import {
   rechnungUpdateMitSchemaFallback,
 } from '@/lib/rechnungen/rechnung-speichern'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import {
+  berechneRechnungZahlungszielUpdate,
+  mahnungFelderBeiFaelligkeitAenderung,
+  rechnungZahlungszielIstBearbeitbar,
+} from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
+import type { ZahlfristSeg } from '@/lib/zahlfrist'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
-import {
-  allocateRechnungsnummer,
-  maybeUpgradeLegacyRechnungsnummer,
-  normalizeRechnungsnummerInput,
-  rechnungsnummerIstFrei,
-} from '@/lib/rechnungen/next-rechnungsnummer'
+import { ensureRechnungsnummerFuerVersand } from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
   positionen: AngebotPosition[]
@@ -67,7 +73,7 @@ export type RechnungEntwurfPayload = {
   liste_berechnung?: RechnungBerechnung | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
-  /** Optional: manuell gewählte Nummer (sonst fortlaufend vergeben). */
+  /** Nur Anzeige/Vorschau — Entwürfe speichern keine offizielle Nummer. */
   rechnungsnummer?: string | null
 }
 
@@ -121,18 +127,6 @@ export async function createRechnungEntwurf(input: {
   )
   const berechnung = input.liste_berechnung ?? berechnungVoll
 
-  let rechnungsnummer: string
-  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
-  if (manual) {
-    const frei = await rechnungsnummerIstFrei(supabase, manual)
-    if (!frei.ok) return frei
-    rechnungsnummer = manual
-  } else {
-    const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
-    if (!numRes.ok) return { ok: false, message: numRes.message }
-    rechnungsnummer = numRes.nummer
-  }
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -147,7 +141,7 @@ export async function createRechnungEntwurf(input: {
       angebot_id: input.angebot_id,
       auftrag_id: input.auftrag_id,
       kunde_id: input.kunde_id,
-      rechnungsnummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: input.leistungszeitraum_von,
@@ -205,25 +199,6 @@ export async function updateRechnungEntwurf(
   const rechnungsdatum =
     (input.rechnungsdatum && input.rechnungsdatum.trim()) || undefined
 
-  let rechnungsnummerPatch: { rechnungsnummer: string } | Record<string, never> = {}
-  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
-  if (manual) {
-    const { data: cur } = await supabase
-      .from('rechnungen')
-      .select('status, rechnungsnummer')
-      .eq('id', id)
-      .maybeSingle()
-    const st = String(cur?.status ?? '').toLowerCase()
-    if (st === 'entwurf') {
-      const current = String(cur?.rechnungsnummer ?? '').trim()
-      if (manual !== current) {
-        const frei = await rechnungsnummerIstFrei(supabase, manual, id)
-        if (!frei.ok) return frei
-        rechnungsnummerPatch = { rechnungsnummer: manual }
-      }
-    }
-  }
-
   const { error } = await rechnungUpdateMitSchemaFallback(
     supabase,
     id,
@@ -238,7 +213,6 @@ export async function updateRechnungEntwurf(
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
       hinweis_35a: input.hinweis_35a ?? null,
-      ...rechnungsnummerPatch,
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id
@@ -265,6 +239,64 @@ export async function updateRechnungEntwurf(
   revalidatePath(`/rechnungen/${id}`)
   revalidatePath('/vorgaenge')
   return { ok: true }
+}
+
+/** Fälligkeit / Zahlungsziel nachträglich — ohne Storno (Entwurf + versendet). */
+export async function updateRechnungZahlungsziel(input: {
+  rechnungId: string
+  zahlfrist: ZahlfristSeg
+  zahlfristDatum?: string
+}): Promise<{ ok: true; faellig_am: string } | { ok: false; message: string }> {
+  const rechnungId = input.rechnungId?.trim()
+  if (!rechnungId) return { ok: false, message: 'Rechnung fehlt.' }
+
+  const supabase = createClient()
+  const { data: rec, error: loadErr } = await supabase
+    .from('rechnungen')
+    .select('id, status, beleg_typ, richtung, faellig_am, rechnungsdatum, created_at, zahlungsbedingungen')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden.' }
+
+  if (
+    !rechnungZahlungszielIstBearbeitbar({
+      status: rec.status as string,
+      beleg_typ: rec.beleg_typ as string,
+      richtung: rec.richtung as string,
+    })
+  ) {
+    return { ok: false, message: 'Zahlungsziel kann für diese Rechnung nicht mehr geändert werden.' }
+  }
+
+  const rechnungsdatum =
+    String(rec.rechnungsdatum ?? '').trim().slice(0, 10) ||
+    String(rec.created_at ?? '').trim().slice(0, 10) ||
+    new Date().toISOString().slice(0, 10)
+
+  const { faellig_am, zahlungsbedingungen } = berechneRechnungZahlungszielUpdate({
+    zahlfrist: input.zahlfrist,
+    zahlfristDatum: input.zahlfristDatum?.trim()?.slice(0, 10) ?? '',
+    rechnungsdatum,
+    bisherigeZahlungsbedingungen: rec.zahlungsbedingungen as string | null,
+  })
+
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({
+      faellig_am,
+      zahlungsbedingungen,
+      ...mahnungFelderBeiFaelligkeitAenderung(faellig_am, rec.faellig_am as string | null),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', rechnungId)
+
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidatePath('/vorgaenge')
+  return { ok: true, faellig_am }
 }
 
 /** Gutschrift zur Originalrechnung (negative Beträge, neue Nummer GS-BW-…). */
@@ -301,10 +333,6 @@ export async function createGutschriftFromRechnung(
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
 
-  const numRes = await allocateRechnungsnummer('gutschrift', supabaseAdmin)
-  if (!numRes.ok) return { ok: false, message: numRes.message }
-  const rechnungsnummer = numRes.nummer
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -315,7 +343,7 @@ export async function createGutschriftFromRechnung(
       angebot_id: orig.angebot_id,
       auftrag_id: orig.auftrag_id,
       kunde_id: orig.kunde_id,
-      rechnungsnummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: orig.leistungszeitraum_von,
@@ -395,15 +423,12 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
   const gutschrift = await createGutschriftFromRechnung(rechnungId)
   if (!gutschrift.ok) return gutschrift
 
-  // 2) Neue Rechnung als Entwurf (gleiche Positionen, neue Nummer)
+  // 2) Neue Rechnung als Entwurf (Nummer erst beim Versand)
   const positionenRaw = (orig.positionen as AngebotPosition[]) ?? []
   const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(supabase, {
     positionen: positionenRaw,
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
-
-  const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
-  if (!numRes.ok) return { ok: false, message: numRes.message }
 
   const {
     data: { user },
@@ -415,7 +440,7 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       angebot_id: orig.angebot_id,
       auftrag_id: orig.auftrag_id,
       kunde_id: orig.kunde_id,
-      rechnungsnummer: numRes.nummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: orig.leistungszeitraum_von,
@@ -593,13 +618,14 @@ async function sendZahlungsbestaetigungForRechnung(
   const email = kunde?.email?.trim()
   if (!email) return { ok: true, skipped: true }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'bezahlt'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
@@ -680,7 +706,7 @@ export async function updateRechnungStatus(
   const { data: before } = await supabase
     .from('rechnungen')
     .select(
-      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id'
+      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id, gesendet_at, bezahlt_at'
     )
     .eq('id', id)
     .maybeSingle()
@@ -690,8 +716,13 @@ export async function updateRechnungStatus(
   const isEingehend = String(before.richtung ?? '') === 'eingehend'
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
-  if (status === 'gesendet') patch.gesendet_at = new Date().toISOString()
-  if (status === 'bezahlt') patch.bezahlt_at = new Date().toISOString()
+  // Storno zurücknehmen darf das echte Versanddatum nicht auf „heute“ überschreiben.
+  if (status === 'gesendet' && !before.gesendet_at) {
+    patch.gesendet_at = new Date().toISOString()
+  }
+  if (status === 'bezahlt' && !before.bezahlt_at) {
+    patch.bezahlt_at = new Date().toISOString()
+  }
   const { error } = await supabase.from('rechnungen').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
 
@@ -834,20 +865,21 @@ export async function sendRechnung(
 
   if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'entwurf'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
   rec.rechnungsnummer = rechnungsnummer
 
   const pdf = await persistPdfForRechnung(rechnungId)
   if (!pdf.ok) return pdf
 
   /** Storno-Gutschrift zur gleichen Planzeile (nach „Stornieren & neu stellen“) mitversenden. */
-  type StornoAnhang = { id: string; nr: string; buffer: Buffer }
+  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
   let stornoAnhang: StornoAnhang | null = null
   const belegTyp = String(rec.beleg_typ ?? 'rechnung')
   if (belegTyp !== 'gutschrift') {
@@ -863,7 +895,7 @@ export async function sendRechnung(
     async function loadGutschriftAnhang(origId: string): Promise<StornoAnhang | null> {
       const { data: gs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, status')
+        .select('id, rechnungsnummer, status, bezug_rechnung_id')
         .eq('bezug_rechnung_id', origId)
         .eq('beleg_typ', 'gutschrift')
         .in('status', ['entwurf', 'gesendet'])
@@ -873,10 +905,25 @@ export async function sendRechnung(
       if (!gs?.id) return null
       const gsPdf = await persistPdfForRechnung(String(gs.id))
       if (!gsPdf.ok) return null
+      const { data: gsAfter } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', gs.id)
+        .maybeSingle()
+      let bezugRechnungsnummer: string | null = null
+      const { data: origRow } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', origId)
+        .maybeSingle()
+      bezugRechnungsnummer = String(origRow?.rechnungsnummer ?? '').trim() || null
       return {
         id: String(gs.id),
-        nr: String(gs.rechnungsnummer ?? 'Gutschrift').trim() || 'Gutschrift',
+        nr:
+          String(gsAfter?.rechnungsnummer ?? gs.rechnungsnummer ?? 'Gutschrift').trim() ||
+          'Gutschrift',
         buffer: gsPdf.buffer,
+        bezugRechnungsnummer,
       }
     }
 
@@ -956,10 +1003,6 @@ export async function sendRechnung(
     fallback: '',
   })
 
-  const stornoHinweis = stornoAnhang
-    ? `Im Anhang: Storno-Gutschrift ${stornoAnhang.nr} und die korrigierte Rechnung ${rechnungsnummer}.`
-    : null
-
   /** Optional: Abschlussbericht mit Rechnung versenden. */
   let abschlussAnhang: { filename: string; buffer: Buffer } | null = null
   if (options?.mitAbschlussbericht && rec.auftrag_id) {
@@ -1006,9 +1049,9 @@ export async function sendRechnung(
     ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
     : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
-  const mailEinleitung = [stornoHinweis, abschlussHinweis, mailEinleitungBase]
-    .filter(Boolean)
-    .join('\n\n') || null
+  const mailEinleitung = stornoAnhang
+    ? mailEinleitungBase
+    : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
 
   const tpl = buildRechnungMail(
     {
@@ -1022,6 +1065,8 @@ export async function sendRechnung(
       mailBetreff: (rec.mail_betreff as string | null)?.trim() || null,
       reverseCharge: Boolean(rec.reverse_charge_13b),
       mitStornoAnhang: Boolean(stornoAnhang),
+      stornoGutschriftNummer: stornoAnhang?.nr ?? null,
+      stornoBezugRechnungsnummer: stornoAnhang?.bezugRechnungsnummer ?? null,
       mitAbschlussberichtAnhang: Boolean(abschlussAnhang),
     },
     branding
@@ -1287,24 +1332,14 @@ export async function previewRechnungKundeMail(input: {
   return { ok: true, html: tpl.html, betreff: tpl.betreff }
 }
 
-function tageSeitFaelligkeitYmd(faelligAm: string | null): number {
-  if (!faelligAm) return 0
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, m, d] = parts
-  const due = new Date(y, m - 1, d)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
-}
-
 type ZahlungserinnerungRechnungRow = {
+  id: string
   rechnungsnummer: string | null
   status: string | null
   beleg_typ: string | null
   auftrag_id: string | null
   kunde_id: string | null
+  rechnung_art: string | null
   faellig_am: string | null
   brutto: number | null
   erinnerung_7_sent_at: string | null
@@ -1324,11 +1359,13 @@ async function loadRechnungFuerZahlungserinnerung(
         .from('rechnungen')
         .select(
           `
+      id,
       rechnungsnummer,
       status,
       beleg_typ,
       auftrag_id,
       kunde_id,
+      rechnung_art,
       faellig_am,
       brutto,
       erinnerung_7_sent_at,
@@ -1349,13 +1386,14 @@ async function loadRechnungFuerZahlungserinnerung(
   }
 
   const supabase = createClient()
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'gesendet'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
 
   return { ok: true, rec: { ...rec, rechnungsnummer }, rechnungsnummer }
 }
@@ -1364,7 +1402,8 @@ function buildZahlungserinnerungVorschau(
   rec: ZahlungserinnerungRechnungRow,
   rechnungsnummer: string,
   stufe: ZahlungserinnerungStufe,
-  branding: Awaited<ReturnType<typeof getMailBranding>>
+  branding: Awaited<ReturnType<typeof getMailBranding>>,
+  betragFelder: ReturnType<typeof mahnungBetragMailFelder>
 ) {
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
@@ -1376,10 +1415,10 @@ function buildZahlungserinnerungVorschau(
     {
       name: kunde?.name?.trim() || 'Kundin/Kunde',
       nummer: rechnungsnummer,
-      brutto: Number(rec.brutto ?? 0),
+      ...betragFelder,
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       zahlbarBis: formatDatumDeFromIso(zahlbarBisIso),
-      tageUeberfaellig: Math.max(0, tageSeitFaelligkeitYmd(rec.faellig_am)),
+      tageUeberfaellig: Math.max(0, tageSeitFaelligkeitRechnung(rec.faellig_am)),
       stufe,
       iban,
       anrede,
@@ -1421,12 +1460,24 @@ export async function previewZahlungserinnerungMail(
   const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
   if (!loaded.ok) return loaded
 
+  const mahnKontext = await mahnungBetragKontextFuerRechnung(supabaseAdmin, {
+    id: rechnungId,
+    auftrag_id: loaded.rec.auftrag_id,
+    brutto: loaded.rec.brutto,
+    rechnung_art: loaded.rec.rechnung_art,
+  })
+  if (mahnKontext.skipMahnung) {
+    return { ok: false, message: 'Für diese Rechnung ist kein offener Betrag mehr — keine Mahnung nötig.' }
+  }
+
   const branding = await getMailBranding(supabaseAdmin)
+  const betragFelder = mahnungBetragMailFelder(mahnKontext)
   const preview = buildZahlungserinnerungVorschau(
     loaded.rec,
     loaded.rechnungsnummer,
     stufe,
-    branding
+    branding,
+    betragFelder
   )
 
   return {
@@ -1457,15 +1508,27 @@ export async function sendZahlungserinnerungMail(
   const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
   if (!loaded.ok) return loaded
 
+  const mahnKontext = await mahnungBetragKontextFuerRechnung(supabaseAdmin, {
+    id: rechnungId,
+    auftrag_id: loaded.rec.auftrag_id,
+    brutto: loaded.rec.brutto,
+    rechnung_art: loaded.rec.rechnung_art,
+  })
+  if (mahnKontext.skipMahnung) {
+    return { ok: false, message: 'Für diese Rechnung ist kein offener Betrag mehr — keine Mahnung nötig.' }
+  }
+
   const toList = options.to.map((v) => v.trim()).filter(Boolean)
   if (!toList.length) return { ok: false, message: 'Bitte mindestens eine Empfänger-Adresse angeben.' }
 
   const branding = await getMailBranding(supabaseAdmin)
+  const betragFelder = mahnungBetragMailFelder(mahnKontext)
   const preview = buildZahlungserinnerungVorschau(
     loaded.rec,
     loaded.rechnungsnummer,
     options.stufe,
-    branding
+    branding,
+    betragFelder
   )
 
   const pdf = await persistPdfForRechnung(rechnungId)
@@ -1492,7 +1555,6 @@ export async function sendZahlungserinnerungMail(
   const now = new Date().toISOString()
   const supabase = createClient()
   const patch: Record<string, unknown> = {
-    faellig_am: preview.zahlbarBisIso,
     updated_at: now,
   }
   if (options.stufe === 1) patch.erinnerung_7_sent_at = now

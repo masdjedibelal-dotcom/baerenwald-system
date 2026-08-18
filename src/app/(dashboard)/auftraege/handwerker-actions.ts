@@ -185,6 +185,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
   handwerkerId: string
   positionIds?: string[]
   status?: AuftragHandwerkerZuweisungStatus
+  hwRechnungReverseCharge13b?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
@@ -267,6 +268,22 @@ export async function assignAuftragHandwerkerGewerk(input: {
     gewerkName: gw.name as string,
   })
 
+  const { data: auftragMeta } = await supabase
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', input.auftragId)
+    .maybeSingle()
+  const angebotId = String(auftragMeta?.angebot_id ?? '').trim()
+  if (angebotId) {
+    const rc13b = input.hwRechnungReverseCharge13b === true
+    await supabase
+      .from('angebot_handwerker')
+      .update({ hw_rechnung_reverse_charge_13b: rc13b })
+      .eq('angebot_id', angebotId)
+      .eq('handwerker_id', input.handwerkerId)
+      .eq('gewerk_id', input.gewerkId)
+  }
+
   {
     const { data: auf } = await supabase
       .from('auftraege')
@@ -307,6 +324,7 @@ export async function assignAuftragHandwerkerPosition(input: {
   positionId: string
   handwerkerId: string
   status?: AuftragHandwerkerZuweisungStatus
+  hwRechnungReverseCharge13b?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
@@ -387,6 +405,30 @@ export async function assignAuftragHandwerkerPosition(input: {
     gewerkSlug: pos.gewerk_slug as string | null,
     gewerkName: String(pos.gewerk_name ?? ''),
   })
+
+  const { data: auftragMeta } = await supabase
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', input.auftragId)
+    .maybeSingle()
+  const angebotId = String(auftragMeta?.angebot_id ?? '').trim()
+  if (angebotId && pos.gewerk_slug) {
+    const { data: gwForPos } = await supabase
+      .from('gewerke')
+      .select('id')
+      .eq('slug', pos.gewerk_slug as string)
+      .maybeSingle()
+    const gewerkIdForPos = String(gwForPos?.id ?? '').trim()
+    if (gewerkIdForPos) {
+      const rc13b = input.hwRechnungReverseCharge13b === true
+      await supabase
+        .from('angebot_handwerker')
+        .update({ hw_rechnung_reverse_charge_13b: rc13b })
+        .eq('angebot_id', angebotId)
+        .eq('handwerker_id', input.handwerkerId)
+        .eq('gewerk_id', gewerkIdForPos)
+    }
+  }
 
   {
     const { data: auf } = await supabase

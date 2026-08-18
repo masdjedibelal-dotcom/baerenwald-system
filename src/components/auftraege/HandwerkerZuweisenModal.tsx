@@ -155,6 +155,7 @@ export function HandwerkerZuweisenModal({
   const [listErr, setListErr] = useState<string | null>(null)
   const [splitZiel, setSplitZiel] = useState<Record<string, SplitZiel>>({})
   const [betragAlt, setBetragAlt] = useState<Record<string, string>>({})
+  const [hwRechnungReverseCharge13b, setHwRechnungReverseCharge13b] = useState(false)
 
   const gewerkId = scope?.gewerkId ?? ''
   const gewerkSlug = scope?.gewerkSlug ?? null
@@ -192,6 +193,7 @@ export function HandwerkerZuweisenModal({
     setEmpfohlen([])
     setAlle([])
     setLoadingList(true)
+    setHwRechnungReverseCharge13b(false)
 
     const nextZiel: Record<string, SplitZiel> = {}
     const nextBetrag: Record<string, string> = {}
@@ -301,13 +303,17 @@ export function HandwerkerZuweisenModal({
               auftragId: scope.position.auftrag_id?.trim() || auftragId,
               positionId: scope.position.id,
               handwerkerId: selectedId,
-              status })
+              status,
+              hwRechnungReverseCharge13b,
+            })
           : await assignAuftragHandwerkerGewerk({
               auftragId,
               gewerkId: scope.gewerkId,
               handwerkerId: selectedId,
               positionIds: scope.positionIds,
-              status })
+              status,
+              hwRechnungReverseCharge13b,
+            })
       if (!r.ok) {
         toast.error(r.message)
         return
@@ -440,7 +446,7 @@ export function HandwerkerZuweisenModal({
               ? `${scopeLeistungenCount} Leistungen · ein Partner.`
               : `Partner für „${gewerkName}“ wählen.`}
       </p>
-      {isReplace ? null : (
+      {!isReplace && (
         <Select
           label="Status nach Zuweisung"
           name="hw-status"
@@ -449,6 +455,22 @@ export function HandwerkerZuweisenModal({
           options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           className="mb-4"
         />
+      )}
+      {!isReplace && (
+        <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={hwRechnungReverseCharge13b}
+            onChange={(e) => setHwRechnungReverseCharge13b(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">EK: § 13b UStG für Partner-Rechnung</span>
+            <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+              Steuert den Reverse-Charge-Hinweis auf der automatischen Eingangsrechnung.
+            </span>
+          </span>
+        </label>
       )}
       {leistungenPreview}
       {splitPanel}

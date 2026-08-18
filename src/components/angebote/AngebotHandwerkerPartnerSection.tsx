@@ -14,6 +14,7 @@ import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerE
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
 import { cn } from '@/lib/utils'
 import type { AngebotDetail, AngebotHandwerkerRow } from '@/lib/types'
+import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
 import { handwerkerZuweisungAktiv } from '@/lib/angebote/angebot-handwerker-flow'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
@@ -57,6 +58,7 @@ function ZuweisungCard({
   auftragId,
   onRefresh,
   onAcceptWizard,
+  kundeHatAngenommen,
 }: {
   z: AngebotHandwerkerRow
   angebotId: string
@@ -69,6 +71,7 @@ function ZuweisungCard({
     gewerkId: string
     zuweisungId: string
   }) => void
+  kundeHatAngenommen: boolean
 }) {
   const [manuellOpen, setManuellOpen] = useState(false)
   const [replaceOpen, setReplaceOpen] = useState(false)
@@ -82,6 +85,7 @@ function ZuweisungCard({
   const kannManuell = !abgelehnt && !eingereicht && !uebernommen
   const statusLc = (z.status ?? 'ausstehend').toLowerCase()
   const kannBestaetigen =
+    z.ohne_lv !== true &&
     !abgelehnt &&
     statusLc !== 'akzeptiert' &&
     statusLc !== 'ersetzt' &&
@@ -230,9 +234,10 @@ function ZuweisungCard({
           auftragId={auftragId}
           onRefresh={onRefresh}
           onAcceptWizard={onAcceptWizard}
+          bestaetigenErstNachKundenJa={z.ohne_lv === true && !kundeHatAngenommen}
         />
 
-        {!eingereicht && kannManuell ? (
+        {!eingereicht && kannManuell && z.ohne_lv !== true ? (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               {z.status === 'akzeptiert'
@@ -357,6 +362,7 @@ export function AngebotHandwerkerPartnerSection({
   const [wizardBootstrap, setWizardBootstrap] = useState<ProjektVertragWizardBootstrap | null>(null)
   const [wizardPending, startWizardTransition] = useTransition()
   const rows = (detail.angebot_handwerker ?? []).filter(handwerkerZuweisungAktiv)
+  const kundeHatAngenommen = isAngenommenesAngebotStatus(detail.status, detail.status_einfach)
   const angebotTitel =
     detail.notizen?.trim()?.slice(0, 80) ||
     (detail.angebotsnr ? `Angebot ${detail.angebotsnr}` : 'Projekt')
@@ -397,6 +403,7 @@ export function AngebotHandwerkerPartnerSection({
                 auftragId={auftragId}
                 onRefresh={() => router.refresh()}
                 onAcceptWizard={auftragId ? openAcceptWizard : undefined}
+                kundeHatAngenommen={kundeHatAngenommen}
               />
             ))}
           </div>

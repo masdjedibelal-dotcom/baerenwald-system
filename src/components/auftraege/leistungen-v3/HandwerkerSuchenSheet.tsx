@@ -206,7 +206,6 @@ export function HandwerkerSuchenSheet({
                             <span className="hw-anfrage-star">★</span> {rating.toFixed(1)}
                           </>
                         ) : null}
-                        {h.verfuegbar === false ? ' · Im Einsatz' : ''}
                       </span>
                     </span>
                   </button>

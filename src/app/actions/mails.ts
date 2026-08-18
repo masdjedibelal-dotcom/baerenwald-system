@@ -18,6 +18,13 @@ import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
+import { cronMahnungFuerRechnung, tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
+import {
+  berechneMahnungBetragKontext,
+  loadGeschwisterMapFuerMahnung,
+  mahnungBetragMailFelder,
+} from '@/lib/rechnungen/mahnung-betrag'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
@@ -212,14 +219,7 @@ export async function sendBesichtigungTerminBestaetigung(input: {
 }
 
 function tageUeberfaellig(faelligAm: string): number {
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, mo, d] = parts
-  const due = new Date(y, mo - 1, d)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
+  return tageSeitFaelligkeitRechnung(faelligAm)
 }
 
 type RechnungRow = {
@@ -231,6 +231,10 @@ type RechnungRow = {
   erinnerung_21_sent_at: string | null
   intern_warnung_30_at: string | null
   kunde_id: string | null
+  auftrag_id: string | null
+  rechnung_art: string | null
+  beleg_typ: string | null
+  richtung: string | null
   kunden: { name: string; email: string | null } | { name: string; email: string | null }[] | null
 }
 
@@ -242,25 +246,23 @@ function normalizeKunde(
   return k
 }
 
-/** Cron: Zahlungserinnerungen 7 / 21 Tage + interne 30-Tage-Warnung */
+/** Cron: 1. Erinnerung nach Zahlungsziel, 2. nach weiteren 7 Tagen, intern ab 30 Tagen. */
 export async function sendZahlungserinnerungen(): Promise<{
   ok: true
   bearbeitet: number
   details: { id: string; aktion: string }[]
 }> {
-  const heute = new Date().toISOString().slice(0, 10)
   const branding = await getMailBranding(supabaseAdmin)
   const iban = branding.iban || process.env.EMAIL_FIRMEN_IBAN || ''
 
   const { data: rows, error } = await supabaseAdmin
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, kunden(name, email, typ)'
+      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, auftrag_id, rechnung_art, beleg_typ, richtung, kunden(name, email, typ)'
     )
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
     .not('faellig_am', 'is', null)
-    .lt('faellig_am', heute)
 
   if (error) {
     console.error('[sendZahlungserinnerungen]', error.message)
@@ -270,31 +272,59 @@ export async function sendZahlungserinnerungen(): Promise<{
   const list = (rows ?? []) as RechnungRow[]
   const ergebnis: { id: string; aktion: string }[] = []
 
+  const geschwisterMap = await loadGeschwisterMapFuerMahnung(
+    supabaseAdmin,
+    list.map((r) => r.auftrag_id).filter(Boolean) as string[]
+  )
+
   for (const r of list) {
     if (!r.faellig_am) continue
-    const tage = tageUeberfaellig(r.faellig_am)
-    if (tage <= 0) continue
+    if (String(r.beleg_typ ?? 'rechnung') === 'gutschrift') continue
+    if (String(r.richtung ?? '') === 'eingehend') continue
+
+    const mahnKontext = berechneMahnungBetragKontext(
+      {
+        id: r.id,
+        brutto: r.brutto,
+        rechnung_art: r.rechnung_art,
+      },
+      r.auftrag_id ? (geschwisterMap.get(r.auftrag_id) ?? []) : []
+    )
+    if (mahnKontext.skipMahnung) {
+      ergebnis.push({ id: r.id, aktion: 'nichts_offen' })
+      continue
+    }
+
+    const aktion = cronMahnungFuerRechnung(r)
+    if (!aktion) continue
 
     const kunde = normalizeKunde(r.kunden)
     const name = kunde?.name ?? 'Kundin/Kunde'
     const email = kunde?.email?.trim() ?? ''
     const kundeTyp = (kunde as { typ?: string | null } | null)?.typ ?? null
-    const brutto = r.brutto ?? 0
-    const faelligFmt = formatDeDate(r.faellig_am)
+    const betragFelder = mahnungBetragMailFelder(mahnKontext)
+    const tage = tageUeberfaellig(r.faellig_am)
+    const faelligEff = effektivesFaelligAmYmd(r.faellig_am) ?? r.faellig_am
+    const faelligFmt = formatDeDate(faelligEff)
 
     try {
-      if (tage >= 7 && !r.erinnerung_7_sent_at && email) {
+      if (aktion === 'stufe1' || aktion === 'stufe2') {
+        if (!email) {
+          ergebnis.push({ id: r.id, aktion: 'keine_email' })
+          continue
+        }
+        const stufe = aktion === 'stufe1' ? 1 : 2
         const zahlbarBisIso = zahlungserinnerungZahlbarBis(r.faellig_am)
         const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
           {
             name,
             nummer: r.rechnungsnummer,
-            brutto,
+            ...betragFelder,
             faelligAm: faelligFmt,
             zahlbarBis: zahlbarBisFmt,
             tageUeberfaellig: tage,
-            stufe: 1,
+            stufe,
             iban,
             kundeTyp,
           },
@@ -310,78 +340,34 @@ export async function sendZahlungserinnerungen(): Promise<{
           rechnungId: r.id,
         })
         if (send.success) {
-          await supabaseAdmin
-            .from('rechnungen')
-            .update({
-              erinnerung_7_sent_at: new Date().toISOString(),
-              faellig_am: zahlbarBisIso,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', r.id)
-          ergebnis.push({ id: r.id, aktion: 'erinnerung_7' })
+          const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+          if (stufe === 1) patch.erinnerung_7_sent_at = new Date().toISOString()
+          if (stufe === 2) patch.erinnerung_21_sent_at = new Date().toISOString()
+          await supabaseAdmin.from('rechnungen').update(patch).eq('id', r.id)
+          ergebnis.push({ id: r.id, aktion: stufe === 1 ? 'erinnerung_1' : 'erinnerung_2' })
         }
+        continue
       }
 
-      if (tage >= 21 && !r.erinnerung_21_sent_at && email) {
-        const zahlbarBisIso = zahlungserinnerungZahlbarBis(r.faellig_am)
-        const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
-        const tpl = mailZahlungserinnerung(
-          {
-            name,
-            nummer: r.rechnungsnummer,
-            brutto,
-            faelligAm: faelligFmt,
-            zahlbarBis: zahlbarBisFmt,
-            tageUeberfaellig: tage,
-            stufe: 2,
-            iban,
-            kundeTyp,
-          },
-          branding
-        )
-        const send = await sendMail({
-          typ: 'zahlungserinnerung',
-          an: email,
-          anName: name,
-          betreff: tpl.betreff,
-          html: tpl.html,
-          kundeId: r.kunde_id,
-          rechnungId: r.id,
+      const msg = `[Intern] Rechnung ${r.rechnungsnummer} (${r.id}) ist seit ${tage} Tagen überfällig (Fälligkeit ${r.faellig_am}).`
+      console.warn(msg)
+      const intern = process.env.INTERNE_RECHNUNG_WARNUNG_EMAIL
+      if (intern) {
+        await sendMail({
+          typ: 'intern_hinweis',
+          an: intern,
+          betreff: '[Intern] Bärenwald CRM — überfällige Rechnung',
+          html: `<pre style="font-family:system-ui,sans-serif;font-size:13px;white-space:pre-wrap;">${msg
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')}</pre>`,
         })
-        if (send.success) {
-          await supabaseAdmin
-            .from('rechnungen')
-            .update({
-              erinnerung_21_sent_at: new Date().toISOString(),
-              faellig_am: zahlbarBisIso,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', r.id)
-          ergebnis.push({ id: r.id, aktion: 'erinnerung_21' })
-        }
       }
-
-      if (tage >= 30 && !r.intern_warnung_30_at) {
-        const msg = `[Intern] Rechnung ${r.rechnungsnummer} (${r.id}) ist seit ${tage} Tagen überfällig (Fälligkeit ${r.faellig_am}).`
-        console.warn(msg)
-        const intern = process.env.INTERNE_RECHNUNG_WARNUNG_EMAIL
-        if (intern) {
-          await sendMail({
-            typ: 'intern_hinweis',
-            an: intern,
-            betreff: '[Intern] Bärenwald CRM — überfällige Rechnung',
-            html: `<pre style="font-family:system-ui,sans-serif;font-size:13px;white-space:pre-wrap;">${msg
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')}</pre>`,
-          })
-        }
-        await supabaseAdmin
-          .from('rechnungen')
-          .update({ intern_warnung_30_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-          .eq('id', r.id)
-        ergebnis.push({ id: r.id, aktion: 'intern_30' })
-      }
+      await supabaseAdmin
+        .from('rechnungen')
+        .update({ intern_warnung_30_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', r.id)
+      ergebnis.push({ id: r.id, aktion: 'intern_30' })
     } catch (e) {
       console.error('[sendZahlungserinnerungen] Rechnung', r.id, e)
       ergebnis.push({ id: r.id, aktion: 'fehler' })

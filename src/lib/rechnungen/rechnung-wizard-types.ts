@@ -9,6 +9,7 @@ import {
 } from '@/lib/rechnungen/rechnung-texte'
 import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 
 export type RechnungWizardZahlungsart = 'standard' | 'abschlaege'
 
@@ -152,7 +153,7 @@ export function defaultRechnungWizardMeta(
     rechnungsdatum: heute,
     leistungszeitraum_von: von,
     leistungszeitraum_bis: bis,
-    faellig_am: addDaysYmd(heute, zahlungszielTage),
+    faellig_am: effektivesFaelligAmYmd(addDaysYmd(heute, zahlungszielTage)) ?? addDaysYmd(heute, zahlungszielTage),
     zahlungsart: 'standard',
     zahlungsbedingungen: standardRechnungZahlungstext(zahlungszielTage),
     abschlag_zeile_id: null,

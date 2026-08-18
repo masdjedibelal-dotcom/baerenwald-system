@@ -22,13 +22,30 @@ export function brandLogoPath(variant: BrandLogoVariant): string {
   return variant === 'white' ? BRAND_LOGO_WHITE : BRAND_LOGO_GREEN
 }
 
-/** Host mit öffentlich erreichbaren Logo-PNGs (Website), Fallback wenn CRM-/public-Logo fehlt. */
+/** Öffentliche Website — einzige stabile Quelle für Remote-Logos in Mails. */
+const WEBSITE_LOGO_HOST = 'https://baerenwaldmuenchen.de'
+
+function isPublicLogoHost(raw: string): boolean {
+  try {
+    const u = new URL(raw.includes('://') ? raw : `https://${raw}`)
+    if (u.protocol !== 'https:') return false
+    const h = u.hostname.toLowerCase()
+    if (h === 'localhost' || h === '127.0.0.1') return false
+    if (h.includes('baerenwald-backend')) return false
+    if (h.endsWith('.netlify.app') && h.includes('backend')) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Host mit öffentlich erreichbaren Logo-PNGs (Website). Nie localhost / CRM-Netlify. */
 function emailLogoHostFallback(): string {
-  return (
-    process.env.NEXT_PUBLIC_EMAIL_LOGO_HOST?.replace(/\/$/, '') ||
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
-    'https://baerenwaldmuenchen.de'
-  )
+  const explicit = process.env.NEXT_PUBLIC_EMAIL_LOGO_HOST?.trim().replace(/\/$/, '')
+  if (explicit && isPublicLogoHost(explicit)) return explicit.replace(/\/$/, '')
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, '')
+  if (site && isPublicLogoHost(site)) return site
+  return WEBSITE_LOGO_HOST
 }
 
 function websiteLogoPath(variant: BrandLogoVariant): string {

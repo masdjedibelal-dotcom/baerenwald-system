@@ -277,7 +277,7 @@ export function buildRechnungHtmlInput(
     firmen_steuer_footer: steuer.length ? steuer.join('\n') : null,
     firmen_bankverbindung: bank.length ? bank.join('\n') : null,
     firmen_impressum: firm.pdf_fusszeile?.trim() || null,
-    angebotsnr: row.rechnungsnummer,
+    angebotsnr: row.rechnungsnummer?.trim() || 'Entwurf',
     kundennr: row.kunden.id ? formatKundennr(row.kunden.id) : '—',
     datum: rechnungsdatumDe,
     gueltig_bis: formatDatumDe(row.faellig_am),

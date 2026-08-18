@@ -4,9 +4,7 @@ import { randomUUID } from 'crypto'
 
 import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
 import { summenAusPositionen, normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
-import { defaultAngebotZahlungsbedingungen } from '@/lib/angebote/angebot-wizard-types'
-import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
+import { defaultAngebotZahlungsbedingungen, resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { copilotAlertAlreadySent, recordCopilotAlert } from '@/lib/copilot/alerts'
 import { sendTelegram } from '@/lib/copilot/telegram'
@@ -568,7 +566,6 @@ export async function createAngebotEntwurfCopilot(input: {
   const zahlungsbedingungen = defaultAngebotZahlungsbedingungen(
     resolveAngebotKundeTyp(kundeTyp, leadKundentyp)
   )
-  const angebotsnr = await nextAngebotsnummerJahr()
 
   const { data: row, error } = await supabaseAdmin
     .from('angebote')
@@ -584,7 +581,7 @@ export async function createAngebotEntwurfCopilot(input: {
       notizen: null,
       pdf_url: null,
       preis_typ: 'fix',
-      angebotsnr,
+      angebotsnr: null,
       leistungsumfang,
       zahlungsbedingungen,
       dokument_typ: 'einfach',

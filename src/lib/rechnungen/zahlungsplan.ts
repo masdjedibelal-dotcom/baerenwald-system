@@ -2,6 +2,7 @@ import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-p
 import { berechneRechnung, type RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 
 function neueZahlungsplanId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -90,7 +91,8 @@ function plusDaysIso(days: number): string {
   const d = new Date()
   d.setHours(12, 0, 0, 0)
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  const raw = d.toISOString().slice(0, 10)
+  return effektivesFaelligAmYmd(raw) ?? raw
 }
 
 export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
@@ -342,6 +344,47 @@ export function berechneZahlungsplan(
   })
 
   return { gesamtNetto, gesamtBrutto, zeilen }
+}
+
+export type AbschlagAuftragSummeAbweichung = {
+  zeileId: string
+  titel: string
+  rechnungsnummer: string | null
+  gestelltBrutto: number
+  sollBrutto: number
+}
+
+/**
+ * Gestellter Abschlag weicht von % der *aktuellen* Auftragssumme ab.
+ * Schlussrate und Entwürfe/Stornos zählen nicht — die bleiben bewusst auf Ist-Betrag.
+ */
+export function abschlagWeichtVonAktuellerAuftragssummeAb(
+  plan: Zahlungsplan,
+  gesamtNetto: number,
+  links: RechnungAbschlagLink[],
+  mwstSatz = 19
+): AbschlagAuftragSummeAbweichung[] {
+  const soll = berechneZahlungsplan(plan, gesamtNetto, mwstSatz)
+  const out: AbschlagAuftragSummeAbweichung[] = []
+  for (const z of soll.zeilen) {
+    if (z.istSchluss) continue
+    const link = rechnungFuerAbschlagZeile(z.id, links)
+    if (!link) continue
+    const st = String(link.status ?? '').toLowerCase()
+    if (st === 'storniert' || st === 'entwurf') continue
+    if (String(link.beleg_typ ?? 'rechnung') === 'gutschrift') continue
+    const gestellt = Number(link.brutto)
+    if (!Number.isFinite(gestellt)) continue
+    if (Math.abs(gestellt - z.brutto) <= 0.05) continue
+    out.push({
+      zeileId: z.id,
+      titel: z.titel?.trim() || `Abschlag ${z.index}`,
+      rechnungsnummer: link.rechnungsnummer?.trim() || null,
+      gestelltBrutto: gestellt,
+      sollBrutto: z.brutto,
+    })
+  }
+  return out
 }
 
 /**

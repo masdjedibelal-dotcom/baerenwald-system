@@ -298,6 +298,8 @@ export function AngebotWizard({
 
   const [mounted, setMounted] = useState(false)
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
+  const hatGestellteAbschlaege =
+    (bootstrap?.auftragKorrektur?.gestellteAbschlaege ?? 0) > 0
   const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
   /**
    * Neu: zuerst Art (Einmalig/Wiederkehrend), bei Einmalig dann Layout (Einfach/Komplex).
@@ -797,9 +799,13 @@ export function AngebotWizard({
           toast.success(
             istNachtrag
               ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
-              : res.angebotsnr?.trim()
-                ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-                : 'Entwurf gespeichert'
+              : istAuftragKorrektur
+                ? hatGestellteAbschlaege
+                  ? 'Korrektur gespeichert. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
+                  : 'Korrektur gespeichert'
+                : res.angebotsnr?.trim()
+                  ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+                  : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
@@ -831,6 +837,7 @@ export function AngebotWizard({
       wichtigeHinweisePersist,
       onSaved,
       istAuftragKorrektur,
+      hatGestellteAbschlaege,
       auftragKorrekturId,
       zahlungsplan,
       projekt,
@@ -970,7 +977,9 @@ export function AngebotWizard({
         istNachtrag
           ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
           : istAuftragKorrektur
-            ? 'Korrektur gespeichert und an den Kunden versendet'
+            ? hatGestellteAbschlaege
+              ? 'Korrektur gespeichert und versendet. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
+              : 'Korrektur gespeichert und an den Kunden versendet'
             : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
       )
       setSheet(null)
@@ -1035,9 +1044,13 @@ export function AngebotWizard({
     ? [name?.trim() && name !== '—' ? name.trim() : null, 'Auftrag bleibt bis zur Annahme unverändert']
         .filter(Boolean)
         .join(' · ') || 'Auftrag bleibt bis zur Annahme unverändert'
-    : name?.trim() && name !== '—'
-      ? name.trim()
-      : undefined
+    : istAuftragKorrektur
+      ? [name?.trim() && name !== '—' ? name.trim() : null, 'Korrektur am angenommenen Angebot']
+          .filter(Boolean)
+          .join(' · ')
+      : name?.trim() && name !== '—'
+        ? name.trim()
+        : undefined
 
   const headerEnd = (
     <>
@@ -1087,6 +1100,16 @@ export function AngebotWizard({
 
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
+      {istAuftragKorrektur && hatGestellteAbschlaege ? (
+        <div className="zahlung-tab-hint">
+          <MockIcon ctx="btn" n="info" size={15} />
+          <span>
+            Bereits gestellte Abschläge bleiben nach der Korrektur unverändert. Die
+            Schlussrechnung gleicht die Differenz aus. Soll ein Abschlag zur neuen Summe
+            passen: Rechnung stornieren und die Rate neu stellen.
+          </span>
+        </div>
+      ) : null}
       <PosBoard
         title={angebotTitel || 'Angebot'}
         positionen={posBoardLines}
@@ -1384,6 +1407,15 @@ export function AngebotWizard({
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
+          {istAuftragKorrektur && hatGestellteAbschlaege ? (
+            <div className="full zahlung-tab-hint" style={{ marginBottom: 0 }}>
+              <MockIcon ctx="btn" n="info" size={15} />
+              <span>
+                Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag
+                stornieren und die Rate neu stellen.
+              </span>
+            </div>
+          ) : null}
           <MockField label="Gültig bis" full>
             <DateInput
               size="sm"

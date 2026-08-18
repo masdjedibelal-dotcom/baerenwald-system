@@ -35,6 +35,10 @@ export type RechnungMailInput = {
   reverseCharge?: boolean
   /** Storno-Gutschrift + neue RE in einer Mail */
   mitStornoAnhang?: boolean
+  /** GS-Nummer für klarere Mail (z. B. GS-RE2026-2072) */
+  stornoGutschriftNummer?: string | null
+  /** Ursprungs-RE, die storniert wird (z. B. RE2026-2088) */
+  stornoBezugRechnungsnummer?: string | null
   /** Abschlussbericht als zusätzlicher PDF-Anhang */
   mitAbschlussberichtAnhang?: boolean
 }
@@ -93,7 +97,15 @@ export function buildRechnungMail(
 
   const introRaw =
     data.mailEinleitung?.trim() ||
-    defaultRechnungMailEinleitung(anrede)
+    (data.mitStornoAnhang
+      ? anrede === 'du'
+        ? data.stornoBezugRechnungsnummer && data.stornoGutschriftNummer
+          ? `wir korrigieren die Rechnung ${data.stornoBezugRechnungsnummer}: Im Anhang findest du die Storno-Gutschrift ${data.stornoGutschriftNummer} und die neue Rechnung ${data.rechnungsnummer}.`
+          : 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang findest du die Storno-Gutschrift und die neue Rechnung.'
+        : data.stornoBezugRechnungsnummer && data.stornoGutschriftNummer
+          ? `wir korrigieren die Rechnung ${data.stornoBezugRechnungsnummer}: Im Anhang finden Sie die Storno-Gutschrift ${data.stornoGutschriftNummer} und die neue Rechnung ${data.rechnungsnummer}.`
+          : 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang finden Sie die Storno-Gutschrift und die neue Rechnung.'
+      : defaultRechnungMailEinleitung(anrede))
   const intro = esc(introRaw)
 
   const pdfHinweis = data.mitAbschlussberichtAnhang
@@ -102,20 +114,30 @@ export function buildRechnungMail(
       : 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
     : data.mitStornoAnhang
       ? anrede === 'du'
-        ? 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
-        : 'Im Anhang: die Storno-Gutschrift und die neue Rechnung als PDF.'
+        ? data.stornoGutschriftNummer
+          ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`
+          : 'Zwei PDFs im Anhang: Storno-Gutschrift und neue Rechnung.'
+        : data.stornoGutschriftNummer
+          ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`
+          : 'Zwei PDFs im Anhang: Storno-Gutschrift und neue Rechnung.'
       : anrede === 'du'
         ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
         : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
 
-  const summaryHtml = mailSummaryBlock({
-    label: data.mitStornoAnhang
+  const summaryLabel = data.mitStornoAnhang
+    ? data.stornoBezugRechnungsnummer
       ? anrede === 'du'
+        ? `KORREKTUR · ${data.stornoBezugRechnungsnummer} → ${nr}`
+        : `KORREKTUR · ${data.stornoBezugRechnungsnummer} → ${nr}`
+      : anrede === 'du'
         ? `STORNO + RECHNUNG · ${nr}`
         : `STORNO + RECHNUNG · ${nr}`
-      : anrede === 'du'
-        ? `DEINE RECHNUNG · ${nr}`
-        : `IHRE RECHNUNG · ${nr}`,
+    : anrede === 'du'
+      ? `DEINE RECHNUNG · ${nr}`
+      : `IHRE RECHNUNG · ${nr}`
+
+  const summaryHtml = mailSummaryBlock({
+    label: summaryLabel,
     title: titel,
     priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
     metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,

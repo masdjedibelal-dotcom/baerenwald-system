@@ -59,6 +59,7 @@ export function HandwerkerEinreichungPruefung({
   angebotPositionen = [],
   onRefresh,
   onAcceptWizard,
+  bestaetigenErstNachKundenJa = false,
 }: {
   z: AngebotHandwerkerRow
   angebotId: string
@@ -76,8 +77,10 @@ export function HandwerkerEinreichungPruefung({
     gewerkId: string
     zuweisungId: string
   }) => void
+  /** Partner-Einholung: Bestätigen erst nach Kunden-Ja. */
+  bestaetigenErstNachKundenJa?: boolean
 }) {
-  if (auftragId) {
+  if (auftragId && z.ohne_lv !== true) {
     return (
       <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
         <p className="font-medium text-bw-text">Vorgänge-Flow (Auftrag aktiv)</p>
@@ -119,7 +122,7 @@ export function HandwerkerEinreichungPruefung({
         })()
       : konditionenRaw
   const hwSt = (z.hw_status ?? '').toLowerCase()
-  const kannPruefen = kannHwEinreichungPruefen(z)
+  const kannPruefen = kannHwEinreichungPruefen(z) && !bestaetigenErstNachKundenJa
   const uebernommen = hwSt === 'uebernommen'
   const bestaetigt = hwSt === 'bestaetigt'
   const ek = eingereicht ? ekNettoFromHwEinreichung(z) : null
@@ -336,7 +339,7 @@ export function HandwerkerEinreichungPruefung({
           {kannPruefen ? (
             <>
               <Button type="button" variant="primary" size="sm" loading={pending} onClick={bestaetigen}>
-                Übernehmen
+                {z.ohne_lv ? 'Bestätigen' : 'Übernehmen'}
               </Button>
               <Button
                 type="button"

@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js'
+import { isStagingAdminEmail } from '@/lib/auth/staging-admin'
 
 const BAERENWALD_PRIMARY_STAFF_EMAIL = 'info@baerenwald-muenchen.de'
 
@@ -14,6 +15,7 @@ export function isBaerenwaldPrimaryStaffEmail(email: string | null | undefined):
 export function isCrmAdmin(user: User | null | undefined): boolean {
   if (!user) return false
   if (isBaerenwaldPrimaryStaffEmail(user.email)) return true
+  if (isStagingAdminEmail(user.email)) return true
   const app = (user.app_metadata ?? {}) as {
     crm_role?: string
     is_crm_admin?: boolean

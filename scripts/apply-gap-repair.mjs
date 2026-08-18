@@ -1,5 +1,7 @@
 /**
- * Wendet Schema-Lücken auf angebot_handwerker an (Live-Supabase).
+ * Wendet Schema-Lücken auf angebot_handwerker an.
+ *
+ * Schreibt nicht auf Prod (Guard). Staging: SUPABASE_DB_URL auf Staging-URI.
  *
  * Voraussetzung in .env.local (Dashboard → Database → Connection string URI):
  *   SUPABASE_DB_URL=postgresql://postgres.[ref]:[PASSWORD]@...
@@ -13,6 +15,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertNotProdWrite } from './lib/prod-guard.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const sqlPath = resolve(
@@ -32,6 +35,8 @@ if (!dbUrl) {
   )
   process.exit(1)
 }
+
+assertNotProdWrite({ dbUrl }, 'SUPABASE_DB_URL / DATABASE_URL')
 
 const { default: postgres } = await import('postgres')
 const db = postgres(dbUrl, { max: 1 })

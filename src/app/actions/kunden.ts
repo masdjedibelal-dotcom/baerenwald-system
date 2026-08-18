@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { saveCustomValue as persistCustomFieldValue } from '@/lib/custom-fields'
@@ -179,15 +180,28 @@ export async function updateGesamtUmsatz(
   kundeId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('rechnungen')
-    .select('brutto')
-    .eq('kunde_id', kundeId)
-    .eq('status', 'bezahlt')
+  const [aufRes, reRes] = await Promise.all([
+    supabase
+      .from('auftraege')
+      .select(
+        `
+        status,
+        angebote(gesamt_fix, gesamt_min, gesamt_max, positionen)
+      `
+      )
+      .eq('kunde_id', kundeId)
+      .neq('status', 'storniert'),
+    supabase
+      .from('rechnungen')
+      .select('status, brutto, netto, auftrag_id')
+      .eq('kunde_id', kundeId)
+      .eq('status', 'bezahlt'),
+  ])
 
-  if (error) return { ok: false, message: error.message }
+  if (aufRes.error) return { ok: false, message: aufRes.error.message }
+  if (reRes.error) return { ok: false, message: reRes.error.message }
 
-  const summe = (data ?? []).reduce((s, r) => s + (Number(r.brutto) || 0), 0)
+  const summe = berechneKundeGesamtumsatz(aufRes.data ?? [], reRes.data ?? [])
 
   const { error: uErr } = await withCrmReadFallback(async (db) =>
     db.from('kunden').update({ gesamt_umsatz: summe }).eq('id', kundeId)

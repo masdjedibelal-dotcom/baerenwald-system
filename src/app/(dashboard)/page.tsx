@@ -137,7 +137,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .from('rechnungen')
           .select(
             `
-            id, status, created_at, faellig_am, kunde_id, netto, brutto,
+            id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto,
             kunden(id, name, vorname, nachname)
           `
           )
@@ -150,7 +150,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, positionen')
+          .select('id, status, created_at, auftrag_id, positionen')
           .neq('status', 'storniert')
           .order('created_at', { ascending: false })
           .limit(800)
@@ -197,6 +197,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     status: string
     created_at: string
     faellig_am?: string | null
+    auftrag_id?: string | null
     kunde_id?: string | null
     netto?: number | null
     brutto?: number | null
@@ -209,6 +210,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     id: string
     status: string
     created_at: string
+    auftrag_id?: string | null
     positionen?: unknown
   }>
 
@@ -271,6 +273,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       status: r.status,
       created_at: r.created_at,
       netto: r.netto,
+      auftrag_id: r.auftrag_id,
     })),
     6
   )
@@ -316,6 +319,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
+      auftrag_id: r.auftrag_id,
     })),
     gewerkeKatalog
   )
@@ -414,6 +418,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       kunde_name: name,
       rechnung_id: r.id,
       rechnung_netto: Number(r.netto) || 0,
+      rechnung_auftrag_id: (r.auftrag_id as string | null) ?? null,
     })
   }
   const rankingKunden = buildKundenRanking(kundenRows)

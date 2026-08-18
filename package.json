@@ -31,6 +31,8 @@
     "db:rls-recursion-fix": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/fix-angebote-rls-recursion.sql",
     "db:partner-portal": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/partner-portal/01_portal_auth_handwerker.sql && node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/partner-portal/02_portal_handwerker_angebot_einreichung.sql && node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/partner-portal/03_portal_handwerker_bautagebuch.sql && node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/partner-portal/04_portal_handwerker_storage_policies.sql",
     "db:storage-buckets": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/storage-buckets-crm-setup.sql",
+    "staging:buckets": "./scripts/staging/apply-storage-buckets-staging.sh",
+    "staging:seed": "node --env-file=.env.staging scripts/staging/seed-staging.mjs",
     "db:hw-rechnung-einreichung": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260603120500_portal_handwerker_rechnung_einreichung.sql",
     "db:angebot-handwerker-gaps": "node --env-file=.env.local scripts/apply-gap-repair.mjs",
     "docs:screenshots": "node --env-file=.env.local scripts/docs-screenshots/capture.mjs",

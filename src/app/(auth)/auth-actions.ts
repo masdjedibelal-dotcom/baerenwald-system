@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { CRM_LOGIN_PORTAL_ONLY_MESSAGE } from '@/lib/auth/crm-access'
+import { isStagingAdminEmail, STAGING_ADMIN_EMAIL, STAGING_ADMIN_NAME } from '@/lib/auth/staging-admin'
 import { crmPasswordResetRedirectUrl } from '@/lib/auth/crm-auth-url'
 import { sendMail } from '@/lib/mail-service'
 
@@ -27,11 +28,19 @@ export async function verifyCrmStaffSession(
     .eq('id', uid)
     .maybeSingle()
 
-  if (!profile) {
-    return { ok: false, message: CRM_LOGIN_PORTAL_ONLY_MESSAGE, reason: 'portal_only' }
+  if (profile) return { ok: true }
+
+  const { data: authData } = await supabaseAdmin.auth.admin.getUserById(uid)
+  if (isStagingAdminEmail(authData.user?.email)) {
+    await supabaseAdmin.from('user_profiles').upsert({
+      id: uid,
+      name: STAGING_ADMIN_NAME,
+      email: STAGING_ADMIN_EMAIL,
+    })
+    return { ok: true }
   }
 
-  return { ok: true }
+  return { ok: false, message: CRM_LOGIN_PORTAL_ONLY_MESSAGE, reason: 'portal_only' }
 }
 
 export async function requestCrmPasswordReset(

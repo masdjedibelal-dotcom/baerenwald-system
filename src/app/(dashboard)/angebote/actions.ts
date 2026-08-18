@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { nextAngebotsnummerJahr } from '@/lib/angebot-utils'
+import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
@@ -33,6 +33,7 @@ import { getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { reparentPartnerEinholungenZuKundenangebot } from '@/lib/angebote/partner-einholung'
 import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
@@ -431,8 +432,6 @@ export async function createAngebot(
   }
   await syncNeueLeistungenToPreisliste(preislisteSync)
 
-  const angebotsnr = await nextAngebotsnummerJahr()
-
   // Bei HV-/Mieter-Meldungen: Vertragskunde = Hausverwaltung (nicht Melder)
   const kundeId =
     (await resolveVertragsKundeIdForLead(supabase, input.lead_id, input.kunde_id)) ??
@@ -452,7 +451,7 @@ export async function createAngebot(
       pdf_url: null,
       preis_typ: input.preis_typ ?? 'fix',
       vorlage_id: input.vorlage_id ?? null,
-      angebotsnr,
+      angebotsnr: null,
       leistungsumfang: input.leistungsumfang?.trim() || null,
       einleitung: input.einleitung?.trim() || null,
       hinweise: input.hinweise?.trim() || null,
@@ -495,10 +494,12 @@ export async function createAngebot(
       handwerker_id: z.handwerker_id,
       status: z.status ?? 'ausstehend',
       aufgabe_notiz: z.aufgabe_notiz?.trim() || null,
+      hw_rechnung_reverse_charge_13b: false,
     })
   }
 
   if (input.lead_id) {
+    await reparentPartnerEinholungenZuKundenangebot(input.lead_id, id)
     await markLeadAngeboteErsetzt(supabase, input.lead_id, id)
 
     if (input.ist_wiederkehrend !== undefined) {
@@ -775,7 +776,7 @@ export async function updateAngebot(
 
   const prevHwMap = new Map<
     string,
-    { status: string; aufgabe_notiz: string | null }
+    { status: string; aufgabe_notiz: string | null; hw_rechnung_reverse_charge_13b: boolean }
   >()
   for (const r of prevHw ?? []) {
     const g = r.gewerk_id as string
@@ -784,6 +785,9 @@ export async function updateAngebot(
     prevHwMap.set(`${g}|${h}`, {
       status: String((r as { status?: string }).status ?? 'ausstehend'),
       aufgabe_notiz: (r as { aufgabe_notiz?: string | null }).aufgabe_notiz ?? null,
+      hw_rechnung_reverse_charge_13b: Boolean(
+        (r as { hw_rechnung_reverse_charge_13b?: boolean | null }).hw_rechnung_reverse_charge_13b
+      ),
     })
   }
 
@@ -809,10 +813,12 @@ export async function updateAngebot(
         z.aufgabe_notiz?.trim() ||
         prev?.aufgabe_notiz?.trim() ||
         null,
+      hw_rechnung_reverse_charge_13b: prev?.hw_rechnung_reverse_charge_13b ?? false,
     })
   }
 
   if (leadId) {
+    await reparentPartnerEinholungenZuKundenangebot(leadId, angebotId)
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
     const freigabeSync = await syncAngebotMitOrgFreigabe({
@@ -917,7 +923,7 @@ export async function persistPdfForAngebot(
   const { data: pub } = supabaseAdmin.storage.from('angebote-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl
 
-  // PDF speichern = fürs Portal „vorgelegt“ (wie Versand). E-Mail bleibt optional über „Senden“.
+  // PDF am Entwurf: nur Datei. Status „gesendet“ erst wenn eine offizielle Nummer existiert (Versand).
   const st = String(detail.status_einfach ?? detail.status ?? '')
     .trim()
     .toLowerCase()
@@ -933,7 +939,8 @@ export async function persistPdfForAngebot(
     String(detail.gesendet_am ?? detail.gesendet_kunde_at ?? '').trim()
   )
   const wasEntwurf = st === 'entwurf' || !st
-  const shouldPromote = !terminal && (wasEntwurf || !hadTimestamps)
+  const hasNummer = Boolean(detail.angebotsnr?.trim())
+  const shouldPromote = hasNummer && !terminal && (wasEntwurf || !hadTimestamps)
   const now = new Date().toISOString()
 
   const { error: dbErr } = await supabaseAdmin
@@ -1749,6 +1756,10 @@ export async function sendAngebotToKunde(
   if (!toList.length) {
     return { ok: false as const, message: 'Keine Empfänger-Adresse (An)' }
   }
+
+  const nrRes = await ensureAngebotsnummerFuerVersand(angebotId, detail.angebotsnr)
+  if (!nrRes.ok) return nrRes
+  detail.angebotsnr = nrRes.nummer
 
   const pdf = await persistPdfForAngebot(angebotId, {
     detail,

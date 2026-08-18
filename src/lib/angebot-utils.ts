@@ -20,6 +20,7 @@ export async function nextAngebotsnummerJahr(year = new Date().getFullYear()): P
     .select('angebotsnr')
     .not('angebotsnr', 'is', null)
     .like('angebotsnr', `${prefix}%`)
+    .neq('status_einfach', 'entwurf')
 
   if (error) {
     console.warn('[angebot-utils] angebotsnr query:', error.message)
@@ -35,6 +36,24 @@ export async function nextAngebotsnummerJahr(year = new Date().getFullYear()): P
     if (!Number.isNaN(n)) maxSeq = Math.max(maxSeq, n)
   }
   return generateAngebotsnr(year, maxSeq + 1)
+}
+
+/** Offizielle Angebotsnummer erst beim Versand — Entwürfe bleiben ohne Nummer. */
+export async function ensureAngebotsnummerFuerVersand(
+  angebotId: string,
+  current?: string | null
+): Promise<{ ok: true; nummer: string } | { ok: false; message: string }> {
+  const existing = current?.trim() ?? ''
+  if (existing) return { ok: true, nummer: existing }
+
+  const nummer = await nextAngebotsnummerJahr()
+  const { error } = await supabaseAdmin
+    .from('angebote')
+    .update({ angebotsnr: nummer, updated_at: new Date().toISOString() })
+    .eq('id', angebotId)
+
+  if (error) return { ok: false, message: error.message }
+  return { ok: true, nummer }
 }
 
 export function formatEurBetrag(n: number): string {

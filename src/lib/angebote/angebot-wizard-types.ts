@@ -161,7 +161,7 @@ export type AngebotWizardBootstrap = {
   /** Angebot wurde bereits an den Kunden versendet (Korrektur-Mail/Vorschau). */
   bereitsGesendet?: boolean
   /** Korrektur aus laufendem Auftrag — kein erneutes Annehmen, Auftrag wird mitgespeichert. */
-  auftragKorrektur?: { auftragId: string }
+  auftragKorrektur?: { auftragId: string; gestellteAbschlaege?: number }
   /** Phase 10: Nachtrag — erweitert Auftrag, ersetzt ihn nicht. */
   nachtragZu?: { auftragId: string }
   zahlungsplan?: Zahlungsplan | null

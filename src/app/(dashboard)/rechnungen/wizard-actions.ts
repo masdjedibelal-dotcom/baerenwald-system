@@ -28,6 +28,8 @@ import {
   type AbschlagRechnungEntwurf,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
+import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
+import { mahnungFelderBeiFaelligkeitAenderung } from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
 import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
@@ -66,10 +68,7 @@ import {
   type ZahlungsplanZeileBerechnet,
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import {
-  maybeUpgradeLegacyRechnungsnummer,
-  nextRechnungsnummerAusDb,
-} from '@/lib/rechnungen/next-rechnungsnummer'
+import { nextRechnungsnummerAusDb } from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
@@ -520,7 +519,10 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           zt,
           zeile
         ),
-        faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am,
+        faellig_am:
+          normalizeFaelligAmYmd(
+            zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am
+          ) ?? metaDefaults.faellig_am,
       }
       modus = 'abschlag'
       zahlungsplan = gespeicherterPlan
@@ -619,7 +621,10 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
             zt,
             zeile
           ),
-          faellig_am: zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am,
+          faellig_am:
+          normalizeFaelligAmYmd(
+            zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am
+          ) ?? metaDefaults.faellig_am,
         }
         modus = 'abschlag'
         abschlag = {
@@ -749,13 +754,7 @@ export async function loadRechnungWizardBootstrap(
     return { ok: false, message: 'Diese Rechnung kann im Wizard nicht mehr bearbeitet werden.' }
   }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
-    supabase,
-    rechnungId,
-    rec.rechnungsnummer as string,
-    rec.status as string,
-    (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
-  )
+  const rechnungsnummer = (rec.rechnungsnummer as string | null)?.trim() || null
 
   const basis = await positionenAusAuftrag(supabase, auftragId)
   const kRaw = rec.kunden
@@ -891,13 +890,7 @@ export async function loadRechnungWizardBootstrapStandalone(
     return loadRechnungWizardBootstrap(rechnungId, auftragId)
   }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
-    supabase,
-    rechnungId,
-    rec.rechnungsnummer as string,
-    rec.status as string,
-    (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
-  )
+  const rechnungsnummer = (rec.rechnungsnummer as string | null)?.trim() || null
 
   const kRaw = rec.kunden
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
@@ -1112,7 +1105,7 @@ export async function saveRechnungWizardDraft(
     positionen: positionenFuerBeleg,
     leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
     leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
-    faellig_am: input.meta.faellig_am || null,
+    faellig_am: normalizeFaelligAmYmd(input.meta.faellig_am),
     rechnungsdatum: input.meta.rechnungsdatum || null,
     reverse_charge_13b: input.meta.reverse_charge_13b,
     hinweis_35a: input.meta.hinweis_35a,
@@ -1165,11 +1158,18 @@ export async function saveRechnungWizardDraft(
       const brauchtStorno = rechnungBrauchtStornoBeiAenderung(existingStatus, vorher, nachher)
 
       if (!brauchtStorno) {
+        const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
         const { error: mailErr } = await supabaseCheck
           .from('rechnungen')
           .update({
             mail_einleitung: input.meta.mail_einleitung?.trim() || null,
             mail_betreff: input.meta.mail_betreff?.trim() || null,
+            faellig_am: faelligNeu,
+            zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+            ...mahnungFelderBeiFaelligkeitAenderung(
+              faelligNeu,
+              (existingRec as { faellig_am?: string | null }).faellig_am
+            ),
             updated_at: new Date().toISOString(),
           })
           .eq('id', input.rechnungId)
@@ -1280,7 +1280,7 @@ function entwurfPayloadAusWizardMeta(
     positionen,
     leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
     leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
-    faellig_am: input.meta.faellig_am || null,
+    faellig_am: normalizeFaelligAmYmd(input.meta.faellig_am),
     rechnungsdatum: input.meta.rechnungsdatum || null,
     reverse_charge_13b: input.meta.reverse_charge_13b,
     hinweis_35a: input.meta.hinweis_35a,
@@ -1480,13 +1480,20 @@ export async function syncRechnungWizardMetaToEntwurf(
   input: Pick<SaveRechnungWizardDraftPayload, 'kunde_id' | 'meta'>
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
+  const { data: cur } = await supabase
+    .from('rechnungen')
+    .select('faellig_am')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('rechnungen')
     .update({
       kunde_id: input.kunde_id,
       leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
       leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
-      faellig_am: input.meta.faellig_am || null,
+      faellig_am: faelligNeu,
       rechnungsdatum: input.meta.rechnungsdatum || null,
       reverse_charge_13b: input.meta.reverse_charge_13b,
       hinweis_35a: input.meta.hinweis_35a,
@@ -1495,6 +1502,7 @@ export async function syncRechnungWizardMetaToEntwurf(
       mail_einleitung: input.meta.mail_einleitung || null,
       mail_betreff: input.meta.mail_betreff || null,
       zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+      ...mahnungFelderBeiFaelligkeitAenderung(faelligNeu, cur?.faellig_am as string | null),
       updated_at: new Date().toISOString(),
     })
     .eq('id', rechnungId)

@@ -13,6 +13,11 @@ import {
   CRM_LOGIN_INVALID_MESSAGE,
   CRM_LOGIN_PORTAL_ONLY_MESSAGE,
 } from '@/lib/auth/crm-access'
+import {
+  STAGING_ADMIN_EMAIL,
+  STAGING_ADMIN_PASSWORD,
+  isStagingSupabase,
+} from '@/lib/auth/staging-admin'
 import { cn } from '@/lib/utils'
 
 const BENEFITS: { icon: string; text: string }[] = [
@@ -22,8 +27,9 @@ const BENEFITS: { icon: string; text: string }[] = [
 ]
 
 function LoginPageContent() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const staging = isStagingSupabase()
+  const [email, setEmail] = useState(staging ? STAGING_ADMIN_EMAIL : '')
+  const [password, setPassword] = useState(staging ? STAGING_ADMIN_PASSWORD : '')
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -197,7 +203,15 @@ function LoginPageContent() {
           {mode === 'login' ? (
             <>
               <h2 className="crm-login__welcome">Willkommen zurück</h2>
-              <p className="crm-login__welcome-sub">Melde dich mit deinem Konto an.</p>
+              <p className="crm-login__welcome-sub">
+                {staging ? 'Staging — Admin ist vorausgefüllt.' : 'Melde dich mit deinem Konto an.'}
+              </p>
+
+              {staging ? (
+                <div className="crm-login__alert crm-login__alert--ok">
+                  Staging-Admin: {STAGING_ADMIN_EMAIL} / {STAGING_ADMIN_PASSWORD}
+                </div>
+              ) : null}
 
               <div className="crm-login__fields">
                 <div className="crm-login__field">

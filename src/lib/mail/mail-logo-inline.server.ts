@@ -33,10 +33,18 @@ function crmProjectRoots(): string[] {
 }
 
 export function readLocalBrandLogoBuffer(variant: BrandLogoVariant): Buffer | null {
-  const file = variant === 'white' ? 'logo-mark-white.png' : 'logo-mark-green.png'
+  const mailFile = variant === 'white' ? 'mail-logo-white.png' : 'mail-logo-green.png'
+  const markFile = variant === 'white' ? 'logo-mark-white.png' : 'logo-mark-green.png'
   for (const root of crmProjectRoots()) {
-    const abs = join(root, 'public', 'brand', file)
-    if (existsSync(abs)) return readFileSync(abs)
+    const candidates = [
+      join(root, 'public', 'brand', mailFile),
+      join(root, 'public', mailFile),
+      join(root, 'public', 'brand', markFile),
+      join(root, 'public', markFile),
+    ]
+    for (const abs of candidates) {
+      if (existsSync(abs)) return readFileSync(abs)
+    }
   }
   return null
 }

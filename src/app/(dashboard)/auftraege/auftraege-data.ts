@@ -48,6 +48,7 @@ const AUFTRAG_DETAIL_SELECT = `
         hw_angebot_anhang_urls,
         hw_rechnung_pdf_url,
         hw_rechnung_eingereicht_at,
+        hw_rechnung_reverse_charge_13b,
         hw_eingereicht_at,
         hw_status,
         hw_notiz,

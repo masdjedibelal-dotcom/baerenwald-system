@@ -46,6 +46,12 @@ import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCa
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { LeadBefundCrmCard } from '@/components/anfragen/LeadBefundCrmCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
+import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
+import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
+import {
+  listAnfragePartnerEinholungen,
+  type AnfragePartnerEinholungRow,
+} from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
@@ -163,6 +169,13 @@ function leadVorhabenTitel(lead: LeadDetail): string {
   )
 }
 
+function leadBeschreibung(lead: LeadDetail): string {
+  const fd = lead.funnel_daten
+  const rec = typeof fd === 'object' && fd !== null ? (fd as Record<string, unknown>) : {}
+  const fromFunnel = typeof rec.beschreibung === 'string' ? rec.beschreibung.trim() : ''
+  return fromFunnel || lead.kontakt_nachricht?.trim() || lead.situation?.trim() || ''
+}
+
 type AngebotKurz = {
   id: string
   status: string
@@ -249,6 +262,8 @@ export function AnfrageDetailClient({
   const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
+  const [anfragenOpen, setAnfragenOpen] = useState(false)
+  const [einholungRows, setEinholungRows] = useState<AnfragePartnerEinholungRow[]>([])
 
   useEffect(() => {
     const raw = searchParams.get('tab')
@@ -279,6 +294,16 @@ export function AnfrageDetailClient({
   useEffect(() => {
     setLead(initial)
   }, [initial])
+
+  const loadEinholungen = useCallback(() => {
+    void listAnfragePartnerEinholungen(lead.id).then((res) => {
+      if (res.ok) setEinholungRows(res.rows)
+    })
+  }, [lead.id])
+
+  useEffect(() => {
+    loadEinholungen()
+  }, [loadEinholungen, generation])
 
   const leadStatusData = useMemo(() => {
     const fd = lead.funnel_daten
@@ -738,6 +763,12 @@ export function AnfrageDetailClient({
             : 'Angebot erstellen'
       }
       emptyTitle="Noch keine Leistungen"
+      belowTable={
+        <AnfragePartnerEinholungCards
+          rows={einholungRows}
+          onAnfragen={() => setAnfragenOpen(true)}
+        />
+      }
     />
   )
 
@@ -957,6 +988,19 @@ export function AnfrageDetailClient({
         bearbeitenLead={lead}
         onSuccess={() => {
           setBearbeitenOpen(false)
+          refresh()
+        }}
+      />
+
+      <AnfrageHandwerkerAnfragenSheet
+        open={anfragenOpen}
+        onClose={() => setAnfragenOpen(false)}
+        leadId={lead.id}
+        titelDefault={vorhabenTitel}
+        beschreibungDefault={leadBeschreibung(lead)}
+        gewerke={liveGewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug }))}
+        onDone={() => {
+          loadEinholungen()
           refresh()
         }}
       />

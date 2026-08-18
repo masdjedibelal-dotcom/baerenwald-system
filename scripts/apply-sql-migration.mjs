@@ -1,15 +1,14 @@
 /**
- * Wendet eine SQL-Migrationsdatei auf die Supabase-Postgres-DB an.
- *
- * Voraussetzung in .env.local (Dashboard → Settings → Database → Connection string, URI):
- *   SUPABASE_DB_URL=postgresql://postgres.[ref]:[PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+ * Wendet eine SQL-Migrationsdatei auf Postgres an.
+ * Prod (wnotlydvhsmfkhexgeol) wird abgelehnt — Ziel-URI muss Staging sein.
  *
  * Nutzung:
- *   node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260520153000_kunden_adresse_felder.sql
+ *   node --env-file=.env.staging scripts/apply-sql-migration.mjs pfad/zur.sql
  */
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { assertNotProdWrite } from './lib/prod-guard.mjs'
 
 const file = process.argv[2]
 const dbUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim()
@@ -28,6 +27,8 @@ if (!dbUrl) {
   )
   process.exit(1)
 }
+
+assertNotProdWrite({ dbUrl }, 'SUPABASE_DB_URL / DATABASE_URL')
 
 const sql = readFileSync(resolve(file), 'utf8')
 

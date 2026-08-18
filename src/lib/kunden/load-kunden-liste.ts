@@ -1,5 +1,6 @@
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { istHvPortalRollenKunde } from '@/lib/kunde-stammdaten'
+import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'
 import type { Kunde } from '@/lib/types'
 
@@ -59,10 +60,19 @@ async function finalizeKundenListe(kunden: Kunde[]): Promise<KundeListeZeile[]> 
       .from('leads')
       .select('id, kunde_id, auftraggeber_kunde_id')
       .in('auftraggeber_kunde_id', ids),
-    supabase.from('auftraege').select('kunde_id').in('kunde_id', ids),
+    supabase
+      .from('auftraege')
+      .select(
+        `
+        kunde_id, status,
+        angebote(gesamt_fix, gesamt_min, gesamt_max, positionen)
+      `
+      )
+      .in('kunde_id', ids)
+      .neq('status', 'storniert'),
     supabase
       .from('rechnungen')
-      .select('kunde_id, brutto')
+      .select('kunde_id, brutto, netto, auftrag_id, status')
       .eq('status', 'bezahlt')
       .in('kunde_id', ids),
   ])
@@ -99,11 +109,30 @@ async function finalizeKundenListe(kunden: Kunde[]): Promise<KundeListeZeile[]> 
     aufCount.set(id, (aufCount.get(id) ?? 0) + 1)
   }
 
-  const umsatzByKunde = new Map<string, number>()
+  const aufByKunde = new Map<string, typeof aufRes.data>()
+  for (const r of aufRes.data ?? []) {
+    const id = r.kunde_id as string | null
+    if (!id) continue
+    const list = aufByKunde.get(id) ?? []
+    list.push(r)
+    aufByKunde.set(id, list)
+  }
+
+  const reByKunde = new Map<string, typeof reRes.data>()
   for (const r of reRes.data ?? []) {
     const id = r.kunde_id as string | null
     if (!id) continue
-    umsatzByKunde.set(id, (umsatzByKunde.get(id) ?? 0) + (Number(r.brutto) || 0))
+    const list = reByKunde.get(id) ?? []
+    list.push(r)
+    reByKunde.set(id, list)
+  }
+
+  const umsatzByKunde = new Map<string, number>()
+  for (const kid of ids) {
+    umsatzByKunde.set(
+      kid,
+      berechneKundeGesamtumsatz(aufByKunde.get(kid) ?? [], reByKunde.get(kid) ?? [])
+    )
   }
 
   return kunden.map((row) => ({

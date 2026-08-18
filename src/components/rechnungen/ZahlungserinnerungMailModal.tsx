@@ -193,9 +193,9 @@ export function ZahlungserinnerungMailModal({
 
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
             {stufe === 1
-              ? 'Freundliche Erinnerung — neue Frist: bisherige Fälligkeit + 7 Tage.'
-              : 'Deutlichere Erinnerung — erneut +7 Tage auf die aktuelle Fälligkeit.'}{' '}
-            Zahlbar bis: <strong>{mail.zahlbarBisLabel}</strong>
+              ? 'Geht automatisch am Tag nach Ablauf des Zahlungsziels (Fälligkeit auf Werktag), wenn nicht bezahlt.'
+              : 'Zweite Erinnerung — 7 Tage nach der ersten, falls weiter unbezahlt.'}{' '}
+            In der Mail: Zahlbar bis <strong>{mail.zahlbarBisLabel}</strong>
             {erinnerung7SentAt ? (
               <span className="mt-1 block text-[length:var(--fs-meta)] text-amber-900/80">
                 Stufe 1 zuletzt: {formatDatum(erinnerung7SentAt.slice(0, 10))}

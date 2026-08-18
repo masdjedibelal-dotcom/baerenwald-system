@@ -44,9 +44,11 @@ import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteT
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import {
   defaultZahlungszielTage,
@@ -134,18 +136,6 @@ function resolveRechnungDetailTabFromQuery(raw: string | null): RechnungDetailTa
   return RECHNUNG_DETAIL_DEFAULT_TAB
 }
 
-function tageSeitFaelligkeit(faelligAm: string | null): number {
-  if (!faelligAm) return 0
-  const parts = faelligAm.split('-').map((x) => parseInt(x, 10))
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0
-  const [y, m, d] = parts
-  const due = new Date(y!, m! - 1, d!)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  due.setHours(0, 0, 0, 0)
-  return Math.floor((today.getTime() - due.getTime()) / 86400000)
-}
-
 function rechnungTitelMeta(
   detail: Rechnung,
   belegTyp: RechnungBelegTyp,
@@ -212,6 +202,7 @@ export function RechnungDetailClient({
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
   const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | null>(null)
+  const [korrekturWahlOpen, setKorrekturWahlOpen] = useState(false)
 
   useEffect(() => {
     setDetail(initial)
@@ -266,7 +257,7 @@ export function RechnungDetailClient({
     : detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
   const kundeId = detail.kunden?.id ?? detail.kunde_id
 
-  const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeit(detail.faellig_am) : 0
+  const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeitRechnung(detail.faellig_am) : 0
   const ueberfaellig =
     !isEingehend &&
     tageUeberfaellig > 0 &&
@@ -356,7 +347,25 @@ export function RechnungDetailClient({
       toast.error('Diese Rechnung kann nicht korrigiert werden.')
       return
     }
+    if (modus === 'storno_neu') {
+      setKorrekturWahlOpen(true)
+      return
+    }
     openWizard()
+  }
+
+  function handleNeueRechnungAnlegen() {
+    const auftragId = detail.auftrag_id?.trim()
+    const kundeId = detail.kunde_id?.trim()
+    if (auftragId) {
+      router.push(`/rechnungen/neu?auftrag_id=${encodeURIComponent(auftragId)}&neu=1`)
+      return
+    }
+    if (kundeId) {
+      router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
+      return
+    }
+    toast.error('Kein Kunde oder Auftrag verknüpft — neue Rechnung kann nicht geöffnet werden.')
   }
 
   function handleSenden() {
@@ -387,7 +396,28 @@ export function RechnungDetailClient({
     })
   }
 
+  function handleStornoZuruecknehmen() {
+    void actionBusy.run('Storno wird zurückgenommen…', async () => {
+      const r = await nehmeRechnungStornoZurueck(detail.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Wieder als versendet — ursprüngliches Versanddatum bleibt.')
+      setDetail((d) => ({ ...d, status: 'gesendet' }))
+      refresh()
+    })
+  }
+
   const primaryAction = useMemo((): DetailActionDef | null => {
+    if (darfStornoZuruecknehmen) {
+      return {
+        label: 'Storno zurücknehmen',
+        icon: 'check',
+        onClick: handleStornoZuruecknehmen,
+        disabled: pending,
+      }
+    }
     const cta = primaryCta('rechnung', detail.status, {
       ueberfaellig,
       eingehend: isEingehend,
@@ -441,6 +471,7 @@ export function RechnungDetailClient({
     return null
   }, [
     detail.status,
+    detail.id,
     detail.auftrag_id,
     ueberfaellig,
     pending,
@@ -448,6 +479,7 @@ export function RechnungDetailClient({
     belegTyp,
     kundeEmail,
     isEingehend,
+    darfStornoZuruecknehmen,
   ])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
@@ -645,6 +677,7 @@ export function RechnungDetailClient({
               auftragDetail={auftragDetail}
               rechnungen={auftragRechnungen}
               fallbackTitel={projektTitelAnzeige}
+              zahlungszielFallback={zahlungszielFallback}
               onEditInvoice={(rechnungId) => {
                 startTransition(async () => {
                   const res = detail.auftrag_id
@@ -771,6 +804,20 @@ export function RechnungDetailClient({
       ) : null}
 
       {quickActionSheets}
+
+      <RechnungKorrekturWahlModal
+        open={korrekturWahlOpen}
+        onClose={() => setKorrekturWahlOpen(false)}
+        rechnungId={detail.id}
+        auftragId={detail.auftrag_id}
+        rechnungsnummer={detail.rechnungsnummer}
+        onKorrigieren={(bootstrap) => {
+          setWizardBootstrap(bootstrap)
+          setWizardKey((k) => k + 1)
+          setWizardOpen(true)
+        }}
+        onNeueRechnung={handleNeueRechnungAnlegen}
+      />
 
       <Modal
         open={rechnungConfirm === 'gutschrift'}

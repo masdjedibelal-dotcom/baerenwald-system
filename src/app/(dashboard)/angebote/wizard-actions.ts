@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
@@ -100,6 +101,18 @@ async function persistAngebotPdfNachEntwurfSpeichern(
 export async function finalizeAngebotWizardWithoutMail(
   angebotId: string
 ): Promise<{ ok: true; angebotsnr: string | null } | { ok: false; message: string }> {
+  const { data: before } = await supabaseAdmin
+    .from('angebote')
+    .select('angebotsnr')
+    .eq('id', angebotId)
+    .maybeSingle()
+
+  const nrRes = await ensureAngebotsnummerFuerVersand(
+    angebotId,
+    (before as { angebotsnr?: string | null } | null)?.angebotsnr
+  )
+  if (!nrRes.ok) return nrRes
+
   const pdf = await persistPdfForAngebot(angebotId)
   if (!pdf.ok) return pdf
 
