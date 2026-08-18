@@ -101,7 +101,7 @@ export function ZugehoerigListe({
     rows.push({
       key: `rechnung-${r.id}`,
       icon: 're',
-      label: r.rechnungsnummer?.trim() || 'Rechnung',
+      label: r.rechnungsnummer?.trim() || 'Entwurf',
       meta: [
         r.rechnungsdatum ? formatDatum(r.rechnungsdatum) : null,
         formatEurKurz(r.brutto),

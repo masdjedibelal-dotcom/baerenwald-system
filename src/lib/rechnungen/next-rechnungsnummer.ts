@@ -42,6 +42,7 @@ export async function nextRechnungsnummerAusDb(
     .from('rechnungen')
     .select('rechnungsnummer')
     .like('rechnungsnummer', `${prefix}%`)
+    .neq('status', 'entwurf')
 
   if (error) {
     console.warn('[nextRechnungsnummerAusDb]', error.message)
@@ -104,7 +105,34 @@ export async function allocateRechnungsnummer(
   }
 }
 
-/** Entwürfe mit BW-… o. ä. erhalten beim Öffnen/Versand eine RE2026-…-Nummer. */
+/**
+ * Offizielle Belegnummer erst beim Versand / PDF-Ausstellung.
+ * Entwürfe bleiben ohne Nummer, damit ungesendete Entwürfe keine Lücken erzeugen.
+ */
+export async function ensureRechnungsnummerFuerVersand(
+  _supabase: SupabaseClient,
+  rechnungId: string,
+  current: string | null | undefined,
+  belegTyp: RechnungBelegNummerTyp = 'rechnung'
+): Promise<{ ok: true; nummer: string } | { ok: false; message: string }> {
+  const nr = current?.trim() ?? ''
+  if (nr && isRe2026FormatNummer(nr, belegTyp)) return { ok: true, nummer: nr }
+
+  const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
+  if (!numRes.ok) return numRes
+
+  const { error } = await supabaseAdmin
+    .from('rechnungen')
+    .update({ rechnungsnummer: numRes.nummer, updated_at: new Date().toISOString() })
+    .eq('id', rechnungId)
+
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+  return { ok: true, nummer: numRes.nummer }
+}
+
+/** @deprecated Nicht beim Öffnen von Entwürfen aufrufen — sonst Lücken in der Nummernfolge. */
 export async function maybeUpgradeLegacyRechnungsnummer(
   supabase: SupabaseClient,
   rechnungId: string,
@@ -112,23 +140,11 @@ export async function maybeUpgradeLegacyRechnungsnummer(
   status: string,
   belegTyp: RechnungBelegNummerTyp = 'rechnung'
 ): Promise<string> {
-  const nr = current?.trim() ?? ''
-  if (status !== 'entwurf') return nr
-  if (nr && isRe2026FormatNummer(nr, belegTyp)) return nr
-
-  const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
-  if (!numRes.ok) return nr
-
-  const { error } = await supabase
-    .from('rechnungen')
-    .update({ rechnungsnummer: numRes.nummer, updated_at: new Date().toISOString() })
-    .eq('id', rechnungId)
-
-  if (error) {
-    console.warn('[maybeUpgradeLegacyRechnungsnummer]', rechnungId, error.message)
-    return nr
+  if (String(status ?? '').toLowerCase() === 'entwurf') {
+    return current?.trim() ?? ''
   }
-  return numRes.nummer
+  const res = await ensureRechnungsnummerFuerVersand(supabase, rechnungId, current, belegTyp)
+  return res.ok ? res.nummer : current?.trim() ?? ''
 }
 
 /**

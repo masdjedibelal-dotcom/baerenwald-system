@@ -10,6 +10,7 @@ import { berechneRechnung, parseKleinunternehmerSetting } from '@/lib/rechnung-b
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { loadGewerkeAusfuehrung, sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
+import { ensureRechnungsnummerFuerVersand } from '@/lib/rechnungen/next-rechnungsnummer'
 
 export async function buildRechnungPdfBuffer(
   supabase: SupabaseClient,
@@ -77,7 +78,7 @@ export async function buildRechnungPdfBuffer(
 
   try {
     const buf = await renderRechnungPdfForDetail(row, firm, gewerke, { supabase })
-    return { ok: true, buffer: buf, rechnungsnummer: row.rechnungsnummer }
+    return { ok: true, buffer: buf, rechnungsnummer: row.rechnungsnummer?.trim() || '' }
   } catch (e) {
     return {
       ok: false,
@@ -89,6 +90,22 @@ export async function buildRechnungPdfBuffer(
 export async function persistPdfForRechnung(
   rechnungId: string
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
+  const { data: recMeta } = await supabaseAdmin
+    .from('rechnungen')
+    .select('rechnungsnummer, beleg_typ, richtung')
+    .eq('id', rechnungId)
+    .maybeSingle()
+
+  if (String(recMeta?.richtung ?? '') !== 'eingehend') {
+    const numRes = await ensureRechnungsnummerFuerVersand(
+      supabaseAdmin,
+      rechnungId,
+      recMeta?.rechnungsnummer as string | null,
+      (recMeta?.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
+    )
+    if (!numRes.ok) return numRes
+  }
+
   const built = await buildRechnungPdfBuffer(supabaseAdmin, rechnungId)
   if (!built.ok) return built
 

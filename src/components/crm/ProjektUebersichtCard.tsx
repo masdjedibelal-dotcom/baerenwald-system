@@ -90,7 +90,7 @@ export function ProjektUebersichtCard({ kontext }: Props) {
               {rechnungen.slice(0, 5).map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
                   <Link href={`/rechnungen/${r.id}`} className="text-bw-link hover:underline">
-                    {r.rechnungsnummer}
+                    {r.rechnungsnummer?.trim() || 'Entwurf'}
                   </Link>
                   <span className="flex items-center gap-2">
                     <MockBadge kind={hubSpotStatusToMockBadgeKind('done')}>{RECHNUNG_STATUS_LABELS[r.status as RechnungStatus] ?? r.status}</MockBadge>

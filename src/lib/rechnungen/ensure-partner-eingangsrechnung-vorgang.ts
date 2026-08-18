@@ -42,6 +42,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
       hw_rechnung_status,
       hw_rechnung_bezahlt_at,
       hw_rechnung_betrag_brutto,
+      hw_rechnung_reverse_charge_13b,
       hw_preis_brutto,
       handwerker:handwerker_id ( id, name, firma ),
       angebote:angebot_id ( id, kunde_id, angebotsnr, lead_id )
@@ -106,6 +107,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
         : null
 
   const status = mapHwStatusToRechnungStatus(ah.hw_rechnung_status as string | null)
+  const reverseCharge13b = Boolean(ah.hw_rechnung_reverse_charge_13b)
   const eingereichtAt =
     String(ah.hw_rechnung_eingereicht_at ?? '').trim() || new Date().toISOString()
   const rechnungsdatum = eingereichtAt.slice(0, 10)
@@ -141,6 +143,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
     brutto: betragRaw,
     mwst_satz: 0,
     mwst_betrag: 0,
+    reverse_charge_13b: reverseCharge13b,
     pdf_url: pdfPath,
     rechnungsdatum,
     gesendet_at: eingereichtAt,

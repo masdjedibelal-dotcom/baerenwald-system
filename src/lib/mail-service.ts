@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
 import { cache } from 'react'
 import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
-import { mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
+import { mailLogoInlineEnabled, rewriteMailLogoUrlsToCid } from '@/lib/mail/mail-logo-inline'
 import {
   inlineLogoAttachmentsForHtml,
   type MailInlineLogoAttachment,
@@ -122,6 +122,7 @@ function mergeAttachments(
     content: string
     contentId?: string
     contentType?: string
+    contentDisposition?: 'inline' | 'attachment'
   }> = []
   for (const logo of inlineLogos ?? []) {
     list.push({
@@ -129,6 +130,7 @@ function mergeAttachments(
       content: toBase64AttachmentContent(logo.content),
       contentId: logo.contentId,
       contentType: logo.contentType,
+      contentDisposition: 'inline',
     })
   }
   for (const extra of extraPdfs ?? []) {
@@ -151,9 +153,10 @@ function mergeAttachments(
 export async function sendMail(
   opts: SendMailOptions
 ): Promise<{ success: boolean; error?: string; resendId?: string | null; emailLogId?: string | null }> {
-  const html = opts.html
-  const inlineLogos =
-    mailLogoInlineEnabled() ? inlineLogoAttachmentsForHtml(html) : []
+  const html = mailLogoInlineEnabled()
+    ? rewriteMailLogoUrlsToCid(opts.html)
+    : opts.html
+  const inlineLogos = mailLogoInlineEnabled() ? inlineLogoAttachmentsForHtml(html) : []
 
   if (opts.pdfBuffer && opts.pdfBuffer.byteLength === 0) {
     const msg = 'PDF-Anhang ist leer — Versand abgebrochen'

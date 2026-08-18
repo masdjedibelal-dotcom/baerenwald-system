@@ -68,10 +68,7 @@ import {
   type ZahlungsplanZeileBerechnet,
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import {
-  maybeUpgradeLegacyRechnungsnummer,
-  nextRechnungsnummerAusDb,
-} from '@/lib/rechnungen/next-rechnungsnummer'
+import { nextRechnungsnummerAusDb } from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
@@ -757,13 +754,7 @@ export async function loadRechnungWizardBootstrap(
     return { ok: false, message: 'Diese Rechnung kann im Wizard nicht mehr bearbeitet werden.' }
   }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
-    supabase,
-    rechnungId,
-    rec.rechnungsnummer as string,
-    rec.status as string,
-    (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
-  )
+  const rechnungsnummer = (rec.rechnungsnummer as string | null)?.trim() || null
 
   const basis = await positionenAusAuftrag(supabase, auftragId)
   const kRaw = rec.kunden
@@ -899,13 +890,7 @@ export async function loadRechnungWizardBootstrapStandalone(
     return loadRechnungWizardBootstrap(rechnungId, auftragId)
   }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
-    supabase,
-    rechnungId,
-    rec.rechnungsnummer as string,
-    rec.status as string,
-    (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
-  )
+  const rechnungsnummer = (rec.rechnungsnummer as string | null)?.trim() || null
 
   const kRaw = rec.kunden
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw

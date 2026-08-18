@@ -1,6 +1,4 @@
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
-import { resolveBrandLogoUrl, type BrandLogoVariant } from '@/lib/brand'
 import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import {
   buildPortalLoginLink,
@@ -38,36 +36,17 @@ function esc(s: string): string {
 
 const MAIL_MARKENNAME = 'Bärenwald'
 
-function brandVariantForMail(variant: 'onDark' | 'onLight'): BrandLogoVariant {
-  return variant === 'onLight' ? 'green' : 'white'
-}
-
-function usesCustomFirmLogoUrl(url: string, brandVariant: BrandLogoVariant): boolean {
-  const u = url.trim()
-  if (!u || !/^https?:\/\//i.test(u)) return false
-  const defaults = [
-    resolveBrandLogoUrl('green'),
-    resolveBrandLogoUrl('white'),
-    resolveBrandLogoUrl(brandVariant),
-  ]
-  return !defaults.includes(u)
-}
-
 /** Logo + Markenname „Bärenwald“ (grüner oder heller Kopf). */
 export function mailLogoMitMarkenname(
   b: MailBranding,
   variant: 'onDark' | 'onLight' = 'onDark'
 ): string {
-  const brandVariant = brandVariantForMail(variant)
   const logo =
     variant === 'onLight' ? (b.logoUrlOnLight?.trim() ?? '') : (b.logoUrl?.trim() ?? '')
   const textColor = variant === 'onLight' ? '#1A3D2B' : '#FFFFFF'
-  const useInline =
-    mailLogoInlineEnabled() && !usesCustomFirmLogoUrl(logo, brandVariant)
-  const logoSrc = useInline ? mailLogoCidSrc(brandVariant) : logo
   const logoImg =
-    logoSrc && (useInline || /^https?:\/\//i.test(logoSrc))
-      ? `<img src="${useInline ? logoSrc : esc(logoSrc)}" width="36" height="36" alt="${esc(MAIL_MARKENNAME)}" style="display:block;width:36px;height:36px;border:0;"/>`
+    logo && /^https?:\/\//i.test(logo)
+      ? `<img src="${esc(logo)}" width="36" height="36" alt="${esc(MAIL_MARKENNAME)}" style="display:block;width:36px;height:36px;border:0;"/>`
       : ''
   if (!logoImg) {
     return `<span style="color:${textColor};font-size:20px;font-weight:700;letter-spacing:-0.02em;">${esc(MAIL_MARKENNAME)}</span>`

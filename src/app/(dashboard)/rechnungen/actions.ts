@@ -50,12 +50,7 @@ import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
-import {
-  allocateRechnungsnummer,
-  maybeUpgradeLegacyRechnungsnummer,
-  normalizeRechnungsnummerInput,
-  rechnungsnummerIstFrei,
-} from '@/lib/rechnungen/next-rechnungsnummer'
+import { ensureRechnungsnummerFuerVersand } from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
   positionen: AngebotPosition[]
@@ -78,7 +73,7 @@ export type RechnungEntwurfPayload = {
   liste_berechnung?: RechnungBerechnung | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
-  /** Optional: manuell gewählte Nummer (sonst fortlaufend vergeben). */
+  /** Nur Anzeige/Vorschau — Entwürfe speichern keine offizielle Nummer. */
   rechnungsnummer?: string | null
 }
 
@@ -132,18 +127,6 @@ export async function createRechnungEntwurf(input: {
   )
   const berechnung = input.liste_berechnung ?? berechnungVoll
 
-  let rechnungsnummer: string
-  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
-  if (manual) {
-    const frei = await rechnungsnummerIstFrei(supabase, manual)
-    if (!frei.ok) return frei
-    rechnungsnummer = manual
-  } else {
-    const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
-    if (!numRes.ok) return { ok: false, message: numRes.message }
-    rechnungsnummer = numRes.nummer
-  }
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -158,7 +141,7 @@ export async function createRechnungEntwurf(input: {
       angebot_id: input.angebot_id,
       auftrag_id: input.auftrag_id,
       kunde_id: input.kunde_id,
-      rechnungsnummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: input.leistungszeitraum_von,
@@ -216,25 +199,6 @@ export async function updateRechnungEntwurf(
   const rechnungsdatum =
     (input.rechnungsdatum && input.rechnungsdatum.trim()) || undefined
 
-  let rechnungsnummerPatch: { rechnungsnummer: string } | Record<string, never> = {}
-  const manual = normalizeRechnungsnummerInput(input.rechnungsnummer ?? '')
-  if (manual) {
-    const { data: cur } = await supabase
-      .from('rechnungen')
-      .select('status, rechnungsnummer')
-      .eq('id', id)
-      .maybeSingle()
-    const st = String(cur?.status ?? '').toLowerCase()
-    if (st === 'entwurf') {
-      const current = String(cur?.rechnungsnummer ?? '').trim()
-      if (manual !== current) {
-        const frei = await rechnungsnummerIstFrei(supabase, manual, id)
-        if (!frei.ok) return frei
-        rechnungsnummerPatch = { rechnungsnummer: manual }
-      }
-    }
-  }
-
   const { error } = await rechnungUpdateMitSchemaFallback(
     supabase,
     id,
@@ -249,7 +213,6 @@ export async function updateRechnungEntwurf(
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
       hinweis_35a: input.hinweis_35a ?? null,
-      ...rechnungsnummerPatch,
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id
@@ -370,10 +333,6 @@ export async function createGutschriftFromRechnung(
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
 
-  const numRes = await allocateRechnungsnummer('gutschrift', supabaseAdmin)
-  if (!numRes.ok) return { ok: false, message: numRes.message }
-  const rechnungsnummer = numRes.nummer
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -384,7 +343,7 @@ export async function createGutschriftFromRechnung(
       angebot_id: orig.angebot_id,
       auftrag_id: orig.auftrag_id,
       kunde_id: orig.kunde_id,
-      rechnungsnummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: orig.leistungszeitraum_von,
@@ -464,15 +423,12 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
   const gutschrift = await createGutschriftFromRechnung(rechnungId)
   if (!gutschrift.ok) return gutschrift
 
-  // 2) Neue Rechnung als Entwurf (gleiche Positionen, neue Nummer)
+  // 2) Neue Rechnung als Entwurf (Nummer erst beim Versand)
   const positionenRaw = (orig.positionen as AngebotPosition[]) ?? []
   const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(supabase, {
     positionen: positionenRaw,
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
-
-  const numRes = await allocateRechnungsnummer('rechnung', supabaseAdmin)
-  if (!numRes.ok) return { ok: false, message: numRes.message }
 
   const {
     data: { user },
@@ -484,7 +440,7 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       angebot_id: orig.angebot_id,
       auftrag_id: orig.auftrag_id,
       kunde_id: orig.kunde_id,
-      rechnungsnummer: numRes.nummer,
+      rechnungsnummer: null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: orig.leistungszeitraum_von,
@@ -662,13 +618,14 @@ async function sendZahlungsbestaetigungForRechnung(
   const email = kunde?.email?.trim()
   if (!email) return { ok: true, skipped: true }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'bezahlt'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
@@ -908,13 +865,14 @@ export async function sendRechnung(
 
   if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
 
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'entwurf'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
   rec.rechnungsnummer = rechnungsnummer
 
   const pdf = await persistPdfForRechnung(rechnungId)
@@ -947,6 +905,11 @@ export async function sendRechnung(
       if (!gs?.id) return null
       const gsPdf = await persistPdfForRechnung(String(gs.id))
       if (!gsPdf.ok) return null
+      const { data: gsAfter } = await supabase
+        .from('rechnungen')
+        .select('rechnungsnummer')
+        .eq('id', gs.id)
+        .maybeSingle()
       let bezugRechnungsnummer: string | null = null
       const { data: origRow } = await supabase
         .from('rechnungen')
@@ -956,7 +919,9 @@ export async function sendRechnung(
       bezugRechnungsnummer = String(origRow?.rechnungsnummer ?? '').trim() || null
       return {
         id: String(gs.id),
-        nr: String(gs.rechnungsnummer ?? 'Gutschrift').trim() || 'Gutschrift',
+        nr:
+          String(gsAfter?.rechnungsnummer ?? gs.rechnungsnummer ?? 'Gutschrift').trim() ||
+          'Gutschrift',
         buffer: gsPdf.buffer,
         bezugRechnungsnummer,
       }
@@ -1421,13 +1386,14 @@ async function loadRechnungFuerZahlungserinnerung(
   }
 
   const supabase = createClient()
-  const rechnungsnummer = await maybeUpgradeLegacyRechnungsnummer(
+  const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
-    rec.rechnungsnummer as string,
-    String(rec.status ?? 'gesendet'),
+    rec.rechnungsnummer as string | null,
     (rec.beleg_typ as 'rechnung' | 'gutschrift') ?? 'rechnung'
   )
+  if (!numRes.ok) return numRes
+  const rechnungsnummer = numRes.nummer
 
   return { ok: true, rec: { ...rec, rechnungsnummer }, rechnungsnummer }
 }

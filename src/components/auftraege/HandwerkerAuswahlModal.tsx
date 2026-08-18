@@ -12,7 +12,6 @@ import {
   listHandwerkerAuswahlFuerGewerk,
 } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
-import { cn } from '@/lib/utils'
 import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -44,14 +43,6 @@ function HandwerkerPickRow({
             {[h.firma, h.telefon].filter(Boolean).join(' · ') || '—'}
           </p>
         </div>
-        <span
-          className={cn(
-            'hw-pick-badge',
-            h.verfuegbar ? 'hw-pick-badge-free' : 'hw-pick-badge-busy'
-          )}
-        >
-          {h.verfuegbar ? 'Verfügbar' : 'Im Einsatz'}
-        </span>
       </div>
       <Button type="button" variant="primary" size="sm" disabled={disabled} onClick={onAdd}>
         Hinzufügen

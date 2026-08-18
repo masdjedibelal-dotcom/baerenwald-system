@@ -4,7 +4,6 @@
  */
 
 import { resolveBrandLogoUrl } from '@/lib/brand'
-import { mailLogoCidSrc, mailLogoInlineEnabled } from '@/lib/mail/mail-logo-inline'
 import { telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPortalLoginLink, buildPortalButton } from '@/lib/portal-utils'
@@ -32,9 +31,6 @@ const DEFAULT_BRANDING: EmailBranding = {
 }
 
 function resolveLogoSrcForTemplate(branding: EmailBranding): string {
-  if (mailLogoInlineEnabled()) {
-    return mailLogoCidSrc('white')
-  }
   return escapeHtml(branding.logoUrl)
 }
 

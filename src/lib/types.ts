@@ -564,6 +564,7 @@ export type AngebotHandwerkerRow = {
   hw_rechnung_status?: string | null
   hw_rechnung_bezahlt_at?: string | null
   hw_rechnung_betrag_brutto?: number | null
+  hw_rechnung_reverse_charge_13b?: boolean | null
   hw_eingereicht_at?: string | null
   hw_status?: string | null
   hw_notiz?: string | null
@@ -1285,7 +1286,8 @@ export type Rechnung = {
   richtung?: 'ausgehend' | 'eingehend' | null
   handwerker_id?: string | null
   angebot_handwerker_id?: string | null
-  rechnungsnummer: string
+  /** Null solange Entwurf — offizielle Nummer erst beim Versand. */
+  rechnungsnummer: string | null
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
   /** Spec Ketten */
