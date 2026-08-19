@@ -227,6 +227,7 @@ export function KundenDokumenteTab({
         a.lead_id?.trim() ||
         normalizeAuftragAngebote(a.angebote).find((x) => x.lead_id)?.lead_id ||
         null
+      const group = groupForVorgang({ leadId, auftragId: a.id })
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         const id = `angebot-${ang.id}`
