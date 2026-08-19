@@ -237,6 +237,7 @@ export function KundeDetailClient({
       (d) => d.typ !== 'protokoll' && d.datei_url?.trim()
     ).length
     const seenAngebote = new Set<string>()
+    const auftragIds = new Set<string>((kunde.auftraege ?? []).map((a) => a.id))
     for (const a of kunde.auftraege ?? []) {
       for (const ang of normalizeAuftragAngebote(a.angebote)) {
         if (ang?.id && !seenAngebote.has(ang.id)) {
@@ -250,7 +251,12 @@ export function KundeDetailClient({
     for (const l of kunde.leads ?? []) {
       for (const ang of l.angebote ?? []) {
         if (!ang?.id || seenAngebote.has(ang.id)) continue
-        if ('auftrag_id' in ang && ang.auftrag_id) continue
+        // Orphan/Merge-Fall: wenn zwar `auftrag_id` gesetzt ist, aber der Auftrag im geladenen Datensatz fehlt,
+        // muss das Angebot trotzdem gezählt werden.
+        const offerAuftragId = ('auftrag_id' in ang
+          ? (ang as { auftrag_id?: string | null }).auftrag_id?.trim()
+          : null) as string | null
+        if (offerAuftragId && auftragIds.has(offerAuftragId)) continue
         seenAngebote.add(ang.id)
         n += 1
       }

@@ -14,6 +14,7 @@ import {
   removeObjektHausmeister,
   saveObjektHausmeister,
 } from '@/app/actions/org-hausmeister'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
 type Props = {
@@ -226,6 +227,13 @@ export function ObjektHausmeisterCard({
                 <MockBtn sm kind="secondary" disabled={pending} onClick={einladen}>
                   Einladung senden
                 </MockBtn>
+              ) : null}
+              {!amObjekt.isLegacy && amObjekt.portal_zugang && amObjekt.portal_kunde_id ? (
+                <PortalLoginIconButton
+                  kundeId={amObjekt.portal_kunde_id}
+                  label="Hausmeister-Portal öffnen"
+                  withLabel
+                />
               ) : null}
               {!amObjekt.isLegacy ? (
                 <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>

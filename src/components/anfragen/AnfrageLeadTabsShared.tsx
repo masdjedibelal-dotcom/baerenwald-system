@@ -15,7 +15,7 @@ import { addLeadNotizRow, deleteLeadNotizRow } from '@/app/(dashboard)/anfragen/
 import { leadNotizFotoUrls } from '@/lib/anfragen/lead-notiz-fotos'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadNotizRow } from '@/lib/types'
-import { betragAnzeige } from '@/lib/angebot-einfach'
+import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { richTextToPlain } from '@/lib/rich-text'
 import { formatDatumZeit, formatRelativeDate } from '@/lib/utils'
 
@@ -377,7 +377,7 @@ export function AngeboteListeTab({
                   </span>
                 </span>
                 <span className="text-right text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
-                  {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </span>
                 <AngebotStatusBadge status={a.status} />
                 <ExternalLink className="mx-auto h-4 w-4 text-bw-text-muted" aria-hidden />
@@ -445,7 +445,7 @@ export function AngeboteListeTab({
             >
               <div>
                 <div className="text-[length:var(--fs-text)] font-medium text-bw-text">
-                  {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </div>
                 <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
                   {a.created_at ? new Date(a.created_at).toLocaleDateString('de') : '—'}

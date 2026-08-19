@@ -12,6 +12,7 @@ import {
   angebotNrAnzeige,
   angebotStatusKurz,
   auftragStatusKurz,
+  formatAngebotEurKurzBrutto,
   formatEurKurz,
   rechnungStatusKurz,
 } from '@/lib/vorgang/projekt-kontext-labels'
@@ -460,8 +461,10 @@ function buildPhaseRows(
               'in Bearbeitung'
             : `angenommen ${angebot?.created_at ? formatDatum(angebot.created_at) : ''}`.trim(),
       betrag: hasAngebot
-        ? formatEurKurz(
-            angebot!.gesamt_fix ?? angebot!.gesamt_max ?? angebot!.gesamt_min
+        ? formatAngebotEurKurzBrutto(
+            angebot!.gesamt_fix,
+            angebot!.gesamt_min,
+            angebot!.gesamt_max
           )
         : null,
       href: hasAngebot ? withFrom(`/angebote/${angebot!.id}`) : null,
@@ -478,8 +481,10 @@ function buildPhaseRows(
             {
               k: 'Summe',
               v:
-                formatEurKurz(
-                  angebot!.gesamt_fix ?? angebot!.gesamt_max ?? angebot!.gesamt_min
+                formatAngebotEurKurzBrutto(
+                  angebot!.gesamt_fix,
+                  angebot!.gesamt_min,
+                  angebot!.gesamt_max
                 ) || '—',
             },
             {

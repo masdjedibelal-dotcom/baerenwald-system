@@ -9,6 +9,7 @@ import {
   angebotNrAnzeige,
   angebotStatusKurz,
   auftragStatusKurz,
+  formatAngebotEurKurzBrutto,
   formatEurKurz,
   rechnungStatusKurz,
 } from '@/lib/vorgang/projekt-kontext-labels'
@@ -66,7 +67,11 @@ export function PhaseCardsBlock({
     cards.push({
       title: 'Angebot',
       line1: `${nr} · ${angebotStatusKurz(angebot.status, angebot.status_einfach)}`,
-      line2: formatEurKurz(angebot.gesamt_fix ?? angebot.gesamt_max ?? angebot.gesamt_min),
+      line2: formatAngebotEurKurzBrutto(
+        angebot.gesamt_fix,
+        angebot.gesamt_min,
+        angebot.gesamt_max
+      ),
       href: withFrom(`/angebote/${angebot.id}`),
     })
   }
