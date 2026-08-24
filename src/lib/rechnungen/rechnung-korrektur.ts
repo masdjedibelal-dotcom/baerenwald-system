@@ -5,6 +5,114 @@ import type { AngebotPosition, RechnungStatus } from '@/lib/types'
 
 export type RechnungKorrekturModus = 'direkt' | 'storno_neu' | 'gesperrt'
 
+/** Filter-/Anzeige-Stufen einer laufenden Rechnungskorrektur. */
+export type RechnungKorrekturFilterKey =
+  | 'korrektur_entwurf'
+  | 'korrektur_gespeichert'
+  | 'korrektur_versendet'
+
+export const RECHNUNG_KORREKTUR_FILTER_LABELS: Record<RechnungKorrekturFilterKey, string> = {
+  korrektur_entwurf: 'Korrektur Entwurf',
+  korrektur_gespeichert: 'Korrektur Gespeichert',
+  korrektur_versendet: 'Korrektur Versendet',
+}
+
+export const RECHNUNG_KORREKTUR_FILTER_KEYS: RechnungKorrekturFilterKey[] = [
+  'korrektur_entwurf',
+  'korrektur_gespeichert',
+  'korrektur_versendet',
+]
+
+export type RechnungKorrekturUiInput = {
+  status?: string | null
+  korrektur_von?: string | null
+  korrektur_art?: string | null
+}
+
+export type RechnungKorrekturUi = {
+  filterKey: RechnungKorrekturFilterKey | null
+  /** Nur bei Korrektur-Entwurf/-Gespeichert: Gesendet + Korrektur-Pill. */
+  dualBadges: { primary: string; secondary: string } | null
+}
+
+/** Ableitung Anzeige/Filter aus korrektur_von + Status (+ Art). */
+export function resolveRechnungKorrekturUi(r: RechnungKorrekturUiInput): RechnungKorrekturUi {
+  const von = String(r.korrektur_von ?? '').trim()
+  if (!von) return { filterKey: null, dualBadges: null }
+
+  const st = String(r.status ?? '').trim().toLowerCase()
+  if (st === 'gesendet' || st === 'bezahlt' || st === 'versendet') {
+    return { filterKey: 'korrektur_versendet', dualBadges: null }
+  }
+  if (st !== 'entwurf') return { filterKey: null, dualBadges: null }
+
+  const art = String(r.korrektur_art ?? 'entwurf').trim().toLowerCase()
+  const gespeichert = art === 'gespeichert'
+  const filterKey: RechnungKorrekturFilterKey = gespeichert
+    ? 'korrektur_gespeichert'
+    : 'korrektur_entwurf'
+  return {
+    filterKey,
+    dualBadges: {
+      primary: 'Gesendet',
+      secondary: RECHNUNG_KORREKTUR_FILTER_LABELS[filterKey],
+    },
+  }
+}
+
+/** Status-Filter-Keys einer Listen-Zeile (Korrektur kann zwei Keys matchen). */
+export function rechnungStatusFilterKeys(r: RechnungKorrekturUiInput & { unterstatus?: string }): string[] {
+  const ui = resolveRechnungKorrekturUi(r)
+  if (ui.filterKey === 'korrektur_entwurf' || ui.filterKey === 'korrektur_gespeichert') {
+    return [ui.filterKey]
+  }
+  if (ui.filterKey === 'korrektur_versendet') {
+    return ['gesendet', 'korrektur_versendet']
+  }
+  const u = String(r.unterstatus ?? r.status ?? '').trim().toLowerCase()
+  return u ? [u] : []
+}
+
+export function matchesRechnungStatusFilterKey(
+  r: RechnungKorrekturUiInput & { unterstatus?: string },
+  filter: string
+): boolean {
+  return rechnungStatusFilterKeys(r).includes(filter)
+}
+
+/** Nach Storno + neuer RE: Kette setzen (korrektur_von / ersetzt_durch / Art). */
+export async function linkRechnungKorrekturKette(
+  supabase: {
+    from: (table: string) => {
+      update: (values: Record<string, unknown>) => {
+        eq: (column: string, value: string) => unknown
+      }
+    }
+  },
+  input: {
+    originalId: string
+    neuId: string
+    art: 'entwurf' | 'gespeichert'
+  }
+): Promise<void> {
+  const now = new Date().toISOString()
+  const neuRes = (await supabase
+    .from('rechnungen')
+    .update({
+      korrektur_von: input.originalId,
+      korrektur_art: input.art,
+      updated_at: now,
+    })
+    .eq('id', input.neuId)) as { error: { message: string } | null }
+  if (neuRes?.error && /korrektur_von|korrektur_art|schema cache|column/i.test(neuRes.error.message)) {
+    return
+  }
+  await supabase
+    .from('rechnungen')
+    .update({ ersetzt_durch: input.neuId, updated_at: now })
+    .eq('id', input.originalId)
+}
+
 export function rechnungKorrekturModus(status: RechnungStatus | string | null | undefined): RechnungKorrekturModus {
   const s = (status ?? '').toLowerCase()
   if (s === 'entwurf') return 'direkt'
@@ -161,6 +269,43 @@ export function findeNachfolgerRechnungId(
     const ta = a.created_at ? new Date(a.created_at).getTime() : 0
     const tb = b.created_at ? new Date(b.created_at).getTime() : 0
     return ta - tb
+  })
+  return candidates[0]?.id ?? null
+}
+
+/** Inverse: Original-ID für Korrektur-Entwurf ohne gesetztes korrektur_von (Legacy-Daten). */
+export function findeKorrekturOriginalId(
+  neu: {
+    id: string
+    created_at?: string | null
+    zahlungsplan_abschlag_id?: string | null
+    rechnung_art?: string | null
+    abschlag_index?: number | null
+  },
+  siblings: RechnungKorrekturSibling[]
+): string | null {
+  const neuTs = neu.created_at ? new Date(neu.created_at).getTime() : 0
+  const abNeu = String(neu.zahlungsplan_abschlag_id ?? '').trim() || null
+  const artNeu = String(neu.rechnung_art ?? 'voll')
+  const idxNeu = neu.abschlag_index ?? null
+
+  const candidates = siblings.filter((s) => {
+    if (s.id === neu.id) return false
+    if (String(s.beleg_typ ?? 'rechnung') === 'gutschrift') return false
+    if (String(s.status ?? '') !== 'storniert') return false
+    const sTs = s.created_at ? new Date(s.created_at).getTime() : 0
+    if (sTs >= neuTs) return false
+    const abS = String(s.zahlungsplan_abschlag_id ?? '').trim() || null
+    if (abNeu || abS) return abNeu === abS
+    return (
+      String(s.rechnung_art ?? 'voll') === artNeu && (s.abschlag_index ?? null) === idxNeu
+    )
+  })
+
+  candidates.sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+    return tb - ta
   })
   return candidates[0]?.id ?? null
 }

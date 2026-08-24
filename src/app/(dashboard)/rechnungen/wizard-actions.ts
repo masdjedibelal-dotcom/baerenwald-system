@@ -36,6 +36,7 @@ import {
   rechnungMaterialFingerprint,
   rechnungBrauchtStornoBeiAenderung,
   type RechnungMaterialSnapshot,
+  linkRechnungKorrekturKette,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   abschlagTextKontextFromWizard,
@@ -1251,6 +1252,12 @@ export async function saveRechnungWizardDraft(
       })
       if (!created.ok) return created
 
+      await linkRechnungKorrekturKette(supabaseCheck, {
+        originalId: input.rechnungId,
+        neuId: created.id,
+        art: 'gespeichert',
+      })
+
       const { data: nr } = await supabaseCheck
         .from('rechnungen')
         .select('rechnungsnummer')
@@ -1261,6 +1268,7 @@ export async function saveRechnungWizardDraft(
       revalidatePath(`/rechnungen/${input.rechnungId}`)
       revalidatePath(`/rechnungen/${gutschrift.id}`)
       revalidatePath(`/rechnungen/${created.id}`)
+      revalidatePath('/vorgaenge')
       revalidateAuftragPfad(input.auftrag_id)
       return {
         ok: true,

@@ -35,6 +35,9 @@ const RECHNUNG_UNTERSTATUS: Record<string, string> = {
   gesendet: 'Gesendet',
   bezahlt: 'Bezahlt',
   storniert: 'Storniert',
+  korrektur_entwurf: 'Korrektur Entwurf',
+  korrektur_gespeichert: 'Korrektur Gespeichert',
+  korrektur_versendet: 'Korrektur Versendet',
 }
 
 export function unterstatusLabel(phase: VorgangPhase, unterstatus: string): string {
@@ -105,5 +108,14 @@ export const PHASE_UNTERSTATUS_VALUES: Record<VorgangPhase, readonly string[]> =
     'storniert',
   ],
   auftrag: ['offen', 'in_arbeit', 'abnahme', 'abgeschlossen', 'storniert'],
-  rechnung: ['ausstehend', 'entwurf', 'gesendet', 'bezahlt', 'storniert'],
+  rechnung: [
+    'ausstehend',
+    'entwurf',
+    'gesendet',
+    'bezahlt',
+    'storniert',
+    'korrektur_entwurf',
+    'korrektur_gespeichert',
+    'korrektur_versendet',
+  ],
 }

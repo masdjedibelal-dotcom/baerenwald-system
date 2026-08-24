@@ -55,7 +55,8 @@ export type DocumentCanvasProps = {
 
 /**
  * Surface A — Dokument-Flow (Angebot/RE/Abnahme).
- * S9: X = schließen (Caller speichert Entwurf); Verwerfen nur über DocBar + Confirm.
+ * S9: X = schließen (Caller speichert Entwurf still); Caller zeigt `toast.autoSaved` bei Erfolg.
+ * Verwerfen nur über DocBar + Confirm.
  * S10: Back schließt Canvas wenn History gesetzt.
  */
 export function DocumentCanvas({

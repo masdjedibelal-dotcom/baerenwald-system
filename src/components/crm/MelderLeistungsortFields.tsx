@@ -33,7 +33,7 @@ export function MelderLeistungsortFields({
       <MockFormSection title="Leistungsort" icon="map-pin">
         <MockField label="Objekt" full>
           <select
-            className="sel"
+            className="sel sel--choice"
             value={draft.kunde_objekt_id ?? ''}
             disabled={disabled}
             onChange={(e) =>

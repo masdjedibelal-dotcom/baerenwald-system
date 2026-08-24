@@ -29,6 +29,7 @@ import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-m
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
+import { linkRechnungKorrekturKette } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   berechneRechnungMitFirmeneinstellungen,
   isRechnungComplianceSchemaError,
@@ -247,6 +248,25 @@ export async function updateRechnungEntwurf(
   )
 
   if (error) return { ok: false, message: error.message }
+
+  // Korrektur-Entwurf → nach Speichern als „Korrektur Gespeichert“ markieren
+  const { data: korMeta } = await supabase
+    .from('rechnungen')
+    .select('korrektur_von, korrektur_art, status')
+    .eq('id', id)
+    .maybeSingle()
+  if (
+    korMeta &&
+    String(korMeta.korrektur_von ?? '').trim() &&
+    String(korMeta.status ?? '').toLowerCase() === 'entwurf' &&
+    String(korMeta.korrektur_art ?? '').toLowerCase() !== 'gespeichert'
+  ) {
+    await supabase
+      .from('rechnungen')
+      .update({ korrektur_art: 'gespeichert', updated_at: new Date().toISOString() })
+      .eq('id', id)
+  }
+
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${id}`)
   revalidatePath('/vorgaenge')
@@ -482,11 +502,18 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     return { ok: false, message: neuErr?.message ?? 'Neue Rechnung konnte nicht angelegt werden.' }
   }
 
+  await linkRechnungKorrekturKette(supabase, {
+    originalId: rechnungId,
+    neuId: neu.id as string,
+    art: 'entwurf',
+  })
+
   // Storno-Gutschrift: Bezug bleibt auf Original; optional Hinweis auf Nachfolger in Notizen weglassen
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath(`/rechnungen/${gutschrift.id}`)
   revalidatePath(`/rechnungen/${neu.id}`)
+  revalidatePath('/vorgaenge')
   if (orig.auftrag_id) revalidatePath(`/auftraege/${orig.auftrag_id}`)
 
   return {

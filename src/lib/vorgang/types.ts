@@ -112,6 +112,9 @@ export type VorgangListeRow = ResolvedVorgang & {
   kontaktEmail?: string | null
   /** Ersetzt-Kette (Angebot/Rechnung). */
   ersetzt_durch?: string | null
+  /** Rechnungskorrektur: Verweis auf Original. */
+  korrektur_von?: string | null
+  korrektur_art?: string | null
   /** ausgehend (Default) | eingehend (Partner-Rechnung). */
   rechnungRichtung?: 'ausgehend' | 'eingehend'
   /** Nur eingehend: angebot_handwerker.id für Ensure/Deep-Link. */

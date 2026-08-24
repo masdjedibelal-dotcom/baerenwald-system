@@ -714,19 +714,25 @@ export function RechnungWizard({
   }
 
   const persistEinzel = useCallback(
-    async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
+    async (opts?: {
+      manageBusy?: boolean
+      /** false = keine Validierungs-Toasts (stiller Close-Save) */
+      silent?: boolean
+      notify?: boolean
+    }): Promise<string | null> => {
       const planAktiv = hatAuftrag && hasPlan && Boolean(aktivRate)
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      const silent = opts?.silent === true
       if (!artikel.length) {
-        toast.error('Mindestens eine Position erforderlich.')
+        if (!silent) toast.error('Mindestens eine Position erforderlich.')
         return null
       }
       if (artikel.some((z) => !z.bezeichnung.trim())) {
-        toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
+        if (!silent) toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
         return null
       }
       if (!kundeId?.trim()) {
-        toast.error('Kein Kunde verknüpft.')
+        if (!silent) toast.error('Kein Kunde verknüpft.')
         return null
       }
       const nextMeta = buildMetaForSave()
@@ -758,7 +764,7 @@ export function RechnungWizard({
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
         if (!res.ok) {
-          toast.error(res.message)
+          if (!silent) toast.error(res.message)
           return null
         }
         const switched = Boolean(korrekturKontext && res.rechnungId !== rechnungId)
@@ -767,14 +773,18 @@ export function RechnungWizard({
         if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
         if (switched) {
           setKorrekturKontext(null)
-          toast.success('Storno angelegt — Korrektur als neue Rechnung gespeichert')
+          toast.success('Storno angelegt — Korrektur gespeichert (noch nicht versendet)')
+        } else if (opts?.notify) {
+          toast.autoSaved({ label: 'Entwurf' })
         }
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
         return res.rechnungId
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        if (!silent) {
+          toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        }
         return null
       } finally {
         if (manageBusy) setSaving(false)
@@ -810,17 +820,24 @@ export function RechnungWizard({
     ]
   )
 
-  const persistPlan = useCallback(async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
+  const persistPlan = useCallback(async (opts?: {
+    manageBusy?: boolean
+    silent?: boolean
+    notify?: boolean
+  }): Promise<string | null> => {
+    const silent = opts?.silent === true
     if (!bootstrap.auftragId?.trim()) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
+      if (!silent) toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
       return null
     }
     if (!kundeId?.trim()) {
-      toast.error('Kein Kunde verknüpft.')
+      if (!silent) toast.error('Kein Kunde verknüpft.')
       return null
     }
     if (!planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      if (!silent) {
+        toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      }
       return null
     }
     const nextMeta = buildMetaForSave()
@@ -829,7 +846,7 @@ export function RechnungWizard({
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
       if (!planSave.ok) {
-        toast.error(planSave.message)
+        if (!silent) toast.error(planSave.message)
         return null
       }
       const res = await createAllAbschlagRechnungenFromWizard({
@@ -846,7 +863,7 @@ export function RechnungWizard({
         wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        if (!silent) toast.error(res.message)
         return null
       }
       setAbschlagRechnungen(res.rechnungen)
@@ -857,9 +874,12 @@ export function RechnungWizard({
       setMeta(nextMeta)
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
+      if (opts?.notify) toast.autoSaved({ label: 'Entwurf' })
       return res.versandRechnungId
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      if (!silent) {
+        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      }
       return null
     } finally {
       if (manageBusy) setSaving(false)
@@ -881,11 +901,18 @@ export function RechnungWizard({
     hasPlan,
     rFaellig,
     defaultBetreff,
+    wiederkehr,
   ])
 
-  async function persistDraft(opts?: { manageBusy?: boolean }): Promise<string | null> {
+  async function persistDraft(opts?: {
+    manageBusy?: boolean
+    silent?: boolean
+    notify?: boolean
+  }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
+      if (!opts?.silent) {
+        toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
+      }
       return null
     }
     // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
@@ -980,7 +1007,23 @@ export function RechnungWizard({
 
   async function handleCanvasClose() {
     if (draftDirty && !saving) {
-      /* S9: Auto-Entwurf best-effort — RE speichert oft über goNextStep */
+      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      const canSilentSave =
+        Boolean(kundeId?.trim()) &&
+        artikel.length > 0 &&
+        !artikel.some((z) => !z.bezeichnung.trim()) &&
+        !(hasPlan && !hatAuftrag) &&
+        !(hasPlan && !aktivRate && !planOk)
+      if (canSilentSave) {
+        try {
+          const id = await persistDraft({ manageBusy: false, silent: true, notify: true })
+          if (!id) {
+            /* unvollständig — schließen ohne Toast */
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
     onClose()
   }
@@ -1311,10 +1354,9 @@ export function RechnungWizard({
               <span className="gfc-v">{kundeFirma}</span>
             </div>
           ) : null}
-          <label className="field" style={{ margin: '10px 0 4px' }}>
-            <span className="field-label">Ansprechpartner</span>
+          <MockField label="Ansprechpartner" full>
             <select
-              className="sel"
+              className="sel sel--choice"
               value={ansprechpartnerId ?? ''}
               onChange={(e) => {
                 const next = e.target.value.trim() || null
@@ -1336,7 +1378,7 @@ export function RechnungWizard({
                 </option>
               ))}
             </select>
-          </label>
+          </MockField>
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
             <span className="gfc-v">{displayVorname || '—'}</span>

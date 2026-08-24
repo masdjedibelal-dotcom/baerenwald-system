@@ -2,7 +2,7 @@
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { updateLeadBeschreibung, updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
@@ -34,25 +34,58 @@ export function AnfragePhaseEditSheet({
   const [budgetBis, setBudgetBis] = useState('')
   const [notiz, setNotiz] = useState('')
   const [pending, startTransition] = useTransition()
+  const [baseline, setBaseline] = useState({
+    name: '',
+    telefon: '',
+    email: '',
+    anliegen: '',
+    ort: '',
+    plz: '',
+    budgetVon: '',
+    budgetBis: '',
+    notiz: '',
+  })
 
   useEffect(() => {
     if (!open || !lead) return
-    setName(lead.kontakt_name ?? '')
-    setTelefon(lead.kontakt_telefon ?? '')
-    setEmail(lead.kontakt_email ?? '')
-    setAnliegen(lead.situation ?? '')
-    setOrt(lead.kunden?.ort ?? '')
-    setPlz(lead.plz ?? lead.kunden?.plz ?? '')
-    setBudgetVon(lead.preis_min != null ? String(lead.preis_min) : '')
-    setBudgetBis(
-      lead.preis_max != null
-        ? String(lead.preis_max)
-        : lead.budget_ca != null
-          ? String(lead.budget_ca)
-          : ''
-    )
-    setNotiz(lead.kontakt_nachricht ?? '')
+    const next = {
+      name: lead.kontakt_name ?? '',
+      telefon: lead.kontakt_telefon ?? '',
+      email: lead.kontakt_email ?? '',
+      anliegen: lead.situation ?? '',
+      ort: lead.kunden?.ort ?? '',
+      plz: lead.plz ?? lead.kunden?.plz ?? '',
+      budgetVon: lead.preis_min != null ? String(lead.preis_min) : '',
+      budgetBis:
+        lead.preis_max != null
+          ? String(lead.preis_max)
+          : lead.budget_ca != null
+            ? String(lead.budget_ca)
+            : '',
+      notiz: lead.kontakt_nachricht ?? '',
+    }
+    setName(next.name)
+    setTelefon(next.telefon)
+    setEmail(next.email)
+    setAnliegen(next.anliegen)
+    setOrt(next.ort)
+    setPlz(next.plz)
+    setBudgetVon(next.budgetVon)
+    setBudgetBis(next.budgetBis)
+    setNotiz(next.notiz)
+    setBaseline(next)
   }, [open, lead])
+
+  const dirty =
+    name !== baseline.name ||
+    telefon !== baseline.telefon ||
+    email !== baseline.email ||
+    anliegen !== baseline.anliegen ||
+    ort !== baseline.ort ||
+    plz !== baseline.plz ||
+    budgetVon !== baseline.budgetVon ||
+    budgetBis !== baseline.budgetBis ||
+    notiz !== baseline.notiz
 
   function save() {
     if (!lead) return
@@ -73,6 +106,17 @@ export function AnfragePhaseEditSheet({
         return
       }
       toast.success('Anfrage gespeichert')
+      setBaseline({
+        name,
+        telefon,
+        email,
+        anliegen,
+        ort,
+        plz,
+        budgetVon,
+        budgetBis,
+        notiz,
+      })
       onSaved()
     })
   }
@@ -83,24 +127,9 @@ export function AnfragePhaseEditSheet({
       onClose={onClose}
       title="Anfrage bearbeiten"
       size="lg"
-      dirty={false}
+      dirty={dirty}
       overlayClassName="editor-sheet-overlay--stack"
-      footer={
-        <div className="phase-sheet-footer">
-          <button type="button" className="btn secondary" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </button>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={save}
-            disabled={pending}
-          >
-            <MockIcon ctx="default" n="check" size={14} />
-            Speichern
-          </button>
-        </div>
-      }
+      footer={<AnfragePhaseEditFooter pending={pending} onSave={save} />}
     >
       <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
         <p className="text-[length:var(--fs-meta)] font-bold uppercase tracking-wide text-bw-text-muted">
@@ -165,5 +194,31 @@ export function AnfragePhaseEditSheet({
         </label>
       </div>
     </EditorSheet>
+  )
+}
+
+function AnfragePhaseEditFooter({
+  pending,
+  onSave,
+}: {
+  pending: boolean
+  onSave: () => void
+}) {
+  const requestClose = useEditorSheetRequestClose()
+  return (
+    <div className="phase-sheet-footer">
+      <button
+        type="button"
+        className="btn secondary"
+        onClick={() => (requestClose ? requestClose() : undefined)}
+        disabled={pending}
+      >
+        Abbrechen
+      </button>
+      <button type="button" className="btn primary" onClick={onSave} disabled={pending}>
+        <MockIcon ctx="default" n="check" size={14} />
+        Speichern
+      </button>
+    </div>
   )
 }

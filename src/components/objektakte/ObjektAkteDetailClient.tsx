@@ -5,10 +5,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
-import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
@@ -16,11 +15,7 @@ import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeister
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
-import {
-  deleteKundenObjekt,
-  updateKundenObjektFreigabe,
-} from '@/app/actions/kunden-objekte'
-import { toast } from '@/components/ui/app-toast'
+import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
@@ -55,7 +50,6 @@ export function ObjektAkteDetailClient({
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
-  const [editOpen, setEditOpen] = useState(false)
   const [objektState, setObjektState] = useState(objekt)
 
   useEffect(() => {
@@ -86,26 +80,6 @@ export function ObjektAkteDetailClient({
 
   function refresh() {
     router.refresh()
-  }
-
-  function loeschen() {
-    if (
-      !confirm(
-        `Objekt „${objektState.titel}“ wirklich löschen? Zugehörige Einheiten/Kontakte gehen mit verloren.`
-      )
-    ) {
-      return
-    }
-    void (async () => {
-      const r = await deleteKundenObjekt(objektState.id, kunde.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Objekt gelöscht')
-      router.push(`/kunden/${kunde.id}`)
-      router.refresh()
-    })()
   }
 
   const einheiten = useMemo(
@@ -139,14 +113,6 @@ export function ObjektAkteDetailClient({
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Objektdaten</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditOpen(true)}>
-              Bearbeiten
-            </MockBtn>
-            <MockBtn sm kind="ghost" onClick={loeschen}>
-              Löschen
-            </MockBtn>
-          </div>
         </div>
         <div className="card-b">
           <div className="vgid">
@@ -279,40 +245,25 @@ export function ObjektAkteDetailClient({
   ]
 
   return (
-    <>
-      <EntityDetailLayout
-        crumbBackHref={`/kunden/${kunde.id}`}
-        crumbBackLabel="Zurück zu Details"
-        head={{
-          title: objektState.titel,
-          titleBadges:
-            einheitenAnzahl > 0 ? (
-              <MockBadge kind="aktiv">
-                {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
-              </MockBadge>
-            ) : null,
-          badges: adresse ? <span>{adresse}</span> : null,
-        }}
-      >
-        <DetailShell
-          groups={detailShellGroups}
-          value={tab}
-          onChange={(id) => setTab(id as ObjektAkteTab)}
-        />
-      </EntityDetailLayout>
-
-      <KundenObjektModal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        kundeId={kunde.id}
-        verwaltungName={kunde.name}
-        editObjekt={objektState}
-        onSaved={(next) => {
-          setObjektState(next)
-          setEditOpen(false)
-          refresh()
-        }}
+    <EntityDetailLayout
+      crumbBackHref={`/kunden/${kunde.id}`}
+      crumbBackLabel="Zurück zu Details"
+      head={{
+        title: objektState.titel,
+        titleBadges:
+          einheitenAnzahl > 0 ? (
+            <MockBadge kind="aktiv">
+              {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
+            </MockBadge>
+          ) : null,
+        badges: adresse ? <span>{adresse}</span> : null,
+      }}
+    >
+      <DetailShell
+        groups={detailShellGroups}
+        value={tab}
+        onChange={(id) => setTab(id as ObjektAkteTab)}
       />
-    </>
+    </EntityDetailLayout>
   )
 }
