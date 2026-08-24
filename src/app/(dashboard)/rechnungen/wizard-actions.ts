@@ -128,12 +128,15 @@ function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterial
     zahlungsbedingungen: String(rec.zahlungsbedingungen ?? ''),
     einleitung: String(rec.einleitung ?? ''),
     hinweise: String(rec.hinweise ?? ''),
+    ansprechpartner_id: (rec.ansprechpartner_id as string | null) ?? null,
+    kunde_objekt_id: (rec.kunde_objekt_id as string | null) ?? null,
   }
 }
 
 function materialSnapshotFromWizardPayload(
   positionen: AngebotPosition[],
-  meta: RechnungWizardMeta
+  meta: RechnungWizardMeta,
+  opts?: { ansprechpartner_id?: string | null; kunde_objekt_id?: string | null }
 ): RechnungMaterialSnapshot {
   return {
     positionen,
@@ -146,6 +149,8 @@ function materialSnapshotFromWizardPayload(
     zahlungsbedingungen: meta.zahlungsbedingungen,
     einleitung: meta.einleitung,
     hinweise: meta.hinweise,
+    ansprechpartner_id: opts?.ansprechpartner_id?.trim() || null,
+    kunde_objekt_id: opts?.kunde_objekt_id?.trim() || null,
   }
 }
 
@@ -882,7 +887,10 @@ export async function loadRechnungWizardBootstrap(
         (rec.wiederkehr_turnus as string | null) ?? basis.wiederkehr_turnus,
       korrekturKontext: korrekturKontextFromRec(
         rec,
-        materialSnapshotFromWizardPayload(positionen, meta)
+        materialSnapshotFromWizardPayload(positionen, meta, {
+          ansprechpartner_id: (rec.ansprechpartner_id as string | null) ?? null,
+          kunde_objekt_id: (rec.kunde_objekt_id as string | null) ?? null,
+        })
       ),
     },
   }
@@ -988,7 +996,10 @@ export async function loadRechnungWizardBootstrapStandalone(
       gesamtNetto: berechnung.netto,
       korrekturKontext: korrekturKontextFromRec(
         rec,
-        materialSnapshotFromWizardPayload(positionen, meta)
+        materialSnapshotFromWizardPayload(positionen, meta, {
+          ansprechpartner_id: (rec.ansprechpartner_id as string | null) ?? null,
+          kunde_objekt_id: (rec.kunde_objekt_id as string | null) ?? null,
+        })
       ),
     },
   }
@@ -1171,7 +1182,7 @@ export async function saveRechnungWizardDraft(
     const { data: existingRec } = await supabaseCheck
       .from('rechnungen')
       .select(
-        'id, status, rechnungsnummer, positionen, reverse_charge_13b, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis, faellig_am, zahlungsbedingungen, einleitung, hinweise, beleg_typ, angebot_id, auftrag_id'
+        'id, status, rechnungsnummer, positionen, reverse_charge_13b, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis, faellig_am, zahlungsbedingungen, einleitung, hinweise, beleg_typ, angebot_id, auftrag_id, ansprechpartner_id, kunde_objekt_id'
       )
       .eq('id', input.rechnungId)
       .maybeSingle()
@@ -1192,7 +1203,10 @@ export async function saveRechnungWizardDraft(
         existingStatus === 'versendet')
     ) {
       const vorher = materialSnapshotFromRec(existingRec as Record<string, unknown>)
-      const nachher = materialSnapshotFromWizardPayload(positionenFuerBeleg, input.meta)
+      const nachher = materialSnapshotFromWizardPayload(positionenFuerBeleg, input.meta, {
+        ansprechpartner_id: input.ansprechpartner_id,
+        kunde_objekt_id: input.kunde_objekt_id,
+      })
       const brauchtStorno = rechnungBrauchtStornoBeiAenderung(existingStatus, vorher, nachher)
 
       if (!brauchtStorno) {
@@ -1204,6 +1218,8 @@ export async function saveRechnungWizardDraft(
             mail_betreff: input.meta.mail_betreff?.trim() || null,
             faellig_am: faelligNeu,
             zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+            ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
+            kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
             ...mahnungFelderBeiFaelligkeitAenderung(
               faelligNeu,
               (existingRec as { faellig_am?: string | null }).faellig_am

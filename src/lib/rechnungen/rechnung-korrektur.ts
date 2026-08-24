@@ -24,6 +24,9 @@ export type RechnungMaterialSnapshot = {
   zahlungsbedingungen?: string | null
   einleitung?: string | null
   hinweise?: string | null
+  /** Empfänger / Adressblock — Änderung an gesendeter RE → Storno + neu. */
+  ansprechpartner_id?: string | null
+  kunde_objekt_id?: string | null
 }
 
 function normText(v: string | null | undefined): string {
@@ -56,6 +59,8 @@ export function rechnungMaterialFingerprint(s: RechnungMaterialSnapshot): string
     leistungszeitraum_bis: normText(s.leistungszeitraum_bis).slice(0, 10),
     einleitung: normText(s.einleitung),
     hinweise: normText(s.hinweise),
+    ansprechpartner_id: normText(s.ansprechpartner_id),
+    kunde_objekt_id: normText(s.kunde_objekt_id),
   })
 }
 

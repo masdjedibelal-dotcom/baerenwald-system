@@ -36,8 +36,17 @@ export async function GET(request: Request) {
   }
 
   const detail = await loadRechnungDetailForPdf(supabaseAdmin, rechnungId)
-  if (!detail?.kunden) {
-    return NextResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
+  if (!detail) {
+    return NextResponse.json(
+      {
+        error: 'Nicht gefunden',
+        hint: 'Rechnung fehlt oder PDF-Laden scheiterte (Schema/Join). Server-Log: loadRechnungDetailForPdf.',
+      },
+      { status: 404 }
+    )
+  }
+  if (!detail.kunden) {
+    return NextResponse.json({ error: 'Kunde fehlt an der Rechnung' }, { status: 404 })
   }
 
   const firm = await fetchFirmenEinstellungen(supabaseAdmin)
