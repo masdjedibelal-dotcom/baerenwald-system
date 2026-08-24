@@ -1125,7 +1125,6 @@ export async function saveRechnungWizardDraft(
         : null),
     zahlungsplan_abschlag_id: input.abschlag?.zeileId ?? abschlagZeileId,
     liste_berechnung,
-    rechnungsnummer: input.rechnungsnummer?.trim() || null,
   }
 
   if (input.rechnungId) {

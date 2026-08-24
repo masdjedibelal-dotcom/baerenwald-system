@@ -621,7 +621,6 @@ export function RechnungWizard({
           kunde_id: kundeId,
           positionen: positionenBerechnet,
           meta: nextMeta,
-          rechnungsnummer: rechnungsnummer.trim() || null,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
           abschlag:
             planAktiv && sel

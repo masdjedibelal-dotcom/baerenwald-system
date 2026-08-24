@@ -13,6 +13,10 @@ import {
   type HausmeisterAmObjekt,
   type OrgHausmeister,
 } from '@/lib/org/org-hausmeister'
+import {
+  ensureHausmeisterPortalActivation,
+  hausmeisterEmailAllowsSharedLogin,
+} from '@/lib/org/ensure-hausmeister-portal'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 function revalidateObjekt(kundeId: string, objektId: string) {
@@ -122,9 +126,22 @@ export async function saveObjektHausmeister(
   })
   if (!asg.ok) return { ok: false, message: asg.error }
 
+  const hmAfter = (await listOrgHausmeister(kid)).find((h) => h.id === hmId)
+  const sharedLogin = hausmeisterEmailAllowsSharedLogin(hmAfter?.email)
+  if (hmAfter?.portal_zugang && (sharedLogin || input.invite)) {
+    const act = await ensureHausmeisterPortalActivation({
+      orgHausmeisterId: hmId,
+      orgKundeId: kid,
+    })
+    if (!act.ok) {
+      console.warn('[saveObjektHausmeister] ensure portal:', act.error)
+    }
+  }
+
   let inviteUrl: string | null = null
   let inviteMailto: string | null = null
-  if (input.invite) {
+  // Primary-Staff: kein Mailto — Konto ist bereits CRM/Partner.
+  if (input.invite && !sharedLogin) {
     const inv = await createHausmeisterEinladung({
       orgKundeId: kid,
       orgHausmeisterId: hmId,
@@ -160,6 +177,59 @@ export async function saveObjektHausmeister(
 
   revalidateObjekt(kid, oid)
   return { ok: true, hausmeisterId: hmId, inviteUrl, inviteMailto }
+}
+
+/** Portal für Org-HM aktivieren (Primary-Staff ohne Einladung; sonst Stub + Hinweis). */
+export async function activateObjektHausmeisterPortal(
+  kundeId: string,
+  objektId: string,
+  hausmeisterId?: string | null
+): Promise<
+  | { ok: true; portalKundeId: string; hasAuthAccount: boolean; primaryStaff: boolean }
+  | { ok: false; message: string }
+> {
+  const kid = kundeId.trim()
+  const oid = objektId.trim()
+  if (!kid || !oid) return { ok: false, message: 'Kunde/Objekt fehlt.' }
+
+  const obj = await assertObjektGehoertKunde(kid, oid)
+  if (!obj.ok) return obj
+
+  let hmId = hausmeisterId?.trim() || ''
+  if (!hmId) {
+    const am = await loadHausmeisterForObjekt(oid)
+    if (!am || am.isLegacy) {
+      return { ok: false, message: 'Kein Portal-Hausmeister am Objekt.' }
+    }
+    hmId = am.id
+  }
+
+  const hm = (await listOrgHausmeister(kid)).find((h) => h.id === hmId)
+  if (!hm) return { ok: false, message: 'Hausmeister nicht gefunden.' }
+  if (!hm.portal_zugang) {
+    const up = await upsertOrgHausmeister({
+      orgKundeId: kid,
+      id: hmId,
+      name: hm.name,
+      email: hm.email,
+      portalZugang: true,
+    })
+    if (!up.ok) return { ok: false, message: up.error }
+  }
+
+  const act = await ensureHausmeisterPortalActivation({
+    orgHausmeisterId: hmId,
+    orgKundeId: kid,
+  })
+  if (!act.ok) return { ok: false, message: act.error }
+
+  revalidateObjekt(kid, oid)
+  return {
+    ok: true,
+    portalKundeId: act.portalKundeId,
+    hasAuthAccount: act.hasAuthAccount,
+    primaryStaff: act.primaryStaff,
+  }
 }
 
 /** Bestehenden Org-HM dem Objekt zuweisen (ohne Stammdaten zu ändern). */
@@ -239,6 +309,17 @@ export async function inviteObjektHausmeister(
   if (!inv.ok) return { ok: false, message: inv.error }
 
   const hm = (await listOrgHausmeister(kid)).find((h) => h.id === hmId)
+
+  if (hausmeisterEmailAllowsSharedLogin(hm?.email)) {
+    const act = await ensureHausmeisterPortalActivation({
+      orgHausmeisterId: hmId,
+      orgKundeId: kid,
+    })
+    if (!act.ok) return { ok: false, message: act.error }
+    revalidateObjekt(kid, oid)
+    return { ok: true, inviteUrl: inv.url, inviteMailto: null }
+  }
+
   const { data: kunde } = await getSupabaseAdmin()
     .from('kunden')
     .select('name, org_anzeigename')

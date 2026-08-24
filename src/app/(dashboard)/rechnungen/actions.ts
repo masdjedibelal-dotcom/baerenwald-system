@@ -73,7 +73,7 @@ export type RechnungEntwurfPayload = {
   liste_berechnung?: RechnungBerechnung | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
-  /** Nur Anzeige/Vorschau — Entwürfe speichern keine offizielle Nummer. */
+  /** Entwurf: keine Nummer — offizielle RE erst beim Versand (siehe ensureRechnungsnummerFuerVersand). */
   rechnungsnummer?: string | null
 }
 

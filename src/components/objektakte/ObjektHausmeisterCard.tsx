@@ -5,16 +5,22 @@ import { useTransition } from '@/components/ui/action-busy'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
 import {
+  activateObjektHausmeisterPortal,
   inviteObjektHausmeister,
   removeObjektHausmeister,
   saveObjektHausmeister,
 } from '@/app/actions/org-hausmeister'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { getPortalLoginHint } from '@/app/actions/kunden'
+import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
+import { cn } from '@/lib/utils'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
 type Props = {
@@ -28,6 +34,7 @@ type Props = {
 /**
  * Hausmeister am Objekt — analog HV-Portal:
  * ohne Zuordnung → neu anlegen; optional bestehenden Org-HM zuweisen.
+ * Portal-Zeile wie Kunde/Handwerker: Status · Einladen/Aktivieren · Login.
  */
 export function ObjektHausmeisterCard({
   kundeId,
@@ -40,6 +47,7 @@ export function ObjektHausmeisterCard({
   const [amObjekt, setAmObjekt] = useState(initialAmObjekt)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pending, startTransition] = useTransition()
+  const isCrmAdmin = useIsCrmAdmin()
 
   const [mode, setMode] = useState<'existing' | 'new'>('new')
   const [hmId, setHmId] = useState('')
@@ -47,15 +55,50 @@ export function ObjektHausmeisterCard({
   const [email, setEmail] = useState('')
   const [portalZugang, setPortalZugang] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [registered, setRegistered] = useState<boolean | null>(null)
+  const [loginBusy, setLoginBusy] = useState(false)
 
   useEffect(() => {
     setListe(initialListe)
     setAmObjekt(initialAmObjekt)
   }, [initialListe, initialAmObjekt])
 
+  const portalKundeId = amObjekt?.portal_kunde_id?.trim() || null
+  const hmEmail = amObjekt?.email?.trim() || ''
+  const primaryStaff = isBaerenwaldPrimaryStaffEmail(hmEmail)
+
+  useEffect(() => {
+    if (!amObjekt || amObjekt.isLegacy || !amObjekt.portal_zugang) {
+      setRegistered(null)
+      return
+    }
+    if (!portalKundeId) {
+      // Primary Staff: Auth existiert schon (CRM) → nach Aktivierung „aktiv“
+      setRegistered(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const hint = await getPortalLoginHint(portalKundeId)
+      if (cancelled) return
+      if (hint.ok && hint.hasAuthAccount) {
+        setRegistered(true)
+        return
+      }
+      // Primary Staff: Auth oft nur an Handwerker/CRM — trotzdem Login möglich
+      if (primaryStaff) {
+        setRegistered(true)
+        return
+      }
+      setRegistered(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [amObjekt, portalKundeId, primaryStaff, amObjekt?.portal_zugang, amObjekt?.isLegacy])
+
   function openSheet() {
     setErr(null)
-    // Wie Portal: am Objekt schon HM → bearbeiten; sonst → neu anlegen
     if (amObjekt && !amObjekt.isLegacy) {
       setMode('existing')
       setHmId(amObjekt.id)
@@ -120,7 +163,16 @@ export function ObjektHausmeisterCard({
         toast.error(r.message)
         return
       }
-      toast.success(mode === 'new' ? 'Hausmeister angelegt' : 'Hausmeister gespeichert')
+      const staffMail = isBaerenwaldPrimaryStaffEmail(
+        mode === 'new' ? email : email || amObjekt?.email
+      )
+      toast.success(
+        staffMail && portalZugang
+          ? 'Hausmeister gespeichert — Portal aktiviert'
+          : mode === 'new'
+            ? 'Hausmeister angelegt'
+            : 'Hausmeister gespeichert'
+      )
       setSheetOpen(false)
       if (r.inviteMailto) {
         window.location.href = r.inviteMailto
@@ -142,9 +194,31 @@ export function ObjektHausmeisterCard({
     })
   }
 
-  function einladen() {
+  function einladenOderAktivieren() {
     if (!amObjekt || amObjekt.isLegacy || !amObjekt.portal_zugang) return
     startTransition(async () => {
+      if (primaryStaff || !portalKundeId) {
+        const r = await activateObjektHausmeisterPortal(kundeId, objektId, amObjekt.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(
+          r.primaryStaff
+            ? 'Hausmeister-Portal aktiv (Team-Login)'
+            : r.hasAuthAccount
+              ? 'Portal aktiv'
+              : 'Portal-Stub angelegt — Einladung senden'
+        )
+        if (!r.primaryStaff && !r.hasAuthAccount) {
+          const inv = await inviteObjektHausmeister(kundeId, objektId, amObjekt.id)
+          if (inv.ok && inv.inviteMailto) {
+            window.location.href = inv.inviteMailto
+          }
+        }
+        onChanged()
+        return
+      }
       const r = await inviteObjektHausmeister(kundeId, objektId, amObjekt.id)
       if (!r.ok) {
         toast.error(r.message)
@@ -165,6 +239,27 @@ export function ObjektHausmeisterCard({
     })
   }
 
+  async function openLogin() {
+    if (loginBusy || !portalKundeId) return
+    setLoginBusy(true)
+    const popup = window.open('about:blank', '_blank')
+    try {
+      const r = await openPortalAsKunde(portalKundeId)
+      if (!r.ok) {
+        popup?.close()
+        toast.error(r.message)
+        return
+      }
+      if (popup) popup.location.href = r.url
+      else window.location.assign(r.url)
+    } catch {
+      popup?.close()
+      toast.error('Portal konnte nicht geöffnet werden.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
   const selectOptions = [
     { value: '__new__', label: '＋ Neu anlegen' },
     ...liste.map((h) => ({
@@ -181,6 +276,20 @@ export function ObjektHausmeisterCard({
         : liste.length > 0
           ? 'Anlegen / Zuweisen'
           : 'Anlegen'
+
+  const showPortalZeile =
+    amObjekt && !amObjekt.isLegacy && amObjekt.portal_zugang
+  const statusLabel =
+    registered === true
+      ? 'Portal aktiv'
+      : registered === false
+        ? 'Noch nicht registriert'
+        : showPortalZeile
+          ? '…'
+          : null
+  const showInvite = showPortalZeile && registered === false
+  const showLogin =
+    showPortalZeile && registered === true && Boolean(portalKundeId) && isCrmAdmin
 
   return (
     <>
@@ -206,35 +315,67 @@ export function ObjektHausmeisterCard({
                 <div style={{ color: 'var(--text-3)', marginTop: 2 }}>{amObjekt.email}</div>
               ) : null}
             </div>
-            <div style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-              Portal-Zugang:{' '}
-              {amObjekt.isLegacy
-                ? 'nur Kontakt (Legacy)'
-                : amObjekt.portal_zugang
-                  ? amObjekt.portal_kunde_id
-                    ? 'aktiv'
-                    : 'Einladung möglich'
-                  : 'nein'}
-            </div>
             {amObjekt.isLegacy ? (
               <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)', margin: 0 }}>
                 Noch unter Objekt-Kontakte. Bitte hier als Org-Hausmeister speichern, damit Portal und
                 Auto-Zuweisung greifen.
               </p>
+            ) : !amObjekt.portal_zugang ? (
+              <div style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+                Portal-Zugang: nein
+              </div>
+            ) : (
+              <div className="vgid-portal">
+                <span
+                  className={cn(
+                    'd',
+                    registered === true ? 'is-on' : registered === false ? 'is-off' : ''
+                  )}
+                  aria-hidden
+                />
+                <span className="t">{statusLabel}</span>
+                {showInvite ? (
+                  <span className="a">
+                    <button
+                      type="button"
+                      className="vgid-portal__invite"
+                      onClick={einladenOderAktivieren}
+                      disabled={pending}
+                      aria-label={primaryStaff ? 'Portal aktivieren' : 'Portal-Einladung senden'}
+                      title={
+                        primaryStaff
+                          ? 'Team-Login als Hausmeister aktivieren'
+                          : 'Portal-Einladung erneut senden'
+                      }
+                    >
+                      <MockIcon ctx="default" n="send" size={15} />
+                      <span>{primaryStaff ? 'Aktivieren' : 'Einladen'}</span>
+                    </button>
+                  </span>
+                ) : null}
+                {showLogin ? (
+                  <span className="a">
+                    <button
+                      type="button"
+                      className="vgid-portal__login"
+                      onClick={() => void openLogin()}
+                      disabled={loginBusy || pending}
+                      aria-label="Hausmeister-Portal Login"
+                      title="Als Hausmeister im Portal anmelden"
+                    >
+                      <MockIcon ctx="btn" n="log-in" size={15} />
+                      <span>Login</span>
+                    </button>
+                  </span>
+                ) : null}
+              </div>
+            )}
+            {primaryStaff && amObjekt.portal_zugang ? (
+              <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)', margin: 0 }}>
+                Team-Mail: gleiches Login wie CRM / Partner / HV — kein separates Registrieren.
+              </p>
             ) : null}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {!amObjekt.isLegacy && amObjekt.portal_zugang && !amObjekt.portal_kunde_id ? (
-                <MockBtn sm kind="secondary" disabled={pending} onClick={einladen}>
-                  Einladung senden
-                </MockBtn>
-              ) : null}
-              {!amObjekt.isLegacy && amObjekt.portal_zugang && amObjekt.portal_kunde_id ? (
-                <PortalLoginIconButton
-                  kundeId={amObjekt.portal_kunde_id}
-                  label="Hausmeister-Portal öffnen"
-                  withLabel
-                />
-              ) : null}
               {!amObjekt.isLegacy ? (
                 <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>
                   Entfernen
@@ -295,7 +436,11 @@ export function ObjektHausmeisterCard({
                   onChange={(e) => setPortalZugang(e.target.checked)}
                   style={{ marginTop: 2 }}
                 />
-                <span>Portal-Zugang — Einladung per E-Mail nach Speichern</span>
+                <span>
+                  {isBaerenwaldPrimaryStaffEmail(email)
+                    ? 'Portal-Zugang — Team-Login sofort aktiv'
+                    : 'Portal-Zugang — Einladung per E-Mail nach Speichern'}
+                </span>
               </label>
               {portalZugang ? (
                 <Input

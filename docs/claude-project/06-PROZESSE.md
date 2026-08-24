@@ -1,0 +1,131 @@
+# 06 — Prozesse (End-to-End)
+
+Wie die Welten zusammenspielen. Jeder Ablauf in der Sprache der Nutzer.
+
+---
+
+## 1) Privatkunde über Website
+
+```
+Website Rechner/GPT → Anfrage im CRM → Angebot erstellen & senden
+  → Kunde sieht Angebot (Mail / MeinBärenwald / Projekt-Link)
+  → Annahme → Auftrag → Handwerker zuweisen & senden
+  → Ausführung (Bautagebuch, Updates) → Abnahme → Rechnung(en) → fertig
+```
+
+**CRM-Jobs zwischendurch:** nachfassen, korrigieren, Nachtrag, Zahlplan, Dokumente.
+
+---
+
+## 2) Mieter meldet über Hausverwaltung
+
+```
+Aushang/QR → /melden/org/objekt → Funnel → Bestätigung + Status-Link
+  → Anfrage im CRM mit Org-/Objekt-/Melder-Kontext
+  → ggf. HV-Freigabe im MeinBärenwald-Portal
+  → erst dann Partner anfragen / Auftrag fortsetzen
+  → Mieter sieht Timeline auf Status-Seite (Termine, Feedback, Abnahme-PDF)
+```
+
+**CRM konfiguriert:** Kunde vom Typ HV → Tab Organisation + Objekte mit Melde-Links.
+
+---
+
+## 3) HV legt Vorgang selbst an
+
+```
+MeinBärenwald → Neuer Vorgang (HV-Funnel)
+  → erscheint als Anfrage im CRM
+  → gleicher Pipeline-Weg wie oben, inkl. Freigabe-Regeln
+```
+
+---
+
+## 4) Angebot mit Partner-Einholung
+
+```
+CRM Angebot (oder Anfrage-Leistungen) → Handwerker anfragen (Token und/oder Portal)
+  → Partner nimmt an / reicht Preis+PDF ein
+  → CRM prüft Einreichung → EK übernehmen
+  → Kundenangebot finalisieren & senden
+```
+
+Ohne Freigabe (HV): Partner-Versand kann blockiert sein.
+
+---
+
+## 5) Auftragskoordination Handwerker
+
+```
+Auftrag → Leistungen: zuweisen (still) → an Handwerker senden (Notification)
+  → Partner bestätigt im Portal
+  → Formular-Links / Bautagebuch / Compliance / Vertrag nach Bedarf
+  → Abnahmeprotokoll → Abschlussdokumentation Kunde
+```
+
+---
+
+## 6) Nachtrag während Bau
+
+```
+CRM: Nachtrag / Baustopp anlegen
+  → Kunde bestätigt über /nachtrag/[token]
+  → Arbeit geht weiter; Positionen/Kosten nachgezogen
+```
+
+---
+
+## 7) Rechnung & Zahlung
+
+```
+Auftrag Zahlungstab / Neu Rechnung
+  → Wizard (Abschlag oder Schluss)
+  → Versenden → Kunde zahlt → als bezahlt markieren
+  → optional Mahnung
+```
+
+Partner kann **Eingangsrechnung** einreichen → erscheint in Vorgängen/Finanzen.
+
+---
+
+## 8) Korrekturen
+
+| Situation | Kanonischer Weg |
+|-----------|-----------------|
+| Angebot ändern am laufenden Auftrag | AG-Korrektur-Wizard |
+| Rechnung falsch | Storno mit Ersatz / Gutschrift / ohne Ersatz |
+| Positionen steuern | PosBoard im Leistungen-Tab |
+
+---
+
+## 9) KI-gestützte Einstiege
+
+| Einstieg | Ergebnis |
+|----------|----------|
+| BärenwaldGPT Visualisierung | Bilder + ggf. Preisrahmen → Lead |
+| CRM Assistent | Entwürfe, Planung, Navigation, Mail-Vorschläge |
+| Angebot Visualisierung | Bilder am Angebot für Kundenkommunikation |
+
+---
+
+## 10) Alltags-Jobs im CRM (Schnellreferenz)
+
+| Job | Bevorzugter Einstieg |
+|-----|----------------------|
+| Neues Angebot | FAB/Wizard oder Primary „Angebot erstellen“ an Anfrage |
+| Angebot senden | Wizard-Ende oder Detail-Versand |
+| Rechnung senden | RechnungWizard |
+| HW zuweisen | Auftrag → Leistungen |
+| Abnahme | Auftrag → Abnahme-Wizard |
+| Nachtrag Kunde | Auftrag Vor Ort/Abschluss → Nachtrag-Link |
+| Etwas finden | TopBar-Suche |
+| Heute planen | Dashboard + Assistent / Kalender |
+
+---
+
+## Bewusste Produktgrenzen
+
+- **Formulare bearbeiten** im CRM-UI derzeit ausgeblendet; Token-Formulare für Ausfüller bleiben.
+- **Partner-Nav** im CRM ist unter Handwerker zusammengeführt.
+- Manche Marketing-/Analytics-Karten zeigen Quellen-Status, sind aber keine eigenen „Arbeitsmodule“.
+- Soll-Navigation („Heute / Projekte / Kontakte / Finanzen“) ist Konzept — Ist-Nav siehe `05-CRM.md`.

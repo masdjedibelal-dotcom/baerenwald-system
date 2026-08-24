@@ -5,6 +5,7 @@ import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
   isAktiverAuftragStatus,
+  isOffeneAnfrageStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
 } from '@/lib/dashboard-mock-mapping'
@@ -222,8 +223,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
   const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, zeitraumRange))
 
-  const neueAnfragenCount = leadsZ.filter(
-    (l) => String(l.status ?? '').toLowerCase() === 'neu'
+  const offeneAnfragenCount = leadsZ.filter((l) =>
+    isOffeneAnfrageStatus(l.status as string)
   ).length
   const offeneAngeboteCount = angeboteZ.filter((a) =>
     isOffenesAngebotStatus(a.status as string, a.status_einfach as string | null)
@@ -238,8 +239,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const kpis = [
     {
       icon: 'inbox',
-      label: 'Neue Anfragen',
-      value: neueAnfragenCount,
+      label: 'Offene Anfragen',
+      value: offeneAnfragenCount,
       href: '/vorgaenge?tab=anfrage&lifecycle=offen',
     },
     {
