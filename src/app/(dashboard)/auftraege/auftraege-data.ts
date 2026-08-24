@@ -48,7 +48,6 @@ const AUFTRAG_DETAIL_SELECT = `
         hw_angebot_anhang_urls,
         hw_rechnung_pdf_url,
         hw_rechnung_eingereicht_at,
-        hw_rechnung_reverse_charge_13b,
         hw_eingereicht_at,
         hw_status,
         hw_notiz,
@@ -121,6 +120,16 @@ const AUFTRAG_DETAIL_SELECT_FALLBACK = `
       )
     `
 
+/** Letzter Fallback: ohne riskante Nested-Spalten — Detailseite darf nie nur wegen Schema-Drift 404en. */
+const AUFTRAG_DETAIL_SELECT_MINIMAL = `
+      *,
+      kunden(*),
+      angebote(*),
+      auftrag_handwerker(*, handwerker(id, name, email, telefon, firma), gewerke(id, name, slug)),
+      auftrag_timeline(*),
+      auftrag_positionen(*, handwerker(id, name, email, telefon))
+    `
+
 function parseAuftragDetailRow(
   data: AuftragDetail & { angebote?: { positionen?: unknown } | null }
 ): AuftragDetail {
@@ -181,10 +190,17 @@ export async function loadAuftragDetail(
     let { data, error } = await fetchAuftragDetailRow(id, AUFTRAG_DETAIL_SELECT)
 
     if (error) {
-      console.warn('[loadAuftragDetail] full select failed, retry minimal:', error.message, error.code)
+      console.warn('[loadAuftragDetail] full select failed, retry fallback:', error.message, error.code)
       const fallback = await fetchAuftragDetailRow(id, AUFTRAG_DETAIL_SELECT_FALLBACK)
       data = fallback.data
       error = fallback.error
+    }
+
+    if (error) {
+      console.warn('[loadAuftragDetail] fallback failed, retry minimal:', error.message, error.code)
+      const minimal = await fetchAuftragDetailRow(id, AUFTRAG_DETAIL_SELECT_MINIMAL)
+      data = minimal.data
+      error = minimal.error
     }
 
     if (error) {
