@@ -1292,6 +1292,10 @@ export type Rechnung = {
   angebot_handwerker_id?: string | null
   /** Null solange Entwurf — offizielle Nummer erst beim Versand. */
   rechnungsnummer: string | null
+  /** Optionaler Ansprechpartner (Empfängeradresse / Anrede / Mail). */
+  ansprechpartner_id?: string | null
+  /** Ausführungsort / Verwaltungsobjekt (PDF „Durchführung in“). */
+  kunde_objekt_id?: string | null
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
   /** Spec Ketten */

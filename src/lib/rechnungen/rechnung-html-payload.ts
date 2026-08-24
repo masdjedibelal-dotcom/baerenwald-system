@@ -18,7 +18,7 @@ import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
-  formatKundeEmpfaengerFuerDokument,
+  formatRechnungEmpfaengerFuerDokument,
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
@@ -39,7 +39,8 @@ import {
   istAbschlagPauschalPosition,
   type RechnungAbschlagLink,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition, Auftrag, Gewerk, Kunde, Rechnung } from '@/lib/types'
+import { resolveRechnungLeistungsortIn } from '@/lib/kunden-objekte'
+import type { AngebotPosition, Auftrag, Gewerk, Kunde, KundenObjekt, Rechnung } from '@/lib/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 function formatDatumDe(iso: string | null | undefined): string {
@@ -86,6 +87,8 @@ type AngebotJoin = AngebotLeistungsumfangQuelle | AngebotLeistungsumfangQuelle[]
 
 export type RechnungDetailForPdf = Omit<Rechnung, 'kunden' | 'angebote' | 'auftraege'> & {
   kunden: Kunde | null
+  /** Join über rechnungen.kunde_objekt_id */
+  kunden_objekte?: KundenObjekt | KundenObjekt[] | null
   angebote?: AngebotJoin
   auftraege?:
     | (Pick<Auftrag, 'id' | 'titel'> & { angebote?: AngebotJoin })
@@ -207,8 +210,15 @@ export function buildRechnungHtmlInput(
     }
   )
 
-  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden)
-  const empfaenger = formatKundeEmpfaengerFuerDokument(row.kunden)
+  const objektJoin = firstJoin(row.kunden_objekte)
+  const apId = (row as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null
+  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden, null, {
+    selectedAnsprechpartnerId: apId,
+  })
+  const empfaenger = formatRechnungEmpfaengerFuerDokument(row.kunden, {
+    selectedAnsprechpartnerId: apId,
+    objekt: objektJoin,
+  })
   const anrede: AngebotMailAnrede = 'sie'
   const anredeCtx = kundeAnredeKontextFromEmpfaenger(empfaengerStamm)
   const rechnungsdatumDe = formatDatumDe(String(row.rechnungsdatum))
@@ -258,6 +268,7 @@ export function buildRechnungHtmlInput(
 
   const steuer = firmenSteuerFooterZeilen(firm)
   const bank = firmenBankverbindungZeilen(firm)
+  const durchfuehrungIn = resolveRechnungLeistungsortIn(objektJoin)
 
   return {
     dokument_art: 'rechnung',
@@ -284,6 +295,7 @@ export function buildRechnungHtmlInput(
     kunde_name: empfaenger.name,
     kunde_adresse: empfaenger.adresse,
     kunde_typ: row.kunden.typ ?? null,
+    durchfuehrung_in: durchfuehrungIn,
     leistungsumfang: projektTitel,
     variant_erste_ueberschrift:
       projektTitel && projektTitel !== 'Rechnung' ? projektTitel : undefined,
@@ -346,7 +358,7 @@ export async function loadRechnungDetailForPdf(
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      '*, kunden(*), angebote(leistungsumfang, notizen), auftraege(id, titel, kostentraeger, versicherungs_nr, versicherungsakte_pdf_url, angebote(leistungsumfang, notizen))'
+      '*, kunden(*, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)), kunden_objekte(id, kunde_id, titel, strasse, hausnummer, plz, ort), angebote(leistungsumfang, notizen), auftraege(id, titel, kostentraeger, versicherungs_nr, versicherungsakte_pdf_url, angebote(leistungsumfang, notizen))'
     )
     .eq('id', rechnungId)
     .maybeSingle()
@@ -357,9 +369,12 @@ export async function loadRechnungDetailForPdf(
   const auftrag = Array.isArray(aRaw) ? aRaw[0] : aRaw
   const angRaw = data.angebote
   const angebot = Array.isArray(angRaw) ? angRaw[0] : angRaw
+  const oRaw = (data as { kunden_objekte?: KundenObjekt | KundenObjekt[] | null }).kunden_objekte
+  const objekt = Array.isArray(oRaw) ? oRaw[0] : oRaw
   return {
     ...(data as Rechnung),
     kunden: (kunde as Kunde) ?? null,
+    kunden_objekte: (objekt as KundenObjekt) ?? null,
     angebote: (angebot as AngebotLeistungsumfangQuelle | null) ?? null,
     auftraege: (auftrag as RechnungDetailForPdf['auftraege']) ?? null,
   }

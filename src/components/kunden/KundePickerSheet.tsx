@@ -103,6 +103,7 @@ export function KundePickerSheet({
             onChange={pickValue}
             placeholder="Kunde wählen oder tippen…"
             emptyLabel="Keine Treffer"
+            defaultOpen
           />
         )}
       </div>

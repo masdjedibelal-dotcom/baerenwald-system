@@ -51,6 +51,10 @@ export type RechnungWizardBootstrap = {
   auftragId: string | null
   angebotId: string | null
   kundeId: string
+  /** Optional: Empfänger-Ansprechpartner (null = Hauptkontakt / Primär). */
+  ansprechpartnerId?: string | null
+  /** Ausführungsort / Verwaltungsobjekt (HV/Gewerbe). */
+  kundeObjektId?: string | null
   /** Direktrechnung von /rechnungen/neu (ohne Anfrage/Angebot/Auftrag) */
   standalone?: boolean
   kunde: Pick<

@@ -26,6 +26,32 @@ async function requireAuth() {
   return { ok: true as const }
 }
 
+/** Legacy-Feld `kunden.ansprechpartner` = Name des Primären (oder null). */
+async function syncKundeLegacyAnsprechpartnerFeld(kundeId: string): Promise<void> {
+  const kid = kundeId.trim()
+  if (!kid) return
+  const { data: primary } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden_ansprechpartner')
+      .select('name')
+      .eq('kunde_id', kid)
+      .eq('ist_primaer', true)
+      .order('sort_order', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+  )
+  const name =
+    primary && typeof primary === 'object' && 'name' in primary
+      ? String((primary as { name?: string | null }).name ?? '').trim() || null
+      : null
+  await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .update({ ansprechpartner: name, updated_at: new Date().toISOString() })
+      .eq('id', kid)
+  )
+}
+
 export async function listKundenAnsprechpartner(
   kundeId: string
 ): Promise<KundeAnsprechpartner[]> {
@@ -89,6 +115,7 @@ export async function saveKundenAnsprechpartner(
         .eq('kunde_id', kid)
     )
     if (error) return { ok: false, message: error.message }
+    await syncKundeLegacyAnsprechpartnerFeld(kid)
     revalidatePath(`/kunden/${kid}`)
     return { ok: true, id: ansprechpartnerId.trim() }
   }
@@ -109,6 +136,7 @@ export async function saveKundenAnsprechpartner(
       .single()
   )
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen.' }
+  await syncKundeLegacyAnsprechpartnerFeld(kid)
   revalidatePath(`/kunden/${kid}`)
   return { ok: true, id: String((data as { id: string }).id) }
 }
@@ -127,6 +155,7 @@ export async function deleteKundenAnsprechpartner(
     db.from('kunden_ansprechpartner').delete().eq('id', aid).eq('kunde_id', kid)
   )
   if (error) return { ok: false, message: error.message }
+  await syncKundeLegacyAnsprechpartnerFeld(kid)
   revalidatePath(`/kunden/${kid}`)
   return { ok: true }
 }

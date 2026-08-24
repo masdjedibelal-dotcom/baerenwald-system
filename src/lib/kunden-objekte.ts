@@ -73,10 +73,30 @@ export function formatKundenObjektDurchfuehrung(o: KundenObjekt): string {
   return lines.join('\n')
 }
 
+/** Nur Anschrift des Objekts (ohne Titel) — Leistungsort neben WEG-Empfängername. */
+export function formatKundenObjektLeistungsortAnschrift(
+  o: Pick<KundenObjekt, 'strasse' | 'hausnummer' | 'plz' | 'ort'>
+): string | null {
+  const lines: string[] = []
+  const str = kundenObjektStrasseZeile(o)
+  if (str) lines.push(str)
+  const po = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
+  if (po) lines.push(po)
+  return lines.length ? lines.join('\n') : null
+}
+
 /** Ausführungsort nur bei echter Anschrift — kein Fallback auf Projekt-Titel. */
 export function resolveAngebotDurchfuehrungIn(
   verwaltersObjekt: KundenObjekt | null | undefined
 ): string | null {
   if (!verwaltersObjekt || !kundenObjektHatAnschrift(verwaltersObjekt)) return null
   return formatKundenObjektDurchfuehrung(verwaltersObjekt)
+}
+
+/** Rechnung: Leistungsort = Objektanschrift (Titel steckt schon im Empfängernamen). */
+export function resolveRechnungLeistungsortIn(
+  verwaltersObjekt: KundenObjekt | null | undefined
+): string | null {
+  if (!verwaltersObjekt || !kundenObjektHatAnschrift(verwaltersObjekt)) return null
+  return formatKundenObjektLeistungsortAnschrift(verwaltersObjekt)
 }

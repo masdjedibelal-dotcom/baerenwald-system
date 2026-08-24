@@ -63,6 +63,8 @@ const COMPLIANCE_COLUMN_MARKERS = [
   'mail_einleitung',
   'mail_betreff',
   'zahlungsbedingungen',
+  'ansprechpartner_id',
+  'kunde_objekt_id',
 ] as const
 
 /** PostgREST-Schema-Cache: Migration 20260521120000_rechnungen_compliance fehlt. */
@@ -133,6 +135,8 @@ export async function rechnungInsertMitSchemaFallback(
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
+      ansprechpartner_id,
+      kunde_objekt_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
@@ -153,6 +157,8 @@ export async function rechnungInsertMitSchemaFallback(
         rechnung_art: _r,
         abschlag_index: _a,
         zahlungsplan_abschlag_id: _z,
+        ansprechpartner_id: _ap,
+        kunde_objekt_id: _ko,
         ...restAbschlag
       } = base as Record<string, unknown>
       base = restAbschlag
@@ -198,6 +204,8 @@ export async function rechnungUpdateMitSchemaFallback(
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
+      ansprechpartner_id,
+      kunde_objekt_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
@@ -218,6 +226,8 @@ export async function rechnungUpdateMitSchemaFallback(
         rechnung_art: _r,
         abschlag_index: _a,
         zahlungsplan_abschlag_id: _z,
+        ansprechpartner_id: _ap,
+        kunde_objekt_id: _ko,
         ...restAbschlag
       } = base as Record<string, unknown>
       base = restAbschlag

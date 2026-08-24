@@ -21,14 +21,23 @@ import { DateInput } from '@/components/ui/DateInput'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
+import {
+  MelderLeistungsortFields,
+  type MelderLeistungsortDraft,
+} from '@/components/crm/MelderLeistungsortFields'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import { toast } from '@/components/ui/app-toast'
+import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen } from '@/lib/kunde-namen'
+import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
+  istKundeGewerbeTyp,
   kundeStrasseHausnummerZeile,
 } from '@/lib/kunde-stammdaten'
+import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
@@ -83,7 +92,7 @@ import {
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
+import type { Gewerk, Kunde, KundeAnsprechpartner, KundenObjekt, Preisliste } from '@/lib/types'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -168,7 +177,29 @@ export function RechnungWizard({
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [kunde, setKunde] = useState(bootstrap.kunde)
   const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
+  const [ansprechpartnerId, setAnsprechpartnerId] = useState<string | null>(
+    () => bootstrap.ansprechpartnerId?.trim() || null
+  )
+  const [kundeObjektId, setKundeObjektId] = useState<string | null>(
+    () => bootstrap.kundeObjektId?.trim() || null
+  )
+  const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
+  const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [kundeEditOpen, setKundeEditOpen] = useState(false)
+  const isHvOderGewerbe = istKundeGewerbeTyp(kunde?.typ)
+  const leistungsortDraft: MelderLeistungsortDraft = {
+    melder_name: '',
+    melder_telefon: '',
+    melder_email: '',
+    melder_einheit: '',
+    kunde_objekt_id: kundeObjektId,
+  }
+  const gewaehltesObjekt =
+    (kundeObjektId ? hvObjekte.find((o) => o.id === kundeObjektId) : null) ?? null
+  const leistungsortCrowHint = gewaehltesObjekt
+    ? kundenObjektKurzlabel(gewaehltesObjekt)
+    : null
   const kundeNamen = normalizeKundeNamen({
     typ: kunde?.typ,
     name: kunde?.name,
@@ -183,13 +214,35 @@ export function RechnungWizard({
     [kundeNamen.vorname, kundeNamen.nachname].filter(Boolean).join(' ') ||
     kunde?.name?.trim() ||
     'Kunde wählen'
-  const kundeEmail = (kunde?.email || '').trim()
-  const kundeTelefon = (kunde?.telefon || '').trim()
+  /** Gewählter AP, sonst Primär — steuert Anzeige & Mail-Vorbelegung. */
+  const effektivAp =
+    (ansprechpartnerId
+      ? apRows.find((a) => a.id === ansprechpartnerId)
+      : null) ??
+    apRows.find((a) => a.ist_primaer) ??
+    null
+  const apNamen = effektivAp
+    ? splitDeutscherVollname(String(effektivAp.name ?? '').trim())
+    : null
+  const displayVorname = apNamen?.vorname || kundeNamen.vorname
+  const displayNachname = apNamen?.nachname || kundeNamen.nachname
+  const kundeEmail =
+    (effektivAp?.email?.trim() || kunde?.email || '').trim()
+  const kundeTelefon =
+    (effektivAp?.telefon?.trim() || kunde?.telefon || '').trim()
   const kundeAnschrift = kunde
     ? kundeStrasseHausnummerZeile(kunde) || kunde.adresse?.trim() || null
     : null
   const kundeStadt = [kunde?.plz?.trim(), kunde?.ort?.trim()].filter(Boolean).join(' ')
   const kundeTypLabel = kundentypLabel(kunde?.typ)
+  const kundeCrowValue = (() => {
+    const ap = effektivAp?.name?.trim()
+    const ort = leistungsortCrowHint
+    if (ap && ort) return `${kundeName} · ${ap} · ${ort}`
+    if (ap) return `${kundeName} · ${ap}`
+    if (ort) return `${kundeName} · ${ort}`
+    return kundeName
+  })()
   const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
   const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
   /** Neu: Art der Leistung vor dem Wizard (nicht im Dokument-Sheet). */
@@ -343,6 +396,59 @@ export function RechnungWizard({
       cancelled = true
     }
   }, [bootstrap.auftragId, istDirektrechnung])
+
+  useEffect(() => {
+    const kid = kundeId.trim()
+    if (!kid) {
+      setApRows([])
+      return
+    }
+    let cancelled = false
+    void listKundenAnsprechpartner(kid).then((rows) => {
+      if (cancelled) return
+      setApRows(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [kundeId])
+
+  useEffect(() => {
+    if (!isHvOderGewerbe || !kundeId.trim()) {
+      setHvObjekte([])
+      if (!isHvOderGewerbe && kundeObjektId) {
+        setKundeObjektId(null)
+        setDraftDirty(true)
+      }
+      return
+    }
+    let cancelled = false
+    void fetchKundenObjekte(kundeId).then((rows) => {
+      if (cancelled) return
+      setHvObjekte(rows)
+      if (kundeObjektId && !rows.some((o) => o.id === kundeObjektId)) {
+        setKundeObjektId(null)
+        setDraftDirty(true)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Objekt nur bei Kundenwechsel prüfen
+  }, [kundeId, isHvOderGewerbe])
+
+  /** Bootstrap: Mail an gewählten AP, sobald die Liste da ist. */
+  useEffect(() => {
+    const sid = bootstrap.ansprechpartnerId?.trim()
+    if (!sid || !apRows.length) return
+    const ap = apRows.find((a) => a.id === sid)
+    const mail = ap?.email?.trim() || ''
+    if (mail && isValidEmail(mail)) {
+      setMailTo((prev) => (prev.length === 1 && prev[0] === (kunde?.email || '').trim() ? [mail] : prev.length ? prev : [mail]))
+    }
+    // nur einmal nach Laden der AP-Liste für den Bootstrap-Wert
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apRows])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -524,8 +630,22 @@ export function RechnungWizard({
         rechnungsnummer,
         zahlfrist,
         zahlfristDatum,
+        ansprechpartnerId,
+        kundeObjektId,
       }),
-    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, rechnungsnummer, zahlfrist, zahlfristDatum]
+    [
+      zeilen,
+      meta,
+      rechnungsart,
+      plan,
+      einleitung,
+      mailBetreff,
+      rechnungsnummer,
+      zahlfrist,
+      zahlfristDatum,
+      ansprechpartnerId,
+      kundeObjektId,
+    ]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -619,6 +739,8 @@ export function RechnungWizard({
           auftrag_id: bootstrap.auftragId,
           angebot_id: bootstrap.angebotId,
           kunde_id: kundeId,
+          ansprechpartner_id: ansprechpartnerId,
+          kunde_objekt_id: kundeObjektId,
           positionen: positionenBerechnet,
           meta: nextMeta,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
@@ -662,6 +784,8 @@ export function RechnungWizard({
     [
       zeilen,
       kundeId,
+      ansprechpartnerId,
+      kundeObjektId,
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
@@ -712,6 +836,8 @@ export function RechnungWizard({
         auftrag_id: bootstrap.auftragId,
         angebot_id: bootstrap.angebotId,
         kunde_id: kundeId,
+        ansprechpartner_id: ansprechpartnerId,
+        kunde_objekt_id: kundeObjektId,
         positionen: positionenBerechnet,
         meta: nextMeta,
         zahlungsplan: plan,
@@ -742,6 +868,8 @@ export function RechnungWizard({
     bootstrap.auftragId,
     bootstrap.angebotId,
     kundeId,
+    ansprechpartnerId,
+    kundeObjektId,
     planOk,
     plan,
     positionenBerechnet,
@@ -794,6 +922,8 @@ export function RechnungWizard({
 
       const sync = await syncRechnungWizardMetaToEntwurf(id, {
         kunde_id: kundeId,
+        ansprechpartner_id: ansprechpartnerId,
+        kunde_objekt_id: kundeObjektId,
         meta: nextMeta,
       })
       if (!sync.ok) {
@@ -808,7 +938,7 @@ export function RechnungWizard({
           return
         }
         toast.success(
-          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+          `Rechnung gespeichert${res.rechnungsnummer?.trim() ? ` · ${res.rechnungsnummer.trim()}` : ''} · ${formatEurBetrag(rBrutto)} brutto`
         )
         setSheet(null)
         setKundeEditOpen(false)
@@ -949,8 +1079,12 @@ export function RechnungWizard({
     if (!saved) return
     setKunde((prev) => ({ ...(prev ?? {}), ...saved, id: saved.id || prev?.id || kundeId } as typeof kunde))
     if (saved.id) setKundeId(saved.id)
+    const kid = (saved.id || kundeId).trim()
+    if (kid) {
+      void listKundenAnsprechpartner(kid).then(setApRows)
+    }
     const email = saved.email?.trim()
-    if (email && isValidEmail(email)) setMailTo([email])
+    if (email && isValidEmail(email) && !ansprechpartnerId) setMailTo([email])
     setDraftDirty(true)
   }
 
@@ -1053,7 +1187,7 @@ export function RechnungWizard({
       </div>
       <MetaCrowButton
         label="Kunde"
-        value={kundeName}
+        value={kundeCrowValue}
         onClick={() => setSheet('kunde')}
       />
       <MetaCrowButton
@@ -1177,13 +1311,39 @@ export function RechnungWizard({
               <span className="gfc-v">{kundeFirma}</span>
             </div>
           ) : null}
+          <label className="field" style={{ margin: '10px 0 4px' }}>
+            <span className="field-label">Ansprechpartner</span>
+            <select
+              className="sel"
+              value={ansprechpartnerId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value.trim() || null
+                setAnsprechpartnerId(next)
+                const ap = next ? apRows.find((a) => a.id === next) : apRows.find((a) => a.ist_primaer)
+                const mail = (ap?.email?.trim() || kunde?.email || '').trim()
+                if (mail && isValidEmail(mail)) setMailTo([mail])
+                else if (!mail) setMailTo([])
+                setDraftDirty(true)
+              }}
+              disabled={!kundeId}
+            >
+              <option value="">Hauptansprechpartner</option>
+              {apRows.map((ap) => (
+                <option key={ap.id} value={ap.id}>
+                  {ap.name.trim() || 'Ohne Name'}
+                  {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
-            <span className="gfc-v">{kundeNamen.vorname || '—'}</span>
+            <span className="gfc-v">{displayVorname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
-            <span className="gfc-v">{kundeNamen.nachname || '—'}</span>
+            <span className="gfc-v">{displayNachname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Anschrift</span>
@@ -1202,6 +1362,22 @@ export function RechnungWizard({
             <span className="gfc-v">{kundeTelefon || <em>fehlt</em>}</span>
           </div>
         </div>
+        {isHvOderGewerbe && kundeId ? (
+          <div style={{ marginTop: 16 }}>
+            <MelderLeistungsortFields
+              draft={leistungsortDraft}
+              hideMelder
+              onChange={(patch) => {
+                if (patch.kunde_objekt_id !== undefined) {
+                  setKundeObjektId(patch.kunde_objekt_id)
+                  setDraftDirty(true)
+                }
+              }}
+              objekte={hvObjekte}
+              onNeuObjekt={() => setObjektNeuOpen(true)}
+            />
+          </div>
+        ) : null}
       </EditorSheet>
 
       <KundeModal
@@ -1212,6 +1388,24 @@ export function RechnungWizard({
         context="canvas"
         onSaved={onKundeSaved}
       />
+
+      {kundeId && isHvOderGewerbe ? (
+        <KundenObjektModal
+          open={objektNeuOpen}
+          onClose={() => setObjektNeuOpen(false)}
+          kundeId={kundeId}
+          verwaltungName={kundeName}
+          onSaved={(objekt) => {
+            setHvObjekte((prev) => {
+              if (prev.some((o) => o.id === objekt.id)) return prev
+              return [...prev, objekt]
+            })
+            setKundeObjektId(objekt.id)
+            setDraftDirty(true)
+            setObjektNeuOpen(false)
+          }}
+        />
+      ) : null}
 
       <EditorSheet
         open={sheet === 'dokument'}

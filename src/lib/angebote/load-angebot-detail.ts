@@ -5,7 +5,7 @@ import type { AngebotDetail } from '@/lib/types'
 
 const ANGEBOT_DETAIL_SELECT = `
   *,
-  kunden(*),
+  kunden(*, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
   leads(
     id,
     kontakt_name,

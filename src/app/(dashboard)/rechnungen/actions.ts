@@ -75,6 +75,10 @@ export type RechnungEntwurfPayload = {
   wiederkehr_turnus?: string | null
   /** Entwurf: keine Nummer — offizielle RE erst beim Versand (siehe ensureRechnungsnummerFuerVersand). */
   rechnungsnummer?: string | null
+  /** Empfänger-Ansprechpartner (null = Hauptkontakt). */
+  ansprechpartner_id?: string | null
+  /** Ausführungsort / Verwaltungsobjekt. */
+  kunde_objekt_id?: string | null
 }
 
 async function validateVorSpeichern(
@@ -142,6 +146,8 @@ export async function createRechnungEntwurf(input: {
       auftrag_id: input.auftrag_id,
       kunde_id: input.kunde_id,
       rechnungsnummer: null,
+      ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
+      kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: input.leistungszeitraum_von,
@@ -213,6 +219,12 @@ export async function updateRechnungEntwurf(
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
       hinweis_35a: input.hinweis_35a ?? null,
+      ...(input.ansprechpartner_id !== undefined
+        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
+        : {}),
+      ...(input.kunde_objekt_id !== undefined
+        ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+        : {}),
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id
@@ -833,6 +845,7 @@ export async function sendRechnung(
     mail_betreff?: string | null
     rechnung_art?: string | null
     reverse_charge_13b?: boolean | null
+    ansprechpartner_id?: string | null
     kunden: Kunde | Kunde[] | null
     angebote: unknown
     auftraege: unknown
@@ -854,7 +867,8 @@ export async function sendRechnung(
       mail_betreff,
       rechnung_art,
       reverse_charge_13b,
-      kunden(name, email, typ, vorname, nachname),
+      ansprechpartner_id,
+      kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
     `
@@ -981,12 +995,14 @@ export async function sendRechnung(
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
   const toList = options?.to?.map((v) => v.trim()).filter(Boolean) ?? []
-  const email = kunde?.email?.trim()
+  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde, null, {
+    selectedAnsprechpartnerId: rec.ansprechpartner_id ?? null,
+  })
+  const email = empfaenger.email?.trim() || kunde?.email?.trim()
   if (!toList.length && !email) return { ok: false, message: 'Kunden-E-Mail fehlt' }
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
-  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
@@ -1085,7 +1101,7 @@ export async function sendRechnung(
     typ: 'rechnung',
     an: toList.length ? toList : (email as string),
     cc: options?.cc?.map((v) => v.trim()).filter(Boolean),
-    anName: kunde?.name ?? null,
+    anName: empfaenger.ansprechpartner || kunde?.name || null,
     betreff: stornoAnhang
       ? sanitizeRechnungMailBetreff(
           `Storno + Rechnung ${rechnungsnummer} · ${branding.firmenname}`
@@ -1197,9 +1213,13 @@ export async function previewRechnungKundeMail(input: {
   const rechnungId = input.rechnungId?.trim() || ''
   const kundeId = input.kundeId?.trim() || ''
 
-  type KundeSnap = Pick<Kunde, 'name' | 'email' | 'typ' | 'vorname' | 'nachname'>
+  type KundeSnap = Pick<
+    Kunde,
+    'name' | 'email' | 'typ' | 'vorname' | 'nachname' | 'ansprechpartner' | 'kunden_ansprechpartner'
+  >
 
   let kunde: KundeSnap | null = null
+  let selectedAnsprechpartnerId: string | null = null
   let rechnungsnummer =
     input.rechnungsnummer?.trim() || 'Rechnung'
   let brutto = input.brutto ?? 0
@@ -1223,6 +1243,7 @@ export async function previewRechnungKundeMail(input: {
       mail_einleitung?: string | null
       mail_betreff?: string | null
       reverse_charge_13b?: boolean | null
+      ansprechpartner_id?: string | null
       kunden: Kunde | Kunde[] | null
       angebote: unknown
       auftraege: unknown
@@ -1241,7 +1262,8 @@ export async function previewRechnungKundeMail(input: {
       mail_einleitung,
       mail_betreff,
       reverse_charge_13b,
-      kunden(name, email, typ, vorname, nachname),
+      ansprechpartner_id,
+      kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
     `
@@ -1263,6 +1285,7 @@ export async function previewRechnungKundeMail(input: {
 
       const kRaw = rec.kunden as Kunde | Kunde[] | null
       kunde = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as KundeSnap | null
+      selectedAnsprechpartnerId = rec.ansprechpartner_id ?? null
 
       if (input.brutto === undefined) brutto = Number(rec.brutto ?? 0)
       if (input.faelligAm === undefined) faelligRaw = rec.faellig_am as string | null
@@ -1297,7 +1320,9 @@ export async function previewRechnungKundeMail(input: {
     const { data: k } = await withCrmReadFallback<KundeSnap>(async (db) =>
       db
         .from('kunden')
-        .select('name, email, typ, vorname, nachname')
+        .select(
+          'name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)'
+        )
         .eq('id', kundeId)
         .maybeSingle()
     )
@@ -1306,7 +1331,9 @@ export async function previewRechnungKundeMail(input: {
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
-  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
+  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde, null, {
+    selectedAnsprechpartnerId,
+  })
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   const faelligAm =

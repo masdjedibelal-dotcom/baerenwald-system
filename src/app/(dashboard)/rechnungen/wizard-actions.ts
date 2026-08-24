@@ -110,6 +110,10 @@ export type SaveRechnungWizardDraftPayload = {
   wiederkehr_turnus?: string | null
   /** Manuell gesetzte Nummer (RE2026-… oder Suffix); fortlaufend ab dort. */
   rechnungsnummer?: string | null
+  /** Empfänger-Ansprechpartner (leer = Hauptkontakt / Primär). */
+  ansprechpartner_id?: string | null
+  /** Ausführungsort / Verwaltungsobjekt. */
+  kunde_objekt_id?: string | null
 }
 
 function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterialSnapshot {
@@ -167,6 +171,7 @@ async function positionenAusAuftrag(
   positionen: AngebotPosition[]
   angebot_id: string | null
   kunde_id: string
+  kunde_objekt_id: string | null
   auftragsReferenz: string
   projektTitel: string | null
   leistungszeitraum_von: string | null
@@ -194,7 +199,7 @@ async function positionenAusAuftrag(
       zahlungsplan,
       ist_wiederkehrend,
       wiederkehr_turnus,
-      angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan),
+      angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan, kunde_objekt_id),
       auftrag_positionen(*)
     `
     )
@@ -266,8 +271,16 @@ async function positionenAusAuftrag(
   })
 
   const angRawJoin = auf.angebote as
-    | { leistungsumfang?: string | null; notizen?: string | null }
-    | { leistungsumfang?: string | null; notizen?: string | null }[]
+    | {
+        leistungsumfang?: string | null
+        notizen?: string | null
+        kunde_objekt_id?: string | null
+      }
+    | {
+        leistungsumfang?: string | null
+        notizen?: string | null
+        kunde_objekt_id?: string | null
+      }[]
     | null
     | undefined
   const angJoin = Array.isArray(angRawJoin) ? angRawJoin[0] : angRawJoin
@@ -304,6 +317,7 @@ async function positionenAusAuftrag(
     positionen,
     angebot_id: (auf.angebot_id as string | null) ?? null,
     kunde_id: kundeId,
+    kunde_objekt_id: angJoin?.kunde_objekt_id?.trim() || null,
     auftragsReferenz,
     projektTitel,
     leistungszeitraum_von: (auf.start_datum as string | null) ?? null,
@@ -565,13 +579,19 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
 
       let rechnungId: string | null = versand.rechnungId
       let rechnungsnummer: string | null = null
+      let ansprechpartnerId: string | null = null
+      let kundeObjektId: string | null = basis.kunde_objekt_id
       if (rechnungId) {
         const { data: nrRow } = await supabase
           .from('rechnungen')
-          .select('rechnungsnummer')
+          .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id')
           .eq('id', rechnungId)
           .maybeSingle()
         rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
+        ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
+        if (nrRow?.kunde_objekt_id) {
+          kundeObjektId = String(nrRow.kunde_objekt_id)
+        }
       }
 
       return {
@@ -582,6 +602,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           auftragId,
           angebotId: basis.angebot_id,
           kundeId: basis.kunde_id,
+          ansprechpartnerId,
+          kundeObjektId,
           kunde: kunde ?? null,
           positionen,
           meta,
@@ -671,13 +693,19 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     }
 
     let rechnungsnummer: string | null = null
+    let ansprechpartnerId: string | null = null
+    let kundeObjektId: string | null = basis.kunde_objekt_id
     if (draftRechnungId) {
       const { data: nrRow } = await supabase
         .from('rechnungen')
-        .select('rechnungsnummer')
+        .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id')
         .eq('id', draftRechnungId)
         .maybeSingle()
       rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
+      ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
+      if (nrRow?.kunde_objekt_id) {
+        kundeObjektId = String(nrRow.kunde_objekt_id)
+      }
     }
 
     return {
@@ -688,6 +716,8 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         auftragId,
         angebotId: basis.angebot_id,
         kundeId: basis.kunde_id,
+        ansprechpartnerId,
+        kundeObjektId,
         kunde: kunde ?? null,
         positionen,
         meta,
@@ -819,6 +849,11 @@ export async function loadRechnungWizardBootstrap(
       auftragId,
       angebotId: (rec.angebot_id as string | null) ?? basis.angebot_id,
       kundeId: rec.kunde_id as string,
+      ansprechpartnerId: (rec.ansprechpartner_id as string | null) ?? null,
+      kundeObjektId:
+        (rec.kunde_objekt_id as string | null)?.trim() ||
+        basis.kunde_objekt_id ||
+        null,
       kunde: kunde ?? null,
       positionen,
       meta,
@@ -939,6 +974,8 @@ export async function loadRechnungWizardBootstrapStandalone(
       auftragId: null,
       angebotId: (rec.angebot_id as string | null) ?? null,
       kundeId: (rec.kunde_id as string) ?? '',
+      ansprechpartnerId: (rec.ansprechpartner_id as string | null) ?? null,
+      kundeObjektId: (rec.kunde_objekt_id as string | null) ?? null,
       kunde: kunde ?? null,
       positionen,
       meta,
@@ -1125,6 +1162,8 @@ export async function saveRechnungWizardDraft(
         : null),
     zahlungsplan_abschlag_id: input.abschlag?.zeileId ?? abschlagZeileId,
     liste_berechnung,
+    ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
+    kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
   }
 
   if (input.rechnungId) {
@@ -1294,6 +1333,8 @@ function entwurfPayloadAusWizardMeta(
     liste_berechnung,
     ist_wiederkehrend: input.ist_wiederkehrend,
     wiederkehr_turnus: input.wiederkehr_turnus,
+    ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
+    kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
   }
 }
 
@@ -1476,7 +1517,10 @@ export async function createAllAbschlagRechnungenFromWizard(
 
 export async function syncRechnungWizardMetaToEntwurf(
   rechnungId: string,
-  input: Pick<SaveRechnungWizardDraftPayload, 'kunde_id' | 'meta'>
+  input: Pick<
+    SaveRechnungWizardDraftPayload,
+    'kunde_id' | 'meta' | 'ansprechpartner_id' | 'kunde_objekt_id'
+  >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
@@ -1490,6 +1534,12 @@ export async function syncRechnungWizardMetaToEntwurf(
     .from('rechnungen')
     .update({
       kunde_id: input.kunde_id,
+      ...(input.ansprechpartner_id !== undefined
+        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
+        : {}),
+      ...(input.kunde_objekt_id !== undefined
+        ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+        : {}),
       leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
       leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
       faellig_am: faelligNeu,
@@ -1529,56 +1579,45 @@ export async function sendRechnungWizard(input: {
   return { ok: true }
 }
 
-/** PDF erzeugen und speichern — ohne E-Mail (Versand gesammelt in Abschlussdokumentation).
- * Voll-/Schlussrechnung: Status „gesendet“ + Auftrag abgeschlossen. */
+/** PDF erzeugen und speichern — Status bleibt Entwurf (kein „gesendet“, kein Auftragsabschluss).
+ * Offizielle Nummer und Status „gesendet“ nur über sendRechnung / Senden im Wizard. */
 export async function finalizeRechnungWizardWithoutMail(
   rechnungId: string
 ): Promise<{ ok: true; rechnungsnummer: string } | { ok: false; message: string }> {
-  const pdf = await persistPdfForRechnung(rechnungId)
-  if (!pdf.ok) return pdf
-
   const { data: rec } = await supabaseAdmin
     .from('rechnungen')
-    .select('rechnungsnummer, auftrag_id, rechnung_art, beleg_typ, status')
+    .select('rechnungsnummer, auftrag_id, status')
     .eq('id', rechnungId)
     .maybeSingle()
 
-  const art = String(rec?.rechnung_art ?? 'voll').trim().toLowerCase()
-  const isEndabrechnung = art === 'voll' || art === 'schluss'
-  const st = String(rec?.status ?? '').trim().toLowerCase()
+  if (!rec) return { ok: false, message: 'Rechnung nicht gefunden' }
 
-  if (isEndabrechnung && st === 'entwurf') {
-    const now = new Date().toISOString()
-    await supabaseAdmin
-      .from('rechnungen')
-      .update({
-        status: 'gesendet',
-        gesendet_at: now,
-        updated_at: now,
-      })
-      .eq('id', rechnungId)
-  }
-
-  if (isEndabrechnung && rec?.auftrag_id) {
-    const { completeAuftragNachEndabrechnung } = await import(
-      '@/app/(dashboard)/auftraege/actions'
-    )
-    await completeAuftragNachEndabrechnung({
-      auftragId: rec.auftrag_id as string,
-      rechnungArt: art,
+  const st = String(rec.status ?? '')
+    .trim()
+    .toLowerCase()
+  /** Entwürfe: kein PDF/Nummer — sonst Lücken in der Nummernfolge. */
+  if (st === 'entwurf') {
+    if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
+    revalidatePath('/rechnungen')
+    revalidatePath(`/rechnungen/${rechnungId}`)
+    revalidatePath('/vorgaenge')
+    return {
+      ok: true,
       rechnungsnummer: String(rec.rechnungsnummer ?? ''),
-      belegTyp: rec.beleg_typ as string | null,
-    })
+    }
   }
 
-  if (rec?.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
+  const pdf = await persistPdfForRechnung(rechnungId)
+  if (!pdf.ok) return pdf
+
+  if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath('/vorgaenge')
 
   return {
     ok: true,
-    rechnungsnummer: String(rec?.rechnungsnummer ?? ''),
+    rechnungsnummer: String(rec.rechnungsnummer ?? ''),
   }
 }
 
