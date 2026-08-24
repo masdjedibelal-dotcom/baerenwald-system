@@ -5,9 +5,10 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
@@ -15,7 +16,11 @@ import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeister
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
-import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
+import {
+  deleteKundenObjekt,
+  updateKundenObjektFreigabe,
+} from '@/app/actions/kunden-objekte'
+import { toast } from '@/components/ui/app-toast'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
 import type { Kunde, KundenObjekt } from '@/lib/types'
@@ -50,13 +55,19 @@ export function ObjektAkteDetailClient({
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
+  const [editOpen, setEditOpen] = useState(false)
+  const [objektState, setObjektState] = useState(objekt)
 
   useEffect(() => {
     setFreigabeErben(objektErbtFreigabe(objekt))
   }, [objekt.id, objekt.freigabe_schwelle_eur, objekt.notfall_direkt])
 
+  useEffect(() => {
+    setObjektState(objekt)
+  }, [objekt])
+
   const orgSlug = kunde.org_kennung?.trim().toLowerCase() || null
-  const objektMeldeSlug = objekt.melde_slug?.trim() || null
+  const objektMeldeSlug = objektState.melde_slug?.trim() || null
   const zeigtMeldeLinks = Boolean(orgSlug && objektMeldeSlug)
   const zeigtFreigabe = Boolean(orgSlug)
 
@@ -66,12 +77,35 @@ export function ObjektAkteDetailClient({
       kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
   }
 
-  const adresse = [kundenObjektStrasseZeile(objekt), [objekt.plz, objekt.ort].filter(Boolean).join(' ')]
+  const adresse = [
+    kundenObjektStrasseZeile(objektState),
+    [objektState.plz, objektState.ort].filter(Boolean).join(' '),
+  ]
     .filter(Boolean)
     .join(', ')
 
   function refresh() {
     router.refresh()
+  }
+
+  function loeschen() {
+    if (
+      !confirm(
+        `Objekt „${objektState.titel}“ wirklich löschen? Zugehörige Einheiten/Kontakte gehen mit verloren.`
+      )
+    ) {
+      return
+    }
+    void (async () => {
+      const r = await deleteKundenObjekt(objektState.id, kunde.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      toast.success('Objekt gelöscht')
+      router.push(`/kunden/${kunde.id}`)
+      router.refresh()
+    })()
   }
 
   const einheiten = useMemo(
@@ -105,10 +139,18 @@ export function ObjektAkteDetailClient({
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Objektdaten</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <MockBtn sm kind="ghost" icon="pencil" onClick={() => setEditOpen(true)}>
+              Bearbeiten
+            </MockBtn>
+            <MockBtn sm kind="ghost" onClick={loeschen}>
+              Löschen
+            </MockBtn>
+          </div>
         </div>
         <div className="card-b">
           <div className="vgid">
-            <div className="vgid-name">{objekt.titel}</div>
+            <div className="vgid-name">{objektState.titel}</div>
             {adresse ? <div className="vgid-meta">{adresse}</div> : null}
             <div className="vgid-chips" style={{ marginTop: 10 }}>
               <span className="vgid-chip ghost">
@@ -140,7 +182,7 @@ export function ObjektAkteDetailClient({
         <MeldeLinksCard
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
-          aushangPdfHref={`/api/objekte/${objekt.id}/aushang-pdf`}
+          aushangPdfHref={`/api/objekte/${objektState.id}/aushang-pdf`}
         />
       ) : null}
 
@@ -151,12 +193,12 @@ export function ObjektAkteDetailClient({
               ? { notfall_direkt: null, freigabe_schwelle_eur: null }
               : {
                   notfall_direkt:
-                    objekt.notfall_direkt != null
-                      ? Boolean(objekt.notfall_direkt)
+                    objektState.notfall_direkt != null
+                      ? Boolean(objektState.notfall_direkt)
                       : kundeFreigabeDefaults.notfall_direkt,
                   freigabe_schwelle_eur:
-                    objekt.freigabe_schwelle_eur != null
-                      ? Number(objekt.freigabe_schwelle_eur)
+                    objektState.freigabe_schwelle_eur != null
+                      ? Number(objektState.freigabe_schwelle_eur)
                       : null,
                 }
           }
@@ -164,7 +206,7 @@ export function ObjektAkteDetailClient({
           erben={freigabeErben}
           onErbenChange={setFreigabeErben}
           onSave={async (next) =>
-            updateKundenObjektFreigabe(objekt.id, kunde.id, {
+            updateKundenObjektFreigabe(objektState.id, kunde.id, {
               notfall_direkt: next.notfall_direkt,
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
             })
@@ -175,7 +217,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektHausmeisterCard
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         liste={akte.orgHausmeisterListe}
         amObjekt={akte.hausmeisterAmObjekt}
         onChanged={refresh}
@@ -183,7 +225,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektKontakteSection
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         kontakte={akte.kontakte.filter((k) => k.rolle !== 'hausmeister')}
         onChanged={refresh}
       />
@@ -205,7 +247,7 @@ export function ObjektAkteDetailClient({
       render: () => (
         <ObjektEinheitenSection
           kundeId={kunde.id}
-          objektId={objekt.id}
+          objektId={objektState.id}
           einheiten={akte.einheiten}
           bewohner={akte.bewohner}
           onChanged={refresh}
@@ -237,25 +279,40 @@ export function ObjektAkteDetailClient({
   ]
 
   return (
-    <EntityDetailLayout
-      crumbBackHref={`/kunden/${kunde.id}`}
-      crumbBackLabel="Zurück zu Details"
-      head={{
-        title: objekt.titel,
-        titleBadges:
-          einheitenAnzahl > 0 ? (
-            <MockBadge kind="aktiv">
-              {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
-            </MockBadge>
-          ) : null,
-        badges: adresse ? <span>{adresse}</span> : null,
-      }}
-    >
-      <DetailShell
-        groups={detailShellGroups}
-        value={tab}
-        onChange={(id) => setTab(id as ObjektAkteTab)}
+    <>
+      <EntityDetailLayout
+        crumbBackHref={`/kunden/${kunde.id}`}
+        crumbBackLabel="Zurück zu Details"
+        head={{
+          title: objektState.titel,
+          titleBadges:
+            einheitenAnzahl > 0 ? (
+              <MockBadge kind="aktiv">
+                {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
+              </MockBadge>
+            ) : null,
+          badges: adresse ? <span>{adresse}</span> : null,
+        }}
+      >
+        <DetailShell
+          groups={detailShellGroups}
+          value={tab}
+          onChange={(id) => setTab(id as ObjektAkteTab)}
+        />
+      </EntityDetailLayout>
+
+      <KundenObjektModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        kundeId={kunde.id}
+        verwaltungName={kunde.name}
+        editObjekt={objektState}
+        onSaved={(next) => {
+          setObjektState(next)
+          setEditOpen(false)
+          refresh()
+        }}
       />
-    </EntityDetailLayout>
+    </>
   )
 }

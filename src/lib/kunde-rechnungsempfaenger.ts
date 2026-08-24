@@ -275,13 +275,16 @@ export function formatKundeEmpfaengerFuerDokument(
 
 /** Rechnungsname der WEG/des Objekts (Titel, sonst „WEG …“ aus Anschrift). */
 export function resolveWegRechnungsname(objekt: KundenObjekt): string {
-  const titel = objekt.titel?.trim()
-  if (titel) return titel
+  const titel = objekt.titel?.trim() || ''
   const str = kundenObjektStrasseZeile(objekt)
-  if (str) return `WEG ${str}`
   const po = [objekt.plz?.trim(), objekt.ort?.trim()].filter(Boolean).join(' ')
+  /** Nur „WEG“ / leer → Anschrift ergänzen, sonst steht nichts Aussagekräftiges. */
+  const titelIstNurWeg = !titel || /^weg\.?$/i.test(titel)
+
+  if (!titelIstNurWeg) return titel
+  if (str) return `WEG ${str}`
   if (po) return `WEG ${po}`
-  return 'WEG'
+  return titel || 'WEG'
 }
 
 /**
