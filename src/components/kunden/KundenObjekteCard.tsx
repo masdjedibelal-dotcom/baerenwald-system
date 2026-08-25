@@ -256,7 +256,7 @@ export function KundenObjekteCard({
           </MockBtn>
         ) : null}
         <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Objekt
+          Hinzufügen
         </MockBtn>
       </div>
 
@@ -335,7 +335,7 @@ export function KundenObjekteCard({
           hint="Objekt anlegen für Gebäude, WEGs und Melde-Links"
           action={
             <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Objekt anlegen
+              Hinzufügen
             </MockBtn>
           }
         />

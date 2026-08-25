@@ -157,8 +157,18 @@ function materialSnapshotFromWizardPayload(
 
 function korrekturKontextFromRec(
   rec: Record<string, unknown>,
-  snapshot?: RechnungMaterialSnapshot
+  snapshot?: RechnungMaterialSnapshot,
+  opts?: { originalNr?: string | null }
 ): NonNullable<RechnungWizardBootstrap['korrekturKontext']> | null {
+  const korVon = String(rec.korrektur_von ?? '').trim()
+  if (korVon) {
+    return {
+      originalStatus: 'gesendet',
+      originalNr: String(opts?.originalNr ?? '').trim() || 'Rechnung',
+      materialFingerprint: '',
+      istErsatzEntwurf: true,
+    }
+  }
   const status = String(rec.status ?? '').toLowerCase()
   if (status !== 'gesendet' && status !== 'bezahlt' && status !== 'versendet') return null
   return {
@@ -167,7 +177,22 @@ function korrekturKontextFromRec(
     materialFingerprint: rechnungMaterialFingerprint(
       snapshot ?? materialSnapshotFromRec(rec)
     ),
+    istErsatzEntwurf: false,
   }
+}
+
+async function loadKorrekturOriginalNr(
+  supabase: ReturnType<typeof createClient>,
+  korrekturVonId: string | null | undefined
+): Promise<string | null> {
+  const id = String(korrekturVonId ?? '').trim()
+  if (!id) return null
+  const { data } = await supabase
+    .from('rechnungen')
+    .select('rechnungsnummer')
+    .eq('id', id)
+    .maybeSingle()
+  return String(data?.rechnungsnummer ?? '').trim() || null
 }
 
 async function positionenAusAuftrag(
@@ -891,7 +916,13 @@ export async function loadRechnungWizardBootstrap(
         materialSnapshotFromWizardPayload(positionen, meta, {
           ansprechpartner_id: (rec.ansprechpartner_id as string | null) ?? null,
           kunde_objekt_id: (rec.kunde_objekt_id as string | null) ?? null,
-        })
+        }),
+        {
+          originalNr: await loadKorrekturOriginalNr(
+            supabase,
+            rec.korrektur_von as string | null
+          ),
+        }
       ),
     },
   }
@@ -1000,7 +1031,13 @@ export async function loadRechnungWizardBootstrapStandalone(
         materialSnapshotFromWizardPayload(positionen, meta, {
           ansprechpartner_id: (rec.ansprechpartner_id as string | null) ?? null,
           kunde_objekt_id: (rec.kunde_objekt_id as string | null) ?? null,
-        })
+        }),
+        {
+          originalNr: await loadKorrekturOriginalNr(
+            supabase,
+            rec.korrektur_von as string | null
+          ),
+        }
       ),
     },
   }

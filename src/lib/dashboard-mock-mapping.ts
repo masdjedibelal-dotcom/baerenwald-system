@@ -73,7 +73,7 @@ export function rechnungDashboardBadge(input: {
   return { kind: 'plain', label: input.status || '—' }
 }
 
-/** KPI: Offene Anfragen = Phase Anfrage, lifecycle offen (noch bearbeiten). */
+/** KPI: Offene Anfragen = Status neu/kontaktiert/termin, ohne Soft-Delete, ohne verknüpftes Angebot. */
 export function isOffeneAnfrageStatus(status: string | null | undefined): boolean {
   const s = String(status ?? '').toLowerCase()
   return s === 'neu' || s === 'kontaktiert' || s === 'termin'

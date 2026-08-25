@@ -14,7 +14,11 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { buildRechnungMail, sanitizeRechnungMailBetreff } from '@/lib/mail/rechnung-mail'
+import {
+  buildRechnungMail,
+  rechnungKorrekturMailBetreff,
+  sanitizeRechnungMailBetreff,
+} from '@/lib/mail/rechnung-mail'
 import { buildZahlungserinnerungMail } from '@/lib/mail-templates'
 import {
   zahlungserinnerungZahlbarBis,
@@ -873,6 +877,7 @@ export async function sendRechnung(
     rechnung_art?: string | null
     reverse_charge_13b?: boolean | null
     ansprechpartner_id?: string | null
+    korrektur_von?: string | null
     kunden: Kunde | Kunde[] | null
     angebote: unknown
     auftraege: unknown
@@ -895,6 +900,7 @@ export async function sendRechnung(
       rechnung_art,
       reverse_charge_13b,
       ansprechpartner_id,
+      korrektur_von,
       kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
@@ -936,7 +942,7 @@ export async function sendRechnung(
     async function loadGutschriftAnhang(origId: string): Promise<StornoAnhang | null> {
       const { data: gs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, status, bezug_rechnung_id')
+        .select('id, rechnungsnummer, status, bezug_rechnung_id, brutto, reverse_charge_13b')
         .eq('bezug_rechnung_id', origId)
         .eq('beleg_typ', 'gutschrift')
         .in('status', ['entwurf', 'gesendet'])
@@ -944,6 +950,44 @@ export async function sendRechnung(
         .limit(1)
         .maybeSingle()
       if (!gs?.id) return null
+
+      // Legacy-Bug: Festpreis nur in vk_netto → Gutschrift mit Brutto 0 — Beträge nachziehen
+      if (Math.abs(Number(gs.brutto ?? 0)) < 0.01) {
+        const { data: origPos } = await supabase
+          .from('rechnungen')
+          .select('positionen, reverse_charge_13b')
+          .eq('id', origId)
+          .maybeSingle()
+        if (origPos?.positionen) {
+          const positionenNeg = positionenFuerGutschrift(
+            (origPos.positionen as AngebotPosition[]) ?? []
+          )
+          const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(
+            supabase,
+            {
+              positionen: positionenNeg,
+              reverse_charge_13b: Boolean(
+                origPos.reverse_charge_13b ?? gs.reverse_charge_13b
+              ),
+            }
+          )
+          await rechnungUpdateMitSchemaFallback(
+            supabase,
+            String(gs.id),
+            {
+              positionen,
+              updated_at: new Date().toISOString(),
+            },
+            berechnung,
+            {
+              reverse_charge_13b: Boolean(
+                origPos.reverse_charge_13b ?? gs.reverse_charge_13b
+              ),
+            }
+          )
+        }
+      }
+
       const gsPdf = await persistPdfForRechnung(String(gs.id))
       if (!gsPdf.ok) return null
       const { data: gsAfter } = await supabase
@@ -986,6 +1030,20 @@ export async function sendRechnung(
           stornoAnhang = found
           break
         }
+      }
+    }
+
+    // Korrektur-Kette: neue RE zeigt auf Original
+    if (!stornoAnhang) {
+      const { data: neuKor } = await supabase
+        .from('rechnungen')
+        .select('korrektur_von')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      const korVon = String(neuKor?.korrektur_von ?? '').trim()
+      if (korVon) {
+        const found = await loadGutschriftAnhang(korVon)
+        if (found) stornoAnhang = found
       }
     }
 
@@ -1096,6 +1154,19 @@ export async function sendRechnung(
     ? mailEinleitungBase
     : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
 
+  const korrekturVonId = String(rec.korrektur_von ?? '').trim()
+  let korrekturOriginalNr =
+    stornoAnhang?.bezugRechnungsnummer?.trim() || null
+  if (!korrekturOriginalNr && korrekturVonId) {
+    const { data: origNrRow } = await supabase
+      .from('rechnungen')
+      .select('rechnungsnummer')
+      .eq('id', korrekturVonId)
+      .maybeSingle()
+    korrekturOriginalNr = String(origNrRow?.rechnungsnummer ?? '').trim() || null
+  }
+  const istKorrekturVersand = Boolean(stornoAnhang) || Boolean(korrekturVonId)
+
   const tpl = buildRechnungMail(
     {
       anrede,
@@ -1105,11 +1176,15 @@ export async function sendRechnung(
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       projektTitel: projektTitel || null,
       mailEinleitung,
-      mailBetreff: (rec.mail_betreff as string | null)?.trim() || null,
+      // Korrektur: Standard-Betreff erzwingen (Wizard-Kopie der alten RE-Nr. nicht übernehmen)
+      mailBetreff: istKorrekturVersand
+        ? null
+        : (rec.mail_betreff as string | null)?.trim() || null,
       reverseCharge: Boolean(rec.reverse_charge_13b),
+      istKorrektur: istKorrekturVersand,
       mitStornoAnhang: Boolean(stornoAnhang),
       stornoGutschriftNummer: stornoAnhang?.nr ?? null,
-      stornoBezugRechnungsnummer: stornoAnhang?.bezugRechnungsnummer ?? null,
+      stornoBezugRechnungsnummer: korrekturOriginalNr,
       mitAbschlussberichtAnhang: Boolean(abschlussAnhang),
     },
     branding
@@ -1129,9 +1204,9 @@ export async function sendRechnung(
     an: toList.length ? toList : (email as string),
     cc: options?.cc?.map((v) => v.trim()).filter(Boolean),
     anName: empfaenger.ansprechpartner || kunde?.name || null,
-    betreff: stornoAnhang
+    betreff: istKorrekturVersand
       ? sanitizeRechnungMailBetreff(
-          `Storno + Rechnung ${rechnungsnummer} · ${branding.firmenname}`
+          rechnungKorrekturMailBetreff(rechnungsnummer, branding.firmenname)
         )
       : tpl.betreff,
     html: tpl.html,
@@ -1168,8 +1243,8 @@ export async function sendRechnung(
     await insertAuftragTimelineEvent({
       auftrag_id: auftragId,
       typ: 'rechnung_gesendet',
-      titel: stornoAnhang
-        ? `Storno + Rechnung ${rechnungsnummer} versendet`
+      titel: istKorrekturVersand
+        ? `Korrektur ${rechnungsnummer} versendet`
         : abschlussAnhang
           ? `Rechnung ${rechnungsnummer} + Abschlussbericht versendet`
           : `Rechnung ${rechnungsnummer} versendet`,
@@ -1236,6 +1311,8 @@ export async function previewRechnungKundeMail(input: {
   faelligAm?: string | null
   projektTitel?: string | null
   rechnungsnummer?: string | null
+  istKorrektur?: boolean
+  korrekturOriginalNr?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const rechnungId = input.rechnungId?.trim() || ''
   const kundeId = input.kundeId?.trim() || ''
@@ -1259,6 +1336,8 @@ export async function previewRechnungKundeMail(input: {
   let mailBetreff: string | null =
     input.betreff !== undefined ? input.betreff?.trim() || null : null
   let reverseCharge = false
+  let istKorrektur = Boolean(input.istKorrektur)
+  let korrekturOriginalNr = input.korrekturOriginalNr?.trim() || null
 
   if (rechnungId) {
     type RechnungPreviewRow = {
@@ -1271,6 +1350,7 @@ export async function previewRechnungKundeMail(input: {
       mail_betreff?: string | null
       reverse_charge_13b?: boolean | null
       ansprechpartner_id?: string | null
+      korrektur_von?: string | null
       kunden: Kunde | Kunde[] | null
       angebote: unknown
       auftraege: unknown
@@ -1290,6 +1370,7 @@ export async function previewRechnungKundeMail(input: {
       mail_betreff,
       reverse_charge_13b,
       ansprechpartner_id,
+      korrektur_von,
       kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
@@ -1323,6 +1404,19 @@ export async function previewRechnungKundeMail(input: {
         mailBetreff = (rec.mail_betreff as string | null)?.trim() || null
       }
       reverseCharge = Boolean(rec.reverse_charge_13b)
+
+      const korVon = String(rec.korrektur_von ?? '').trim()
+      if (korVon) {
+        istKorrektur = true
+        if (!korrekturOriginalNr) {
+          const { data: origNrRow } = await supabaseAdmin
+            .from('rechnungen')
+            .select('rechnungsnummer')
+            .eq('id', korVon)
+            .maybeSingle()
+          korrekturOriginalNr = String(origNrRow?.rechnungsnummer ?? '').trim() || null
+        }
+      }
 
       if (input.projektTitel === undefined) {
         const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
@@ -1377,8 +1471,10 @@ export async function previewRechnungKundeMail(input: {
       faelligAm,
       projektTitel,
       mailEinleitung: mailEinleitung?.trim() || null,
-      mailBetreff,
+      mailBetreff: istKorrektur ? null : mailBetreff,
       reverseCharge,
+      istKorrektur,
+      stornoBezugRechnungsnummer: korrekturOriginalNr,
     },
     branding
   )

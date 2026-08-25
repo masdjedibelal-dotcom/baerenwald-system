@@ -370,13 +370,14 @@ export function RechnungDetailClient({
   }
 
   function handleSenden() {
-    void actionBusy.run('Wird gesendet…', async () => {
+    const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
+    void actionBusy.run(istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…', async () => {
       const r = await sendRechnung(detail.id)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Rechnung gesendet')
+      toast.success(istKorrektur ? 'Korrektur gesendet' : 'Rechnung gesendet')
       setDetail((d) => ({ ...d, status: 'gesendet' }))
       refresh()
     })
@@ -422,6 +423,7 @@ export function RechnungDetailClient({
     const cta = primaryCta('rechnung', detail.status, {
       ueberfaellig,
       eingehend: isEingehend,
+      korrektur: Boolean(String(detail.korrektur_von ?? '').trim()),
     })
     if (cta?.id === 'rechnung_versenden') {
       if (isEingehend) return null
@@ -474,6 +476,7 @@ export function RechnungDetailClient({
     detail.status,
     detail.id,
     detail.auftrag_id,
+    detail.korrektur_von,
     ueberfaellig,
     pending,
     handleSenden,

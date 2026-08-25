@@ -89,12 +89,14 @@ export type RechnungWizardBootstrap = {
   wiederkehr_turnus?: string | null
   /**
    * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
-   * nur Mail → ohne Storno.
+   * nur Mail → ohne Storno. Auch Ersatz-Entwurf mit korrektur_von.
    */
   korrekturKontext?: {
     originalStatus: string
     originalNr: string
     materialFingerprint: string
+    /** true = bereits Ersatz-Entwurf (korrektur_von gesetzt) */
+    istErsatzEntwurf?: boolean
   } | null
 }
 

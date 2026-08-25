@@ -67,7 +67,10 @@ import {
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
-import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
+import {
+  defaultRechnungKorrekturMailEinleitung,
+  defaultRechnungMailEinleitung,
+} from '@/lib/mail/rechnung-mail'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
@@ -548,7 +551,16 @@ export function RechnungWizard({
   /** Rechnung versendet immer nur die Rechnung — kein Abschluss-/Dokumentpaket-Frage. */
   const previewNr = rechnungsnummer.trim() || 'Rechnung'
   const activeVersandId = versandRechnungId ?? rechnungId
-  const defaultBetreff = `${previewNr} · ${rTitel}`
+  const istKorrekturVersand = Boolean(korrekturKontext)
+  const defaultBetreff = istKorrekturVersand
+    ? `Korrektur · ${previewNr} · ${rTitel}`
+    : `${previewNr} · ${rTitel}`
+  const defaultMailEinleitung = istKorrekturVersand
+    ? defaultRechnungKorrekturMailEinleitung('sie', {
+        originalNr: korrekturKontext?.originalNr,
+        neueNr: previewNr !== 'Rechnung' ? previewNr : null,
+      })
+    : defaultRechnungMailEinleitung('sie')
 
   function scrollToSection(sec: number) {
     requestAnimationFrame(() => {
@@ -589,11 +601,7 @@ export function RechnungWizard({
       }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
-        setEinleitung(
-          defaultRechnungMailEinleitung(
-            'sie'
-          )
-        )
+        setEinleitung(defaultMailEinleitung)
       }
     }
     goToSection(next)
@@ -767,12 +775,19 @@ export function RechnungWizard({
           if (!silent) toast.error(res.message)
           return null
         }
-        const switched = Boolean(korrekturKontext && res.rechnungId !== rechnungId)
+        const switched = Boolean(
+          korrekturKontext && !korrekturKontext.istErsatzEntwurf && res.rechnungId !== rechnungId
+        )
         setRechnungId(res.rechnungId)
         setVersandRechnungId(res.rechnungId)
         if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
         if (switched) {
-          setKorrekturKontext(null)
+          setKorrekturKontext({
+            originalStatus: korrekturKontext!.originalStatus,
+            originalNr: korrekturKontext!.originalNr,
+            materialFingerprint: '',
+            istErsatzEntwurf: true,
+          })
           toast.success('Storno angelegt — Korrektur gespeichert (noch nicht versendet)')
         } else if (opts?.notify) {
           toast.autoSaved({ label: 'Entwurf' })
@@ -990,7 +1005,9 @@ export function RechnungWizard({
         return
       }
       toast.success(
-        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+        istKorrekturVersand
+          ? `Korrektur ${nrLabel()} versendet · ${formatEurBetrag(rBrutto)} brutto`
+          : `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
       )
       setSheet(null)
       setKundeEditOpen(false)
@@ -1294,7 +1311,13 @@ export function RechnungWizard({
             },
           },
           {
-            label: saving ? 'Senden…' : 'Senden',
+            label: saving
+              ? istKorrekturVersand
+                ? 'Korrektur wird gesendet…'
+                : 'Senden…'
+              : istKorrekturVersand
+                ? 'Korrektur versenden'
+                : 'Senden',
             icon: <MockIcon ctx="btn" n="send" size={16} />,
             onClick: () => {
               if (saving) return
@@ -1857,7 +1880,7 @@ export function RechnungWizard({
       <EditorSheet
         open={sheet === 'versand'}
         onClose={closeSheet}
-        title="Versand"
+        title={istKorrekturVersand ? 'Korrektur versenden' : 'Versand'}
         context="canvas"
       >
         <div className="form-grid form-grid--sheet">
@@ -1899,12 +1922,14 @@ export function RechnungWizard({
               rechnungId={activeVersandId}
               kundeId={kundeId}
               betreff={mailBetreff || defaultBetreff}
-              einleitung={einleitung}
+              einleitung={einleitung.trim() || defaultMailEinleitung}
               rechnungsnummer={previewNr}
               brutto={displayBrutto}
               faelligAm={rFaellig}
               projektTitel={rechnungTitel || rTitel}
               empfaengerHint={mailTo[0] || kundeEmail || kundeName}
+              istKorrektur={istKorrekturVersand}
+              korrekturOriginalNr={korrekturKontext?.originalNr ?? null}
             />
           </div>
         </div>

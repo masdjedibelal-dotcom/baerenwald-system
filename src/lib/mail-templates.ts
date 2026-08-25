@@ -934,7 +934,7 @@ export function mailAbnahme(
   }
 }
 
-export { buildRechnungMail, rechnungMailBetreff, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
+export { buildRechnungMail, rechnungMailBetreff, rechnungKorrekturMailBetreff, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
 
 export function mailRechnung(data: RechnungMailInput, b: MailBranding) {
   return buildRechnungMail(data, b)

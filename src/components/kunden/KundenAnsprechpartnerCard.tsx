@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -287,25 +288,28 @@ export function KundenAnsprechpartnerCard({
   }
 
   return (
-    <div className={cn('ap-card', className)}>
-      <div className="ap-card__head">
-        <span className="ap-card__title">Ansprechpartner</span>
-        <div style={{ flex: 1 }} />
-        {rows.length > 0 ? (
-          <MockBtn
-            sm
-            kind="ghost"
-            onClick={toggleAll}
-            title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            {allSelected ? 'Keine' : 'Alle'}
-          </MockBtn>
-        ) : null}
-        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Ansprechpartner
-        </MockBtn>
-      </div>
-
+    <MockCard
+      title="Ansprechpartner"
+      icon="users"
+      className={cn(className)}
+      actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {rows.length > 0 ? (
+            <MockBtn
+              sm
+              kind="ghost"
+              onClick={toggleAll}
+              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              {allSelected ? 'Keine' : 'Alle'}
+            </MockBtn>
+          ) : null}
+            <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+              Hinzufügen
+            </MockBtn>
+        </div>
+      }
+    >
       {selectedCount > 0 ? (
         <div className="bulkbar">
           <span className="bulkbar-count">
@@ -383,7 +387,7 @@ export function KundenAnsprechpartnerCard({
           hint="Weitere E-Mails und Kontakte ohne neuen Kunden-Account"
           action={
             <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Ansprechpartner anlegen
+              Hinzufügen
             </MockBtn>
           }
         />
@@ -455,6 +459,6 @@ export function KundenAnsprechpartnerCard({
           </label>
         </div>
       </EditorSheet>
-    </div>
+    </MockCard>
   )
 }

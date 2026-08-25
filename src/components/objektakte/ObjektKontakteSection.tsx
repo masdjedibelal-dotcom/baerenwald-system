@@ -23,13 +23,12 @@ import {
 import type { ObjektKontakt, ObjektKontaktInput, ObjektKontaktRolle } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.filter((r) => r !== 'hausmeister').map((r) => ({
   value: r,
   label: OBJEKT_KONTAKT_ROLLE_LABELS[r],
 }))
-
-const COLS = '36px minmax(0, 1.3fr) 120px minmax(0, 1.2fr)'
 
 export function ObjektKontakteSection({
   kundeId,
@@ -42,6 +41,7 @@ export function ObjektKontakteSection({
   kontakte: ObjektKontakt[]
   onChanged: () => void
 }) {
+  const isMobile = useIsMobile()
   const [liste, setListe] = useState(initial)
   const [modalOpen, setModalOpen] = useState(false)
   const [edit, setEdit] = useState<ObjektKontakt | null>(null)
@@ -202,7 +202,7 @@ export function ObjektKontakteSection({
         )
       } else {
         toast.success(
-          selectedRows.length === 1 ? 'Kontakt entfernt' : `${selectedRows.length} Kontakte entfernt`
+          selectedRows.length === 1 ? 'Kontakt gelöscht' : `${selectedRows.length} Kontakte gelöscht`
         )
       }
       onChanged()
@@ -211,13 +211,81 @@ export function ObjektKontakteSection({
     }
   }
 
+  function rowBody(k: ObjektKontakt) {
+    const kontaktZeile =
+      [k.telefon?.trim(), k.email?.trim()].filter(Boolean).join(' · ') || '—'
+    const isChecked = Boolean(selected[k.id])
+    const rolleLabel = OBJEKT_KONTAKT_ROLLE_LABELS[k.rolle]
+    return (
+      <div
+        key={k.id}
+        className={cn(
+          isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
+          isChecked && 'is-checked'
+        )}
+      >
+        <div
+          className="vg-check"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleSel(k.id)
+          }}
+          role="checkbox"
+          aria-checked={isChecked}
+          aria-label={`${k.name} auswählen`}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              toggleSel(k.id)
+            }
+          }}
+        >
+          <span className={cn('vg-box', isChecked && 'on')}>
+            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={() => openBearbeiten(k)}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{k.name}</span>
+              </div>
+              <div className="ap-mobile-card__meta">{rolleLabel}</div>
+              <div className="ap-mobile-card__meta">{kontaktZeile}</div>
+              {k.notiz ? <div className="ap-mobile-card__meta">{k.notiz}</div> : null}
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">
+                {k.name}
+                {k.notiz ? (
+                  <span className="ap-list__dim" style={{ display: 'block', marginTop: 2 }}>
+                    {k.notiz}
+                  </span>
+                ) : null}
+              </span>
+              <span className="ap-list__dim">{rolleLabel}</span>
+              <span className="ap-list__dim">{kontaktZeile}</span>
+            </>
+          )}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <MockCard
         title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
         icon="user"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {liste.length > 0 ? (
               <MockBtn
                 sm
@@ -274,102 +342,23 @@ export function ObjektKontakteSection({
             icon="user"
             title="Noch keine Kontakte"
             hint="Kontakt hinzufügen — Hausmeister bitte in der Karte darüber anlegen."
+            action={
+              <MockBtn kind="primary" icon="plus" onClick={openNeu}>
+                Hinzufügen
+              </MockBtn>
+            }
           />
+        ) : isMobile ? (
+          <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>
         ) : (
-          <div className="listcard vg-selectmode">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div />
-              <div>Name</div>
-              <div>Rolle</div>
-              <div>Kontakt</div>
+          <div className="ap-list vg-selectmode">
+            <div className="ap-list__head ap-list__head--select">
+              <span aria-hidden />
+              <span>Name</span>
+              <span>Rolle</span>
+              <span>Kontakt</span>
             </div>
-            {liste.map((k) => {
-              const kontaktZeile =
-                [k.telefon?.trim(), k.email?.trim()].filter(Boolean).join(' · ') || '—'
-              const isChecked = Boolean(selected[k.id])
-              return (
-                <div
-                  key={k.id}
-                  className={cn('list-row', isChecked && 'sel')}
-                  style={{ gridTemplateColumns: COLS, cursor: 'default' }}
-                >
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(k.id)
-                    }}
-                    role="checkbox"
-                    aria-checked={isChecked}
-                    aria-label={`${k.name} auswählen`}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        toggleSel(k.id)
-                      }
-                    }}
-                  >
-                    <span className={cn('vg-box', isChecked && 'on')}>
-                      {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="lc-title"
-                    style={{
-                      fontWeight: 600,
-                      margin: 0,
-                      padding: 0,
-                      border: 0,
-                      background: 'transparent',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      color: 'inherit',
-                      font: 'inherit',
-                    }}
-                    onClick={() => openBearbeiten(k)}
-                  >
-                    {k.name}
-                    {k.notiz ? (
-                      <div
-                        className="lc-sub"
-                        style={{
-                          fontSize: 'var(--fs-meta)',
-                          fontWeight: 400,
-                          color: 'var(--text-3)',
-                          marginTop: 2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={k.notiz}
-                      >
-                        {k.notiz}
-                      </div>
-                    ) : null}
-                  </button>
-                  <div className="lc-pills">
-                    <span className="pill-tag" style={{ cursor: 'default' }}>
-                      {OBJEKT_KONTAKT_ROLLE_LABELS[k.rolle]}
-                    </span>
-                  </div>
-                  <div
-                    className="lc-sub"
-                    style={{
-                      color: 'var(--text-2)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={kontaktZeile}
-                  >
-                    {kontaktZeile}
-                  </div>
-                </div>
-              )
-            })}
+            {liste.map(rowBody)}
           </div>
         )}
       </MockCard>

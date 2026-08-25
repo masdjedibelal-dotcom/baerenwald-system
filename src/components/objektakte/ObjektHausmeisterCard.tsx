@@ -273,9 +273,7 @@ export function ObjektHausmeisterCard({
       ? 'Bearbeiten'
       : amObjekt?.isLegacy
         ? 'Als Org-HM speichern'
-        : liste.length > 0
-          ? 'Anlegen / Zuweisen'
-          : 'Anlegen'
+        : 'Anlegen'
 
   const showPortalZeile =
     amObjekt && !amObjekt.isLegacy && amObjekt.portal_zugang
@@ -291,21 +289,38 @@ export function ObjektHausmeisterCard({
   const showLogin =
     showPortalZeile && registered === true && Boolean(portalKundeId) && isCrmAdmin
 
+  const headerActions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {amObjekt && !amObjekt.isLegacy ? (
+        <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>
+          Entfernen
+        </MockBtn>
+      ) : null}
+      <MockBtn
+        sm
+        kind={amObjekt && !amObjekt.isLegacy ? 'ghost' : 'primary'}
+        icon={amObjekt && !amObjekt.isLegacy ? undefined : 'plus'}
+        onClick={openSheet}
+        disabled={pending}
+      >
+        {ctaLabel}
+      </MockBtn>
+    </div>
+  )
+
   return (
     <>
-      <MockCard
-        title="Hausmeister"
-        icon="key"
-        actions={
-          <MockBtn sm kind="ghost" onClick={openSheet} disabled={pending}>
-            {ctaLabel}
-          </MockBtn>
-        }
-      >
+      <MockCard title="Hausmeister" icon="key" actions={headerActions}>
         {!amObjekt ? (
           <MockEmpty
+            icon="key"
             title="Kein Hausmeister"
             hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen."
+            action={
+              <MockBtn kind="primary" icon="plus" onClick={openSheet} disabled={pending}>
+                Anlegen
+              </MockBtn>
+            }
           />
         ) : (
           <div className="space-y-2" style={{ fontSize: 'var(--fs-body)' }}>
@@ -370,18 +385,6 @@ export function ObjektHausmeisterCard({
                 ) : null}
               </div>
             )}
-            {primaryStaff && amObjekt.portal_zugang ? (
-              <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)', margin: 0 }}>
-                Team-Mail: gleiches Login wie CRM / Partner / HV — kein separates Registrieren.
-              </p>
-            ) : null}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {!amObjekt.isLegacy ? (
-                <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>
-                  Entfernen
-                </MockBtn>
-              ) : null}
-            </div>
           </div>
         )}
       </MockCard>

@@ -47,6 +47,8 @@ export type PrimaryCtaContext = {
   unterSchwelleDirektAuftrag?: boolean
   /** Partner-Eingangsrechnung: CTA „Als überwiesen markieren“ statt „Als bezahlt“ */
   eingehend?: boolean
+  /** Korrektur-Entwurf (korrektur_von) → „Korrektur versenden“ */
+  korrektur?: boolean
 }
 
 function norm(status: string | null | undefined): string {
@@ -167,6 +169,9 @@ export function primaryCta(
     return { id: 'rechnung_erstellen', label: 'Rechnung erstellen', icon: 'file-invoice' }
   }
   if (ui === 'entwurf') {
+    if (ctx.korrektur) {
+      return { id: 'rechnung_versenden', label: 'Korrektur versenden', icon: 'send' }
+    }
     if (ctx.naechsterAbschlagSenden) {
       return { id: 'rechnung_versenden', label: 'Abschlag senden', icon: 'send' }
     }
