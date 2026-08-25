@@ -11,6 +11,7 @@ import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-h
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { metaBeimSendenAnHandwerker } from '@/lib/auftraege/partner-vorgang-meta'
 import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import {
   listHandwerkerFuerGewerk,
   replaceAngebotHandwerkerUndSenden,
@@ -190,6 +191,9 @@ export async function assignAuftragHandwerkerGewerk(input: {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
 
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
+
   const supabase = crmDb()
   const status = input.status ?? 'angefragt'
   const now = new Date().toISOString()
@@ -328,6 +332,9 @@ export async function assignAuftragHandwerkerPosition(input: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
+
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
 
   const supabase = crmDb()
   const status = input.status ?? 'angefragt'
@@ -475,6 +482,9 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireCrmSession()
   if (!gate.ok) return gate
+
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
 
   const supabase = crmDb()
   const auftragId = input.auftragId.trim()
@@ -654,6 +664,22 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   }
 
   const angebotId = auftrag.angebot_id ? String(auftrag.angebot_id).trim() : ''
+
+  /* Token-Links des Alt-Partners ungültig (Voll-Tausch) */
+  if (toAlt.length === 0 && angebotId) {
+    let ahQ = supabase
+      .from('angebot_handwerker')
+      .update({ status: 'ersetzt' })
+      .eq('angebot_id', angebotId)
+      .eq('handwerker_id', alterHandwerkerId)
+      .not('status', 'eq', 'ersetzt')
+    if (gewerkId) ahQ = ahQ.eq('gewerk_id', gewerkId)
+    const { error: ahErr } = await ahQ
+    if (ahErr && !/column|schema|status/i.test(ahErr.message)) {
+      return { ok: false, message: ahErr.message }
+    }
+  }
+
   let partnerBenachrichtigt = false
 
   if (angebotId && gewerkId && toAlt.length === 0) {

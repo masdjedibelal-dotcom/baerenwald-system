@@ -32,6 +32,7 @@ import {
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -101,7 +102,7 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
@@ -766,6 +767,8 @@ export function AnfrageDetailClient({
 
   const headMeta = useMemo(() => {
     const parts = [vorhabenTitel]
+    const kanal = kanalLabel(lead.kanal)
+    if (kanal) parts.push(kanal)
     if (lead.created_at) {
       const d = new Date(lead.created_at)
       const time = Number.isNaN(d.getTime())
@@ -778,7 +781,7 @@ export function AnfrageDetailClient({
       )
     }
     return parts.filter(Boolean).join(' · ')
-  }, [vorhabenTitel, lead.created_at])
+  }, [vorhabenTitel, lead.created_at, lead.kanal])
 
   const stammdatenInhalt = (
     <>
@@ -923,6 +926,7 @@ export function AnfrageDetailClient({
         title: kundeTitel,
         titleBadges: isMobile ? (
           <>
+            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
                 Direktauftrag
@@ -933,6 +937,7 @@ export function AnfrageDetailClient({
         ) : undefined,
         badges: isMobile ? undefined : (
           <>
+            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
                 Direktauftrag

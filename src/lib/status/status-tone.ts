@@ -26,7 +26,7 @@ export const STATUSES: Record<string, StatusEntry> = {
   // Angebot (status_einfach + DB)
   entwurf: { label: 'Entwurf', tone: 'grau' },
   gesendet: { label: 'Gesendet', tone: 'blau' },
-  gesendet_kunde: { label: 'An Kunde gesendet', tone: 'blau' },
+  gesendet_kunde: { label: 'Gesendet', tone: 'blau' },
   gesendet_handwerker: { label: 'An Partner gesendet', tone: 'blau' },
   handwerker_akzeptiert: { label: 'Partner akzeptiert', tone: 'gruen' },
   angenommen: { label: 'Angenommen', tone: 'gruen' },
@@ -41,19 +41,19 @@ export const STATUSES: Record<string, StatusEntry> = {
   zugewiesen: { label: 'Zugewiesen', tone: 'gruen' },
   warten: { label: 'Warten', tone: 'blau' },
 
-  // Auftrag
-  offen: { label: 'Geplant', tone: 'grau' },
-  geplant: { label: 'Geplant', tone: 'grau' },
-  in_arbeit: { label: 'Aktiv', tone: 'blau' },
-  aktiv: { label: 'Aktiv', tone: 'blau' },
+  // Auftrag — kanonisch (status-map / Leitfaden §3)
+  offen: { label: 'Offen', tone: 'grau' },
+  geplant: { label: 'Offen', tone: 'grau' },
+  in_arbeit: { label: 'In Arbeit', tone: 'blau' },
+  aktiv: { label: 'In Arbeit', tone: 'blau' },
   abnahme: { label: 'Abnahme', tone: 'blau' },
-  fertig: { label: 'Fertig', tone: 'gruen' },
+  fertig: { label: 'Abgeschlossen', tone: 'gruen' },
   erledigt: { label: 'Erledigt', tone: 'gruen' },
-  abgenommen: { label: 'Abgenommen', tone: 'gruen' },
+  abgenommen: { label: 'Abnahme', tone: 'gruen' },
   storniert: { label: 'Storniert', tone: 'rot' },
 
   // Rechnung
-  versendet: { label: 'Versendet', tone: 'blau' },
+  versendet: { label: 'Gesendet', tone: 'blau' },
   bezahlt: { label: 'Bezahlt', tone: 'gruen' },
   ueberfaellig: { label: 'Überfällig', tone: 'rot' },
   reklamiert: { label: 'Reklamiert', tone: 'rot' },

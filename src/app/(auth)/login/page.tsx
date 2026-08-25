@@ -18,7 +18,15 @@ import {
   STAGING_ADMIN_PASSWORD,
   isStagingSupabase,
 } from '@/lib/auth/staging-admin'
+import { peekRateLimit, recordRateLimitFailure } from '@/lib/rate-limit'
 import { cn } from '@/lib/utils'
+
+/** App-seitige Login-Drosselung — siehe docs/auth/LOGIN-RATE-LIMIT.md */
+const LOGIN_RL_LIMIT = 5
+const LOGIN_RL_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_RL_MESSAGE =
+  'Zu viele fehlgeschlagene Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.'
+
 
 const BENEFITS: { icon: string; text: string }[] = [
   { icon: 'folders', text: 'Alle Vorgänge – von Anfrage bis Rechnung an einem Ort' },
@@ -86,12 +94,30 @@ function LoginPageContent() {
     setInfo(null)
 
     const normalizedEmail = email.trim().toLowerCase()
+    const rl = peekRateLimit(
+      normalizedEmail || 'unknown',
+      LOGIN_RL_LIMIT,
+      LOGIN_RL_WINDOW_MS,
+      'crm-login'
+    )
+    if (!rl.allowed) {
+      setError(LOGIN_RL_MESSAGE)
+      setLoading(false)
+      return
+    }
+
     const { data: signData, error: signError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     })
 
     if (signError || !signData.user?.id) {
+      recordRateLimitFailure(
+        normalizedEmail || 'unknown',
+        LOGIN_RL_LIMIT,
+        LOGIN_RL_WINDOW_MS,
+        'crm-login'
+      )
       setError(CRM_LOGIN_INVALID_MESSAGE)
       setLoading(false)
       return

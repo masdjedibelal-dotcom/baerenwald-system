@@ -42,15 +42,11 @@ import {
 import { resolveRechnungLeistungsortIn } from '@/lib/kunden-objekte'
 import type { AngebotPosition, Auftrag, Gewerk, Kunde, KundenObjekt, Rechnung } from '@/lib/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatDatum } from '@/lib/utils'
 
 function formatDatumDe(iso: string | null | undefined): string {
   if (!iso?.trim()) return '—'
-  try {
-    const ymd = iso.trim().slice(0, 10)
-    return new Date(`${ymd}T12:00:00`).toLocaleDateString('de-DE')
-  } catch {
-    return iso
-  }
+  return formatDatum(iso.trim())
 }
 
 function formatLeistungszeitraum(von: string | null, bis: string | null): string {

@@ -31,6 +31,7 @@ import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { rechnungDarfImWizardBearbeitetWerden, rechnungWizardBearbeitenSperrgrund } from '@/lib/rechnungen/rechnung-wizard-types'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungEingangStammdatenCard } from '@/components/rechnungen/RechnungEingangStammdatenCard'
 import { RechnungEingangDokumenteCard } from '@/components/rechnungen/RechnungEingangDokumenteCard'
@@ -488,13 +489,25 @@ export function RechnungDetailClient({
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (isEingehend) return null
-    if (rechnungKorrekturModus(detail.status) === 'gesperrt') return null
-    return {
-      label: 'Rechnung bearbeiten',
-      icon: 'pencil',
-      onClick: handleKorrigieren,
-      disabled: pending,
+    if (rechnungDarfImWizardBearbeitetWerden(detail.status)) {
+      return {
+        label: 'Rechnung bearbeiten',
+        icon: 'pencil',
+        onClick: handleKorrigieren,
+        disabled: pending,
+      }
     }
+    const sperrgrund = rechnungWizardBearbeitenSperrgrund(detail.status)
+    if (sperrgrund) {
+      return {
+        label: 'Rechnung bearbeiten',
+        icon: 'pencil',
+        onClick: () => toast.info(sperrgrund),
+        disabled: true,
+        title: sperrgrund,
+      }
+    }
+    return null
   }, [detail.status, pending, isEingehend])
 
   const projektTitelAnzeige = isEingehend

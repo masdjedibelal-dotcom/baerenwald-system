@@ -36,9 +36,9 @@ import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 
 function nachtragPublicUrl(token: string) {
+  /** Strikt CRM-Domain (NEXT_PUBLIC_APP_URL), nie Website-Origin. */
   const b = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
   if (b) return `${b}/nachtrag/${token}`
-  if (typeof window !== 'undefined') return `${window.location.origin}/nachtrag/${token}`
   return `/nachtrag/${token}`
 }
 

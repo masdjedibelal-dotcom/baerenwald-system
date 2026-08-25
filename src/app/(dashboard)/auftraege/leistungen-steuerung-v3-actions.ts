@@ -16,6 +16,7 @@ import {
 import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
+import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import type { AuftragPosition } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
@@ -255,6 +256,9 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
 > {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
+
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
 
   const gewerke = input.gewerke ?? []
 

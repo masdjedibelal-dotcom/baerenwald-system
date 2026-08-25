@@ -176,6 +176,9 @@ export async function notfallDirektBeauftragen(
     await supabaseAdmin
       .from('leads')
       .update({
+        // Dokumentierte Ausnahme: Notmaßnahme umgeht Org-Freigabe-Gate
+        // (`orgFreigabeBlockiertPartner` / assertPartnerVersandOrgFreigabe).
+        // Siehe docs/claude-project/06-PROZESSE.md § Org-Freigabe.
         hv_meldung_status: 'notmassnahme',
         vorgang_phase: 'in_bearbeitung',
         org_freigabe_status: 'nicht_noetig',

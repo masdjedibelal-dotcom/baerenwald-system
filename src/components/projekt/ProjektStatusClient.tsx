@@ -6,6 +6,7 @@ import type { PublicProjektPayload } from '@/lib/projekt/load-public-projekt'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
 import { Check, Circle, Mail, Phone } from 'lucide-react'
 import { BrandLogo } from '@/components/brand/BrandLogo'
+import { TokenLinkInvalid } from '@/components/public/TokenLinkInvalid'
 import { IconText } from '@/components/ui/IconText'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { betragAnzeige } from '@/lib/angebot-einfach'
@@ -112,15 +113,7 @@ export function ProjektStatusClient({
   const siteFooter = process.env.NEXT_PUBLIC_WEBSITE_URL?.replace(/\/$/, '') ?? ''
 
   if (!initial) {
-    return (
-      <div className="min-h-screen bg-[#F7F6F3] px-4 py-16 text-center text-ink">
-        <p className="text-lg font-semibold">Dieser Link ist nicht mehr gültig.</p>
-        <p className="mt-3 text-sm text-muted">Bitte kontaktieren Sie uns:</p>
-        <a href={telHref(tel)} className="mt-4 inline-block text-lg font-semibold text-[#2E7D52] underline">
-          {tel}
-        </a>
-      </div>
-    )
+    return <TokenLinkInvalid />
   }
 
   const { auftrag, kunde, gewerkeLabels, angebote, timeline, nachtraegeAkzeptiert, leadStatus, milestones } = initial

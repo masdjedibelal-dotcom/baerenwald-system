@@ -70,3 +70,16 @@ Entwurf · Gesendet · Bezahlt · Storniert · (Anzeige: Überfällig)
 
 ### Mieter-Status (Melden)
 Eingegangen → In Bearbeitung → Beauftragt → Handwerker vor Ort → Erledigt
+
+#### CRM → Mieter-Timeline (Zuordnung)
+
+| CRM-Signal | Mieter-Stufe |
+|------------|--------------|
+| Lead `neu` / Meldung ohne Bearbeitung | Eingegangen |
+| Lead `kontaktiert` \| `termin`; Freigabe; HV prüft | In Bearbeitung |
+| Auftrag erstellt; HW/Partner gesendet/angefragt | Beauftragt |
+| HW bestätigt; Bautagebuch; `mieter_vor_ort_at`; Auftrag `in_arbeit` | Handwerker vor Ort |
+| Abnahme **ohne** offene Mängel; Positionen erledigt | Erledigt |
+| Offene Mängel in Abnahme | **nicht** Erledigt (bleibt Vor Ort / Beauftragt) |
+
+Kanonische CRM-Labels: `src/lib/status/status-map.ts` (eine Map für Liste, Detail, Dashboard).

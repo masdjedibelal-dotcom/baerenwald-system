@@ -6,6 +6,7 @@ import { mailHandwerkerLeistungZuweisung } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
 import { formatDatum } from '@/lib/utils'
+import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 
 function one<T>(x: T | T[] | null | undefined): T | null {
   if (x == null) return null
@@ -46,6 +47,11 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
   const handwerkerId = input.handwerkerId.trim()
   if (!auftragId || !handwerkerId) {
     return { ok: false, message: 'auftragId oder handwerkerId fehlt' }
+  }
+
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId })
+  if (!freigabeGate.ok) {
+    return { ok: false, message: freigabeGate.message }
   }
 
   const ids = [

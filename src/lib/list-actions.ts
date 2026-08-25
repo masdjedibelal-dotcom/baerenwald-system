@@ -3,6 +3,8 @@
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
+import { confirmDelete } from '@/components/ui/confirm-delete'
+import { confirmKundeDelete } from '@/components/ui/confirm-kunde-delete'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
@@ -11,45 +13,57 @@ import {
   duplicateAuftragHref,
   duplicateRechnung,
 } from '@/app/(dashboard)/crm/list-copy-actions'
-import { duplicateKunde, deleteKunde } from '@/app/actions/kunden'
+import { duplicateKunde } from '@/app/actions/kunden'
 import { duplicateHandwerker, deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 
-export async function runDeleteVorgang(
+export function runDeleteVorgang(
   leadId: string,
   router: AppRouterInstance,
   label = 'Vorgang'
-): Promise<void> {
-  await actionBusy.run(`${label} wird gelöscht…`, async () => {
-    const r = await deleteVorgang(leadId)
-    if (!r.ok) {
-      toast.error(r.message)
-      throw new Error(r.message)
+): void {
+  confirmDelete(
+    `${label} löschen?`,
+    async () => {
+      const r = await deleteVorgang(leadId)
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
+      }
+      toast.success(`${label} gelöscht`)
+      router.refresh()
+    },
+    {
+      sub: 'Dauerhaft entfernen — Kunde bleibt erhalten.',
+      body:
+        label === 'Vorgang' || label === 'Vorgänge'
+          ? 'Der ausgewählte Vorgang wird unwiderruflich gelöscht.'
+          : `„${label}“ wird unwiderruflich gelöscht.`,
     }
-    toast.success(`${label} gelöscht`)
-    router.refresh()
-  })
+  )
 }
 
 /** Standalone-Rechnung (ohne Lead) aus der Vorgänge-Liste löschen. */
-export async function runDeleteStandaloneRechnung(
+export function runDeleteStandaloneRechnung(
   rechnungId: string,
   router: AppRouterInstance,
   label = 'Rechnung'
-): Promise<void> {
-  const ok = window.confirm(
-    `„${label}“ wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.`
-  )
-  if (!ok) return
-
-  await actionBusy.run(`${label} wird gelöscht…`, async () => {
-    const r = await deleteRechnungEntwurf(rechnungId)
-    if (!r.ok) {
-      toast.error(r.message)
-      throw new Error(r.message)
+): void {
+  confirmDelete(
+    `${label} löschen?`,
+    async () => {
+      const r = await deleteRechnungEntwurf(rechnungId)
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
+      }
+      toast.success(`${label} gelöscht`)
+      router.refresh()
+    },
+    {
+      sub: 'Dauerhaft entfernen.',
+      body: `„${label}“ wird unwiderruflich gelöscht.`,
     }
-    toast.success(`${label} gelöscht`)
-    router.refresh()
-  })
+  )
 }
 
 export function runDuplicateAnfrage(leadId: string, router: AppRouterInstance) {
@@ -115,24 +129,15 @@ export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterIn
   })
 }
 
-export async function runDeleteKunde(
+export function runDeleteKunde(
   kundeId: string,
   router: AppRouterInstance,
-  label = 'Kunde'
-): Promise<void> {
-  const ok = window.confirm(
-    `„${label}“ wirklich löschen?\n\nAlle zugehörigen Vorgänge, Angebote, Aufträge und Rechnungen werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`
-  )
-  if (!ok) return
-
-  await actionBusy.run(`${label} wird gelöscht…`, async () => {
-    const r = await deleteKunde(kundeId)
-    if (!r.ok) {
-      toast.error(r.message)
-      throw new Error(r.message)
-    }
-    toast.success(`${label} gelöscht`)
+  _label = 'Kunde',
+  onDone?: () => void | Promise<void>
+): void {
+  confirmKundeDelete(kundeId, async () => {
     router.refresh()
+    if (onDone) await onDone()
   })
 }
 

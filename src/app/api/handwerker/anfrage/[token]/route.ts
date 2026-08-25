@@ -77,6 +77,18 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   const gw = one(raw.gewerke) as { name: string } | null
 
   const st = String(raw.status ?? '').toLowerCase()
+  if (st === 'ersetzt' || st === 'abgelehnt' || st === 'storniert') {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'ungueltig',
+        title: 'Link nicht verfügbar',
+        body: 'Dieser Link ist ungültig oder nicht mehr aktiv.',
+      },
+      { status: 200 }
+    )
+  }
+
   let antwort: 'akzeptiert' | 'abgelehnt' | null = null
   if (st === 'akzeptiert') antwort = 'akzeptiert'
   if (st === 'abgelehnt') antwort = 'abgelehnt'

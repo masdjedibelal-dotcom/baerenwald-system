@@ -15,6 +15,8 @@ export type DetailActionDef = {
   icon?: string
   onClick: () => void
   disabled?: boolean
+  /** Deaktiviert-mit-Grund (PATTERN: title/tooltip, nicht verstecken) */
+  title?: string
   /** Link statt Button (Desktop + Mobil) */
   href?: string
   /** Kompakt-Label (Scroll) — default: letztes Wort = Verb */
@@ -90,7 +92,9 @@ function ActionControl({
       )}
       onClick={action.onClick}
       disabled={action.disabled}
+      title={action.title}
       aria-label={action.label}
+      aria-disabled={action.disabled || undefined}
     >
       {inner}
     </button>

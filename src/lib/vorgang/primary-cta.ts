@@ -131,8 +131,9 @@ export function primaryCta(
       if (ctx.naechsteRechnungAktion === 'bezahlt') {
         return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
       }
+      // Offene RE-Entwürfe: Versenden ist Sekundäraktion — Primary = Bewertung
       if (ctx.naechsteRechnungAktion === 'versenden') {
-        return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+        return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
       }
       if (ctx.naechsteRechnungAktion === 'erstellen') {
         return {

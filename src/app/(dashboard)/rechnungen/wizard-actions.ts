@@ -1697,11 +1697,13 @@ export async function deleteRechnungEntwurf(
   const status = String(rec.status ?? '')
     .trim()
     .toLowerCase()
-  const erlaubt = new Set(['entwurf', 'gesendet', 'versendet', 'bezahlt', 'storniert'])
-  if (!erlaubt.has(status)) {
+  if (status !== 'entwurf') {
     return {
       ok: false,
-      message: `Rechnung mit Status „${rec.status ?? 'unbekannt'}“ kann nicht gelöscht werden.`,
+      message:
+        status === 'gesendet' || status === 'versendet' || status === 'bezahlt'
+          ? 'Nur Entwürfe können gelöscht werden — Korrektur über Storno.'
+          : `Rechnung mit Status „${rec.status ?? 'unbekannt'}“ kann nicht gelöscht werden.`,
     }
   }
 
@@ -1714,7 +1716,7 @@ export async function deleteRechnungEntwurf(
   return { ok: true }
 }
 
-/** Alias — Löschen inkl. erledigter Rechnungen (bezahlt/storniert/gesendet). */
+/** Alias — gleiche Härte wie deleteRechnungEntwurf (nur Status entwurf). */
 export async function deleteRechnung(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {

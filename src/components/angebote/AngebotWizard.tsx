@@ -1185,6 +1185,7 @@ export function AngebotWizard({
         meta={metaColumn}
         className="wizard-flow"
         manageHistory={false}
+        draftDirty={draftDirty}
       />
 
       <EditorSheet

@@ -430,15 +430,30 @@ export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
   'Bärenwald München übernimmt Projektsteuerung, Koordination und Qualitätskontrolle. ' +
   'Endgültige Preise können sich nach exaktem Aufmaß anpassen.'
 
-/** Status, in denen das Angebot im Wizard geladen und gespeichert werden darf (auch nach Versand). */
+/**
+ * Status, in denen das Angebot im Wizard geladen und gespeichert werden darf.
+ * Nicht: kunde_akzeptiert (Angenommen → AG-Korrektur) — Detail-CTA ist Referenz.
+ */
 const ANGEBOT_WIZARD_BEARBEITBAR: readonly AngebotStatus[] = [
   'entwurf',
   'gesendet_handwerker',
   'handwerker_akzeptiert',
   'gesendet_kunde',
-  'kunde_akzeptiert',
 ]
 
 export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
   return (ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(status)
+}
+
+/** Deaktiviert-mit-Grund für Detail-CTA „Angebot bearbeiten“. */
+export function angebotWizardBearbeitenSperrgrund(status: string): string | null {
+  if (angebotDarfImWizardBearbeitetWerden(status)) return null
+  const s = (status ?? '').toLowerCase()
+  if (s === 'kunde_akzeptiert' || s === 'angenommen') {
+    return 'Angenommen — Änderung über AG-Korrektur'
+  }
+  if (s.includes('gesendet') || s === 'abgelaufen') {
+    return 'Gesendet — Korrektur über Storno'
+  }
+  return 'Dieses Angebot kann nicht mehr im Wizard bearbeitet werden.'
 }

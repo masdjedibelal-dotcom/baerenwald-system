@@ -47,6 +47,7 @@ import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCa
 import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotZahlungTab } from '@/components/angebote/AngebotZahlungTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
+import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
@@ -66,7 +67,7 @@ import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-
 import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
-import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
   AngebotDetail,
@@ -219,6 +220,7 @@ export function AngebotDetailPageClient({
   const kannBearbeiten =
     (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
     angebotDarfImWizardBearbeitetWerden(detail.status)
+  const bearbeitenSperrgrund = angebotWizardBearbeitenSperrgrund(detail.status)
 
   const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
     const fromCtx = (projektKontext?.angebote ?? []).map((a) => ({
@@ -536,14 +538,25 @@ export function AngebotDetailPageClient({
   }, [statusEinfach, detail.status, pending, unterSchwelleDirektAuftrag, runDirektAuftrag])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
-    if (!kannBearbeiten) return null
-    return {
-      label: 'Angebot bearbeiten',
-      icon: 'pencil',
-      onClick: openWizardBearbeiten,
-      disabled: pending,
+    if (kannBearbeiten) {
+      return {
+        label: 'Angebot bearbeiten',
+        icon: 'pencil',
+        onClick: openWizardBearbeiten,
+        disabled: pending,
+      }
     }
-  }, [kannBearbeiten, pending])
+    if (bearbeitenSperrgrund) {
+      return {
+        label: 'Angebot bearbeiten',
+        icon: 'pencil',
+        onClick: () => toast.info(bearbeitenSperrgrund),
+        disabled: true,
+        title: bearbeitenSperrgrund,
+      }
+    }
+    return null
+  }, [kannBearbeiten, bearbeitenSperrgrund, pending])
 
   const stammdatenInhalt = (
     <>
@@ -554,6 +567,18 @@ export function AngebotDetailPageClient({
           direktAuftragUnterSchwelle={direktAuftragUnterSchwelleHinweis}
           angebotId={detail.id}
           onSaved={() => refresh()}
+        />
+      ) : null}
+      {lead?.id &&
+      (lead.org_freigabe_status || (lead.org_freigabe_log?.length ?? 0) > 0) ? (
+        <AngebotOrgFreigabeBanner
+          leadId={lead.id}
+          angebotId={detail.id}
+          orgFreigabeStatus={lead.org_freigabe_status}
+          orgFreigabeLog={lead.org_freigabe_log}
+          gesamtFix={detail.gesamt_fix}
+          gesamtMax={detail.gesamt_max}
+          onDone={() => refresh()}
         />
       ) : null}
     </>

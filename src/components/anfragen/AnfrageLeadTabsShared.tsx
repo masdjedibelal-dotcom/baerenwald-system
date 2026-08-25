@@ -135,6 +135,12 @@ export function LeadNotizenListeTab({
   function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
+    const maxBytes = 8 * 1024 * 1024
+    if (f.size > maxBytes) {
+      toast.error('Datei zu groß (max. 8 MB)')
+      e.target.value = ''
+      return
+    }
     setPendingFoto((prev) => {
       if (prev) URL.revokeObjectURL(prev.url)
       return { file: f, url: URL.createObjectURL(f) }
@@ -252,7 +258,7 @@ export function LeadNotizenListeTab({
           </div>
         ) : null}
 
-        <p className="lead-notiz-compose__hint">Optional mit Foto · bis 5 MB · JPEG, PNG, WebP, GIF, HEIC</p>
+        <p className="lead-notiz-compose__hint">Optional mit Foto · bis 8 MB · JPEG, PNG, WebP, GIF, HEIC</p>
       </div>
 
       {allgemeineNotizen.length === 0 ? (

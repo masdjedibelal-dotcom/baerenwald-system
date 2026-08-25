@@ -1175,16 +1175,30 @@ export function AuftragDetailClient({
                 disabled: pending,
               }
             })()}
-            secondary={
-              !istStorniert && detail.angebot_id
-                ? {
-                    label: 'Auftrag bearbeiten',
-                    icon: 'pencil',
-                    onClick: openAngebotKorrektur,
-                    disabled: pending,
-                  }
-                : null
-            }
+            secondary={(() => {
+              if (istStorniert) return null
+              if (
+                detail.status === 'abgeschlossen' &&
+                naechsteRechnungAktion?.art === 'versenden' &&
+                naechsteRechnungAktion.rechnungId
+              ) {
+                return {
+                  label: 'Rechnung versenden',
+                  icon: 'send',
+                  onClick: () => versendeNaechsteRechnung(naechsteRechnungAktion.rechnungId!),
+                  disabled: pending,
+                }
+              }
+              if (detail.angebot_id) {
+                return {
+                  label: 'Auftrag bearbeiten',
+                  icon: 'pencil',
+                  onClick: openAngebotKorrektur,
+                  disabled: pending,
+                }
+              }
+              return null
+            })()}
             menuItems={
               !istStorniert && detail.angebot_id && detail.lead_id
                 ? [

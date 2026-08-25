@@ -1,45 +1,54 @@
-/** Dashboard-Badge-/KPI-Mapping 1:1 Mock-Wortlaut → CRM-Status */
+/**
+ * Dashboard: Kind/Tone + KPI-Helfer.
+ * Labels kommen ausschließlich aus der kanonischen Status-Map (`status-map.ts`).
+ * Keine eigenen Wortlaute („Fertig“, „Versendet“, „Gesendet HW“, …).
+ */
 
 import { istUeberfaelligYmd } from '@/lib/dates/werktag'
+import {
+  statusLabel,
+  statusShortLabel,
+} from '@/lib/status/status-map'
 
 export type DashboardBadge = { kind: string; label: string }
 
-const LEAD_BADGE: Record<string, DashboardBadge> = {
-  neu: { kind: 'neu', label: 'Neu' },
-  kontaktiert: { kind: 'neu', label: 'Kontaktiert' },
-  termin: { kind: 'aktiv', label: 'Termin' },
-  angebot: { kind: 'warten', label: 'Angebot' },
-  auftrag: { kind: 'aktiv', label: 'Auftrag' },
-  abgeschlossen: { kind: 'fertig', label: 'Abgeschlossen' },
-  abgebrochen: { kind: 'storniert', label: 'Abgebrochen' },
+const LEAD_KIND: Record<string, string> = {
+  neu: 'neu',
+  kontaktiert: 'neu',
+  termin: 'aktiv',
+  angebot: 'warten',
+  auftrag: 'aktiv',
+  abgeschlossen: 'fertig',
+  abgebrochen: 'storniert',
 }
 
-/** Mock-Wortlaut (nicht CRM-Langform „Handwerker akzeptiert“) */
-const ANGEBOT_BADGE: Record<string, DashboardBadge> = {
-  entwurf: { kind: 'fertig', label: 'Entwurf' },
-  gesendet_handwerker: { kind: 'neu', label: 'Gesendet HW' },
-  gesendet_hw: { kind: 'neu', label: 'Gesendet HW' },
-  handwerker_akzeptiert: { kind: 'fertig', label: 'HW akzeptiert' },
-  hw_akzeptiert: { kind: 'fertig', label: 'HW akzeptiert' },
-  gesendet_kunde: { kind: 'warten', label: 'Gesendet Kunde' },
-  kunde_akzeptiert: { kind: 'aktiv', label: 'Kunde akzeptiert' },
-  abgelehnt: { kind: 'storniert', label: 'Abgelehnt' },
-  // status_einfach fallbacks
-  gesendet: { kind: 'warten', label: 'Gesendet Kunde' },
-  angenommen: { kind: 'aktiv', label: 'Kunde akzeptiert' },
+const ANGEBOT_KIND: Record<string, string> = {
+  entwurf: 'fertig',
+  gesendet_handwerker: 'neu',
+  gesendet_hw: 'neu',
+  handwerker_akzeptiert: 'fertig',
+  hw_akzeptiert: 'fertig',
+  gesendet_kunde: 'warten',
+  kunde_akzeptiert: 'aktiv',
+  abgelehnt: 'storniert',
+  gesendet: 'warten',
+  angenommen: 'aktiv',
 }
 
-const AUFTRAG_BADGE: Record<string, DashboardBadge> = {
-  offen: { kind: 'aktiv', label: 'In Arbeit' },
-  in_arbeit: { kind: 'aktiv', label: 'In Arbeit' },
-  abnahme: { kind: 'warten', label: 'Abnahme' },
-  abgeschlossen: { kind: 'fertig', label: 'Fertig' },
-  storniert: { kind: 'storniert', label: 'Storniert' },
+const AUFTRAG_KIND: Record<string, string> = {
+  offen: 'aktiv',
+  in_arbeit: 'aktiv',
+  abnahme: 'warten',
+  abgeschlossen: 'fertig',
+  storniert: 'storniert',
 }
 
 export function leadDashboardBadge(status: string | null | undefined): DashboardBadge {
   const key = String(status ?? '').toLowerCase()
-  return LEAD_BADGE[key] ?? { kind: 'plain', label: status || '—' }
+  return {
+    kind: LEAD_KIND[key] ?? 'plain',
+    label: key ? statusLabel('anfrage', key) : '—',
+  }
 }
 
 export function angebotDashboardBadge(
@@ -47,14 +56,28 @@ export function angebotDashboardBadge(
   statusEinfach?: string | null
 ): DashboardBadge {
   const fine = String(status ?? '').toLowerCase()
-  if (ANGEBOT_BADGE[fine]) return ANGEBOT_BADGE[fine]!
   const einfach = String(statusEinfach ?? '').toLowerCase()
-  return ANGEBOT_BADGE[einfach] ?? { kind: 'plain', label: status || statusEinfach || '—' }
+  const key = fine || einfach
+  const mapKey =
+    key === 'gesendet_hw'
+      ? 'gesendet_handwerker'
+      : key === 'hw_akzeptiert'
+        ? 'handwerker_akzeptiert'
+        : key
+  return {
+    kind: ANGEBOT_KIND[key] ?? ANGEBOT_KIND[einfach] ?? 'plain',
+    label: mapKey
+      ? statusShortLabel('angebot', mapKey)
+      : status || statusEinfach || '—',
+  }
 }
 
 export function auftragDashboardBadge(status: string | null | undefined): DashboardBadge {
   const key = String(status ?? '').toLowerCase()
-  return AUFTRAG_BADGE[key] ?? { kind: 'plain', label: status || '—' }
+  return {
+    kind: AUFTRAG_KIND[key] ?? 'plain',
+    label: key ? statusLabel('auftrag', key) : '—',
+  }
 }
 
 export function rechnungDashboardBadge(input: {
@@ -62,13 +85,20 @@ export function rechnungDashboardBadge(input: {
   faellig_am?: string | null
 }): DashboardBadge {
   const st = String(input.status ?? '').toLowerCase()
-  if (st === 'bezahlt') return { kind: 'aktiv', label: 'Bezahlt' }
-  if (st === 'storniert') return { kind: 'storniert', label: 'Storniert' }
-  if (st === 'entwurf') return { kind: 'fertig', label: 'Entwurf' }
-  // gestellt/gesendet → Mock „Versendet“; Überfällig wenn Fälligkeit überschritten
+  if (st === 'bezahlt') {
+    return { kind: 'aktiv', label: statusLabel('rechnung', 'bezahlt') }
+  }
+  if (st === 'storniert') {
+    return { kind: 'storniert', label: statusLabel('rechnung', 'storniert') }
+  }
+  if (st === 'entwurf') {
+    return { kind: 'fertig', label: statusLabel('rechnung', 'entwurf') }
+  }
   if (st === 'gesendet') {
-    if (istUeberfaelligYmd(input.faellig_am)) return { kind: 'storniert', label: 'Überfällig' }
-    return { kind: 'warten', label: 'Versendet' }
+    if (istUeberfaelligYmd(input.faellig_am)) {
+      return { kind: 'storniert', label: statusLabel('rechnung', 'ueberfaellig') }
+    }
+    return { kind: 'warten', label: statusLabel('rechnung', 'gesendet') }
   }
   return { kind: 'plain', label: input.status || '—' }
 }

@@ -5,7 +5,10 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
-import { syncOrgFreigabeNachAngebot } from '@/lib/org/org-freigabe-logic'
+import {
+  erneutOrgFreigabeAnfordernNachAblehnung as erneutOrgFreigabeCore,
+  syncOrgFreigabeNachAngebot,
+} from '@/lib/org/org-freigabe-logic'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 
 async function crmActorId(): Promise<string | null> {
@@ -189,5 +192,33 @@ export async function syncAngebotMitOrgFreigabe(input: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const r = await syncOrgFreigabeNachAngebot(input)
   if (!r.ok) return r
+  return { ok: true }
+}
+
+/** CRM: Freigabe nach Ablehnung erneut anfordern (Pflicht-Kommentar). */
+export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
+  leadId: string
+  angebotId: string
+  anpassungNotiz: string
+  gesamtFix?: number | null
+  gesamtMax?: number | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const uid = await crmActorId()
+  if (!uid) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const r = await erneutOrgFreigabeCore(input)
+  if (!r.ok) return r
+
+  await writeAuditEvent({
+    entityType: 'lead',
+    entityId: input.leadId.trim(),
+    aktion: 'org_freigabe_erneut_angefordert',
+    actorId: uid,
+    actorRolle: 'crm',
+    payload: { angebot_id: input.angebotId, notiz: input.anpassungNotiz.trim() },
+  })
+
+  revalidatePath(`/anfragen/${input.leadId.trim()}`)
+  revalidatePath(`/angebote/${input.angebotId.trim()}`)
   return { ok: true }
 }

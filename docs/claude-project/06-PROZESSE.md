@@ -50,7 +50,17 @@ CRM Angebot (oder Anfrage-Leistungen) → Handwerker anfragen (Token und/oder Po
   → Kundenangebot finalisieren & senden
 ```
 
-Ohne Freigabe (HV): Partner-Versand kann blockiert sein.
+Ohne Freigabe (HV): Partner-Versand ist blockiert (`assertPartnerVersandOrgFreigabe`).
+
+### Org-Freigabe — Gate & Ausnahmen
+
+**Regel:** Solange `org_freigabe_status` ∈ {`ausstehend`, `abgelehnt`}, kein Partner-Versand (Angebot-Anfrage, Auftrag „an HW senden“, Zuweisungs-Mail, Redisposition, Assign+Notify).
+
+**Zentrale Prüfung:** `assertPartnerVersandOrgFreigabe` → `orgFreigabeBlockiertPartner` / Message „Wartet auf Org-Freigabe…“.
+
+**Refreeze nach AG-Korrektur:** War der Status `freigegeben` und der neue Angebotsbetrag liegt über der Schwelle **und** ist **höher** als der zuletzt freigegebene Betrag (`org_freigabe_log`), wird wieder `ausstehend` gesetzt und die HV benachrichtigt. `abgelehnt` bleibt eingefroren.
+
+**Dokumentierte Ausnahme — Notmaßnahme:** `hv_meldung_status = notmassnahme` (HV-Sofortmaßnahme / CRM Notfall-Direkt) umgeht das Gate bewusst. Partner darf ohne Freigabe-Wartezeit beauftragt werden; nach normalem Angebotsfluss gilt das Gate wieder.
 
 ---
 
