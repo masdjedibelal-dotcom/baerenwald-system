@@ -160,7 +160,7 @@ Legende: ✅ vorhanden · ◐ teilweise / eingeschränkt · ⏸ UI ausgeblendet 
 |----------|--------|
 | Mock Design System CSS | ✅ |
 | MockBtn/Chip/Badge/Card | ✅ |
-| DocumentCanvas / Sheets / WizardShell | ✅ |
+| DocumentCanvas / Sheets | ✅ |
 | StatusBadge einheitlich | ✅ |
 | Mobile/Desktop gleiche IA | ◐ weitgehend |
 

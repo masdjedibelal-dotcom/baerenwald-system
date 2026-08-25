@@ -27,7 +27,7 @@
 - Anfrage-Header: Direkt-Annehmen-CTA (gehört Spec-seitig zum Angebot) — Annehmen nur noch über Angebot-Detail / Matrix
 
 ### Bewusst nicht geändert
-- Surfaces / WizardShell — Phase 2
+- Surfaces / DocumentCanvas — Phase 2
 - Alle `kind="primary"` außerhalb Detail-Header (Wizards, Listen-Filter) — nicht Vorgangs-Header-Matrix
 - `mock-badge-kind.ts` bleibt als Adapter für Nicht-Vorgangs-Stellen
 

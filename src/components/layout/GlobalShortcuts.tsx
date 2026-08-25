@@ -15,7 +15,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 const SHORTCUTS = [
   { keys: '⌘K', label: 'Suche öffnen' },
-  { keys: '⌘J', label: 'Assistent' },
+  { keys: '⌘J', label: 'KI-Assistent' },
   { keys: 'n', label: 'Neu erstellen' },
   { keys: '/', label: 'Suche fokussieren' },
   { keys: '?', label: 'Tastenkürzel-Übersicht' },

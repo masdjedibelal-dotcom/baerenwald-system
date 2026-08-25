@@ -150,9 +150,9 @@ Aufwand: **S** klein · **M** mittel · **L** groß
 
 ---
 
-## Welle 10 · Wizard → Canvas (früher WizardShell)
+## Welle 10 · Wizard → Canvas (ehem. Docs-Name DocumentCanvas)
 
-Soll-Modell ist **DocumentCanvas** (nicht mehr WizardShell).
+Soll-Modell ist **DocumentCanvas** (nicht mehr DocumentCanvas).
 
 | ID | Impact | Aufwand | Status | To-do |
 |----|--------|---------|--------|-------|

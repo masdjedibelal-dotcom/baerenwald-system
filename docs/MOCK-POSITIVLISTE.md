@@ -524,7 +524,7 @@ Zusätzlich phasenabhängig (Mock):
 ## Angebots-Wizard
 
 **(1) Element**
-- Vollbild-`WizardShell`, **5 Steps**
+- Vollbild-`DocumentCanvas`, **5 Steps**
 - Doctype-Radios; Projekt-Titel/Beschreibung; Fotodokumentation-Grid; PosBoard; Formular Finalisieren; Angebots-Vorschau (`mail-preview`); Versenden-Übersicht
 
 **(2) Exakter Text — Schritte**
@@ -555,7 +555,7 @@ Zusätzlich phasenabhängig (Mock):
 ## Rechnungs-Wizard
 
 **(1) Element**
-- Vollbild-WizardShell, **3 Steps**
+- Vollbild-DocumentCanvas, **3 Steps**
 - PosBoard; Zahlungsweise-Segmente + Abschlags-Tabelle; Paket/Anlagen/Versandweg; Steuer-Checkboxen; Mail-Preview
 
 **(2) Exakter Text — Schritte**

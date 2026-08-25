@@ -11,6 +11,11 @@ import 'server-only'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
+import {
+  isMailCatcherActive,
+  logMailCatch,
+  newMailCatcherId,
+} from '@/lib/mail/mail-catcher'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -172,6 +177,72 @@ export async function sendMail(
     opts.extraPdfAttachments
   )
 
+  const fromAddr =
+    opts.from ??
+    (opts.typ === 'angebot' || opts.typ === 'handwerker_anfrage' || opts.typ === 'handwerker_formular'
+      ? FROM_ANFRAGEN
+      : FROM_DEFAULT)
+  const cc = normalizeRecipients(opts.cc)
+  const bcc = resolveBcc(opts)
+  const to = Array.isArray(opts.an) ? opts.an : [opts.an]
+
+  if (isMailCatcherActive()) {
+    const catchId = newMailCatcherId()
+    logMailCatch('crm-sendMail', {
+      catchId,
+      typ: opts.typ,
+      to,
+      cc: cc ?? null,
+      bcc: bcc ?? null,
+      from: fromAddr,
+      betreff: opts.betreff,
+      hasPdf: Boolean(opts.pdfBuffer),
+      attachmentCount: attachments?.length ?? 0,
+      kundeId: opts.kundeId ?? null,
+      leadId: opts.leadId ?? null,
+      auftragId: opts.auftragId ?? null,
+      rechnungId: opts.rechnungId ?? null,
+    })
+    try {
+      const gesendetVon = await resolveGesendetVon()
+      const ccJoined = cc?.join(', ') ?? null
+      const insertRow: Record<string, unknown> = {
+        typ: opts.typ,
+        an_email: to.join(', '),
+        an_name: opts.anName ?? null,
+        betreff: opts.betreff,
+        inhalt_html: html,
+        status: 'gesendet',
+        kunde_id: opts.kundeId ?? null,
+        lead_id: opts.leadId ?? null,
+        angebot_id: opts.angebotId ?? null,
+        auftrag_id: opts.auftragId ?? null,
+        rechnung_id: opts.rechnungId ?? null,
+        gesendet_von: gesendetVon,
+        resend_id: catchId,
+        anhang_dateiname:
+          opts.pdfName ??
+          opts.extraPdfAttachments?.[0]?.filename ??
+          attachments?.find((a) => a.contentType === 'application/pdf')?.filename ??
+          attachments?.[0]?.filename ??
+          null,
+        kontext_typ: opts.kontextTyp ?? null,
+        richtung: opts.richtung ?? 'gesendet',
+        cc_email: ccJoined,
+        von_email: opts.vonEmail ?? null,
+        in_reply_to_log_id: opts.inReplyToLogId ?? null,
+        internet_message_id: opts.internetMessageId ?? null,
+      }
+      if (opts.emailLogId) insertRow.id = opts.emailLogId
+      const { id: loggedId } = await insertEmailLogRow(insertRow)
+      return { success: true, resendId: catchId, emailLogId: loggedId ?? opts.emailLogId ?? null }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await logMailError(opts, msg)
+      return { success: false, error: msg }
+    }
+  }
+
   const resend = getResend()
   if (!resend) {
     const msg = 'RESEND_API_KEY fehlt'
@@ -180,14 +251,6 @@ export async function sendMail(
   }
 
   try {
-    const fromAddr =
-      opts.from ??
-      (opts.typ === 'angebot' || opts.typ === 'handwerker_anfrage' || opts.typ === 'handwerker_formular'
-        ? FROM_ANFRAGEN
-        : FROM_DEFAULT)
-    const cc = normalizeRecipients(opts.cc)
-    const bcc = resolveBcc(opts)
-    const to = Array.isArray(opts.an) ? opts.an : [opts.an]
     const result = await resend.emails.send({
       from: fromAddr,
       to,

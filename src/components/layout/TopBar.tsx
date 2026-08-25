@@ -184,12 +184,13 @@ export function TopBar({ user }: TopBarProps) {
             <button
               type="button"
               className={cn('btn sm btn-assistent', assistentOpen && 'is-open')}
-              aria-label="Assistent öffnen"
+              aria-label="KI-Assistent öffnen"
               aria-pressed={assistentOpen}
               onClick={() => toggleAssistent()}
+              title="KI-Assistent"
             >
               <MockIcon ctx="btn" n="sparkles" size={14} />
-              <span className="topbar-cta-label">Assistent</span>
+              <span className="topbar-cta-label">KI</span>
             </button>
 
             <CrmNotificationsBell />

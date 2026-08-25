@@ -61,7 +61,7 @@ e97bd90 v
 | `fa0f59d` (*Bring CRM shell and design tokens to mockup parity.*) | **Nein** | `git cat-file -t fa0f59d` → *Not a valid object name* in diesem Clone |
 | `2354904` Nr. 1 — Listen Welle 1 | **Nein** | Commit existiert hier nicht |
 | `820e802` Nr. 2 — Listen Welle 2 | **Nein** | — |
-| `b666442` Nr. 3 — WizardShell-Optik | **Nein** | — |
+| `b666442` Nr. 3 — DocumentCanvas-Optik | **Nein** | — |
 | `3d880b0` Nr. 4 — P0 Status-Sync | **Nein** | — |
 | `2556e71` Nr. 5 — P0 Kanal-Fix | **Nein** | — |
 | `b4b466e`–`3d8cbc3` Nr. 7a–7d Impersonation | **Nein** | — |
@@ -210,16 +210,16 @@ Aus `docs/LISTEN-KOMPONENTEN-INVENTUR.md` plus Stichprobe im Code:
 | `ListToolbar.tsx` | laut Inventur **verwaist** (0 Produktiv-Imports bestätigt) |
 | `Modal` (nicht `MockModal`) | z. B. `AuftragDetailClient.tsx` Z. 1120+ |
 
-### (h) WizardShell-Parität
+### (h) DocumentCanvas-Parität
 
 | Punkt | Befund | Beleg |
 |-------|--------|-------|
-| `WizardShell.tsx` existiert | **Ja** | `src/components/layout/WizardShell.tsx` Z. 15–16 |
-| In Wizards importiert/verwendet | **Nein** — **0 Imports** außer Definition | `rg WizardShell src` → nur `WizardShell.tsx` |
+| `DocumentCanvas.tsx` existiert | **Ja** | `src/components/layout/DocumentCanvas.tsx` Z. 15–16 |
+| In Wizards importiert/verwendet | **Nein** — **0 Imports** außer Definition | `rg DocumentCanvas src` → nur `DocumentCanvas.tsx` |
 | Angebot/Rechnung-Wizard | Eigene `wizard-header-desktop`-Struktur | `AngebotWizard.tsx` Z. 831 |
 | `PosBoard` in Wizards | **Nein** — `PosBoard` nur innerhalb `components/posboard/` referenziert | `rg "from '@/components/posboard"` → nur `PosBoard.tsx` / `PositionModal.tsx` |
 
-**Parität begonnen** (Dateien + CSS), aber **nicht verdrahtet** (WizardShell, PosBoard).
+**Parität begonnen** (Dateien + CSS), aber **nicht verdrahtet** (DocumentCanvas, PosBoard).
 
 ---
 
@@ -231,7 +231,7 @@ Legende: **umgesetzt** = im laufenden Code nachweisbar und nutzbar · **teilweis
 |-----|-------|--------|-------------------------------|-------------------|
 | **1** | Listen Welle 1 | **teilweise** | Code: `globals.css` 3393–3398, `AnfragenListeClient.tsx` 61/485; Doku: `docs/paritaet/nr1-listen/`; Commit **nur Desktop** `2354904` | Squash-`v`-Historie auf `~/code`; Alt-Filter/Badges bleiben; Nr.-Commit nicht auf Branch |
 | **2** | Listen Welle 2 | **teilweise** | `ListPageParts.tsx` 65–67, `ListGridShell` 85; Screenshots `docs/paritaet/nr2-listen/`; Desktop `820e802` | Wie Nr. 1; `ListFilterBar`/`SortableHeader` nicht ersetzt |
-| **3** | WizardShell-Optik | **teilweise** | `WizardShell.tsx` vorhanden, **unbenutzt**; Screenshot `nr3-wizards/`; Desktop `b666442` | Shell-Datei ohne Integration in `AngebotWizard`/`RechnungWizard` |
+| **3** | DocumentCanvas-Optik | **teilweise** | `DocumentCanvas.tsx` vorhanden, **unbenutzt**; Screenshot `nr3-wizards/`; Desktop `b666442` | Shell-Datei ohne Integration in `AngebotWizard`/`RechnungWizard` |
 | **4** | P0 Status-Sync CRM→Portal | **umgesetzt** | `sync-portal-lead-status.ts`; Aufruf `auftraege/actions.ts` ~77–80; Desktop `3d880b0` | Commit-Message auf `~/code` fehlt (in `v` squash) |
 | **5** | P0 Kanal-Fix | **umgesetzt** | `utils.ts` 130–139 (`kanalLabel`), `KanalIcon.tsx`; Desktop `2556e71` | — |
 | **6** | SQL Cleanup | **n/a (Belal)** | `ENTSCHEIDUNGSLOG.md` Z. 80–82 | Bewusst übersprungen |
@@ -251,7 +251,7 @@ Legende: **umgesetzt** = im laufenden Code nachweisbar und nutzbar · **teilweis
    `nav-config.ts` Z. 35–39 kommentiert: Mock fasst zu **„Vorgänge“** (`folders`) zusammen; CRM behält **getrennte** Einträge Anfragen / Angebote / Aufträge plus **KI Hub** (`/ki-analytics`, Z. 71). Genau das siehst du in der Sidebar.
 
 2. **Du siehst den `~/code`-Stand, nicht die Desktop-Commit-Kette**  
-   Dev-Server-CWD = `~/code/baerenwald-system` @ `9110c1a`. Die **benannten** Paritäts-Commits (`fa0f59d`, Nr. 1–7d) liegen nur auf **Desktop** `008fb9e`, sind aber inhaltlich teils schon über squash-Commits `v` im Code — **ohne** vollständige Verdrahtung (WizardShell, PosBoard, Mock-only-Listen).
+   Dev-Server-CWD = `~/code/baerenwald-system` @ `9110c1a`. Die **benannten** Paritäts-Commits (`fa0f59d`, Nr. 1–7d) liegen nur auf **Desktop** `008fb9e`, sind aber inhaltlich teils schon über squash-Commits `v` im Code — **ohne** vollständige Verdrahtung (DocumentCanvas, PosBoard, Mock-only-Listen).
 
 3. **Hybride UI-Schicht**  
    Tokens und `DetailShell` sind da; Listen nutzen weiter **`ListFilterBar` + `SortableHeader` + `LeadStatusBadge`** statt durchgängig `MockListBar`/`MockSortHead`. `/vorgaenge` ist die Ausnahme mit Mock-Komponenten.
@@ -275,7 +275,7 @@ Legende: **umgesetzt** = im laufenden Code nachweisbar und nutzbar · **teilweis
 | Bereich | Empfehlung |
 |---------|------------|
 | Nr. 1–2 | **Abnahme/Review**, nicht komplett neu — Code weitgehend da; Lücken: Dots-Menü (OP-1), Lucide-Sort, `ListFilterBar`-Ersetzung optional |
-| Nr. 3 | **Nachverdrahtung** — `WizardShell` in `AngebotWizard`/`RechnungWizard` einbinden |
+| Nr. 3 | **Nachverdrahtung** — `DocumentCanvas` in `AngebotWizard`/`RechnungWizard` einbinden |
 | Nr. 4–5, 7 | **Prüfen + testen** — Code vorhanden |
 | Nr. 8a | **Commit auf Branch holen** (`22bb160` oder Diff bestätigen — Code bereits im Tree) |
 | **Nr. 8b–c** | **Neu umsetzen** — PosBoard in Wizards importieren |

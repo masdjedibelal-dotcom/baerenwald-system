@@ -17,8 +17,8 @@ export function mailKiVisualisierungBlock(
 
   const text =
     anrede === 'du'
-      ? 'Wir haben dir eine KI-Visualisierung erstellt — so könnte dein Projekt aussehen. Du findest sie im Angebots-PDF.'
-      : 'Wir haben Ihnen eine KI-Visualisierung erstellt — so könnte Ihr Projekt aussehen. Sie finden sie im Angebots-PDF.'
+      ? 'Im Angebot findest du eine <strong>KI-generierte Visualisierung</strong> — so könnte dein Projekt aussehen (PDF).'
+      : 'Im Angebot finden Sie eine <strong>KI-generierte Visualisierung</strong> — so könnte Ihr Projekt aussehen (PDF).'
 
   return `<p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
 }

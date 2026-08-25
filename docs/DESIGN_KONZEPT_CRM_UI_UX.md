@@ -430,7 +430,7 @@ Dokument-Canvas (eine Seite)
 
 | Regel | Detail |
 |-------|--------|
-| Container | `DocumentCanvas` / `WizardShell` |
+| Container | `DocumentCanvas`` |
 | Mobile | Bottom Sheet für Picker & Anlegen |
 | Desktop | **Detail → Slide-over**; **aus Canvas → Center-Modal** ([SURFACE-KONSOLIDIERUNG](./SURFACE-KONSOLIDIERUNG.md) S1) |
 | Speichern | Header ✓ = Entwurf; Senden = Toolbar |
