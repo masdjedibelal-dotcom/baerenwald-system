@@ -17,12 +17,25 @@ Staging versendet **keine** echten Resend-Mails:
 
 | Ort | Verhalten |
 |---|---|
-| CRM `src/lib/mail-service.ts` | Bei Staging-Supabase (`soqownnkxmtfgvsbrgsl`): Log + `email_log` mit `resend_id = staging-catch:…`, kein `resend.emails.send` |
-| Website `src/lib/email/send-branded-mail.ts` | Bei `isStagingDeploy()`: gleiches Muster (Fake-ID, Log) |
+| CRM `src/lib/mail-service.ts` | Bei aktivem Catcher: Log + `email_log` mit `resend_id = staging-catch:<uuid>`, kein `resend.emails.send` |
+| Website `src/lib/email/send-branded-mail.ts` | Bei aktivem Catcher: Log + `email_log` mit `resend_id = staging-catch:website-<uuid>`, kein Resend |
 | Cron `netlify/functions/cron-dispatcher.mjs` | Mail-/Notify-Jobs (`rechnungen`, `angebot-nachfass`, `einbehalte`, `datenschutz`, `copilot-briefing`) auf Staging-Host **übersprungen** |
 | Telegram `src/lib/copilot/telegram.ts` | Auf Staging nur Log |
 
-Override (Notfall): `ALLOW_STAGING_REAL_MAIL=1`. Erzwingen auch ohne Staging-URL: `MAIL_CATCHER=1`.
+**Catcher aktiv wenn** `ALLOW_STAGING_REAL_MAIL !== '1'` **und** eine der Bedingungen:
+
+| Repo | Auto-Erkennung | Explizit |
+|---|---|---|
+| CRM | `NEXT_PUBLIC_SUPABASE_URL` enthält `soqownnkxmtfgvsbrgsl` (`isStagingSupabase()`) | `MAIL_CATCHER=1` |
+| Website | Staging-Supabase-Ref, Netlify-Branch `staging`, oder URL enthält `staging--baerenwald` (`isStagingDeploy()`) | `MAIL_CATCHER=1` |
+
+**Prod:** weder Staging-Supabase noch Staging-Netlify-URL → Catcher aus → normaler Resend-Versand (sofern `RESEND_API_KEY` gesetzt).
+
+Override (Notfall, echte Mails auf Staging): `ALLOW_STAGING_REAL_MAIL=1`.
+
+**Netlify (beide Staging-Sites):** Staging-Supabase-URL reicht für Auto-Catcher; optional `MAIL_CATCHER=1` als explizite Absicherung. Prod-Sites: diese Variablen **nicht** setzen.
+
+Nachweis-Skript: `node --env-file=.env.staging scripts/staging/trigger-portal-mail-catch.mjs` → prüft `email_log.resend_id LIKE 'staging-catch:%'`.
 
 Seed Runde 2 (Auftrag/Nachtrag/RE/Tokens): `node --env-file=.env.staging scripts/staging/seed-runde2.mjs`  
 Echtdaten-Anonymisierung: `node --env-file=.env.staging scripts/staging/anonymize-echtdaten.mjs`

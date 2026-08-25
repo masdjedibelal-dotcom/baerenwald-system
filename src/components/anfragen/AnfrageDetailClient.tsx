@@ -54,6 +54,8 @@ import {
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { MeldungsdetailsCard } from '@/components/anfragen/MeldungsdetailsCard'
+import { HvWarteFreigabeSheet } from '@/components/anfragen/HvWarteFreigabeSheet'
 import { LeadBefundCrmCard } from '@/components/anfragen/LeadBefundCrmCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
@@ -273,6 +275,7 @@ export function AnfrageDetailClient({
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
   const [anfragenOpen, setAnfragenOpen] = useState(false)
+  const [hvWarteSheetOpen, setHvWarteSheetOpen] = useState(false)
   const [einholungRows, setEinholungRows] = useState<AnfragePartnerEinholungRow[]>([])
 
   useEffect(() => {
@@ -582,16 +585,17 @@ export function AnfrageDetailClient({
   const wartetAufHvFreigabe = leadWartetAufHvStartFreigabe(lead)
   const hatAuftrag = Boolean(leadStatusData.auftrag_id)
 
+  const openHvWarteHinweis = useCallback(() => {
+    setHvWarteSheetOpen(true)
+  }, [])
+
   const openAngebotErstellen = useCallback(() => {
     if (wartetAufHvFreigabe) {
-      toast.message('Warte auf HV / Hausmeister', {
-        description:
-          'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du disponierst.',
-      })
+      openHvWarteHinweis()
       return
     }
     openAngebotAuswahl()
-  }, [openAngebotAuswahl, wartetAufHvFreigabe])
+  }, [openAngebotAuswahl, openHvWarteHinweis, wartetAufHvFreigabe])
 
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -616,15 +620,12 @@ export function AnfrageDetailClient({
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
       if (wartetAufHvFreigabe) {
-        toast.message('Warte auf HV / Hausmeister', {
-          description:
-            'HV muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du ein Angebot erstellst.',
-        })
+        openHvWarteHinweis()
         return
       }
       openAngebotErstellen()
     }
-  }, [matrixCta, openAngebotErstellen, wartetAufHvFreigabe])
+  }, [matrixCta, openAngebotErstellen, openHvWarteHinweis, wartetAufHvFreigabe])
 
   const detailPrimary = useMemo(() => {
     if (hatAuftrag) return null
@@ -640,12 +641,7 @@ export function AnfrageDetailClient({
       return {
         label: 'Warte auf HV / Hausmeister',
         icon: 'clock',
-        onClick: () => {
-          toast.message('Warte auf HV / Hausmeister', {
-            description:
-              'Mieter-Meldung: HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach erscheint „Angebot erstellen“.',
-          })
-        },
+        onClick: openHvWarteHinweis,
         disabled: false,
       }
     }
@@ -664,6 +660,7 @@ export function AnfrageDetailClient({
     openDirektBeauftragen,
     pending,
     primaryCtaAction,
+    openHvWarteHinweis,
   ])
 
   const detailSecondary = useMemo(() => {
@@ -786,6 +783,7 @@ export function AnfrageDetailClient({
   const stammdatenInhalt = (
     <>
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
+      <MeldungsdetailsCard lead={lead} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
       <LeadBefundCrmCard leadId={lead.id} />
     </>
@@ -1116,6 +1114,14 @@ export function AnfrageDetailClient({
       ) : null}
 
       {quickActionSheets}
+
+      <HvWarteFreigabeSheet
+        open={hvWarteSheetOpen}
+        onClose={() => setHvWarteSheetOpen(false)}
+        leadId={lead.id}
+        hvMeldungStatus={lead.hv_meldung_status}
+        auftraggeberKundeId={lead.auftraggeber_kunde_id}
+      />
       </div>
     </EntityDetailLayout>
   )

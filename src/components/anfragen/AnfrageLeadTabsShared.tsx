@@ -156,6 +156,10 @@ export function LeadNotizenListeTab({
         const fd = new FormData()
         fd.append('file', pendingFoto.file)
         const res = await fetch(`/api/anfragen/${leadId}/notiz-foto`, { method: 'POST', body: fd })
+        if (res.status === 413) {
+          toast.error('Datei zu groß (max. 8 MB)')
+          return
+        }
         const js: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}))
         if (!res.ok) {
           const msg = typeof js.error === 'string' ? js.error : 'Foto-Upload fehlgeschlagen.'

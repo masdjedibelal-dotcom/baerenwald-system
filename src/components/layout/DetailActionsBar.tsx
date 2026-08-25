@@ -191,6 +191,7 @@ export function DetailActionsBar({
           onClick={secondary.onClick}
           disabled={secondary.disabled}
           aria-label={secondary.label}
+          title={secondary.title}
         >
           {secondary.icon ? <ActionIcon n={secondary.icon} size={14} /> : null}
           {secondary.label}
@@ -235,6 +236,7 @@ export function DetailActionsBar({
                   onClick={secondary.onClick}
                   disabled={secondary.disabled}
                   aria-label={secondary.label}
+                  title={secondary.title}
                 >
                   {secondary.icon ? <ActionIcon n={secondary.icon} size={16} /> : null}
                   <span className="detail-mobile-action-bar__label min-w-0 truncate">

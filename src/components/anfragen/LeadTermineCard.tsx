@@ -164,6 +164,14 @@ function TerminNotizFormModal({
   function appendFiles(files: FileList | File[]) {
     const list = Array.from(files)
     if (!list.length) return
+    const maxBytes = 8 * 1024 * 1024
+    const tooLarge = list.find((f) => f.size > maxBytes)
+    if (tooLarge) {
+      toast.error('Datei zu groß (max. 8 MB)')
+      if (fileGalleryRef.current) fileGalleryRef.current.value = ''
+      if (fileCameraRef.current) fileCameraRef.current.value = ''
+      return
+    }
     setPendingFotos((prev) => {
       const slots = TERMIN_NOTIZ_MAX_FOTOS - existingUrls.length - prev.length
       if (slots <= 0) {
