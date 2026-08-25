@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import {
   berechneRechnung,
@@ -32,17 +32,40 @@ export async function berechneRechnungMitFirmeneinstellungen(
   return { positionen, firm, berechnung, kleinunternehmer, defaultMwstSatz }
 }
 
+/**
+ * Negiert Positionen für Storno-Gutschrift.
+ * Wichtig: Festpreis-Zeilen oft nur über `vk_netto` (lohn/material = 0) —
+ * vorher repair, sonst entsteht Brutto 0.
+ */
 export function positionenFuerGutschrift(positionen: AngebotPosition[]): AngebotPosition[] {
-  return positionen.map((p) => {
-    const m = p.menge || 1
-    const netto = (p.lohn_netto + p.material_netto) * m
-    const negNetto = -netto
+  return repairAngebotPositionen(normalizeAngebotPositionen(positionen)).map((p) => {
+    const m = Math.max(Number(p.menge) || 1, 0.0001)
+    let lohn = Number(p.lohn_netto) || 0
+    let mat = Number(p.material_netto) || 0
+    const vk = Number(p.vk_netto) || 0
+    const gesamt = Number(p.gesamt_min) || 0
+
+    if (Math.abs(lohn) + Math.abs(mat) < 0.001) {
+      const stueck =
+        Math.abs(vk) > 0.001
+          ? Math.abs(vk)
+          : Math.abs(gesamt) > 0.001
+            ? Math.abs(gesamt) / m
+            : 0
+      lohn = stueck
+      mat = 0
+    }
+
+    const zeile = Math.round((Math.abs(lohn) + Math.abs(mat)) * m * 100) / 100
+    const vkOut = Math.abs(vk) > 0.001 ? Math.abs(vk) : Math.abs(lohn) + Math.abs(mat)
+
     return {
       ...p,
-      lohn_netto: -p.lohn_netto,
-      material_netto: -p.material_netto,
-      gesamt_min: negNetto,
-      gesamt_max: negNetto,
+      lohn_netto: -Math.abs(lohn),
+      material_netto: -Math.abs(mat),
+      vk_netto: -vkOut,
+      gesamt_min: -zeile,
+      gesamt_max: -zeile,
     }
   })
 }
@@ -63,6 +86,8 @@ const COMPLIANCE_COLUMN_MARKERS = [
   'mail_einleitung',
   'mail_betreff',
   'zahlungsbedingungen',
+  'ansprechpartner_id',
+  'kunde_objekt_id',
 ] as const
 
 /** PostgREST-Schema-Cache: Migration 20260521120000_rechnungen_compliance fehlt. */
@@ -133,6 +158,8 @@ export async function rechnungInsertMitSchemaFallback(
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
+      ansprechpartner_id,
+      kunde_objekt_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
@@ -153,6 +180,8 @@ export async function rechnungInsertMitSchemaFallback(
         rechnung_art: _r,
         abschlag_index: _a,
         zahlungsplan_abschlag_id: _z,
+        ansprechpartner_id: _ap,
+        kunde_objekt_id: _ko,
         ...restAbschlag
       } = base as Record<string, unknown>
       base = restAbschlag
@@ -198,6 +227,8 @@ export async function rechnungUpdateMitSchemaFallback(
       rechnung_art,
       abschlag_index,
       zahlungsplan_abschlag_id,
+      ansprechpartner_id,
+      kunde_objekt_id,
       ...restRow
     } = row
     let base = ohneTexte ? restRow : row
@@ -218,6 +249,8 @@ export async function rechnungUpdateMitSchemaFallback(
         rechnung_art: _r,
         abschlag_index: _a,
         zahlungsplan_abschlag_id: _z,
+        ansprechpartner_id: _ap,
+        kunde_objekt_id: _ko,
         ...restAbschlag
       } = base as Record<string, unknown>
       base = restAbschlag

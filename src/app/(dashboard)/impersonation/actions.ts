@@ -23,21 +23,51 @@ async function resolveKundeTarget(kundeId: string): Promise<
   }
   const email = (data.email as string | null)?.trim()
   if (!email) return { ok: false, message: 'Kunde hat keine E-Mail.' }
-  if (!(data.auth_user_id as string | null)?.trim()) {
-    return {
-      ok: false,
-      message: 'Kein Portal-Konto verknüpft — zuerst Einladung / Account anlegen.',
+  const modus = (data.portal_modus as string | null) ?? ''
+  const isOrg = modus === 'organisation'
+  const isHm = modus === 'hausmeister'
+  const hasAuthOnRow = Boolean((data.auth_user_id as string | null)?.trim())
+
+  if (!hasAuthOnRow) {
+    // Primary-Staff-HM: Auth sitzt oft am Handwerker/CRM — Login über E-Mail.
+    const { isBaerenwaldPrimaryStaffEmail } = await import('@/lib/auth/crm-access')
+    if (!(isHm && isBaerenwaldPrimaryStaffEmail(email))) {
+      return {
+        ok: false,
+        message: 'Kein Portal-Konto verknüpft — zuerst Einladung / Account anlegen.',
+      }
+    }
+    const { data: hw } = await supabaseAdmin
+      .from('handwerker')
+      .select('auth_user_id')
+      .ilike('email', email)
+      .not('auth_user_id', 'is', null)
+      .limit(1)
+      .maybeSingle()
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle()
+    if (!hw?.auth_user_id && !profile?.id) {
+      return {
+        ok: false,
+        message: 'Kein Login für diese E-Mail — CRM/Partner-Konto prüfen.',
+      }
     }
   }
-  const isOrg = (data.portal_modus as string | null) === 'organisation'
+
   return {
     ok: true,
     email,
     roleLabel: isOrg
       ? `HV / ${(data.name as string) || 'Organisation'}`
-      : `Kunde / ${(data.name as string) || email}`,
+      : isHm
+        ? `Hausmeister / ${(data.name as string) || email}`
+        : `Kunde / ${(data.name as string) || email}`,
     targetType: isOrg ? 'organisation' : 'kunde',
-    next: '/portal',
+    next: isHm ? '/portal?view=hausmeister' : '/portal',
   }
 }
 

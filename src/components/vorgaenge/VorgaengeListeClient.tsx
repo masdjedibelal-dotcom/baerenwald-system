@@ -43,6 +43,10 @@ import {
   parseVorgangWertLabelEuro,
 } from '@/lib/vorgang/vorgaenge-liste-summe'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
+import {
+  matchesRechnungStatusFilterKey,
+  resolveRechnungKorrekturUi,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import {
@@ -162,7 +166,31 @@ function statusFilterKey(row: VorgangListeRow): string {
 }
 
 function statusLabel(row: VorgangListeRow): string {
+  const ui = resolveRechnungKorrekturUi({
+    status: row.unterstatus,
+    korrektur_von: row.korrektur_von,
+    korrektur_art: row.korrektur_art,
+  })
+  if (ui.dualBadges) return ui.dualBadges.secondary
   return row.unterstatusLabel
+}
+
+function rowMatchesStatusFilter(row: VorgangListeRow, selected: string[]): boolean {
+  if (!selected.length) return true
+  if (row.phase === 'rechnung') {
+    return selected.some((f) =>
+      matchesRechnungStatusFilterKey(
+        {
+          status: row.unterstatus,
+          unterstatus: row.unterstatus,
+          korrektur_von: row.korrektur_von,
+          korrektur_art: row.korrektur_art,
+        },
+        f
+      )
+    )
+  }
+  return selected.includes(statusFilterKey(row))
 }
 
 function dateKey(row: VorgangListeRow): string {
@@ -592,7 +620,7 @@ export function VorgaengeListeClient({
       } else if (filter !== 'alle' && v.phase !== filter) {
         return false
       }
-      if (statusFilter.length && !statusFilter.includes(statusFilterKey(v))) return false
+      if (statusFilter.length && !rowMatchesStatusFilter(v, statusFilter)) return false
       if (
         query &&
         !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId)
@@ -1284,6 +1312,14 @@ export function VorgaengeListeClient({
             const key = rowKey(v)
             const kind = statusKind(v)
             const label = statusLabel(v)
+            const korrekturUi =
+              v.phase === 'rechnung'
+                ? resolveRechnungKorrekturUi({
+                    status: v.unterstatus,
+                    korrektur_von: v.korrektur_von,
+                    korrektur_art: v.korrektur_art,
+                  })
+                : null
             const ersetzt = isErsetzt(v)
             const del = () => {
               if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
@@ -1369,8 +1405,15 @@ export function VorgaengeListeClient({
                 </div>
                 ) : null}
                 {visibleCols.status ? (
-                <div className="vg-status">
-                  <MockBadge kind={kind}>{label}</MockBadge>
+                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {korrekturUi?.dualBadges ? (
+                    <>
+                      <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
+                      <MockBadge kind="neu">{korrekturUi.dualBadges.secondary}</MockBadge>
+                    </>
+                  ) : (
+                    <MockBadge kind={kind}>{label}</MockBadge>
+                  )}
                 </div>
                 ) : null}
               </div>

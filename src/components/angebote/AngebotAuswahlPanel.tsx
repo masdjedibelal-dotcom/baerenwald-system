@@ -16,7 +16,7 @@ import {
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import type { AngebotStatus } from '@/lib/types'
-import { betragAnzeige } from '@/lib/angebot-einfach'
+import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { findeNeuestenEntwurf } from '@/lib/angebote/angebot-lebenszyklus'
 import { ANGEBOT_STATUS_LABELS, formatRelativeDate } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
@@ -200,7 +200,7 @@ export function AngebotAuswahlPanel({
                     {a.created_at ? formatRelativeDate(a.created_at) : '—'}
                     {label ? ` · ${label}` : ''}
                     {' · '}
-                    {betragAnzeige(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                    {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                   </span>
                 </button>
                 <div className="shrink-0">

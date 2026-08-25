@@ -1,7 +1,7 @@
 # CRM-Staff-Funnel — konkretes Step-Mapping
 
 Website-Quelle: `handwerks-plattform` (`getBwRechnerScreenSequence`, `getResolvedStepsForSituation`).  
-CRM-Ziel: verkürzter Staff-Funnel in `WizardShell`, gleiche Daten wie Website (`funnel_daten` + Lead-Spalten).
+CRM-Ziel: verkürzter Staff-Funnel in `DocumentCanvas`, gleiche Daten wie Website (`funnel_daten` + Lead-Spalten).
 
 Legende Aktion:
 - **übernehmen** = gleicher Screen / gleiche Frage

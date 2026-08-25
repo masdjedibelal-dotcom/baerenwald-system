@@ -18,19 +18,22 @@ export function MelderLeistungsortFields({
   objekte,
   onNeuObjekt,
   disabled = false,
+  hideMelder = false,
 }: {
   draft: MelderLeistungsortDraft
   onChange: (patch: Partial<MelderLeistungsortDraft>) => void
   objekte: KundenObjekt[]
   onNeuObjekt?: () => void
   disabled?: boolean
+  /** Rechnung: nur Objekt/Leistungsort, ohne Melder-Block. */
+  hideMelder?: boolean
 }) {
   return (
     <>
       <MockFormSection title="Leistungsort" icon="map-pin">
         <MockField label="Objekt" full>
           <select
-            className="sel"
+            className="sel sel--choice"
             value={draft.kunde_objekt_id ?? ''}
             disabled={disabled}
             onChange={(e) =>
@@ -59,6 +62,7 @@ export function MelderLeistungsortFields({
         ) : null}
       </MockFormSection>
 
+      {hideMelder ? null : (
       <MockFormSection title="Melder" icon="user">
         <MockField label="Name" full>
           <input
@@ -97,6 +101,7 @@ export function MelderLeistungsortFields({
           />
         </MockField>
       </MockFormSection>
+      )}
     </>
   )
 }

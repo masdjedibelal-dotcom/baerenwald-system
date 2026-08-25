@@ -12,6 +12,7 @@ import {
   angebotNrAnzeige,
   angebotStatusKurz,
   auftragStatusKurz,
+  formatAngebotEurKurzBrutto,
   formatEurKurz,
   rechnungStatusKurz,
 } from '@/lib/vorgang/projekt-kontext-labels'
@@ -68,12 +69,12 @@ export function ZugehoerigListe({
   }
 
   for (const a of kontext.angebote.slice(0, 3)) {
-    const betrag = a.gesamt_fix ?? a.gesamt_max ?? a.gesamt_min
+    const betrag = formatAngebotEurKurzBrutto(a.gesamt_fix, a.gesamt_min, a.gesamt_max)
     rows.push({
       key: `angebot-${a.id}`,
       icon: 'ag',
       label: angebotNrAnzeige(a.angebotsnr, a.id),
-      meta: [angebotStatusKurz(a.status, a.status_einfach), formatEurKurz(betrag)]
+      meta: [angebotStatusKurz(a.status, a.status_einfach), betrag !== '—' ? betrag : null]
         .filter(Boolean)
         .join(' · '),
       href: withFrom(`/angebote/${a.id}`),

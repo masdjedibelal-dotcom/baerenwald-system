@@ -319,16 +319,16 @@ export function AssistentPanel() {
       ? scopeMeta.label
       : 'Wie kann ich dir helfen?'
   const startSub = autoSession
-    ? 'KPI-Analyse für den Geschäftsführer'
+    ? 'KPI-Analyse für den Geschäftsführer — KI-Assistent'
     : scopeMeta
       ? scoped?.layer === 'over-sheet'
         ? scoped.scopeId === 'feld'
-          ? 'Sag, wie der Feldtext werden soll — danach Übernehmen.'
+          ? 'KI-Assistent: Sag, wie der Feldtext werden soll — danach Übernehmen.'
           : scoped.scopeId === 'positionen' || scoped.scopeId === 'position'
-            ? 'Beschreib die Position(en) — danach Übernehmen in die Karte.'
-            : 'Beschreib, was du brauchst — danach Übernehmen.'
-        : 'Ich bin dein Assistent für diesen Editor.'
-      : 'Ich bin dein CRM-Assistent.'
+            ? 'KI-Assistent: Beschreib die Position(en) — danach Übernehmen in die Karte.'
+            : 'KI-Assistent: Beschreib, was du brauchst — danach Übernehmen.'
+        : 'Ich bin dein KI-Assistent für diesen Editor.'
+      : 'Ich bin dein KI-Assistent fürs CRM.'
 
   const overSheet = scoped?.layer === 'over-sheet'
   useEffect(() => {
@@ -551,21 +551,21 @@ export function AssistentPanel() {
     ? autoSession.title
     : scopeMeta
       ? `KI · ${scopeMeta.label}`
-      : 'Assistent'
+      : 'KI-Assistent'
 
   return (
     <>
       <button
         type="button"
         className={cn('assistent-scrim', overSheet && 'assistent-scrim--over-sheet')}
-        aria-label="Assistent schließen"
+        aria-label="KI-Assistent schließen"
         onClick={closePanel}
       />
       <aside
         ref={panelRef}
         className={cn('assistent-panel', overSheet && 'assistent-panel--over-sheet')}
         role="dialog"
-        aria-label="Assistent"
+        aria-label="KI-Assistent"
       >
         <header className="assistent-panel__head">
           <button

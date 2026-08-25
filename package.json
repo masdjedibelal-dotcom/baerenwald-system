@@ -25,6 +25,7 @@
     "db:zahlungsplan": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260704120000_zahlungsplan_abschlagsrechnungen.sql",
     "db:rechnungen-zahlungsbedingungen": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260712120000_rechnungen_zahlungsbedingungen.sql",
     "db:rechnungen-hinweis-35a": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260713120000_rechnungen_hinweis_35a.sql",
+    "db:belegnummer-erst-bei-versand": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260818120000_belegnummer_erst_bei_versand.sql",
     "db:rechnungen-all": "npm run db:rechnungen-compliance && npm run db:rechnung-nummer && npm run db:rechnung-nummer-2069 && npm run db:rechnung-texte && npm run db:zahlungsplan && npm run db:rechnungen-zahlungsbedingungen && npm run db:rechnungen-hinweis-35a",
     "db:abschlagsrechnungen": "npm run db:zahlungsplan && npm run db:rechnungen-zahlungsbedingungen",
     "db:portal-fix": "node --env-file=.env.local scripts/apply-sql-migration.mjs scripts/sql/fix-portal-token-not-exists.sql",

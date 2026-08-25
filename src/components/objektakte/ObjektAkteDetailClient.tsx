@@ -50,13 +50,18 @@ export function ObjektAkteDetailClient({
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
+  const [objektState, setObjektState] = useState(objekt)
 
   useEffect(() => {
     setFreigabeErben(objektErbtFreigabe(objekt))
   }, [objekt.id, objekt.freigabe_schwelle_eur, objekt.notfall_direkt])
 
+  useEffect(() => {
+    setObjektState(objekt)
+  }, [objekt])
+
   const orgSlug = kunde.org_kennung?.trim().toLowerCase() || null
-  const objektMeldeSlug = objekt.melde_slug?.trim() || null
+  const objektMeldeSlug = objektState.melde_slug?.trim() || null
   const zeigtMeldeLinks = Boolean(orgSlug && objektMeldeSlug)
   const zeigtFreigabe = Boolean(orgSlug)
 
@@ -66,7 +71,10 @@ export function ObjektAkteDetailClient({
       kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
   }
 
-  const adresse = [kundenObjektStrasseZeile(objekt), [objekt.plz, objekt.ort].filter(Boolean).join(' ')]
+  const adresse = [
+    kundenObjektStrasseZeile(objektState),
+    [objektState.plz, objektState.ort].filter(Boolean).join(' '),
+  ]
     .filter(Boolean)
     .join(', ')
 
@@ -108,7 +116,7 @@ export function ObjektAkteDetailClient({
         </div>
         <div className="card-b">
           <div className="vgid">
-            <div className="vgid-name">{objekt.titel}</div>
+            <div className="vgid-name">{objektState.titel}</div>
             {adresse ? <div className="vgid-meta">{adresse}</div> : null}
             <div className="vgid-chips" style={{ marginTop: 10 }}>
               <span className="vgid-chip ghost">
@@ -140,7 +148,7 @@ export function ObjektAkteDetailClient({
         <MeldeLinksCard
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
-          aushangPdfHref={`/api/objekte/${objekt.id}/aushang-pdf`}
+          aushangPdfHref={`/api/objekte/${objektState.id}/aushang-pdf`}
         />
       ) : null}
 
@@ -151,12 +159,12 @@ export function ObjektAkteDetailClient({
               ? { notfall_direkt: null, freigabe_schwelle_eur: null }
               : {
                   notfall_direkt:
-                    objekt.notfall_direkt != null
-                      ? Boolean(objekt.notfall_direkt)
+                    objektState.notfall_direkt != null
+                      ? Boolean(objektState.notfall_direkt)
                       : kundeFreigabeDefaults.notfall_direkt,
                   freigabe_schwelle_eur:
-                    objekt.freigabe_schwelle_eur != null
-                      ? Number(objekt.freigabe_schwelle_eur)
+                    objektState.freigabe_schwelle_eur != null
+                      ? Number(objektState.freigabe_schwelle_eur)
                       : null,
                 }
           }
@@ -164,7 +172,7 @@ export function ObjektAkteDetailClient({
           erben={freigabeErben}
           onErbenChange={setFreigabeErben}
           onSave={async (next) =>
-            updateKundenObjektFreigabe(objekt.id, kunde.id, {
+            updateKundenObjektFreigabe(objektState.id, kunde.id, {
               notfall_direkt: next.notfall_direkt,
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
             })
@@ -175,7 +183,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektHausmeisterCard
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         liste={akte.orgHausmeisterListe}
         amObjekt={akte.hausmeisterAmObjekt}
         onChanged={refresh}
@@ -183,7 +191,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektKontakteSection
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         kontakte={akte.kontakte.filter((k) => k.rolle !== 'hausmeister')}
         onChanged={refresh}
       />
@@ -205,7 +213,7 @@ export function ObjektAkteDetailClient({
       render: () => (
         <ObjektEinheitenSection
           kundeId={kunde.id}
-          objektId={objekt.id}
+          objektId={objektState.id}
           einheiten={akte.einheiten}
           bewohner={akte.bewohner}
           onChanged={refresh}
@@ -241,7 +249,7 @@ export function ObjektAkteDetailClient({
       crumbBackHref={`/kunden/${kunde.id}`}
       crumbBackLabel="Zurück zu Details"
       head={{
-        title: objekt.titel,
+        title: objektState.titel,
         titleBadges:
           einheitenAnzahl > 0 ? (
             <MockBadge kind="aktiv">

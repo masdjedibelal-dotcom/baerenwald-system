@@ -165,7 +165,7 @@ Pro Listen-Oberfläche geprüft als Varianten derselben Route: **leere Liste**, 
 | Einstellungen (7 Nav) | `/einstellungen/*` | zugeordnet |
 | Mehr | `/mehr` | zugeordnet |
 | Neu erstellen | `/neu` | zugeordnet |
-| Angebots-/Rechnungs-Wizard | WizardShell-Portals | zugeordnet |
+| Angebots-/Rechnungs-Wizard | DocumentCanvas-Portals | zugeordnet |
 | Status-Modal | `StatusModal` | zugeordnet |
 | Kundenportal | `/projekt/[token]` | zugeordnet |
 | Login | `/login` | zugeordnet |

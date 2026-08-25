@@ -43,7 +43,7 @@ Ziel: State-of-the-Art Mobile-App-Feeling + klares Desktop-CRM — gleiche Jobs,
 
 ## A — Flow-Kit (wiederverwendbare Bausteine)
 Definiere und zeige einmal klar (Komponenten-Galerie oder Annotierung):
-- WizardShell: Mobile Toolbar (X · Dots · optional Zurück) + Sticky Footer „Weiter“
+- DocumentCanvas: Mobile Toolbar (X · Dots · optional Zurück) + Sticky Footer „Weiter“
 - Desktop: Titel · Stepper · Zurück/Weiter im Header
 - Card + Overview-Zeilen (Label/Wert) + Button „Bearbeiten“
 - Bottom Sheet: Titel · Formular · Primary „Fertig“
@@ -66,7 +66,7 @@ Ergänze:
 4) Details: [WIZARD-LEXWARE-KONZEPT.md](./WIZARD-LEXWARE-KONZEPT.md)
 
 ## C — Create & Aktionen
-- FAB / „Neu“: Anfrage, Angebot, Rechnung, Abnahme → gleicher Einstieg in WizardShell
+- FAB / „Neu“: Anfrage, Angebot, Rechnung, Abnahme → gleicher Einstieg in DocumentCanvas
 - Detail-Aktionen mobil: Versenden, Ablehnen, Stornieren, Partner anfragen → Bottom Sheet / Action Sheet (kein Desktop-Popover auf dem Phone)
 - Desktop: gleiche Schritte als Modal oder Inline-Panel
 

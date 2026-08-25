@@ -5,10 +5,11 @@ import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
-import { ANGEBOT_STATUS_LABELS, formatDatum, formatPreis } from '@/lib/utils'
+import { formatDatum, formatPreis } from '@/lib/utils'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { resolveStatusEinfach } from '@/lib/angebot-einfach'
+import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import type { AngebotStatus } from '@/lib/types'
 
 type Props = {
@@ -16,7 +17,7 @@ type Props = {
 }
 
 function angebotBetrag(a: ProjektKontext['angebote'][0]): string {
-  return formatPreis(a.gesamt_fix, a.gesamt_min, a.gesamt_max)
+  return formatAngebotEurKurzBrutto(a.gesamt_fix, a.gesamt_min, a.gesamt_max)
 }
 
 export function ProjektUebersichtCard({ kontext }: Props) {

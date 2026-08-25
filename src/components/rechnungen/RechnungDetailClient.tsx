@@ -59,6 +59,7 @@ import {
   rechnungDarfHardGeloeschtWerden,
   rechnungDarfOhneErsatzStorniertWerden,
   rechnungKorrekturModus,
+  resolveRechnungKorrekturUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
@@ -369,13 +370,14 @@ export function RechnungDetailClient({
   }
 
   function handleSenden() {
-    void actionBusy.run('Wird gesendet…', async () => {
+    const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
+    void actionBusy.run(istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…', async () => {
       const r = await sendRechnung(detail.id)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      toast.success('Rechnung gesendet')
+      toast.success(istKorrektur ? 'Korrektur gesendet' : 'Rechnung gesendet')
       setDetail((d) => ({ ...d, status: 'gesendet' }))
       refresh()
     })
@@ -421,6 +423,7 @@ export function RechnungDetailClient({
     const cta = primaryCta('rechnung', detail.status, {
       ueberfaellig,
       eingehend: isEingehend,
+      korrektur: Boolean(String(detail.korrektur_von ?? '').trim()),
     })
     if (cta?.id === 'rechnung_versenden') {
       if (isEingehend) return null
@@ -473,6 +476,7 @@ export function RechnungDetailClient({
     detail.status,
     detail.id,
     detail.auftrag_id,
+    detail.korrektur_von,
     ueberfaellig,
     pending,
     handleSenden,
@@ -501,6 +505,13 @@ export function RechnungDetailClient({
   const rechnungStatus = rechnungStatusDisplay(detail.status, {
     ueberfaellig,
     eingehend: isEingehend,
+    korrektur_von: detail.korrektur_von,
+    korrektur_art: detail.korrektur_art,
+  })
+  const korrekturUi = resolveRechnungKorrekturUi({
+    status: detail.status,
+    korrektur_von: detail.korrektur_von,
+    korrektur_art: detail.korrektur_art,
   })
   const headMeta = useMemo(() => {
     const parts: string[] = []
@@ -735,7 +746,12 @@ export function RechnungDetailClient({
       head={{
         title: kundeName,
         sub: headSub,
-        badges: (
+        badges: korrekturUi.dualBadges ? (
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <StatusBadge status="gesendet" label={korrekturUi.dualBadges.primary} />
+            <StatusBadge status="entwurf" label={korrekturUi.dualBadges.secondary} />
+          </span>
+        ) : (
           <StatusBadge
             status={ueberfaellig ? 'ueberfaellig' : detail.status}
             label={rechnungStatus.label}

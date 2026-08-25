@@ -1,5 +1,6 @@
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { betragAnzeige, resolveStatusEinfach } from '@/lib/angebot-einfach'
+import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { AngebotStatus, AuftragStatus, LeadListAngebot } from '@/lib/types'
@@ -83,7 +84,7 @@ export function buildKundeProjektBaeume(kunde: KundeDetailPayload): KundeProjekt
         status_einfach: a.status_einfach ?? null,
         gueltig_bis: a.gueltig_bis ?? null,
       }),
-      betrag: betragAnzeige(a.gesamt_fix, a.gesamt_min, a.gesamt_max),
+      betrag: formatAngebotEurKurzBrutto(a.gesamt_fix, a.gesamt_min, a.gesamt_max),
       href: `/angebote/${a.id}`,
       }
     })

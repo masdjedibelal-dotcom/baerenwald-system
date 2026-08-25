@@ -8,6 +8,7 @@ import {
   auftragStatusDisplay,
   rechnungStatusDisplay,
 } from '@/lib/status/status-display'
+import { nettoZuBrutto, resolveAngebotGesamtbetrag } from '@/lib/angebot-einfach'
 import { unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 
 /** Angebotsnummer wie im Rest des CRM — ohne doppeltes „AG-“. */
@@ -85,4 +86,16 @@ export function formatEurKurz(n: number | null | undefined): string {
     n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
     ' €'
   )
+}
+
+/** Angebots-Summen in CRM-Phasen-UI: DB speichert netto, Anzeige wie Kunden-Mail (brutto). */
+export function formatAngebotEurKurzBrutto(
+  gesamt_fix: number | null | undefined,
+  gesamt_min: number | null | undefined,
+  gesamt_max: number | null | undefined,
+  mwstSatz = 19
+): string {
+  const netto = resolveAngebotGesamtbetrag(gesamt_fix, gesamt_min, gesamt_max)
+  if (netto == null) return '—'
+  return formatEurKurz(nettoZuBrutto(netto, mwstSatz))
 }

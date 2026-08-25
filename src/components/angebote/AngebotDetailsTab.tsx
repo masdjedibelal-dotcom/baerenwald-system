@@ -8,7 +8,7 @@ import { partnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
-import { betragAnzeige } from '@/lib/angebot-einfach'
+import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -74,7 +74,11 @@ export function AngebotProjektinfosTab({
   editable?: boolean
   onSaved?: () => void
 }) {
-  const betragLabel = betragAnzeige(detail.gesamt_fix, detail.gesamt_min, detail.gesamt_max)
+  const betragLabel = formatAngebotEurKurzBrutto(
+    detail.gesamt_fix,
+    detail.gesamt_min,
+    detail.gesamt_max
+  )
   const angebotNr =
     detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
 

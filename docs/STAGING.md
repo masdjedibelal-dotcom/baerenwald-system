@@ -11,7 +11,21 @@ Staging ist ein **eigenes** Supabase-Projekt. Prod ist ab jetzt **read-only**.
 | Staging-Website (Portal) | `https://staging--baerenwald.netlify.app` |
 | Staging-CRM | `https://staging--baerenwald-backend.netlify.app` |
 
-Phase A–E (Env-Kanon, Mail-Catch, noindex) ist **nicht** Teil dieses Schritts.
+## Mail-Catch (P0-1)
+
+Staging versendet **keine** echten Resend-Mails:
+
+| Ort | Verhalten |
+|---|---|
+| CRM `src/lib/mail-service.ts` | Bei Staging-Supabase (`soqownnkxmtfgvsbrgsl`): Log + `email_log` mit `resend_id = staging-catch:…`, kein `resend.emails.send` |
+| Website `src/lib/email/send-branded-mail.ts` | Bei `isStagingDeploy()`: gleiches Muster (Fake-ID, Log) |
+| Cron `netlify/functions/cron-dispatcher.mjs` | Mail-/Notify-Jobs (`rechnungen`, `angebot-nachfass`, `einbehalte`, `datenschutz`, `copilot-briefing`) auf Staging-Host **übersprungen** |
+| Telegram `src/lib/copilot/telegram.ts` | Auf Staging nur Log |
+
+Override (Notfall): `ALLOW_STAGING_REAL_MAIL=1`. Erzwingen auch ohne Staging-URL: `MAIL_CATCHER=1`.
+
+Seed Runde 2 (Auftrag/Nachtrag/RE/Tokens): `node --env-file=.env.staging scripts/staging/seed-runde2.mjs`  
+Echtdaten-Anonymisierung: `node --env-file=.env.staging scripts/staging/anonymize-echtdaten.mjs`
 
 ---
 

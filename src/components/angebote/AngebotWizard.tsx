@@ -915,7 +915,8 @@ export function AngebotWizard({
         !artikelA.some((z) => !z.bezeichnung.trim())
       if (canSilentSave) {
         try {
-          await persistDraft({ notify: false })
+          const id = await persistDraft({ notify: false })
+          if (id) toast.autoSaved({ label: 'Entwurf' })
         } catch {
           /* ignore */
         }

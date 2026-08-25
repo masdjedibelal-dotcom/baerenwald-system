@@ -51,6 +51,10 @@ export type RechnungWizardBootstrap = {
   auftragId: string | null
   angebotId: string | null
   kundeId: string
+  /** Optional: Empfänger-Ansprechpartner (null = Hauptkontakt / Primär). */
+  ansprechpartnerId?: string | null
+  /** Ausführungsort / Verwaltungsobjekt (HV/Gewerbe). */
+  kundeObjektId?: string | null
   /** Direktrechnung von /rechnungen/neu (ohne Anfrage/Angebot/Auftrag) */
   standalone?: boolean
   kunde: Pick<
@@ -85,12 +89,14 @@ export type RechnungWizardBootstrap = {
   wiederkehr_turnus?: string | null
   /**
    * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
-   * nur Mail → ohne Storno.
+   * nur Mail → ohne Storno. Auch Ersatz-Entwurf mit korrektur_von.
    */
   korrekturKontext?: {
     originalStatus: string
     originalNr: string
     materialFingerprint: string
+    /** true = bereits Ersatz-Entwurf (korrektur_von gesetzt) */
+    istErsatzEntwurf?: boolean
   } | null
 }
 

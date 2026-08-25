@@ -232,6 +232,11 @@ export function KundenDokumenteTab({
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
         const id = `angebot-${ang.id}`
         const m = meta[id]
+        const group = groupForVorgang({
+          leadId,
+          auftragId: a.id,
+          angebot: ang,
+        })
         rows.push({
           id,
           name: m?.name?.trim() || `Angebot ${String(ang.id).slice(0, 8).toUpperCase()}`,
@@ -278,12 +283,18 @@ export function KundenDokumenteTab({
     }
 
     for (const l of leads) {
-      const group = groupForVorgang({ leadId: l.id })
       for (const ang of l.angebote ?? []) {
         if (!ang?.id || seen.has(`angebot-${ang.id}`)) continue
-        if ('auftrag_id' in ang && ang.auftrag_id) continue
+        // Orphan/Merge-Fall:
+        // Wenn zwar `auftrag_id` gesetzt ist, der zugehörige Auftrag aber nicht geladen ist,
+        // darf das Angebot trotzdem in der Akte erscheinen.
+        const offerAuftragId = ('auftrag_id' in ang
+          ? (ang as { auftrag_id?: string | null }).auftrag_id?.trim()
+          : null) as string | null
+        if (offerAuftragId && auftragById.has(offerAuftragId)) continue
         const id = `angebot-${ang.id}`
         const m = meta[id]
+        const offerGroup = groupForVorgang({ leadId: l.id, angebot: ang })
         rows.push({
           id,
           name: m?.name?.trim() || `Angebot ${ang.id.slice(0, 8).toUpperCase()}`,
@@ -293,7 +304,7 @@ export function KundenDokumenteTab({
           quelle: 'angebot',
           beschreibung: m?.beschreibung ?? '',
           freigabe: m?.freigabe ?? true,
-          ...group,
+          ...offerGroup,
         })
         seen.add(id)
       }

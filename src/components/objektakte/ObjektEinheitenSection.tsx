@@ -8,6 +8,7 @@ import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
@@ -28,8 +29,9 @@ import type {
   ObjektEinheit,
 } from '@/lib/objektakte/types'
 import { toast } from '@/components/ui/app-toast'
+import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
-const EINHEIT_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 72px 28px'
 const PERSON_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 44px'
 
 type PersonForm = {
@@ -56,6 +58,7 @@ export function ObjektEinheitenSection({
   onChanged: () => void
 }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [einheiten, setEinheiten] = useState(() =>
     initialEinheiten.filter((e) => e.aktiv !== false)
   )
@@ -65,6 +68,9 @@ export function ObjektEinheitenSection({
   const [pending, startTransition] = useTransition()
 
   const [detail, setDetail] = useState<ObjektEinheit | null>(null)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
 
   const [einheitFormOpen, setEinheitFormOpen] = useState(false)
   const [einheitEdit, setEinheitEdit] = useState<ObjektEinheit | null>(null)
@@ -101,10 +107,51 @@ export function ObjektEinheitenSection({
   }, [initialBewohner])
 
   useEffect(() => {
+    setSelected((prev) => {
+      const ids = new Set(einheiten.map((e) => e.id))
+      let changed = false
+      const next: Record<string, boolean> = {}
+      for (const [id, on] of Object.entries(prev)) {
+        if (!ids.has(id)) {
+          changed = true
+          continue
+        }
+        if (on) next[id] = true
+      }
+      return changed ? next : prev
+    })
+  }, [einheiten])
+
+  useEffect(() => {
     if (!detail) return
     const next = einheiten.find((e) => e.id === detail.id) ?? null
     setDetail(next)
   }, [einheiten, detail?.id])
+
+  const selectedIds = useMemo(
+    () => Object.keys(selected).filter((id) => selected[id]),
+    [selected]
+  )
+  const selectedCount = selectedIds.length
+  const selectedRows = useMemo(
+    () => einheiten.filter((e) => selected[e.id]),
+    [einheiten, selected]
+  )
+  const allSelected = einheiten.length > 0 && selectedCount === einheiten.length
+
+  function toggleSel(id: string) {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected({})
+      return
+    }
+    const next: Record<string, boolean> = {}
+    for (const e of einheiten) next[e.id] = true
+    setSelected(next)
+  }
 
   const byEinheit = useMemo(() => {
     const map = new Map<string, EinheitBewohner[]>()
@@ -272,19 +319,12 @@ export function ObjektEinheitenSection({
         toast.error(r.message)
         return
       }
-      toast.success('Entfernt')
+      toast.success('Gelöscht')
       onChanged()
     })
   }
 
   function entfernenEinheit(u: ObjektEinheit) {
-    if (
-      !confirm(
-        `Einheit „${u.bezeichnung}“ wirklich entfernen? Zugeordnete Personen werden mitentfernt.`
-      )
-    ) {
-      return
-    }
     startTransition(async () => {
       const r = await deleteObjektEinheit(kundeId, objektId, u.id)
       if (!r.ok) {
@@ -292,26 +332,48 @@ export function ObjektEinheitenSection({
         return
       }
       if (detail?.id === u.id) setDetail(null)
-      toast.success('Einheit entfernt')
+      toast.success('Einheit gelöscht')
       onChanged()
     })
   }
 
-  function einheitMenu(u: ObjektEinheit): EntityMenuItem[] {
-    return [
-      { icon: 'eye', label: 'Details', onClick: () => setDetail(u) },
-      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openEinheitBearbeiten(u) },
-      'sep',
-      {
-        icon: 'trash',
-        label: 'Löschen',
-        danger: true,
-        onClick: () => {
-          if (pending) return
-          entfernenEinheit(u)
-        },
-      },
-    ]
+  async function runBulkDelete() {
+    if (!selectedRows.length || bulkDeletePending) return
+    setBulkDeletePending(true)
+    try {
+      const failed: string[] = []
+      for (const u of selectedRows) {
+        const r = await deleteObjektEinheit(kundeId, objektId, u.id)
+        if (!r.ok) {
+          failed.push(u.bezeichnung)
+          continue
+        }
+        if (detail?.id === u.id) setDetail(null)
+      }
+      setSelected({})
+      setBulkDeleteOpen(false)
+      if (failed.length) {
+        toast.error(
+          failed.length === 1
+            ? `„${failed[0]}“ konnte nicht gelöscht werden.`
+            : `${failed.length} Einheiten konnten nicht gelöscht werden.`
+        )
+      } else {
+        toast.success(
+          selectedRows.length === 1
+            ? 'Einheit gelöscht'
+            : `${selectedRows.length} Einheiten gelöscht`
+        )
+      }
+      onChanged()
+    } finally {
+      setBulkDeletePending(false)
+    }
+  }
+
+  function openBearbeitenBulk() {
+    if (selectedRows.length !== 1) return
+    openEinheitBearbeiten(selectedRows[0]!)
   }
 
   function personMenu(b: EinheitBewohner, rolle: EinheitBewohnerRolle): EntityMenuItem[] {
@@ -491,19 +553,89 @@ export function ObjektEinheitenSection({
     )
   }
 
+  function einheitRow(u: ObjektEinheit) {
+    const people = peopleFor(u.id)
+    const leer = people.length === 0
+    const meta = metaFor(u)
+    const isChecked = Boolean(selected[u.id])
+    return (
+      <div
+        key={u.id}
+        className={cn(
+          isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
+          isChecked && 'is-checked'
+        )}
+      >
+        <div
+          className="vg-check"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleSel(u.id)
+          }}
+          role="checkbox"
+          aria-checked={isChecked}
+          aria-label={`${u.bezeichnung} auswählen`}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              toggleSel(u.id)
+            }
+          }}
+        >
+          <span className={cn('vg-box', isChecked && 'on')}>
+            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={() => setDetail(u)}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{u.bezeichnung}</span>
+                <MockBadge kind={leer ? 'warten' : 'aktiv'}>{leer ? 'leer' : 'belegt'}</MockBadge>
+              </div>
+              <div className="ap-mobile-card__meta">{meta || 'Keine Personen'}</div>
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">{u.bezeichnung}</span>
+              <span className="ap-list__dim">{meta || 'Keine Personen'}</span>
+              <span className="ap-list__dim">
+                <MockBadge kind={leer ? 'warten' : 'aktiv'}>{leer ? 'leer' : 'belegt'}</MockBadge>
+              </span>
+            </>
+          )}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <MockCard
-        title={
-          einheiten.length
-            ? `Einheiten · ${einheiten.length}`
-            : 'Einheiten'
-        }
+        title={einheiten.length ? `Einheiten · ${einheiten.length}` : 'Einheiten'}
         icon="building"
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
-            Einheit
-          </MockBtn>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {einheiten.length > 0 ? (
+              <MockBtn
+                sm
+                kind="ghost"
+                onClick={toggleAll}
+                title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+              >
+                {allSelected ? 'Keine' : 'Alle'}
+              </MockBtn>
+            ) : null}
+            <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
+              Hinzufügen
+            </MockBtn>
+          </div>
         }
       >
         <p
@@ -512,67 +644,104 @@ export function ObjektEinheitenSection({
         >
           Einheit öffnen → Eigentümer und Mieter verwalten (wie im HV-Portal).
         </p>
+
+        {selectedCount > 0 ? (
+          <div className="bulkbar" style={{ marginBottom: 12 }}>
+            <span className="bulkbar-count">
+              <b>{selectedCount}</b> ausgewählt
+            </span>
+            <div style={{ flex: 1 }} />
+            {selectedCount === 1 ? (
+              <MockBtn
+                kind="ghost"
+                sm
+                icon="pencil"
+                onClick={openBearbeitenBulk}
+                disabled={pending}
+              >
+                Bearbeiten
+              </MockBtn>
+            ) : null}
+            <MockBtn
+              kind="danger"
+              sm
+              icon="trash"
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={bulkDeletePending || pending}
+            >
+              Löschen
+            </MockBtn>
+            <MockBtn
+              kind="ghost"
+              sm
+              className="qa-btn bulkbar-clear"
+              icon="x"
+              onClick={() => setSelected({})}
+              title="Auswahl aufheben"
+            />
+          </div>
+        ) : null}
+
         {einheiten.length === 0 ? (
           <MockEmpty
             icon="building"
             title="Noch keine Einheiten"
             hint="Einheit anlegen — danach Eigentümer und Mieter zuordnen"
+            action={
+              <MockBtn kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
+                Hinzufügen
+              </MockBtn>
+            }
           />
+        ) : isMobile ? (
+          <div className="ap-cards vg-selectmode">{einheiten.map(einheitRow)}</div>
         ) : (
-          <div className="listcard">
-            <div className="list-row head" style={{ gridTemplateColumns: EINHEIT_COLS }} aria-hidden>
-              <div>Einheit</div>
-              <div>Details</div>
-              <div>Status</div>
-              <div />
+          <div className="ap-list vg-selectmode">
+            <div className="ap-list__head ap-list__head--select">
+              <span aria-hidden />
+              <span>Einheit</span>
+              <span>Details</span>
+              <span>Status</span>
             </div>
-            {einheiten.map((u) => {
-              const people = peopleFor(u.id)
-              const leer = people.length === 0
-              const meta = metaFor(u)
-              return (
-                <div
-                  key={u.id}
-                  role="button"
-                  tabIndex={0}
-                  className="list-row"
-                  style={{ gridTemplateColumns: EINHEIT_COLS, alignItems: 'center' }}
-                  onClick={() => setDetail(u)}
-                  onKeyDown={(ev) => {
-                    if (ev.key === 'Enter' || ev.key === ' ') {
-                      ev.preventDefault()
-                      setDetail(u)
-                    }
-                  }}
-                >
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {u.bezeichnung}
-                  </div>
-                  <div
-                    className="lc-sub"
-                    style={{ color: 'var(--text-2)' }}
-                    title={meta || 'Keine Personen'}
-                  >
-                    {meta || 'Keine Personen'}
-                  </div>
-                  <div className="lc-pills">
-                    <MockBadge kind={leer ? 'warten' : 'aktiv'}>
-                      {leer ? 'leer' : 'belegt'}
-                    </MockBadge>
-                  </div>
-                  <div
-                    className="row-actions always"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ justifyContent: 'flex-end' }}
-                  >
-                    <MockEntityRowMenu items={einheitMenu(u)} title="Einheit" />
-                  </div>
-                </div>
-              )
-            })}
+            {einheiten.map(einheitRow)}
           </div>
         )}
       </MockCard>
+
+      <MockModal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!bulkDeletePending) setBulkDeleteOpen(false)
+        }}
+        icon="trash"
+        title={selectedCount === 1 ? 'Einheit löschen?' : `${selectedCount} Einheiten löschen?`}
+        sub="Zugeordnete Personen werden mitgelöscht."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={bulkDeletePending ? undefined : 'trash'}
+              disabled={bulkDeletePending}
+              onClick={() => void runBulkDelete()}
+            >
+              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {bulkDeletePending
+            ? 'Bitte warten…'
+            : selectedCount === 1
+              ? `„${selectedRows[0]?.bezeichnung ?? 'Einheit'}“ wird unwiderruflich gelöscht.`
+              : `${selectedCount} ausgewählte Einheiten werden unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
 
       {/* Detail: Einheit + Personen */}
       <EditorSheet
@@ -583,21 +752,27 @@ export function ObjektEinheitenSection({
         size="md"
         footer={
           detail ? (
-            <div className="kunde-create-footer">
-              <button
-                type="button"
-                className="btn ghost"
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <MockBtn
+                kind="danger"
+                sm
+                icon="trash"
+                disabled={pending}
+                onClick={() => {
+                  if (!detail || pending) return
+                  entfernenEinheit(detail)
+                }}
+              >
+                Löschen
+              </MockBtn>
+              <MockBtn
+                kind="ghost"
+                sm
+                icon="pencil"
                 disabled={pending}
                 onClick={() => openEinheitBearbeiten(detail)}
               >
                 Bearbeiten
-              </button>
-              <MockBtn
-                kind="ghost"
-                disabled={pending}
-                onClick={() => entfernenEinheit(detail)}
-              >
-                Entfernen
               </MockBtn>
             </div>
           ) : null

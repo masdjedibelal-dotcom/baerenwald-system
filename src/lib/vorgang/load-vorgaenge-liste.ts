@@ -135,7 +135,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
   const leadLimit = scoped ? 80 : 200
 
   const RECHNUNG_SELECT =
-    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, richtung, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
+    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, richtung, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
 
   let handwerkerLeadIds: string[] | null = null
   if (handwerkerId) {
@@ -386,6 +386,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
     ersetzt_durch?: string | null
+    korrektur_von?: string | null
+    korrektur_art?: string | null
     richtung?: string | null
     handwerker_id?: string | null
     angebot_handwerker_id?: string | null
@@ -429,6 +431,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
     ersetzt_durch?: string | null
+    korrektur_von?: string | null
+    korrektur_art?: string | null
     richtung: 'ausgehend' | 'eingehend'
     handwerker_id: string | null
     handwerker_name: string | null
@@ -463,6 +467,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       ist_wiederkehrend: r.ist_wiederkehrend,
       wiederkehr_turnus: r.wiederkehr_turnus,
       ersetzt_durch: r.ersetzt_durch ?? null,
+      korrektur_von: r.korrektur_von ?? null,
+      korrektur_art: r.korrektur_art ?? null,
       richtung,
       handwerker_id: r.handwerker_id?.trim() || null,
       handwerker_name: hwName,
@@ -681,6 +687,16 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
             ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
                 ?.ersetzt_durch ?? null
             : null,
+      korrektur_von:
+        listPhase === 'rechnung' && !rechnungAusstehend
+          ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
+              ?.korrektur_von ?? null
+          : null,
+      korrektur_art:
+        listPhase === 'rechnung' && !rechnungAusstehend
+          ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
+              ?.korrektur_art ?? null
+          : null,
     })
 
     // Abschläge als eigene Zeilen (auch wenn Stamm als „Rechnung ausstehend“ läuft).
@@ -774,6 +790,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       wiederkehr_turnus: r.wiederkehr_turnus ?? null,
       standalone: true,
       ersetzt_durch: r.ersetzt_durch ?? null,
+      korrektur_von: r.korrektur_von ?? null,
+      korrektur_art: r.korrektur_art ?? null,
       rechnungRichtung: 'ausgehend',
     })
   }

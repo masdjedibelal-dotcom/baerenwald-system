@@ -13,7 +13,9 @@ import {
 import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import {
+  findeKorrekturOriginalId,
   findeNachfolgerRechnungId,
+  linkRechnungKorrekturKette,
   rechnungDarfStornoZurueckgenommenWerden,
   type RechnungKorrekturSibling,
 } from '@/lib/rechnungen/rechnung-korrektur'
@@ -50,6 +52,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     abschlag_index?: number | null
     richtung?: string | null
     handwerker_id?: string | null
+    korrektur_von?: string | null
+    korrektur_art?: string | null
   }
 
   const isEingehend = String(rec.richtung ?? '') === 'eingehend'
@@ -141,6 +145,36 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
   const auftragRechnungen = (auftragRechnungenRaw ?? []) as RechnungAuswahlZeile[]
   const siblings = (siblingRes.data ?? []) as RechnungKorrekturSibling[]
 
+  let detailRec = data as Rechnung
+  if (
+    !isEingehend &&
+    String(rec.status ?? '') === 'entwurf' &&
+    !String(rec.korrektur_von ?? '').trim()
+  ) {
+    const origId = findeKorrekturOriginalId(
+      {
+        id: params.id,
+        created_at: rec.created_at,
+        zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
+        rechnung_art: rec.rechnung_art,
+        abschlag_index: rec.abschlag_index,
+      },
+      siblings
+    )
+    if (origId) {
+      await linkRechnungKorrekturKette(supabase, {
+        originalId: origId,
+        neuId: params.id,
+        art: 'gespeichert',
+      })
+      detailRec = {
+        ...detailRec,
+        korrektur_von: origId,
+        korrektur_art: 'gespeichert',
+      }
+    }
+  }
+
   const nachfolgerRechnungId = isEingehend
     ? null
     : findeNachfolgerRechnungId(
@@ -160,7 +194,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
 
   return (
     <RechnungDetailClient
-      detail={data as Rechnung}
+      detail={detailRec}
       kleinunternehmerFirma={parseKleinunternehmerSetting(firm.kleinunternehmer)}
       gewerke={(gwRes.data ?? []) as Gewerk[]}
       preislisten={(plRes.data ?? []) as Preisliste[]}

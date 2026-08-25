@@ -6,6 +6,7 @@ import {
 } from '@/lib/angebot-einfach'
 import type { AuftragStatus, LeadStatus, OrgFreigabeStatus } from '@/lib/types'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
+import { resolveRechnungKorrekturUi } from '@/lib/rechnungen/rechnung-korrektur'
 import { AUFTRAG_STATUS_LABELS, STATUS_LABELS, formatDatum } from '@/lib/utils'
 import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
 
@@ -95,10 +96,25 @@ export function auftragStatusDisplay(status: AuftragStatus | string): StatusDisp
 /** Nutzer-sichtbares Label + semantische Farbe für Rechnung. */
 export function rechnungStatusDisplay(
   status: RechnungStatus | string,
-  opts?: { ueberfaellig?: boolean; eingehend?: boolean }
+  opts?: {
+    ueberfaellig?: boolean
+    eingehend?: boolean
+    korrektur_von?: string | null
+    korrektur_art?: string | null
+  }
 ): StatusDisplay {
   if (opts?.ueberfaellig) {
     return { label: 'Überfällig', variant: 'warning' }
+  }
+  if (opts?.korrektur_von) {
+    const ui = resolveRechnungKorrekturUi({
+      status,
+      korrektur_von: opts.korrektur_von,
+      korrektur_art: opts.korrektur_art,
+    })
+    if (ui.dualBadges) {
+      return { label: ui.dualBadges.secondary, variant: 'neutral' }
+    }
   }
   const key = status as RechnungStatus
   if (opts?.eingehend && key === 'bezahlt') {

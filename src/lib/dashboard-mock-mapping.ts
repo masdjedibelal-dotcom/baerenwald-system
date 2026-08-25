@@ -73,10 +73,15 @@ export function rechnungDashboardBadge(input: {
   return { kind: 'plain', label: input.status || '—' }
 }
 
-/** KPI: Neue Anfragen = Phase Anfrage offen (neu|kontaktiert) */
-export function isNeueAnfrageStatus(status: string | null | undefined): boolean {
+/** KPI: Offene Anfragen = Status neu/kontaktiert/termin, ohne Soft-Delete, ohne verknüpftes Angebot. */
+export function isOffeneAnfrageStatus(status: string | null | undefined): boolean {
   const s = String(status ?? '').toLowerCase()
-  return s === 'neu' || s === 'kontaktiert'
+  return s === 'neu' || s === 'kontaktiert' || s === 'termin'
+}
+
+/** @deprecated Alias — nutze isOffeneAnfrageStatus */
+export function isNeueAnfrageStatus(status: string | null | undefined): boolean {
+  return isOffeneAnfrageStatus(status)
 }
 
 /** KPI: Offene Angebote = nicht angenommen/abgelehnt */
