@@ -1,0 +1,29 @@
+R07 unauth url=https://staging--baerenwald-backend.netlify.app/login hasLogin=true
+R07 login_ms=4103 url=https://staging--baerenwald-backend.netlify.app/
+R05 search=true csv=false bulk=false
+R05 after search rows=0
+R07 login_ms=3246 url=https://staging--baerenwald-backend.netlify.app/
+R06 scrollW=375 clientW=375 overflow=false
+R06 bottomNav=true fab=0
+R04 xss_raw_script_exec=false rendered=false hasTagText=false
+R08 url=https://staging--baerenwald-backend.netlify.app/angebote/neu hasWizard=true
+R10 partner url=https://staging--baerenwald.netlify.app/partner/login
+R10 hasAuftrag=true
+R10 detail=https://staging--baerenwald.netlify.app/partner/passwort-vergessen
+R09 hv url=https://staging--baerenwald.netlify.app/portal
+R09 dash=true
+R02 posthog_before_consent=false
+R02 cookie_equal_visible=true boxes={"a":{"x":1016,"y":816.703125,"width":136,"height":40},"b":{"x":1160,"y":816.703125,"width":136,"height":40}}
+R01 reached FOTOS
+R11 CTA_konto=true CTA_bw=false
+R03 footer_imp=1 footer_ds=1
+R03 impressum url=https://staging--baerenwald.netlify.app/impressum vsbg=true
+R12 colors={"primary":"#2e7d52","sample":"rgb(255, 255, 255)"}
+B01 hinzufügen_count=0
+B01 empty_with_button_hint=false
+B02 naked_actions=[]
+B05 near_cards=[{"title":"Stammdaten","prev":""},{"title":"Stammdaten","prev":""},{"title":"","prev":""},{"title":"","prev":""},{"title":"","prev":"Stammdaten"}]
+D1 {"found":false,"clicks":0,"path":[],"ms":3545}
+D2 {"ms":3421,"found":false,"snippet":""}
+D8 ms=2540 found=true url=https://staging--baerenwald-backend.netlify.app/einstellungen/firma
+B_feedback toast_lib_present=1

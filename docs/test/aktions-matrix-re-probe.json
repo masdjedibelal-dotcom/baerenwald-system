@@ -1,0 +1,202 @@
+[
+  {
+    "phase": "buttons",
+    "buttons": [
+      {
+        "tag": "A",
+        "text": "Bärenwald",
+        "disabled": false,
+        "title": "Bärenwald CRM"
+      },
+      {
+        "tag": "A",
+        "text": "Dashboard",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Vorgänge",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Kunden",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Handwerker",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Kalender",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "KI Analytics",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Einstellungen",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "KI",
+        "disabled": false,
+        "title": "KI-Assistent"
+      },
+      {
+        "tag": "BUTTON",
+        "text": "12",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Transaktionsdaten leeren",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Zurück zu den Suchergebnissen",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Rechnung bearbeiten",
+        "disabled": true,
+        "title": "Gesendet — Korrektur über Storno"
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Als bezahlt markieren",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Übersicht",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Leistungen\n1",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Zahlung",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Akte",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "089 0000 0001",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "legacy.hub@example.test",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "A",
+        "text": "Kundenakte",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Login",
+        "disabled": false,
+        "title": "Kundenportal öffnen"
+      },
+      {
+        "tag": "BUTTON",
+        "text": "Einladen",
+        "disabled": false,
+        "title": "Portal-Einladung erneut senden"
+      },
+      {
+        "tag": "BUTTON",
+        "text": "1 frühere Phasen anzeigen",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "ANGEBOT\nGesendet\n708,05 €",
+        "disabled": false,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "AUFTRAG\nnoch nicht erstellt",
+        "disabled": true,
+        "title": ""
+      },
+      {
+        "tag": "BUTTON",
+        "text": "RECHNUNG\nRechnung\n595,00 €\ngestellt",
+        "disabled": true,
+        "title": ""
+      }
+    ]
+  },
+  {
+    "action": "als_bezahlt",
+    "status": "fail",
+    "toast": [
+      "Rechnung nicht gefunden",
+      "Rechnung nicht gefunden"
+    ],
+    "bodyHit": "Gesendet"
+  },
+  {
+    "action": "mahnung",
+    "status": "skip",
+    "note": "not visible"
+  },
+  {
+    "action": "storno",
+    "status": "skip",
+    "note": "not visible"
+  },
+  {
+    "action": "pdf",
+    "status": "skip",
+    "note": "not visible"
+  },
+  {
+    "action": "korrigieren",
+    "status": "skip",
+    "note": "not visible"
+  },
+  {
+    "phase": "menu",
+    "menuItems": []
+  }
+]

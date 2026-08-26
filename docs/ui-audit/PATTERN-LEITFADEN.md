@@ -15,6 +15,7 @@
 1. **Eine CSS-Quelle** für CRM-Komponenten: `mock-design-system.css` (Tokens nur `globals.css`).
 2. **Ein Primary-CTA** pro Screen (Verb, max. ~2 Wörter).
 3. **Ein Status-Badge** pro Listen-Zeile.
+   - **Flag-Ausnahme:** `badges.notfall` darf als roter Punkt/Icon **vor** dem Status-Badge stehen (kein zweites Status-Wort).
 4. **Gleiche Tab-IDs** Desktop/Mobile; nur Dichte wechselt.
 5. **Anrede:** Nur Marketing **duzt**. Alles mit Login **siezt** (MeinBärenwald, Partner, CRM-Auth für Endkunden-Token-Seiten, Melde/Formal). Bestehende Partner-Du-Copy: Migration bei Berührung; **neue Copy ab jetzt Sie**.
 6. **Whitelabel:** kein Bärenwald-CTA-Wortlaut / kein erzwungenes Brand-Grün auf Org-Melde-UI (außer „technischer Betrieb“-Zeile).
@@ -28,9 +29,20 @@
 |--|--|
 | **Kanonisch** | `MockBtn` aus `src/components/mock-ui/` mit `kind`: `primary` · `ghost` · `danger` (+ `sm`) |
 | **Klassen** | `.btn.primary` / `.btn.ghost` / `.btn.danger` / `.btn.sm` |
-| **Legacy** | `ui/Button` (darf als Thin-Wrapper auf dieselben Klassen bleiben) · raw `className="btn primary"` · Tailwind `bg-emerald-*` |
+| **Legacy** | `ui/Button` (Thin-Wrapper) · `secondary` nur noch für Modal-Abbrechen/Dismiss (Footer) — neue Features: **ghost** |
 | **Regel** | Pro Viewport max. **ein** Primary. Weitere Actions: ghost / ⋯ ActionSheet. |
 | **Copy** | Persistieren in Sheets: **Speichern** (✓). Wizard-Schritt: **Weiter**. Mail: **Senden**. Destructive Confirm: Verb + Objekt („Verwerfen“). Vermeiden: Übernehmen/Fertig für denselben Persist-Job — Ausnahme Abnahme-Ende: **Fertig** (Surface-Checkliste). |
+
+### Aktions-Art → eine Variante (AUFTRAG C4)
+
+| Aktions-Art | Variante | Beispiel |
+|---|---|---|
+| Login / Haupt-Submit | **primary** | CRM-Login „Anmelden“ |
+| Hinzufügen / Anlegen | **primary** (Header) | Card-Header „+ Hinzufügen“ — Empty ohne zweiten Button |
+| Download / Öffnen PDF | **ghost** | Dokument-Zeile Download |
+| Kopieren (Link/Text) | **ghost** | „Link kopieren“ |
+| Abbrechen / Dismiss | **ghost** oder legacy `secondary` im Modal-Footer | Sheet schließen |
+| Destruktiv | **danger** | Löschen im Confirm |
 
 ---
 
@@ -52,7 +64,7 @@
 | **Labels** | **Eine** Map: `status-display` und `vorgang-labels` zusammenführen (Label + optional Kurzlabel in derselben Quelle). `dashboard-mock-mapping` **darf keine eigenen Wortlaute** mehr führen — nur noch Kind/Tone, Labels aus der kanonischen Map. |
 | **Kanonischer Wortlaut** | Auftrag `offen` → **Offen** · `in_arbeit` → **In Arbeit** · `abgeschlossen` → **Abgeschlossen** · RE gesendet → **Gesendet** · HW-gesendet → **An Partner gesendet** · HW akzeptiert → **Partner akzeptiert** |
 | **Legacy** | `AngebotStatusBadge` / `AuftragStatusBadge` (Durchleitung ok) · `emerald-*` Status-Pills · Dual-Badges · abweichende Dashboard-Kurzformen („Fertig“, „Versendet“, „Gesendet HW“) |
-| **Regel** | **Kein** zweites Badge in derselben Zeile. Korrektur-Zustand: ein Badge mit zusammengesetztem Label („Gesendet · Korrektur“) oder Meta-Text, nicht zwei Pills. |
+| **Regel** | **Kein** zweites Status-Badge in derselben Zeile. Korrektur-Zustand: ein Badge mit zusammengesetztem Label („Gesendet · Korrektur“) oder Meta-Text, nicht zwei Pills. **Ausnahme:** Notfall-Flag als roter Punkt vor dem Status-Badge (`badges.notfall`). |
 
 ---
 
@@ -212,6 +224,7 @@
 | **Datum** | `formatDatum` / `formatDatumZeit` aus `src/lib/utils.ts` → TT.MM.JJJJ |
 | **Geld** | **Soll:** eine Hilfsfunktion z. B. `formatEuro(n)` → `1.234,56 €` (2 NK); Ranges ohne Währungs-API-Mix |
 | **Legacy** | lokale `toLocaleString` — bei Touch vereinheitlichen |
+| **Ausnahme E3** | **Listen-Ranges** (Min–Max, z. B. `300 – 700 €`) **ohne** Nachkommastellen — bewusst ok (Dichte). Detail/Belege weiter 2 NK. |
 
 ---
 
@@ -226,6 +239,17 @@
 ---
 
 ## 19. Produkt-Soll & Backlog (entschieden)
+
+### 19.0 Zyklus-Entscheidungen (E1 / E2 / E3 / E6) — final
+
+| ID | Entscheidung | Ist |
+|----|--------------|-----|
+| **E1** | Nach Auftragsabschluss: Primary = **„Schlussrechnung versenden“**, solange unversendete Schluss-RE; erst danach „Bewertung einholen“ | `primary-cta.ts` |
+| **E2** | Button-Copy: Verb ≤2 Wörter; Persist = **Speichern**; **Übernehmen** nur Apply (KI/Katalog); **Fertig** nur Abnahme-Ende | Leitfaden §1 / §16 |
+| **E3** | Geld-**Ranges in Listen** ohne 2 Nachkommastellen erlaubt | §17 Ausnahme |
+| **E6** | Kanal HV-Meldung: Termin-Bestätigungsmail **default AUS** | `StatusModal` / `TerminModal` |
+| **Notfall-Flag** | `badges.notfall` = roter Punkt **vor** Status-Badge (Ausnahme zur Ein-Badge-Regel) | §3 + Vorgänge-Liste |
+| **Kunden-Versand bei Freigabe ausstehend** | **Ist:** Kunden-/HV-Angebotsversand erlaubt trotz `org_freigabe_status=ausstehend`; Partner-Versand blockiert | `docs/claude-project/06-PROZESSE.md` § Org-Freigabe |
 
 ### 19.1 HW nach Status `ersetzt` — **Soll** (Fix separat)
 
@@ -247,20 +271,33 @@ Nach Partner-Tausch („neu disponieren“):
 - Staff-Folgeschritt **„Klären“:** überarbeiten · verwerfen + Baustopp aufheben · stornieren.
 - Bis Umsetzung: Auftrag bleibt bis Annahme unverändert; Ablehnung faktisch nur außerhalb des Token-UI.
 
+### 19.4 Auftrag-7 UI-Hygiene (final)
+
+| Thema | Regel |
+|-------|--------|
+| **Empty-CTA vs. Header** | Kein zweiter Primary im `MockEmpty`, wenn die Card/Liste bereits einen Header-„+“/Hinzufügen-Primary hat. Empty nur Hint („Über + oben…“). Listen-Empty ohne Header-CTA darf den Primary behalten. |
+| **Affordance** | Aktionen = `button` / `MockBtn` / `ListRowCheck` — keine nackten `div`/`span`-`onClick` ohne Rolle. |
+| **Zugehörigkeit** | Gleiche Entität = gleiches Aktions-Muster (⋯ / Confirm / disabled-mit-Grund) — siehe `docs/test/AKTIONS-MATRIX.md`. |
+| **Loading-States** | Übergänge >1 s: Spinner im Trigger und/oder Overlay/`CrmPageLoading`; Auth-Callback mit Splash-Text. |
+
 ---
 
 ## 20. Checkliste vor Merge (neu Feature)
 
 - [ ] MockBtn/Chip/Badge/Card — keine emerald-Status-Pills  
 - [ ] ≤1 Primary auf dem Screen  
-- [ ] ≤1 Status-Badge pro Zeile  
+- [ ] ≤1 Status-Badge pro Zeile (Notfall-Punkt-Ausnahme ok)  
+- [ ] Empty ohne Doppel-Add, wenn Header-„+“ existiert  
+- [ ] Aktionen als Button/MockBtn (keine Text-Links als Primary-Aktion)  
+- [ ] Loading bei langen Mutationen / Route-Wechsel sichtbar  
 - [ ] Anlegen/Edit über EditorSheet (oder DocumentCanvas)  
 - [ ] Status-Label aus kanonischer Map (kein neuer Wortlaut in `dashboard-mock-mapping`)  
 - [ ] Anrede: Login → Sie · Marketing → Du  
 - [ ] Whitelabel: kein BW-CTA-Leak  
 - [ ] Empty/Fehler gestaltet  
-- [ ] Geld/Datum über Hilfsfunktionen  
+- [ ] Geld/Datum über Hilfsfunktionen (Listen-Ranges: E3 ok)  
 - [ ] Kein neuer Docs-/Code-Name „WizardShell“ — nur DocumentCanvas  
+- [ ] Neue Hinweise nur `MockInfoTip` / `InfoTip`  
 
 ---
 
@@ -274,7 +311,32 @@ Nach Partner-Tausch („neu disponieren“):
 | HW `ersetzt` | Sofortsperre + Doku mit Urheber — Soll, Fix separat |
 | `org_kennung` | Warnung Soll · Alias-Redirect Backlog |
 | Nachtrag Ablehnen | Backlog: Token-Ablehnen + Staff „Klären“ |
+| E1 Primary Abschluss | Schlussrechnung versenden vor Bewertung |
+| E2 Button-Copy | Speichern / Weiter / Senden; Übernehmen nur Apply; Fertig nur Abnahme |
+| E3 Listen-Ranges | ohne 2 NK erlaubt |
+| E6 HV Termin-Mail | default AUS |
+| Notfall-Flag | Punkt vor Status-Badge |
+| Kunden-Versand + Freigabe ausstehend | erlaubt (Ist) — siehe 06-PROZESSE |
+| Empty-CTA / Affordance / Zugehörigkeit / Loading | Auftrag-7 — §19.4 |
+
+### Auftrag-7 — Empty, Affordance, Zugehörigkeit, Loading (ausführlich)
+
+1. **Empty-CTA-Header:** Card/Section mit Header-Primary „Hinzufügen“ → Empty ohne Button, nur Hinweistext. Ausnahme: Listen-Empty ohne Header-CTA.
+2. **Affordance:** Klickbare UI ist Button oder Menü-Item; Checkbox-Auswahl über `ListRowCheck`.
+3. **Zugehörigkeit:** Eine Entität hat ein Aktionsmuster (Detail-⋯, Listen-⋯, Bulk) — nicht Inline-Trash hier und ⋯ dort für denselben Delete-Job.
+4. **Loading:** Login-Submit Spinner + Busy-Overlay; Dashboard `loading.tsx` Skeleton; `/auth/callback` Splash; lange Server-Actions über `actionBusy`.
 
 ---
 
-*Eingefroren 2026-08-25. Änderungen nur mit expliziter Produktentscheidung und Sync nach `07-DESIGN.md`.*
+### Info-Hinweise (F-148)
+
+| | |
+|--|--|
+| **Kanonisch** | `MockInfoTip` (`src/components/mock-ui/MockInfoTip.tsx`) — i-Icon, 1–2 Sätze |
+| **Website/Melde** | `InfoTip` (`baerenwald/src/components/ui/InfoTip.tsx`) |
+| **Regel** | Neue Hinweise nur darüber; `title=` / nacktes info-Icon bei Berührung migrieren |
+| **Fachbegriffe** | `FachbegriffHint` → bei Touch auf `MockInfoTip` umstellen |
+
+---
+
+*Eingefroren 2026-08-25 · Zyklus E1/E2/E3/E6 + Auftrag-7 nachgezogen 2026-08-26. Änderungen nur mit expliziter Produktentscheidung und Sync nach `07-DESIGN.md`.*

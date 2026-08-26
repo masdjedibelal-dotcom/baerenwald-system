@@ -1,0 +1,81 @@
+R2-1B started 2026-08-25T23:21:01.978Z
+[23:21:02] PRE-1 ✅ — email_log staging-catch CRM=true Website=false (n=1)
+[23:21:02] F-170 ⚠️ — Kein staging-catch:website- Eintrag in email_log (Website-Catcher unbelegt)
+[23:21:02] PRE-3 ✅ — Seed Auftrag=in_arbeit RE=STG-R2-0001/gesendet
+[23:21:18] R2-V-F1 ✅ — RE edit disabled=true title=Gesendet — Korrektur über Storno
+[23:21:24] R2-V-F6 ❌ — Amber-Hinweis sichtbar=false
+[23:21:24] R2-V-F8 ✅ — Primary button bg=rgb(54, 59, 65) (Anthrazit≈rgb(54,59,65))
+[23:21:25] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:26] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:27] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:28] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:29] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:30] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:31] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:33] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:33] R2-V-F12 ⚠️ — 9MB client error visible=false
+[23:21:36] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:21:37] funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+[23:21:39] funnel picked: Küche
+[23:21:40] funnel picked: Ja
+[23:21:42] funnel picked: Ja
+[23:21:43] funnel picked: Rutschgefahr
+[23:21:53] T1-.1 ⚠️ — Confirm url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
+[23:21:53] T1-.1-F163 ❌ — Referenz sichtbar=false
+[23:21:53] T1-.1-F162 ✅ — next= nicht prod-hardcoded=true
+[23:21:53] T1-.1-CTA ❌ — Neutraler Konto-CTA=false
+[23:21:59] T1-.2 ❌ — Lead gefunden id=null
+[23:21:59] T1-.2-F165 ❌ — Meldungsdetails-Karte=false
+[23:21:59] T1-.2-badge ⚠️ — HV-Meldung Badge=false
+[23:21:59] T1-.2b-F166 ⚠️ — HvWarteFreigabeSheet=false
+[23:21:59] T1-.3 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.4 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.5 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A1 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A2 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A3 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A4 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A5 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.6 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.7 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A6 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-A7 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B1 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B2 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B3 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B4 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B5 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-B6 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.8 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.9 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.10 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-.11 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] T1-D2 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] Block-C 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] E7 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] E8 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] E9 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] F7 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] F9 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] N-block 🚫 — In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf
+[23:21:59] DONE

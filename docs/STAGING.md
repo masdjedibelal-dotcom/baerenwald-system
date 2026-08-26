@@ -17,15 +17,30 @@ Staging versendet **keine** echten Resend-Mails:
 
 | Ort | Verhalten |
 |---|---|
-| CRM `src/lib/mail-service.ts` | Bei Staging-Supabase (`soqownnkxmtfgvsbrgsl`): Log + `email_log` mit `resend_id = staging-catch:…`, kein `resend.emails.send` |
-| Website `src/lib/email/send-branded-mail.ts` | Bei `isStagingDeploy()`: gleiches Muster (Fake-ID, Log) |
+| CRM `src/lib/mail-service.ts` | Bei aktivem Catcher: Log + `email_log` mit `resend_id = staging-catch:<uuid>`, kein `resend.emails.send` |
+| Website `src/lib/email/send-branded-mail.ts` | Bei aktivem Catcher: Log + `email_log` mit `resend_id = staging-catch:website-<uuid>`, kein Resend |
 | Cron `netlify/functions/cron-dispatcher.mjs` | Mail-/Notify-Jobs (`rechnungen`, `angebot-nachfass`, `einbehalte`, `datenschutz`, `copilot-briefing`) auf Staging-Host **übersprungen** |
 | Telegram `src/lib/copilot/telegram.ts` | Auf Staging nur Log |
 
-Override (Notfall): `ALLOW_STAGING_REAL_MAIL=1`. Erzwingen auch ohne Staging-URL: `MAIL_CATCHER=1`.
+**Catcher aktiv wenn** `ALLOW_STAGING_REAL_MAIL !== '1'` **und** eine der Bedingungen:
+
+| Repo | Auto-Erkennung | Explizit |
+|---|---|---|
+| CRM | `NEXT_PUBLIC_SUPABASE_URL` enthält `soqownnkxmtfgvsbrgsl` (`isStagingSupabase()`) | `MAIL_CATCHER=1` |
+| Website | Staging-Supabase-Ref, Netlify-Branch `staging`, oder URL enthält `staging--baerenwald` (`isStagingDeploy()`) | `MAIL_CATCHER=1` |
+
+**Prod:** weder Staging-Supabase noch Staging-Netlify-URL → Catcher aus → normaler Resend-Versand (sofern `RESEND_API_KEY` gesetzt).
+
+Override (Notfall, echte Mails auf Staging): `ALLOW_STAGING_REAL_MAIL=1`.
+
+**Netlify (beide Staging-Sites):** Staging-Supabase-URL reicht für Auto-Catcher; optional `MAIL_CATCHER=1` als explizite Absicherung. Prod-Sites: diese Variablen **nicht** setzen.
+
+Nachweis-Skript: `node --env-file=.env.staging scripts/staging/trigger-portal-mail-catch.mjs` → prüft `email_log.resend_id LIKE 'staging-catch:%'`.
 
 Seed Runde 2 (Auftrag/Nachtrag/RE/Tokens): `node --env-file=.env.staging scripts/staging/seed-runde2.mjs`  
-Echtdaten-Anonymisierung: `node --env-file=.env.staging scripts/staging/anonymize-echtdaten.mjs`
+Echtdaten-Anonymisierung: `node --env-file=.env.staging scripts/staging/anonymize-echtdaten.mjs`  
+Prod-Snapshot → Staging (anonym, `PRODSIM-`): `node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs`  
+(siehe Abschnitt „Prod-Snapshot“ unten)
 
 ---
 
@@ -138,6 +153,46 @@ Voraussetzung: Schema-Dump ist auf Staging (sonst fehlt `public.kunden`). Danach
 ```bash
 node --env-file=.env.staging scripts/staging/seed-staging.mjs
 ```
+
+---
+
+## Prod-Snapshot → Staging (`PRODSIM-`)
+
+Für Ownership-/Historie-Tests (View–Action-Parität): echte **Struktur** aus Prod, **keine** Echtdaten.
+
+```bash
+# .env.staging: STAGING_* ; Prod-Lesen: PROD_SUPABASE_URL + PROD_SERVICE_ROLE_KEY
+npm run staging:import-prodsim
+# oder:
+node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs
+node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs --export-only
+node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs --import-only
+node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs --dry-run
+```
+
+| | |
+|---|---|
+| Tabellen | Kunden, Ansprechpartner, Objekte, Einheiten, Leads, Angebote, Aufträge, Rechnungen, Zuweisungen (`angebot_handwerker` / `auftrag_handwerker` + referenzierte Handwerker), Notiz-/Timeline-**Metadaten** |
+| Nicht | Dokumente, Fotos, PDFs, Mail-Bodies, `email_log`, Storage |
+| Anonym | Namen → Faker-Style, E-Mails → `prodsim-<hash>@example.test`, Telefon Dummy, Freitexte gekürzt, Tokens rotiert |
+| Erhalten | IDs, Status, Beträge, Daten, FKs, `erstellt_von` / `created_by` |
+| Kennung | Titel/Namen mit Präfix **`PRODSIM-`** (≠ `ZZTEST-`) |
+| Artefakte | `scripts/staging/dumps/prodsim/snapshot-anonymized.json`, `import-report.json` (Zeilenzahlen + Anomalien = erstes Testergebnis) |
+
+Prod bleibt read-only; Schreiben nur nach Staging-Guard (`soqownnkxmtfgvsbrgsl`).
+
+### LEGACY-Edgecases (Alt-Daten-Simulation)
+
+Direktes SQL an der App-Logik vorbei — Ownership, tote FKs, leere Altfelder, Alt-Status, halb-migriert, Extremwerte:
+
+```bash
+npm run staging:seed-legacy
+# nur aufräumen:
+node --env-file=.env.staging scripts/staging/seed-legacy-edgecases.mjs --purge-only
+```
+
+Präfix **`LEGACY-`**, feste UUIDs, idempotent. Report: `scripts/staging/dumps/legacy/legacy-seed-report.json`.  
+Braucht `STAGING_DB_URL` (Port 5432) und bestehenden Handwerker/Gewerk-Seed.
 
 ---
 

@@ -1,0 +1,5 @@
+{
+  "blocked": true,
+  "reason": "PROD_CRM_USER / PROD_CRM_PASS fehlen",
+  "allow_bezahlt_pending": true
+}

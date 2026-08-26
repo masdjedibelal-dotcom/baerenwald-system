@@ -1,0 +1,144 @@
+{
+  "results": [
+    {
+      "id": "P4-FREIGABE-UI",
+      "status": "✅",
+      "note": "Angebot zeigt Ausstehend"
+    },
+    {
+      "id": "P4-SEND-MENU",
+      "status": "✅",
+      "note": "E-Mail senden im Menü=true"
+    },
+    {
+      "id": "P4-SEND-RESULT",
+      "status": "⚠️",
+      "note": "outcome=ORG-FREIGABE"
+    },
+    {
+      "id": "P4-ANG-STATUS",
+      "status": "⚠️",
+      "note": "status=entwurf"
+    },
+    {
+      "id": "P4-EMAIL-LOG",
+      "status": "✅",
+      "note": "[{\"typ\":\"update_hinweis\",\"betreff\":\"[F-164 Test] Portal-Link — 2026-08-25T23:24:09.379Z\",\"an\":\"familie.berger@example.test\"},{\"typ\":\"update_hinweis\",\"betreff\":\"[F-164 Test] Portal-Link — 2026-08-25T23:01:28.856Z\",\"an\":\"familie.berger@example.test\"}]"
+    },
+    {
+      "id": "P4-A1",
+      "status": "🚫",
+      "note": "partner-ish=[]"
+    },
+    {
+      "id": "P4-A1-ANFRAGE",
+      "status": "✅",
+      "note": "Freigabe auf Anfrage"
+    },
+    {
+      "id": "P4-A2-HV-UI",
+      "status": "⚠️",
+      "note": "ablehnen=0 erteilen=0 text freigabe=false"
+    },
+    {
+      "id": "P4-A2",
+      "status": "🚫",
+      "note": "Ablehnen-Button nicht gefunden — HV-Freigabe-UI anderes Muster"
+    },
+    {
+      "id": "P4-A3",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-A4",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-A5",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-A6",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-A7",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-A8",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-B",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-C",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-E2E",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-E8",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-E9",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-F7",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-F9",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-N",
+      "status": "🚫",
+      "note": "Nachlauf / Zeit"
+    },
+    {
+      "id": "P4-F178-LIVE",
+      "status": "🚫",
+      "note": "Code lokal — Staging-Verify nach CRM-Deploy"
+    }
+  ],
+  "ang": {
+    "id": "40f62e2e-6f1f-4dc7-ad3c-8b3c076f77c7",
+    "status": "entwurf"
+  },
+  "neu": [
+    {
+      "resend_id": "staging-catch:58bf025d-5a58-43c9-8f7c-a81b462ebf4e",
+      "typ": "update_hinweis",
+      "betreff": "[F-164 Test] Portal-Link — 2026-08-25T23:24:09.379Z",
+      "an_email": "familie.berger@example.test",
+      "created_at": "2026-08-25T23:24:09.534721+00:00"
+    },
+    {
+      "resend_id": "staging-catch:220ee640-e6d5-468b-82b0-370e7b996984",
+      "typ": "update_hinweis",
+      "betreff": "[F-164 Test] Portal-Link — 2026-08-25T23:01:28.856Z",
+      "an_email": "familie.berger@example.test",
+      "created_at": "2026-08-25T23:01:29.019391+00:00"
+    }
+  ]
+}

@@ -21,13 +21,33 @@ Website Rechner/GPT → Anfrage im CRM → Angebot erstellen & senden
 
 ```
 Aushang/QR → /melden/org/objekt → Funnel → Bestätigung + Status-Link
-  → Anfrage im CRM mit Org-/Objekt-/Melder-Kontext
-  → ggf. HV-Freigabe im MeinBärenwald-Portal
-  → erst dann Partner anfragen / Auftrag fortsetzen
+  → Anfrage im CRM mit Org-/Objekt-/Melder-Kontext (hv_meldung_status = neu)
+  → HV entscheidet im Auftraggeber-Portal (MeinBärenwald, Tab Freigaben/Eingang)
+  → erst danach: CRM Primary „Angebot erstellen“
+  → Partner anfragen / Auftrag fortsetzen
   → Mieter sieht Timeline auf Status-Seite (Termine, Feedback, Abnahme-PDF)
 ```
 
 **CRM konfiguriert:** Kunde vom Typ HV → Tab Organisation + Objekte mit Melde-Links.
+
+### HV-Start-Gate → Angebot (Staff-Weg)
+
+| Phase | `hv_meldung_status` | CRM Primary | Wer handelt? |
+|---|---|---|---|
+| Meldung eingegangen | `neu` (Default) | **Warte auf HV / Hausmeister** (Sheet mit Erklärung) | HV im Portal |
+| Hausmeister-Prüfung | `hm_pruefung` | weiterhin gesperrt | HM + HV |
+| Freigegeben für BW | `angebot_eingefordert` | **Angebot erstellen** | Bärenwald-Staff |
+| Notmaßnahme / Akut | `notmassnahme` oder Akut-Flag | **Direkt beauftragen** | Bärenwald (Gate umgangen) |
+
+**HV-Aktionen (Website `/api/org/meldung-aktion`):**
+
+- **An Bärenwald übergeben** (`angebot_einfordern`) — aus `neu` oder Override aus `hm_pruefung` → `angebot_eingefordert`
+- **Hausmeister begutachten** (`hm_begutachten`) — `neu` → `hm_pruefung`; Abschluss via Befund (`fachfirma_angebot`) oder HV-Override → `angebot_eingefordert`
+- **Kleinreparatur / Ablehnen** — nur aus `neu`
+
+**Code-Gate (CRM):** `leadWartetAufHvStartFreigabe()` blockiert Angebot/Partner-Versand solange Status ∈ {`neu`, `hm_pruefung`} und keine Akut-Meldung.
+
+**UI HV-Portal:** `OrganisationEingangPanel` / `OrgMeldungAktionBanner` — Buttons „An Bärenwald übergeben“, „Hausmeister begutachten“.
 
 ---
 
@@ -50,7 +70,19 @@ CRM Angebot (oder Anfrage-Leistungen) → Handwerker anfragen (Token und/oder Po
   → Kundenangebot finalisieren & senden
 ```
 
-Ohne Freigabe (HV): Partner-Versand kann blockiert sein.
+Ohne Freigabe (HV): Partner-Versand ist blockiert (`assertPartnerVersandOrgFreigabe`).
+
+### Org-Freigabe — Gate & Ausnahmen
+
+**Regel:** Solange `org_freigabe_status` ∈ {`ausstehend`, `abgelehnt`}, kein Partner-Versand (Angebot-Anfrage, Auftrag „an HW senden“, Zuweisungs-Mail, Redisposition, Assign+Notify).
+
+**Kunden-/HV-Versand (Ist, bewusst — Zyklus final):** Bei `org_freigabe_status=ausstehend` ist der **Kunden-Versand** des Angebots **nicht** blockiert. Die HV braucht das zugestellte Angebot (PDF/Mail) zur Freigabe-Entscheidung. Nur der Partner-Weg ist gated. UI zeigt z. B. „Gesendet — Entscheidung ausstehend“. Siehe auch `PATTERN-LEITFADEN.md` §19.0.
+
+**Zentrale Prüfung:** `assertPartnerVersandOrgFreigabe` → `orgFreigabeBlockiertPartner` / Message „Wartet auf Org-Freigabe…“.
+
+**Refreeze nach AG-Korrektur:** War der Status `freigegeben` und der neue Angebotsbetrag liegt über der Schwelle **und** ist **höher** als der zuletzt freigegebene Betrag (`org_freigabe_log`), wird wieder `ausstehend` gesetzt und die HV benachrichtigt. `abgelehnt` bleibt eingefroren.
+
+**Dokumentierte Ausnahme — Notmaßnahme:** `hv_meldung_status = notmassnahme` (HV-Sofortmaßnahme / CRM Notfall-Direkt) umgeht das Gate bewusst. Partner darf ohne Freigabe-Wartezeit beauftragt werden; nach normalem Angebotsfluss gilt das Gate wieder.
 
 ---
 

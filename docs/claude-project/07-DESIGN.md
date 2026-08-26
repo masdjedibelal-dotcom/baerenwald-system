@@ -132,6 +132,7 @@ Whitelabel-Organisationen überschreiben Primary/Logo auf Melde- und manchen Por
 | HW nach `ersetzt` | Sofortsperre: Portal-Sicht + Schreibrechte weg; erstellte Doku bleibt mit Urheber-Kennzeichnung |
 | Kunden-Nachtrag Ablehnen | **Backlog:** Button auf `/nachtrag/[token]` + Staff-Folgeschritt „Klären“ (überarbeiten / verwerfen+Baustopp aufheben / stornieren) |
 | `org_kennung` | Warnhinweis Soll · Alias-Redirect Backlog |
+| Empty-CTA / Affordance / Zugehörigkeit / Loading | Auftrag-7 — siehe `docs/ui-audit/PATTERN-LEITFADEN.md` §19.4 / §21 |
 
 ---
 
