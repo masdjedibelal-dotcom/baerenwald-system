@@ -21,6 +21,30 @@ import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type { Kunde, Lead, LeadAnlass, LeadErfassungVon, OrgFreigabeStatus } from '@/lib/types'
 
+/** Await + ehrliches Ergebnis — kein void/Fire-and-forget (F-179). */
+async function awaitOrgFreigabeMail(opts: {
+  typ: 'org_freigabe_angefordert' | 'org_angebot_info'
+  an: string
+  anName: string
+  betreff: string
+  html: string
+  leadId: string
+  kundeId: string
+}): Promise<{ mailOk: true } | { mailOk: false; mailError: string }> {
+  const mail = await sendMail(opts)
+  if (!mail.success) {
+    const mailError = mail.error ?? 'Versand fehlgeschlagen'
+    console.error('[org-freigabe] sendMail fehlgeschlagen', {
+      typ: opts.typ,
+      leadId: opts.leadId,
+      an: opts.an,
+      mailError,
+    })
+    return { mailOk: false, mailError }
+  }
+  return { mailOk: true }
+}
+
 type OrgKundePick = Pick<
   Kunde,
   'id' | 'name' | 'email' | 'org_anzeigename' | 'portal_modus' | 'freigabe_modus' | 'freigabe_schwelle_eur' | 'notfall_direkt'
@@ -223,7 +247,15 @@ export async function syncOrgFreigabeNachAngebot(input: {
   gesamtFix?: number | null
   gesamtMax?: number | null
 }): Promise<
-  | { ok: true; status: OrgFreigabeStatus; erforderlich: boolean; autoAuftragId?: string }
+  | {
+      ok: true
+      status: OrgFreigabeStatus
+      erforderlich: boolean
+      autoAuftragId?: string
+      /** false = Freigabe-Status ok, Mail aber fehlgeschlagen/fehlend (ehrlich, F-179) */
+      mailOk?: boolean
+      mailError?: string
+    }
   | { ok: false; message: string }
 > {
   const leadId = input.leadId?.trim()
@@ -314,7 +346,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
             },
             branding
           )
-          void sendMail({
+          const sent = await awaitOrgFreigabeMail({
             typ: 'org_freigabe_angefordert',
             an: orgEmail,
             anName: orgName,
@@ -323,9 +355,22 @@ export async function syncOrgFreigabeNachAngebot(input: {
             leadId,
             kundeId: orgKundeId,
           })
+          return {
+            ok: true,
+            status: 'ausstehend',
+            erforderlich: true,
+            mailOk: sent.mailOk,
+            ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+          }
         }
 
-        return { ok: true, status: 'ausstehend', erforderlich: true }
+        return {
+          ok: true,
+          status: 'ausstehend',
+          erforderlich: true,
+          mailOk: false,
+          mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+        }
       }
     }
     return { ok: true, status: aktuell, erforderlich }
@@ -356,7 +401,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
 
     // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe, nur Info.
     // Auftrag legt der Nutzer per Primary „Direkt Auftrag“ an (kein stiller Auto-Accept).
-    await sendOrgAngebotInfoOnce({
+    const info = await sendOrgAngebotInfoOnce({
       leadId,
       angebotId,
       orgKundeId,
@@ -370,6 +415,8 @@ export async function syncOrgFreigabeNachAngebot(input: {
       ok: true,
       status: 'nicht_noetig',
       erforderlich: false,
+      mailOk: info.mailOk,
+      ...(info.mailError ? { mailError: info.mailError } : {}),
     }
   }
 
@@ -409,7 +456,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
       },
       branding
     )
-    void sendMail({
+    const sent = await awaitOrgFreigabeMail({
       typ: 'org_freigabe_angefordert',
       an: orgEmail,
       anName: orgName,
@@ -418,9 +465,22 @@ export async function syncOrgFreigabeNachAngebot(input: {
       leadId,
       kundeId: orgKundeId,
     })
+    return {
+      ok: true,
+      status: 'ausstehend',
+      erforderlich: true,
+      mailOk: sent.mailOk,
+      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+    }
   }
 
-  return { ok: true, status: 'ausstehend', erforderlich: true }
+  return {
+    ok: true,
+    status: 'ausstehend',
+    erforderlich: true,
+    mailOk: false,
+    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+  }
 }
 
 async function sendOrgAngebotInfoOnce(input: {
@@ -431,7 +491,7 @@ async function sendOrgAngebotInfoOnce(input: {
   orgName: string
   objektTitel: string
   betrag: number
-}): Promise<void> {
+}): Promise<{ mailOk: boolean; mailError?: string }> {
   const { data: existing } = await supabaseAdmin
     .from('org_freigabe_log')
     .select('id')
@@ -439,7 +499,7 @@ async function sendOrgAngebotInfoOnce(input: {
     .eq('aktion', 'info_gesendet')
     .limit(1)
     .maybeSingle()
-  if (existing?.id) return
+  if (existing?.id) return { mailOk: true }
 
   await supabaseAdmin.from('org_freigabe_log').insert({
     lead_id: input.leadId,
@@ -450,7 +510,9 @@ async function sendOrgAngebotInfoOnce(input: {
     erstellt_von: 'crm',
   })
 
-  if (!input.orgEmail) return
+  if (!input.orgEmail) {
+    return { mailOk: false, mailError: 'Keine Org-E-Mail für Angebots-Info' }
+  }
   const branding = await getMailBranding(supabaseAdmin)
   const tpl = mailOrgAngebotZurInfo(
     {
@@ -461,7 +523,7 @@ async function sendOrgAngebotInfoOnce(input: {
     },
     branding
   )
-  void sendMail({
+  const sent = await awaitOrgFreigabeMail({
     typ: 'org_angebot_info',
     an: input.orgEmail,
     anName: input.orgName,
@@ -470,6 +532,7 @@ async function sendOrgAngebotInfoOnce(input: {
     leadId: input.leadId,
     kundeId: input.orgKundeId,
   })
+  return sent.mailOk ? { mailOk: true } : { mailOk: false, mailError: sent.mailError }
 }
 
 /** Org-Freigabe nach Partner-Nachtrag wenn Summe Schwelle überschreitet. */
@@ -535,7 +598,10 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
   betragEur?: number
   gesamtFix?: number | null
   gesamtMax?: number | null
-}): Promise<{ ok: true; status: 'ausstehend' } | { ok: false; message: string }> {
+}): Promise<
+  | { ok: true; status: 'ausstehend'; mailOk?: boolean; mailError?: string }
+  | { ok: false; message: string }
+> {
   const leadId = input.leadId?.trim()
   const angebotId = input.angebotId?.trim()
   const anpassung = input.anpassungNotiz?.trim() ?? ''
@@ -622,7 +688,7 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
       },
       branding
     )
-    void sendMail({
+    const sent = await awaitOrgFreigabeMail({
       typ: 'org_freigabe_angefordert',
       an: orgEmail,
       anName: orgName,
@@ -631,7 +697,18 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
       leadId,
       kundeId: orgKundeId,
     })
+    return {
+      ok: true,
+      status: 'ausstehend',
+      mailOk: sent.mailOk,
+      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+    }
   }
 
-  return { ok: true, status: 'ausstehend' }
+  return {
+    ok: true,
+    status: 'ausstehend',
+    mailOk: false,
+    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+  }
 }

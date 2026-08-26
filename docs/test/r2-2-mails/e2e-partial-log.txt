@@ -20,7 +20,10 @@ funnel step7: MN |  | Musterverwaltung Nord |  | Verwaltung |  | BESCHREIBUNG | 
 funnel step8: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT |  | Ihre Adresse und Kontaktdaten | Ich stimme der Verarbeitung meiner Angaben zur Bearbeitu
 funnel step9: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ABSCHLUSS |  | Prüfen & absenden |  | Alle Angaben prüfen und absenden |  | IHRE ANGABEN |  | Objekt | WEG Leopold 10 (
 after absenden url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
-CONFIRM skipped — funnel aborted before confirm page
+CONFIRM url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
+CONFIRM CTA bw=false konto=false
+CONFIRM ref=false
+CONFIRM text=MN |  | Musterverwaltung Nord |  | Verwaltung |  | Meldung wird gesendet… |  | Einen Moment — Fotos und Angaben werden übermittelt.
 crm login https://staging--baerenwald-backend.netlify.app/
-LEAD url=https://staging--baerenwald-backend.netlify.app/vorgaenge?tab=anfrage
+LEAD url=https://staging--baerenwald-backend.netlify.app/vorgaenge
 LEAD HV-Meldung=false Leopold=false

@@ -1,0 +1,26 @@
+P4 2026-08-26T00:27:59.797Z
+P4-FREIGABE-UI ✅ — Angebot zeigt Ausstehend
+P4-SEND-MENU ✅ — E-Mail senden im Menü=true
+P4-SEND-RESULT ⚠️ — outcome=ORG-FREIGABE
+P4-ANG-STATUS ⚠️ — status=entwurf
+P4-EMAIL-LOG ✅ — [{"typ":"update_hinweis","betreff":"[F-164 Test] Portal-Link — 2026-08-25T23:24:09.379Z","an":"familie.berger@example.test"},{"typ":"update_hinweis","betreff":"[F-164 Test] Portal-Link — 2026-08-25T23:01:28.856Z","an":"familie.berger@example.test"}]
+P4-A1 🚫 — partner-ish=[]
+P4-A1-ANFRAGE ✅ — Freigabe auf Anfrage
+P4-A2-HV-UI ⚠️ — ablehnen=0 erteilen=0 text freigabe=false
+P4-A2 🚫 — Ablehnen-Button nicht gefunden — HV-Freigabe-UI anderes Muster
+P4-A3 🚫 — Nachlauf / Zeit
+P4-A4 🚫 — Nachlauf / Zeit
+P4-A5 🚫 — Nachlauf / Zeit
+P4-A6 🚫 — Nachlauf / Zeit
+P4-A7 🚫 — Nachlauf / Zeit
+P4-A8 🚫 — Nachlauf / Zeit
+P4-B 🚫 — Nachlauf / Zeit
+P4-C 🚫 — Nachlauf / Zeit
+P4-E2E 🚫 — Nachlauf / Zeit
+P4-E8 🚫 — Nachlauf / Zeit
+P4-E9 🚫 — Nachlauf / Zeit
+P4-F7 🚫 — Nachlauf / Zeit
+P4-F9 🚫 — Nachlauf / Zeit
+P4-N 🚫 — Nachlauf / Zeit
+P4-F178-LIVE 🚫 — Code lokal — Staging-Verify nach CRM-Deploy
+DONE

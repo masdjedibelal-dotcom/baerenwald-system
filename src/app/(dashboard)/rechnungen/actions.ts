@@ -1280,19 +1280,20 @@ export async function sendRechnung(
     })
   }
 
-  void import('@/lib/portal/notify-portal-rechnung-gesendet')
-    .then(({ notifyPortalRechnungGesendetFromCrm }) =>
-      notifyPortalRechnungGesendetFromCrm({
-        rechnungId,
-        auftragId: auftragId || null,
-        kundeId: (rec.kunde_id as string | null) ?? null,
-        rechnungsnummer,
-        brutto: rec.brutto != null ? Number(rec.brutto) : null,
-      })
+  try {
+    const { notifyPortalRechnungGesendetFromCrm } = await import(
+      '@/lib/portal/notify-portal-rechnung-gesendet'
     )
-    .catch((e) =>
-      console.warn('[sendRechnung] HV-Notify:', e)
-    )
+    await notifyPortalRechnungGesendetFromCrm({
+      rechnungId,
+      auftragId: auftragId || null,
+      kundeId: (rec.kunde_id as string | null) ?? null,
+      rechnungsnummer,
+      brutto: rec.brutto != null ? Number(rec.brutto) : null,
+    })
+  } catch (e) {
+    console.warn('[sendRechnung] HV-Notify:', e)
+  }
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)

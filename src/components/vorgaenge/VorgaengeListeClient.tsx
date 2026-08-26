@@ -302,6 +302,11 @@ export function VorgaengeListeClient({
     setSelected({})
   }, [lifecycle])
 
+  /** F-178: Selektion bei Suche/Filter/Phase leeren — keine unsichtbaren Häkchen. */
+  useEffect(() => {
+    setSelected({})
+  }, [query, filter, statusFilter, fKunde, fTitel, fWertVon, fWertBis, fDatumVon, fDatumBis, rechnungRichtung])
+
   const syncPhaseToUrl = useCallback(
     (
       phase: (typeof VORGANG_FILTERS)[number],
@@ -818,12 +823,27 @@ export function VorgaengeListeClient({
     displayItems.length > 0 && displayItems.every((v) => selected[rowKey(v)])
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
+  const showSelectAllFilteredLink =
+    filtered.length > displayItems.length && !allFilteredSelected
 
-  const toggleSelectAll = () => {
-    if (allFilteredSelected) {
-      setSelected({})
+  /** Header: nur sichtbare Zeilen der aktuellen Ansicht (Seite / Infinite-Chunk). */
+  const toggleSelectVisible = () => {
+    if (allPageSelected) {
+      setSelected((prev) => {
+        const n = { ...prev }
+        for (const v of displayItems) delete n[rowKey(v)]
+        return n
+      })
       return
     }
+    setSelected((prev) => {
+      const n = { ...prev }
+      for (const v of displayItems) n[rowKey(v)] = true
+      return n
+    })
+  }
+
+  const selectAllFiltered = () => {
     const n: Record<string, boolean> = {}
     filtered.forEach((v) => {
       n[rowKey(v)] = true
@@ -1129,6 +1149,11 @@ export function VorgaengeListeClient({
           <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
+          {showSelectAllFilteredLink ? (
+            <MockBtn kind="ghost" sm onClick={selectAllFiltered}>
+              Alle {filtered.length} Treffer auswählen
+            </MockBtn>
+          ) : null}
           <div style={{ flex: 1 }} />
           <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
             Export
@@ -1160,9 +1185,9 @@ export function VorgaengeListeClient({
         }}
         icon="trash"
         title={
-          selectedCount === 1
+          selectedRows.length === 1
             ? 'Vorgang löschen?'
-            : `${selectedCount} Vorgänge löschen?`
+            : `${selectedRows.length} Vorgänge löschen?`
         }
         sub="Dauerhaft entfernen — Kunde bleibt erhalten."
         size="sm"
@@ -1175,7 +1200,7 @@ export function VorgaengeListeClient({
             <MockBtn
               kind="danger"
               icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
+              disabled={bulkDeletePending || selectedRows.length === 0}
               onClick={() => void runBulkDelete()}
             >
               {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
@@ -1184,11 +1209,37 @@ export function VorgaengeListeClient({
         }
       >
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-          {bulkDeletePending
-            ? 'Bitte warten…'
-            : selectedCount === 1
-              ? 'Der ausgewählte Vorgang wird unwiderruflich gelöscht.'
-              : `${selectedCount} ausgewählte Vorgänge werden unwiderruflich gelöscht.`}
+          {bulkDeletePending ? (
+            'Bitte warten…'
+          ) : selectedRows.length === 0 ? (
+            <p className="m-0">
+              Keine der ausgewählten Zeilen ist im aktuellen Filter sichtbar — bitte Filter
+              anpassen oder Auswahl aufheben.
+            </p>
+          ) : (
+            <>
+              <p className="m-0 mb-2">
+                {selectedRows.length === 1
+                  ? 'Dieser Vorgang wird unwiderruflich gelöscht:'
+                  : 'Diese Vorgänge werden unwiderruflich gelöscht:'}
+              </p>
+              <ul className="m-0 mb-0 pl-5" style={{ listStyle: 'disc' }}>
+                {selectedRows.slice(0, 10).map((v) => (
+                  <li key={rowKey(v)}>
+                    {(v.titel || 'Ohne Titel').trim()}
+                    {v.kundeName ? (
+                      <span style={{ color: 'var(--text-3)' }}> · {v.kundeName}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {selectedRows.length > 10 ? (
+                <p className="m-0 mt-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+                  + {selectedRows.length - 10} weitere
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </MockModal>
 
@@ -1202,12 +1253,24 @@ export function VorgaengeListeClient({
             className="vg-check"
             onClick={(e) => {
               e.stopPropagation()
-              toggleSelectAll()
+              toggleSelectVisible()
             }}
-            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            title={
+              allPageSelected
+                ? 'Auswahl dieser Ansicht aufheben'
+                : 'Sichtbare Zeilen auswählen'
+            }
           >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
+            <span
+              className={cn(
+                'vg-box',
+                allPageSelected && 'on',
+                !allPageSelected &&
+                  displayItems.some((v) => selected[rowKey(v)]) &&
+                  'partial'
+              )}
+            >
+              {allPageSelected || displayItems.some((v) => selected[rowKey(v)]) ? (
                 <MockIcon ctx="default" n="check" size={12} />
               ) : null}
             </span>

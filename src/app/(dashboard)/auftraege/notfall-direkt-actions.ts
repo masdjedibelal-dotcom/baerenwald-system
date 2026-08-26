@@ -363,7 +363,7 @@ export async function notfallDirektBeauftragen(
           },
           branding
         )
-        void sendMail({
+        const mail = await sendMail({
           typ: 'org_notfall_info',
           an: hvEmail,
           anName: orgName,
@@ -373,6 +373,13 @@ export async function notfallDirektBeauftragen(
           kundeId,
           auftragId,
         })
+        if (!mail.success) {
+          console.error('[notfall-direkt] HV-Info-Mail fehlgeschlagen', mail.error, {
+            auftragId,
+            leadId,
+            hvEmail,
+          })
+        }
       }
     }
   }

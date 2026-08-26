@@ -304,7 +304,7 @@ export async function acceptHandwerkerZuweisung(
       console.warn('[acceptHandwerkerZuweisung] push', e)
     }
 
-    void sendMail({
+    const mail = await sendMail({
       an: internTo,
       betreff:
         antwort === 'akzeptiert'
@@ -320,6 +320,12 @@ export async function acceptHandwerkerZuweisung(
       }),
       typ: 'system',
     })
+    if (!mail.success) {
+      console.error('[acceptHandwerkerZuweisung] interne Mail fehlgeschlagen', mail.error, {
+        zuweisungId,
+        antwort,
+      })
+    }
   }
 
   return { ok: true, status: antwort }

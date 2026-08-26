@@ -76,6 +76,8 @@ Ohne Freigabe (HV): Partner-Versand ist blockiert (`assertPartnerVersandOrgFreig
 
 **Regel:** Solange `org_freigabe_status` ∈ {`ausstehend`, `abgelehnt`}, kein Partner-Versand (Angebot-Anfrage, Auftrag „an HW senden“, Zuweisungs-Mail, Redisposition, Assign+Notify).
 
+**Kunden-/HV-Versand (Ist, bewusst):** Bei `org_freigabe_status=ausstehend` ist der **Kunden-Versand** des Angebots **nicht** blockiert. Die HV braucht das zugestellte Angebot (PDF/Mail) zur Freigabe-Entscheidung. Nur der Partner-Weg ist gated. UI zeigt z. B. „Gesendet — Entscheidung ausstehend“.
+
 **Zentrale Prüfung:** `assertPartnerVersandOrgFreigabe` → `orgFreigabeBlockiertPartner` / Message „Wartet auf Org-Freigabe…“.
 
 **Refreeze nach AG-Korrektur:** War der Status `freigegeben` und der neue Angebotsbetrag liegt über der Schwelle **und** ist **höher** als der zuletzt freigegebene Betrag (`org_freigabe_log`), wird wieder `ausstehend` gesetzt und die HV benachrichtigt. `abgelehnt` bleibt eingefroren.
