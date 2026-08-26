@@ -7943,6 +7943,16 @@ textarea.wizard-dok-beschreibung {
   }
 }
 .vg-check { display: none; align-items: center; justify-content: center; cursor: pointer; }
+button.vg-check {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
 .vg-selectmode .vg-check { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .vg-box {
   width: 18px; height: 18px; border-radius: 5px;
@@ -18197,10 +18207,21 @@ textarea.input:focus {
 .abnahme-inline__check.is-ok {
   background: var(--green);
   border-color: var(--green);
+  color: #fff;
 }
 .abnahme-inline__check.is-mangel {
   border-color: #d97706;
   background: #fff8eb;
+}
+.abnahme-inline__item.is-done .abnahme-inline__item-title {
+  text-decoration: line-through;
+  color: var(--text-3);
+}
+.abnahme-inline__item.is-done .abnahme-inline__item-sub {
+  opacity: 0.75;
+}
+.abnahme-inline__item.is-done .abnahme-inline__check.is-ok {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 28%, transparent);
 }
 .abnahme-inline__item-body {
   min-width: 0;
@@ -18965,6 +18986,10 @@ textarea.input:focus {
   font-family: inherit;
   cursor: pointer;
   transition: background 120ms ease, opacity 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 .crm-login__submit:hover:not(:disabled) {
   background: #2a724b;
@@ -18972,6 +18997,60 @@ textarea.input:focus {
 .crm-login__submit:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.crm-login__submit-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: crm-login-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes crm-login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* MockInfoTip — kanonischer i-Hinweis (AUFTRAG D2) */
+.mock-info-tip__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3, #6b7280);
+  cursor: pointer;
+}
+.mock-info-tip__btn:hover {
+  background: var(--bw-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-2, #374151);
+}
+.mock-info-tip__panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e3df);
+  background: #fff;
+  color: var(--text, #16201b);
+  font-size: var(--fs-meta, 12px);
+  line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  text-align: left;
+  white-space: normal;
+}
+.mock-info-tip__panel--right {
+  left: auto;
+  right: 0;
 }
 .crm-login__alert {
   border-radius: 10px;
@@ -22309,6 +22388,11 @@ button.crow.crow--tap:hover {
 .todo-row--done .todo-row__title span {
   text-decoration: line-through;
   color: var(--text-3);
+  opacity: 0.9;
+}
+.todo-row--done .todo-check--done {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
 }
 .todo-row__main { flex: 1; min-width: 0; padding-top: 2px; }
 .todo-row__title {

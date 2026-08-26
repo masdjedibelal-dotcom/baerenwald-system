@@ -35,6 +35,8 @@ import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
+import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -706,6 +708,42 @@ export function AnfrageDetailClient({
     )
     const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] =
       []
+    if (st === 'neu') {
+      actions.push({
+        id: 'kontaktiert',
+        label: 'Als kontaktiert markieren',
+        icon: 'phone',
+        onClick: () => {
+          void (async () => {
+            const res = await updateLeadStatus(lead.id, 'kontaktiert')
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            toast.success('Als kontaktiert markiert')
+            refresh()
+          })()
+        },
+      })
+    }
+    if (st === 'kontaktiert' || st === 'termin') {
+      actions.push({
+        id: 'zurueck_neu',
+        label: 'Zurück zu Neu',
+        icon: 'arrow-back-up',
+        onClick: () => {
+          void (async () => {
+            const res = await updateLeadStatus(lead.id, 'neu')
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            toast.success('Status auf Neu gesetzt')
+            refresh()
+          })()
+        },
+      })
+    }
     if (st === 'neu' || st === 'kontaktiert') {
       actions.push({
         id: 'termin',
@@ -730,7 +768,7 @@ export function AnfrageDetailClient({
       })
     }
     return actions
-  }, [lead.status, angeboteListe])
+  }, [lead.status, lead.id, angeboteListe, refresh])
 
   const statusBadge = useMemo(() => {
     const s = anfrageStatusDisplay(lead.status, {
@@ -777,8 +815,12 @@ export function AnfrageDetailClient({
           : `Eingang ${formatDatum(lead.created_at)}`
       )
     }
+    const freigabeStatus = lead.org_freigabe_status ?? 'nicht_noetig'
+    parts.push(
+      `Freigabe: ${ORG_FREIGABE_LABELS[freigabeStatus] ?? freigabeStatus}`
+    )
     return parts.filter(Boolean).join(' · ')
-  }, [vorhabenTitel, lead.created_at, lead.kanal])
+  }, [vorhabenTitel, lead.created_at, lead.kanal, lead.org_freigabe_status])
 
   const stammdatenInhalt = (
     <>

@@ -14,7 +14,10 @@ import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
 import { addLeadNotizRow, deleteLeadNotizRow } from '@/app/(dashboard)/anfragen/actions'
 import { leadNotizFotoUrls } from '@/lib/anfragen/lead-notiz-fotos'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import type { LeadNotizRow } from '@/lib/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { richTextToPlain } from '@/lib/rich-text'
 import { formatDatumZeit, formatRelativeDate } from '@/lib/utils'
@@ -177,6 +180,7 @@ export function LeadNotizenListeTab({
         toast.error(r.message)
         return
       }
+      toast.success('Notiz hinzugefügt')
       setNeue('')
       clearPendingFoto()
       onReload()
@@ -184,16 +188,21 @@ export function LeadNotizenListeTab({
     })
   }
 
-  async function loeschen(id: string) {
-    if (!window.confirm('Notiz löschen?')) return
-    startTransition(async () => {
-      const r = await deleteLeadNotizRow(id, leadId)
-      if (!r.ok) toast.error(r.message)
-      else {
+  async function loeschen(id: string, preview?: string) {
+    confirmDelete(
+      'Notiz löschen?',
+      async () => {
+        const r = await deleteLeadNotizRow(id, leadId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Notiz gelöscht')
         onReload()
         router.refresh()
-      }
-    })
+      },
+      { body: preview?.trim() || undefined }
+    )
   }
 
   const allgemeineNotizen = useMemo(
@@ -316,14 +325,25 @@ export function LeadNotizenListeTab({
                   </a>
                 ) : null}
               </Note>
-              <button
-                type="button"
-                className="absolute right-2 top-2 text-[length:var(--fs-meta)] text-bw-text-muted hover:text-status-cancel-text"
-                onClick={() => void loeschen(n.id)}
-                aria-label="Notiz löschen"
-              >
-                ×
-              </button>
+              <div className="absolute right-2 top-2">
+                <MockEntityRowMenu
+                  title="Notiz"
+                  items={
+                    [
+                      {
+                        icon: 'trash',
+                        label: 'Löschen',
+                        danger: true,
+                        onClick: () =>
+                          void loeschen(
+                            n.id,
+                            richTextToPlain(n.inhalt ?? '').trim().split('\n')[0] || 'Notiz'
+                          ),
+                      },
+                    ] satisfies EntityMenuItem[]
+                  }
+                />
+              </div>
             </div>
             )
           })}
@@ -431,18 +451,7 @@ export function AngeboteListeTab({
         <MockEmpty
           icon="file-text"
           title="Noch kein Angebot"
-          hint="Erstelle ein Angebot basierend auf den Projektdetails."
-          action={
-            onAngebotErstellen ? (
-              <button type="button" className="btn primary sm" onClick={onAngebotErstellen}>
-                + Angebot erstellen
-              </button>
-            ) : (
-              <Link href={`/angebote/neu?lead_id=${leadId}`} className="btn primary sm">
-                + Angebot erstellen
-              </Link>
-            )
-          }
+          hint="Erstelle ein Angebot basierend auf den Projektdetails. Über „+ Angebot erstellen“ oben."
         />
       ) : (
         <div className="space-y-2">

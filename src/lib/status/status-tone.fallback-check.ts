@@ -67,12 +67,12 @@ if (
   throw new Error('angebot gesendet direkt auftrag')
 }
 if (primaryCta('auftrag', 'offen')?.id !== 'auftrag_abschliessen') throw new Error('auftrag offen')
-/* Abgeschlossen: RE-Folgeaktion kann schon durch sein → Bewertung; sonst als_bezahlt */
+/* Abgeschlossen + unversendete RE → Schlussrechnung versenden; erst danach Bewertung */
 if (
   primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: 'versenden' })?.id !==
-  'bewertung_einholen'
+  'rechnung_versenden'
 ) {
-  throw new Error('auftrag fertig versenden→bewertung')
+  throw new Error('auftrag fertig versenden→rechnung_versenden')
 }
 if (
   primaryCta('auftrag', 'abgeschlossen', { naechsteRechnungAktion: 'bezahlt' })?.id !== 'als_bezahlt'

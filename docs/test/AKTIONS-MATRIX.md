@@ -1,9 +1,9 @@
 # AKTIONS-MATRIX — Bearbeiten / Löschen / Entfernen auf Cards & Zeilen
 
-**Status:** Referenz ab Etappe 8 (2026-08-25) · dauerhaft pflegen  
+**Status:** Referenz nach AUFTRAG B (2026-08-26) · dauerhaft pflegen  
 **Maßstab:** `docs/ui-audit/PATTERN-LEITFADEN.md` — ⋯-Menü, destruktiv nur mit Confirm (Verb+Objekt), gleiche Entität = gleiches Muster, nicht verfügbar = **deaktiviert mit Grund** (nicht verstecken).  
 **Repos:** `baerenwald-system` (CRM) + `baerenwald` (Portale)  
-**Report:** `docs/test/TESTREPORT-ETAPPE-8.md`
+**Report:** `docs/test/TESTREPORT-ETAPPE-8.md` · Umbau: AUFTRAG B (B1–B7)
 
 ### Legende
 
@@ -14,8 +14,10 @@
 | Inline | Papierkorb/Pencil direkt sichtbar |
 | Bulk | Auswahl → Bulk-Leiste |
 | Sheet | Aktion nur im EditorSheet/Footer |
-| Confirm | `MockModal` / `PortalSheetConfirm` / `window.confirm` |
+| Confirm | `MockModal` via `confirmDelete` / `PortalSheetConfirm` |
 | — | Aktion fehlt |
+
+**Deaktiviert-mit-Grund:** Menü-Items mit `disabled: true` + `hint` (sichtbar, nicht klickbar). Primitives: `ActionsMenuItem`, `EntityMenuItem`, `MockPopoverItem`.
 
 ---
 
@@ -23,26 +25,27 @@
 
 | Card/Zeile (Entität) | Vorkommen | Bearbeiten | Löschen/Entfernen | Duplizieren | Weitere | Muster | Confirm destruktiv? | Deaktiviert-mit-Grund oder versteckt? |
 |---|---|---|---|---|---|---|---|---|
-| Vorgangszeile | `/vorgaenge`; eingebettet Kunde/Objekt | Zeilen-Klick / Swipe | Bulk-Leiste; Swipe mobil | Swipe / Copy-Actions | Export Bulk | **Desktop: Bulk, kein ⋯**; **Mobil: Swipe** | Bulk: **MockModal** ✅; Swipe/`runDeleteVorgang`: **kein Confirm** ❌ | Kopieren: Toast wenn Typ ungeeignet; kein disabled-Grund im Menü |
-| Positions-Zeile PosBoard | Angebot-/RE-Wizard, Direktauftrag | ⋯ Bearbeiten | ⋯ Löschen | ⋯ Kopieren | — | **⋯** (+ mobil Swipe) | **Nein** — direkt `remove` ❌ | Menü nur wenn `editable` (sonst versteckt) |
-| Positions-Zeile Wizard | = PosBoard (`AngebotWizard`/`RechnungWizard`) | = PosBoard | = PosBoard | = PosBoard | — | = PosBoard | = PosBoard | = PosBoard |
-| Bautagebuch-Eintrag | Auftrag-Detail Bautagebuch | Klick → Sheet | Bericht-Card: Sheet/Confirm; Feed oft — | — | +Hinzufügen Header | **kein ⋯**; Klick/Sheet | Bericht: `confirm()`; Feed: oft kein Löschen | Header weg wenn `disabled` |
-| Mangel-Eintrag | Abnahme-Checkliste / Mängel-Flow | Inline Pencil | Inline Trash | — | Status-Buttons | **Inline Icons** ❌ vs. ⋯-Soll | **Kein** Confirm ❌ | Trash nur Edit-Modus (versteckt sonst) |
-| Dokument Akte | Kunde / Anfrage / Auftrag Akte | — (Download/Öffnen) | **Inline Trash** | — | Upload | **Inline Trash** ❌ | `confirm()` ✅ | `disabled={busy}` |
-| Notiz Akte | Kunde / Anfrage Akte | — | **Inline Löschen** | — | Speichern Compose | **Inline** ❌ | `window.confirm` („Notiz löschen?“) ✅ | `disabled={pending}` |
-| Termin | `/kalender` | Chip → Sheet | Sheet-Footer Löschen | — | Neuer Termin | **Sheet**, kein Listen-⋯ | `confirm()` ✅ | Löschen nur bestehender Termin |
-| To-do | Todos-Panel / Kalender-Tab | Zeile → Sheet | Sheet-Footer | — | — | **Sheet** | `confirm()` ✅ | nur Edit, nicht Neu |
-| Kunde-Zeile | `/kunden` | Swipe / Zeilen-Klick | Bulk; Detail ⋯ | Swipe / `duplicateKunde` | — | Liste: **Swipe+Bulk**, Desktop ohne ⋯; Detail: **⋯** | Bulk MockModal; `runDeleteKunde` confirm ✅ | Desktop-Liste ohne Zeilen-⋯ |
-| Objekt-Card CRM | Kunde-Tab Objekte | Bulk bei 1er-Auswahl; Klick → Akte | Bulk | — | — | **kein ⋯**; Bulk/Klick | Bulk MockModal ✅ | Bearbeiten nur 1 ausgewählt |
-| Einheit/Bewohner | Objektakte Einheiten | ⋯ / Sheet Bearbeiten | ⋯ Löschen / Sheet Entfernen | — | Privatkunde verknüpfen | **⋯** + Sheet | Person `confirm()`; Bulk MockModal ✅ | Items kontextabhängig |
-| Handwerker-Zeile | `/handwerker` | wie Kunde | Bulk + confirm | Swipe Duplikat | — | **Swipe+Bulk**, Desktop ohne ⋯ | Bulk MockModal; delete confirm ✅ | Desktop ohne ⋯ |
-| Compliance-Dokument | HW-Detail / Auftrag Compliance | Sheet | Sheet-Footer / Inline Trash | — | Ablehnen | Sheet / Inline | `confirm()` ✅ | `disabled={busy}` |
-| Preislisten-Eintrag | Einstellungen Preise | Zeilen-Klick → Sheet | **—** | — | CSV Import, +Leistung | **kein ⋯/Löschen** | — | +Leistung disabled ohne Gewerk |
-| Vorlage (Angebot) | Einstellungen Vorlagen | Link öffnen | **—** in Liste | — | — | nur Navigation | — | — |
-| Teammitglied CRM | Einstellungen Team | Klick → Sheet | **—** (Deaktivieren statt Delete) | — | Einladen | Sheet; Label „deaktiviert“ | — | Anzeige deaktiviert, kein Delete-⋯ |
-| Zahlplan-Rate | Zahlung / Abschlagsplan | Drawer / Inline | Inline Trash | — | Erstellen | Inline / Drawer | **Kein** Confirm ❌ | Frozen: Trash **versteckt** + Badge „fest“ (title) — nicht disabled-im-⋯ |
-| Eingangsrechnung-Zeile | HW-Eingangsrechnungen | Klick Modal | **—** | — | „Als überwiesen“ | Inline CTA | — | Button nur Status `eingereicht` (sonst versteckt) |
-| Benachrichtigung Glocke | TopBar | Klick öffnen | **—** | — | Alle gelesen; Rechtsklick Detail | **kein ⋯** | — | — |
+| Vorgangszeile | `/vorgaenge`; eingebettet Kunde/Objekt | ⋯ Öffnen/Bearbeiten; Swipe mobil | ⋯ Löschen; Bulk; Swipe mobil | ⋯ Duplizieren; Swipe | Export Bulk | **⋯ + Swipe + Bulk** | Bulk + `runDelete*`: **confirmDelete** ✅ | Kopieren: Toast wenn Typ ungeeignet |
+| Kunden-Zeile | `/kunden` | ⋯ Öffnen/Bearbeiten; Swipe | ⋯; Bulk; Detail ⋯ | ⋯ Duplizieren | — | **⋯ + Swipe + Bulk** | Bulk MockModal; `confirmKundeDelete` ✅ | — |
+| Handwerker-Zeile | `/handwerker` | ⋯ Öffnen/Bearbeiten; Swipe | ⋯; Bulk | ⋯ Duplizieren | — | **⋯ + Swipe + Bulk** | confirmDelete ✅ | — |
+| Rechnung Detail-Header | `/rechnungen/[id]` | Secondary CTA Bearbeiten | ⋯ Löschen (nur Entwurf) | — | ⋯ PDF · Storno/Korrektur · Zahlungserinnerung | **Detail-⋯** (`overflowMenuItems`) | Löschen: confirmDelete ✅ | Statusabhängig disabled+hint („Gesendet — …“) |
+| Positions-Zeile PosBoard | Angebot-/RE-Wizard, Direktauftrag | ⋯ Bearbeiten | ⋯ Löschen | ⋯ Kopieren | — | **⋯** (+ mobil Swipe) | MockModal „Position löschen?“ ✅ | Menü nur wenn `editable` |
+| Mangel-Eintrag | Abnahme-Checkliste | ⋯ Bearbeiten | ⋯ Löschen | — | Status-Buttons | **⋯** | confirmDelete ✅ | nur Edit-Modus |
+| Dokument Akte | Kunde / Anfrage / Auftrag Akte | — | ⋯ Löschen (+ Öffnen/Bearbeiten) | — | Upload | **⋯** | confirmDelete ✅ | `disabled={busy}` · B3: AuftragDokumenteTab Inline-Trash entfernt |
+| Notiz Akte | Kunde / Anfrage / Termin | — | ⋯ Löschen | — | Speichern Compose | **⋯** | confirmDelete (Vorschau 1. Zeile) ✅ | `disabled={pending}` |
+| Termin | `/kalender` | Chip → Sheet | Sheet-Footer Löschen | — | Neuer Termin | **Sheet** | `confirm()` (noch) | Löschen nur bestehender Termin |
+| To-do | Todos-Panel / Kalender-Tab | Zeile → Sheet | Sheet-Footer | — | — | **Sheet** | `confirm()` | nur Edit |
+| Objekt-Card CRM | Kunde-Tab Objekte | Bulk bei 1er-Auswahl; Klick → Akte | Bulk | — | — | Bulk/Klick | Bulk MockModal ✅ | Bearbeiten nur 1 ausgewählt |
+| Einheit/Bewohner | Objektakte Einheiten | ⋯ / Sheet | ⋯ Löschen | — | Privatkunde verknüpfen | **⋯** + Sheet | confirm / Bulk MockModal ✅ | kontextabhängig |
+| Compliance-Dokument | HW-Detail / Auftrag | Sheet | Sheet-Footer | — | Ablehnen | Sheet | confirm ✅ | `disabled={busy}` |
+| Preislisten-Eintrag | Einstellungen Preise | ⋯ Bearbeiten / Zeilen-Klick | ⋯ Löschen → softDelete | — | CSV Import, +Leistung | **⋯** | confirmDelete ✅ | Soft-Delete (`aktiv: false`); Fehler → Toast |
+| Vorlage (Angebot) | Einstellungen Vorlagen | ⋯ Öffnen / Link | ⋯ Löschen | — | — | **⋯** | confirmDelete ✅ | API-Fehler → Toast |
+| Teammitglied CRM | Einstellungen Team | Klick → Sheet | — (Deaktivieren) | — | Einladen | Sheet | — | Anzeige deaktiviert |
+| Zahlplan-Rate | Zahlung / Abschlagsplan | Drawer / Inline | Trash; frozen: **disabled Trash** | — | Erstellen | Inline + disabled-mit-Grund | Entfernen ohne Confirm (nicht frozen) | Frozen: sichtbar, `title`/hint „Gebunden an gesendete Rechnung [Nr]“ ✅ |
+| Zahlplan Dead-Ref | Rate nach RE-Hard-Delete | — | — | — | Badge | Hint am Status | — | Zusatzhinweis „vorherige Rechnung gelöscht“ |
+| Phase-Chip Angebot | VorgangPhasenVerlauf | — | — | — | Navigation | Chip disabled | — | tot: „nicht mehr vorhanden“; nie da: „noch nicht erstellt“ |
+| Eingangsrechnung-Zeile | HW-Eingangsrechnungen | Klick Modal | — | — | „Als überwiesen“ | Inline CTA | — | nur Status `eingereicht` |
+| Benachrichtigung Glocke | TopBar | Klick öffnen | — | — | Alle gelesen | kein ⋯ | — | — |
 
 ---
 
@@ -50,27 +53,26 @@
 
 | Card/Zeile (Entität) | Vorkommen | Bearbeiten | Löschen/Entfernen | Duplizieren | Weitere | Muster | Confirm destruktiv? | Deaktiviert-mit-Grund oder versteckt? |
 |---|---|---|---|---|---|---|---|---|
-| HV-Vorgangszeile | Portal Org Vorgänge/Eingang | Klick öffnen | Bulk-Löschen **nicht freigeschaltet** | — | Inline Freigabe/Ablehnen Eingang | **kein ⋯**; Inline-CTAs Eingang | — | `HV_BULK_DELETE_DISABLED_HINT`; HM: Actions null (**versteckt**) |
-| Objekt-Card HV | Portal Objekte | ⋯ Bearbeiten | ⋯ Löschen | ⋯ Kopieren | Aushang PDF, Link, QR | **⋯ PortalActionMenu** ✅ | **PortalSheetConfirm** ✅ | Aushang/Link/QR: `disabled` + **title**-Hint (Legal) ✅ näher am Soll |
+| HV-Vorgangszeile | Portal Org Vorgänge/Eingang | Klick öffnen | Bulk-Löschen **nicht freigeschaltet** | — | Inline Freigabe/Ablehnen Eingang | kein ⋯; Inline-CTAs | — | `HV_BULK_DELETE_DISABLED_HINT`; HM: Actions null |
+| Objekt-Card HV | Portal Objekte | ⋯ Bearbeiten | ⋯ Löschen | ⋯ Kopieren | Aushang PDF, Link, QR | **⋯ PortalActionMenu** ✅ | PortalSheetConfirm ✅ | Aushang/Link/QR: disabled + title-Hint |
 | Einheit/Mieter HV | Objekt-Detail Einheiten | ⋯ | ⋯ + SheetConfirm | — | Portal-Link | **⋯** ✅ | PortalSheetConfirm ✅ | HM Link: `disabled: !canEinladen` |
-| Teammitglied HV | — | — | — | — | — | **Feature aus** (Redirect) | — | deaktiviert („ein Zugang pro HV“) |
-| Partner-Vorgangszeile | Partner Listen | Klick öffnen | — | — | — | **kein ⋯** | — | — |
-| Partner-Dokument/Rechnung | Stamm/Compliance/Auftrag | — | Inline Trash wenn `canDelete` | — | Upload | **Inline Trash** | PortalSheetConfirm ✅ | Trash sichtbar nur wenn erlaubt (**versteckt** sonst) |
-| Bautagebuch Partner | Partner Auftrag Doku | Flow Bearbeiten | — Listen-Löschen | — | Erfassen | Flow, kein ⋯ | — | `readOnly` wenn erledigt |
-| Planer-Eintrag | Partner Planer | Klick/Navigation | — | — | — | **kein ⋯** | — | — |
-| Mieter-Meldung Liste | Portal Privat/Mieter | Öffnen | — | — | Filter | **kein ⋯** | — | — |
+| Teammitglied HV | — | — | — | — | — | Feature aus | — | deaktiviert |
+| Partner-Vorgangszeile | Partner Listen | Klick öffnen | — | — | — | kein ⋯ | — | — |
+| Partner-Dokument/Rechnung | Stamm/Compliance/Auftrag | — | Inline Trash wenn `canDelete` | — | Upload | Inline Trash | PortalSheetConfirm ✅ | Trash nur wenn erlaubt |
+| Bautagebuch Partner | Partner Auftrag Doku | Flow Bearbeiten | — | — | Erfassen | Flow | — | `readOnly` wenn erledigt |
+| Planer-Eintrag | Partner Planer | Klick/Navigation | — | — | — | kein ⋯ | — | — |
+| Mieter-Meldung Liste | Portal Privat/Mieter | Öffnen | — | — | Filter | kein ⋯ | — | — |
 
 ---
 
-## Soll vs. Ist — Kurz
+## Soll vs. Ist — Kurz (nach AUFTRAG B)
 
-| Regel | Ist-Fazit |
+| Regel | Fazit |
 |---|---|
-| ⋯ an gleicher Position | Nur teilweise (PosBoard, HV-Objekt, CRM-Einheit, Detail-Header). Listen oft Swipe/Bulk **statt** Desktop-⋯ |
-| Destruktiv nie direkt ohne Confirm | Verletzt: PosBoard-Löschen, Mangel-Trash, Zahlplan-Trash, **Vorgang-Swipe** |
-| Gleiche Entität = gleiches Muster | Position: ⋯ im PosBoard; Mangel: Inline; Dokument/Notiz: Inline vs. Vorgang: Bulk |
-| Deaktiviert-mit-Grund | Selten; oft **versteckt** oder nur `title`. HV Legal-Hints besser. Kein CRM-`disabledReason`-Feld |
-| Natürlicher Ort | Preislisten/Vorlagen: Löschen fehlt am natürlichen Ort |
+| ⋯ an gleicher Position | CRM-Listen (Vorgänge/Kunden/HW), Detail-Rechnung, Akte Notiz/Dokument, Mangel, Preislisten/Vorlagen: **⋯** |
+| Destruktiv nie ohne Confirm | Kernpfade über `confirmDelete` / MockModal; Termin/To-do Sheet noch `confirm()` |
+| Deaktiviert-mit-Grund | Rechnung-⋯, Zahlplan-Frozen-Trash; Phase-Chip / Dead-Ref-Hints |
+| Natürlicher Ort | Preislisten/Vorlagen: Löschen am Zeilen-⋯ |
 
 ---
 

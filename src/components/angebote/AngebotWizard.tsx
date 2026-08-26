@@ -20,6 +20,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { Check, FileText } from 'lucide-react'
@@ -798,10 +799,10 @@ export function AngebotWizard({
         if (opts?.notify) {
           toast.success(
             istNachtrag
-              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
+              ? 'Nachtrag gespeichert'
               : istAuftragKorrektur
                 ? hatGestellteAbschlaege
-                  ? 'Korrektur gespeichert. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
+                  ? 'Korrektur gespeichert — Abschläge unverändert'
                   : 'Korrektur gespeichert'
                 : res.angebotsnr?.trim()
                   ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
@@ -866,9 +867,7 @@ export function AngebotWizard({
   async function openVorschauSheet() {
     const id = await ensureDraftForPreview()
     if (!id) {
-      toast.error(
-        'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
-      )
+      toast.error('Entwurf prüfen')
     }
     setSheet('vorschau')
   }
@@ -976,12 +975,12 @@ export function AngebotWizard({
       }
       toast.success(
         istNachtrag
-          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
+          ? 'Nachtrag versendet'
           : istAuftragKorrektur
             ? hatGestellteAbschlaege
-              ? 'Korrektur gespeichert und versendet. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
-              : 'Korrektur gespeichert und an den Kunden versendet'
-            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+              ? 'Korrektur versendet — Abschläge unverändert'
+              : 'Korrektur versendet'
+            : `Angebot versendet · ${formatEurBetrag(mailSummen.bruttoMin)}`
       )
       setSheet(null)
       setKundeEditOpen(false)
@@ -1103,12 +1102,10 @@ export function AngebotWizard({
     <div className="dc-doc flex flex-col gap-4">
       {istAuftragKorrektur && hatGestellteAbschlaege ? (
         <div className="zahlung-tab-hint">
-          <MockIcon ctx="btn" n="info" size={15} />
-          <span>
-            Bereits gestellte Abschläge bleiben nach der Korrektur unverändert. Die
-            Schlussrechnung gleicht die Differenz aus. Soll ein Abschlag zur neuen Summe
-            passen: Rechnung stornieren und die Rate neu stellen.
-          </span>
+          <MockInfoTip
+            label="Hinweis gestellte Abschläge"
+            tip="Gestellte Abschläge bleiben unverändert. Die Schlussrechnung gleicht die Differenz aus — oder Abschlag stornieren und Rate neu stellen."
+          />
         </div>
       ) : null}
       <PosBoard
@@ -1411,11 +1408,10 @@ export function AngebotWizard({
         <div className="form-grid form-grid--sheet">
           {istAuftragKorrektur && hatGestellteAbschlaege ? (
             <div className="full zahlung-tab-hint" style={{ marginBottom: 0 }}>
-              <MockIcon ctx="btn" n="info" size={15} />
-              <span>
-                Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag
-                stornieren und die Rate neu stellen.
-              </span>
+              <MockInfoTip
+                label="Hinweis gestellte Abschläge"
+                tip="Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag stornieren und Rate neu stellen."
+              />
             </div>
           ) : null}
           <MockField label="Gültig bis" full>

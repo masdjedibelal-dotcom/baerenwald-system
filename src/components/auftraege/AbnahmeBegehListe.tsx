@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
@@ -25,6 +27,7 @@ import {
   type AbnahmePunktStatus,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AuftragPosition } from '@/lib/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 import type { KiAssistDraft } from '@/lib/copilot/ki-assist-scopes'
@@ -338,8 +341,8 @@ export function AbnahmeBegehListe({
                 addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()
               }
               onClick={confirmAdd}
-              aria-label="Übernehmen"
-              title="Übernehmen"
+              aria-label="Speichern"
+              title="Speichern"
             >
               <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
             </button>
@@ -431,8 +434,8 @@ export function AbnahmeBegehListe({
               className="editor-sheet__confirm"
               disabled={!editTitel.trim()}
               onClick={confirmEdit}
-              aria-label="Übernehmen"
-              title="Übernehmen"
+              aria-label="Speichern"
+              title="Speichern"
             >
               <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
             </button>
@@ -573,22 +576,36 @@ export function AbnahmeMaengelCheckliste({
                 ) : null}
               </div>
               <div className="abnahme-inline__item-actions">
-                <button
-                  type="button"
-                  className="abnahme-inline__icon-btn"
-                  aria-label="Mangel bearbeiten"
-                  onClick={() => openEdit(i)}
-                >
-                  <MockIcon ctx="btn" n="pencil" size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="abnahme-inline__icon-btn"
-                  aria-label="Mangel entfernen"
-                  onClick={() => onChange(items.filter((_, j) => j !== i))}
-                >
-                  <MockIcon ctx="btn" n="trash" size={15} />
-                </button>
+                <MockEntityRowMenu
+                  title="Mangel"
+                  items={
+                    [
+                      {
+                        icon: 'pencil',
+                        label: 'Bearbeiten',
+                        onClick: () => openEdit(i),
+                      },
+                      'sep',
+                      {
+                        icon: 'trash',
+                        label: 'Löschen',
+                        danger: true,
+                        onClick: () => {
+                          const preview =
+                            [item.titel.trim() || 'Mangel', item.notiz.trim()]
+                              .filter(Boolean)
+                              .join('\n')
+                              .slice(0, 240) || 'Mangel'
+                          confirmDelete(
+                            'Mangel löschen?',
+                            () => onChange(items.filter((_, j) => j !== i)),
+                            { body: preview }
+                          )
+                        },
+                      },
+                    ] satisfies EntityMenuItem[]
+                  }
+                />
               </div>
             </li>
           ))}
@@ -620,8 +637,8 @@ export function AbnahmeMaengelCheckliste({
               className="editor-sheet__confirm"
               disabled={!draftTitel.trim() && !draftNotiz.trim()}
               onClick={confirm}
-              aria-label="Übernehmen"
-              title="Übernehmen"
+              aria-label="Speichern"
+              title="Speichern"
             >
               <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
             </button>

@@ -450,7 +450,7 @@ export function AuftragDetailClient({
       return
     }
     if (!detail.lead_id) {
-      toast.error('Keine Anfrage verknüpft — Korrektur nur über das Angebot möglich.')
+      toast.error('Keine Anfrage verknüpft')
       return
     }
     startTransition(async () => {
@@ -481,7 +481,7 @@ export function AuftragDetailClient({
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
-      toast.info('Nachtrag-Angebot — der laufende Auftrag bleibt bis zur Annahme unverändert.')
+      toast.info('Nachtrag — Auftrag unverändert')
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 

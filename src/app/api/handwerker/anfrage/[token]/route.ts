@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
       gesendet_at,
       gewerk_id,
       gewerke(name),
-      handwerker(name),
+      handwerker(name, telefon),
       angebote(
         id,
         positionen,
@@ -62,8 +62,8 @@ export async function GET(_req: Request, { params }: { params: { token: string }
 
   const { data: einRows } = await supabaseAdmin.from('einstellungen').select('key, value')
   const map = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
-  const kontakt_telefon = map.get('telefon')?.trim() || ''
-  const kontakt_email = map.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
+  const firmaTelefon = map.get('telefon')?.trim() || ''
+  const firmaEmail = map.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
 
   let antwort_frist_iso: string | null = null
   const gesendetAt = raw.gesendet_at as string | null
@@ -73,11 +73,11 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     antwort_frist_iso = d.toISOString()
   }
 
-  const hw = one(raw.handwerker) as { name: string } | null
+  const hw = one(raw.handwerker) as { name: string; telefon?: string | null } | null
   const gw = one(raw.gewerke) as { name: string } | null
 
   const st = String(raw.status ?? '').toLowerCase()
-  if (st === 'ersetzt' || st === 'abgelehnt' || st === 'storniert') {
+  if (st === 'ersetzt' || st === 'storniert') {
     return NextResponse.json(
       {
         ok: false,
@@ -93,8 +93,35 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   if (st === 'akzeptiert') antwort = 'akzeptiert'
   if (st === 'abgelehnt') antwort = 'abgelehnt'
 
+  const handwerkerName = hw?.name?.trim() || 'Handwerkerin'
+  const ansprechTelefon = hw?.telefon?.trim() || firmaTelefon
+
+  // Nach Antwort: reduziertes Payload (kein Kontakt-Mail, keine Positions-/Standort-Details)
+  if (antwort) {
+    const reduced: HandwerkerAnfragePublicPayload = {
+      handwerker_name: handwerkerName,
+      gewerk_name: gw?.name?.trim() || 'Gewerk',
+      plz: '',
+      ort: '',
+      zeitraum: '',
+      geplanter_start: null,
+      antwort_frist_iso: null,
+      positionen: [],
+      kontakt_telefon: ansprechTelefon,
+      kontakt_email: '',
+      status: String(raw.status ?? 'ausstehend'),
+      antwort_at: (raw.antwort_at as string | null) ?? null,
+      antwort,
+    }
+    return NextResponse.json({
+      ...reduced,
+      id: raw.id,
+      token,
+    })
+  }
+
   const payload: HandwerkerAnfragePublicPayload = {
-    handwerker_name: hw?.name?.trim() || 'Handwerkerin',
+    handwerker_name: handwerkerName,
     gewerk_name: gw?.name?.trim() || 'Gewerk',
     plz,
     ort,
@@ -107,8 +134,8 @@ export async function GET(_req: Request, { params }: { params: { token: string }
       menge: p.menge || 1,
       einheit: p.einheit,
     })),
-    kontakt_telefon,
-    kontakt_email,
+    kontakt_telefon: ansprechTelefon || firmaTelefon,
+    kontakt_email: firmaEmail,
     status: String(raw.status ?? 'ausstehend'),
     antwort_at: (raw.antwort_at as string | null) ?? null,
     antwort,

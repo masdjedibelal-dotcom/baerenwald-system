@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -222,28 +222,11 @@ export function ObjektBewohnerSection({
           isChecked && 'is-checked'
         )}
       >
-        <div
-          className="vg-check"
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleSel(b.id)
-          }}
-          role="checkbox"
-          aria-checked={isChecked}
-          aria-label={`${b.name} auswählen`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              e.stopPropagation()
-              toggleSel(b.id)
-            }
-          }}
-        >
-          <span className={cn('vg-box', isChecked && 'on')}>
-            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-          </span>
-        </div>
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(b.id)}
+          title={`${b.name} auswählen`}
+        />
         <button
           type="button"
           className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
@@ -343,12 +326,7 @@ export function ObjektBewohnerSection({
           <MockEmpty
             icon="users"
             title="Noch keine Bewohner"
-            hint="Bewohner hinzufügen"
-            action={
-              <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-                Hinzufügen
-              </MockBtn>
-            }
+            hint="Über „+“ oben hinzufügen."
           />
         ) : isMobile ? (
           <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>

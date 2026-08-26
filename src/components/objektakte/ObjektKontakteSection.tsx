@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -224,28 +224,11 @@ export function ObjektKontakteSection({
           isChecked && 'is-checked'
         )}
       >
-        <div
-          className="vg-check"
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleSel(k.id)
-          }}
-          role="checkbox"
-          aria-checked={isChecked}
-          aria-label={`${k.name} auswählen`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              e.stopPropagation()
-              toggleSel(k.id)
-            }
-          }}
-        >
-          <span className={cn('vg-box', isChecked && 'on')}>
-            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-          </span>
-        </div>
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(k.id)}
+          title={`${k.name} auswählen`}
+        />
         <button
           type="button"
           className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
@@ -341,12 +324,7 @@ export function ObjektKontakteSection({
           <MockEmpty
             icon="user"
             title="Noch keine Kontakte"
-            hint="Kontakt hinzufügen — Hausmeister bitte in der Karte darüber anlegen."
-            action={
-              <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-                Hinzufügen
-              </MockBtn>
-            }
+            hint="Hausmeister bitte in der Karte darüber anlegen. Über „+“ oben hinzufügen."
           />
         ) : isMobile ? (
           <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>

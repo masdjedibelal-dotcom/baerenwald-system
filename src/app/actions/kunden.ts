@@ -358,18 +358,21 @@ export async function getPortalLoginHint(
 /** Globale Suche (Cmd+K) — Server Action wegen RLS-Fallback auf kunden. */
 export async function searchKundenGlobal(
   term: string
-): Promise<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>[]> {
+): Promise<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>[]> {
   const q = term.trim().slice(0, 80).replace(/[%]/g, '')
   if (q.length < 2) return []
   const pct = `%${q}%`
-  const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>>()
+  const byId = new Map<
+    string,
+    Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
+  >()
   const { istHvPortalRollenKunde } = await import('@/lib/kunde-stammdaten')
 
-  for (const column of ['name', 'email'] as const) {
+  for (const column of ['name', 'email', 'org_anzeigename'] as const) {
     const { data } = await withCrmReadFallback(async (db) =>
       db
         .from('kunden')
-        .select('id, name, vorname, nachname, typ, email, portal_modus')
+        .select('id, name, vorname, nachname, typ, email, portal_modus, org_anzeigename')
         .ilike(column, pct)
         .limit(8)
     )
@@ -380,7 +383,7 @@ export async function searchKundenGlobal(
       }
       byId.set(
         row.id as string,
-        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>
+        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
       )
       if (byId.size >= 8) break
     }

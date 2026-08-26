@@ -77,7 +77,10 @@ export async function buildRechnungPdfBuffer(
   })
 
   try {
-    const buf = await renderRechnungPdfForDetail(row, firm, gewerke, { supabase })
+    const buf = await renderRechnungPdfForDetail(row, firm, gewerke, {
+      supabase,
+      bezugNr,
+    })
     return { ok: true, buffer: buf, rechnungsnummer: row.rechnungsnummer?.trim() || '' }
   } catch (e) {
     return {

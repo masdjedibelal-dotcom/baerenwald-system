@@ -138,7 +138,11 @@ export function buildRechnungHtmlInput(
   row: RechnungDetailForPdf,
   firm: FirmenEinstellungen,
   gewerke: Gewerk[] = [],
-  opts?: { vorherigeAbschlaege?: RechnungAbschlagLink[] | null }
+  opts?: {
+    vorherigeAbschlaege?: RechnungAbschlagLink[] | null
+    /** Geladene Bezug-Rechnungsnummer (Storno/Gutschrift) */
+    bezugNr?: string | null
+  }
 ): AngebotHtmlInput {
   if (!row.kunden) throw new Error('Kunde fehlt')
 
@@ -318,6 +322,11 @@ export function buildRechnungHtmlInput(
     rechnung_typ:
       rechnungArt === 'schluss' ? 'schluss' : rechnungArt === 'abschlag' ? 'abschlag' : 'voll',
     rechnung_abschlag_index: abschlagIndex,
+    beleg_typ:
+      String((row as { beleg_typ?: string | null }).beleg_typ ?? '').toLowerCase() === 'gutschrift'
+        ? 'gutschrift'
+        : 'rechnung',
+    bezug_rechnungsnummer: opts?.bezugNr?.trim() || null,
     schluss_abrechnung,
   }
 }

@@ -1,5 +1,6 @@
 /**
- * Einheitliche Kurz-Labels für PhaseCard / Zugehörig —
+ * Einheitliche Kurz-Labels für Projekt-Kontext /
+ * EntityProjektUebersichtCard (PhaseCard/ZugehoerigListe entfernt).
  * gleiche Sprache wie Header-Badges (status-display / vorgang-labels).
  */
 import {

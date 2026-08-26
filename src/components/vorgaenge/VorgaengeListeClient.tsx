@@ -28,14 +28,17 @@ import {
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { toast } from '@/components/ui/app-toast'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import {
@@ -110,6 +113,14 @@ const VORGAENGE_CHECK_COL: ResizableColDef = {
   defaultWidth: 36,
   minWidth: 36,
   maxWidth: 36,
+  fixed: true,
+}
+
+const VORGAENGE_MENU_COL: ResizableColDef = {
+  id: 'menu',
+  defaultWidth: 40,
+  minWidth: 40,
+  maxWidth: 40,
   fixed: true,
 }
 
@@ -282,10 +293,10 @@ export function VorgaengeListeClient({
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const colDefs = useMemo(() => {
     const data = VORGAENGE_DATA_COLS.filter((c) => visibleCols[c.id as DataColId])
-    return [VORGAENGE_CHECK_COL, ...data]
+    return [VORGAENGE_CHECK_COL, ...data, VORGAENGE_MENU_COL]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v5.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v6.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -855,7 +866,7 @@ export function VorgaengeListeClient({
 
   const filterFooter = (
     <div className="sheet-footer-actions">
-      <MockBtn kind="secondary" onClick={resetFilters}>
+      <MockBtn kind="ghost" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
@@ -1249,32 +1260,18 @@ export function VorgaengeListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectVisible()
-            }}
+          <ListRowCheck
+            checked={allPageSelected}
+            partial={
+              !allPageSelected && displayItems.some((v) => selected[rowKey(v)])
+            }
+            onToggle={toggleSelectVisible}
             title={
               allPageSelected
                 ? 'Auswahl dieser Ansicht aufheben'
                 : 'Sichtbare Zeilen auswählen'
             }
-          >
-            <span
-              className={cn(
-                'vg-box',
-                allPageSelected && 'on',
-                !allPageSelected &&
-                  displayItems.some((v) => selected[rowKey(v)]) &&
-                  'partial'
-              )}
-            >
-              {allPageSelected || displayItems.some((v) => selected[rowKey(v)]) ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          />
           {visibleCols.kunde ? (
           <MockSortHead
             col="kunde"
@@ -1397,6 +1394,13 @@ export function VorgaengeListeClient({
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
             const edit = () => openDetail(v)
+            const rowMenu: EntityMenuItem[] = [
+              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(v) },
+              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
+              { icon: 'copy', label: 'Duplizieren', onClick: copy },
+              'sep',
+              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+            ]
             const row = (
               <div
                 className={cn(
@@ -1415,17 +1419,10 @@ export function VorgaengeListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(key)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[key] && 'on')}>
-                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[key])}
+                  onToggle={() => toggleSel(key)}
+                />
                 {visibleCols.kunde ? (
                 <div className="vg-kunde">
                   <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
@@ -1468,7 +1465,26 @@ export function VorgaengeListeClient({
                 </div>
                 ) : null}
                 {visibleCols.status ? (
-                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                  {v.badges?.notfall ? (
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title="Notfall"
+                      aria-label="Notfall"
+                    >
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          background: 'var(--danger, #c0392b)',
+                          display: 'inline-block',
+                          flexShrink: 0,
+                        }}
+                      />
+                    </span>
+                  ) : null}
                   {korrekturUi?.dualBadges ? (
                     <>
                       <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
@@ -1479,6 +1495,13 @@ export function VorgaengeListeClient({
                   )}
                 </div>
                 ) : null}
+                <div
+                  className="vg-row-menu"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+                </div>
               </div>
             )
             return (

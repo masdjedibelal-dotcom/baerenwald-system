@@ -64,7 +64,10 @@ export function BaustelleBerichteDokumenteCard({
     startTransition(async () => {
       const r = await deleteBaustellenDokument(id, auftragId)
       if (!r.ok) toast.error(r.message)
-      else onChanged()
+      else {
+        toast.success('Dokument gelöscht')
+        onChanged()
+      }
     })
   }
 

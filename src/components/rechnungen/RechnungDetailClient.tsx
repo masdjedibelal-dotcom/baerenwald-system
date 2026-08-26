@@ -27,11 +27,18 @@ import {
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
+  deleteRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
-import { rechnungDarfImWizardBearbeitetWerden, rechnungWizardBearbeitenSperrgrund } from '@/lib/rechnungen/rechnung-wizard-types'
+import {
+  rechnungDarfGeloeschtWerden,
+  rechnungDarfImWizardBearbeitetWerden,
+  rechnungWizardBearbeitenSperrgrund,
+} from '@/lib/rechnungen/rechnung-wizard-types'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungEingangStammdatenCard } from '@/components/rechnungen/RechnungEingangStammdatenCard'
 import { RechnungEingangDokumenteCard } from '@/components/rechnungen/RechnungEingangDokumenteCard'
@@ -367,7 +374,7 @@ export function RechnungDetailClient({
       router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
       return
     }
-    toast.error('Kein Kunde oder Auftrag verknüpft — neue Rechnung kann nicht geöffnet werden.')
+    toast.error('Kein Auftrag verknüpft')
   }
 
   function handleSenden() {
@@ -406,7 +413,7 @@ export function RechnungDetailClient({
         toast.error(r.message)
         return
       }
-      toast.success('Wieder als versendet — ursprüngliches Versanddatum bleibt.')
+      toast.success('Wieder als versendet')
       setDetail((d) => ({ ...d, status: 'gesendet' }))
       refresh()
     })
@@ -509,6 +516,116 @@ export function RechnungDetailClient({
     }
     return null
   }, [detail.status, pending, isEingehend])
+
+  const overflowMenuItems = useMemo((): ActionsMenuItem[] => {
+    if (isEingehend) {
+      return [
+        {
+          label: 'PDF öffnen',
+          icon: <MockIcon ctx="btn" n="file" size={16} />,
+          onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+        },
+      ]
+    }
+
+    const st = String(detail.status ?? '').toLowerCase()
+    const statusLabel =
+      st === 'gesendet'
+        ? 'Gesendet'
+        : st === 'bezahlt'
+          ? 'Bezahlt'
+          : st === 'storniert'
+            ? 'Storniert'
+            : st === 'entwurf'
+              ? 'Entwurf'
+              : st || 'Rechnung'
+
+    const korrekturModus = rechnungKorrekturModus(detail.status)
+    const korrekturDisabled = korrekturModus === 'gesperrt'
+    const korrekturHint = korrekturDisabled
+      ? `${statusLabel} — Korrektur nicht möglich`
+      : korrekturModus === 'storno_neu'
+        ? 'Storno + neue RE'
+        : undefined
+
+    const erinnerungOk =
+      belegTyp === 'rechnung' && (st === 'gesendet' || ueberfaellig) && st !== 'bezahlt' && st !== 'storniert'
+    const erinnerungHint = !erinnerungOk
+      ? st === 'entwurf'
+        ? 'Entwurf — erst versenden'
+        : st === 'bezahlt'
+          ? 'Bezahlt — keine Erinnerung'
+          : st === 'storniert'
+            ? 'Storniert — keine Erinnerung'
+            : `${statusLabel} — Erinnerung nicht verfügbar`
+      : undefined
+
+    const loeschbar = rechnungDarfGeloeschtWerden(detail.status)
+    const loeschHint = loeschbar
+      ? undefined
+      : `${statusLabel} — nur Entwürfe löschen`
+
+    const items: ActionsMenuItem[] = [
+      {
+        label: 'PDF öffnen',
+        icon: <MockIcon ctx="btn" n="file" size={16} />,
+        onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+      },
+      {
+        label: korrekturModus === 'storno_neu' ? 'Storno / Korrektur' : 'Korrektur',
+        icon: <MockIcon ctx="btn" n="pencil" size={16} />,
+        disabled: korrekturDisabled,
+        hint: korrekturHint,
+        onClick: () => handleKorrigieren(),
+      },
+      {
+        label: 'Zahlungserinnerung',
+        icon: <MockIcon ctx="btn" n="mail" size={16} />,
+        disabled: !erinnerungOk,
+        hint: erinnerungHint,
+        onClick: () => setErinnerungModalOpen(true),
+      },
+      'sep',
+      {
+        label: 'Löschen',
+        icon: <MockIcon ctx="btn" n="trash" size={16} />,
+        danger: true,
+        disabled: !loeschbar,
+        hint: loeschHint,
+        onClick: () => {
+          const nr = detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)
+          confirmDelete(
+            'Rechnung löschen?',
+            async () => {
+              const r = await deleteRechnungEntwurf(detail.id)
+              if (!r.ok) {
+                toast.error(r.message)
+                return
+              }
+              toast.success('Rechnung gelöscht')
+              router.push('/vorgaenge?tab=rechnung')
+              refresh()
+            },
+            {
+              sub: nr,
+              body: 'Entwurf wird endgültig entfernt.',
+            }
+          )
+        },
+      },
+    ]
+    return items
+  }, [
+    isEingehend,
+    pdfHref,
+    detail.status,
+    detail.id,
+    detail.rechnungsnummer,
+    belegTyp,
+    ueberfaellig,
+    router,
+    refresh,
+  ])
 
   const projektTitelAnzeige = isEingehend
     ? detail.rechnungsnummer?.trim() ||
@@ -776,7 +893,7 @@ export function RechnungDetailClient({
             sheetTitle="Rechnung"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={[]}
+            menuItems={overflowMenuItems}
           />
         ),
       }}

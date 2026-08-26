@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { createKundenUpdateAndSend } from '@/app/(dashboard)/auftraege/kunden-update-actions'
 import {
-  aktuellePhaseIndex,
+  aktuellePhaseIndexFromEntities,
   auftragStatusLabelDe,
   PROJEKT_PHASEN,
 } from '@/lib/auftraege/projekt-phasen'
@@ -34,7 +34,13 @@ export function AuftragKundenUpdatePanel({
   const [sendMail, setSendMail] = useState(true)
 
   const phaseIdx = useMemo(
-    () => aktuellePhaseIndex(leadStatus ?? null, detail.status as AuftragStatus),
+    () =>
+      aktuellePhaseIndexFromEntities({
+        aufStatus: detail.status as AuftragStatus,
+        hasAuftrag: true,
+        hasAngebot: true,
+        leadStatus: leadStatus ?? null,
+      }),
     [leadStatus, detail.status]
   )
 

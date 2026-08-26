@@ -313,7 +313,7 @@ export function AuftragFinanzenClient({
                         startTransition(async () => {
                           const r = await toggleEingangsrechnungBezahlt(e.id, auftragId, ev.target.checked)
                           if (!r.ok) toast.error(r.message)
-                          else toast.success('Gespeichert')
+                          else toast.success(ev.target.checked ? 'Als bezahlt markiert' : 'Bezahlt zurückgenommen')
                         })
                       }}
                     />
@@ -363,6 +363,7 @@ export function AuftragFinanzenClient({
                     startTransition(async () => {
                       const r = await toggleEingangsrechnungBezahlt(e.id, auftragId, ev.target.checked)
                       if (!r.ok) toast.error(r.message)
+                      else toast.success(ev.target.checked ? 'Als bezahlt markiert' : 'Bezahlt zurückgenommen')
                     })
                   }}
                 />

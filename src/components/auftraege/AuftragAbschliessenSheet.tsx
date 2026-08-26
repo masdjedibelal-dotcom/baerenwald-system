@@ -92,9 +92,7 @@ export function AuftragAbschliessenSheet({
       .run('Auftrag wird abgeschlossen…', async () => {
         const ctx = await getAbschliessenKontext(auftragId)
         if (ctx.mode === 'hw') {
-          toast.error(
-            'Es liegt ein Handwerker-Abnahmeprotokoll vor — bitte darüber speichern oder senden.'
-          )
+          toast.error('HW-Protokoll zuerst speichern')
           setHwProtokolle(ctx.protokolle)
           setStep('hw')
           return
@@ -140,8 +138,8 @@ export function AuftragAbschliessenSheet({
           } else {
             toast.success(
               r.sentToKunde
-                ? 'Abnahmeprotokoll an den Kunden gesendet — Auftrag abgeschlossen'
-                : 'Auftrag abgeschlossen (Handwerker-Abnahmeprotokoll)'
+                ? 'Protokoll gesendet — Auftrag abgeschlossen'
+                : 'Auftrag abgeschlossen'
             )
           }
           onClose()
@@ -187,8 +185,8 @@ export function AuftragAbschliessenSheet({
           } else {
             toast.success(
               r.sentToKunde
-                ? 'Abnahmeprotokoll gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
-                : 'Gesamtabnahme gespeichert — Auftrag abgeschlossen'
+                ? 'Protokoll gesendet — Auftrag abgeschlossen'
+                : 'Abnahme gespeichert — Auftrag abgeschlossen'
             )
           }
           onClose()
@@ -234,7 +232,7 @@ export function AuftragAbschliessenSheet({
               loading={pending && pendingKind === 'send'}
               onClick={() => speichernMitHwProtokoll(true)}
             >
-              Speichern und senden
+              Senden
             </Button>
           </div>
         }
@@ -311,7 +309,7 @@ export function AuftragAbschliessenSheet({
             loading={pending && pendingKind === 'send'}
             onClick={() => speichernMitAbnahme(true)}
           >
-            Speichern und senden
+            Senden
           </Button>
         </div>
       }

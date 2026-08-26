@@ -308,7 +308,7 @@ export function AbnahmeprotokollCreateWizard({
         const prev = r.previousStatus
         if (r.sendWarning) {
           toast.error(
-            `Abnahme gespeichert und Auftrag abgeschlossen, Versand fehlgeschlagen: ${r.sendWarning}`,
+            `Gespeichert — Versand fehlgeschlagen: ${r.sendWarning}`,
             {
               action: {
                 label: 'Rückgängig',
@@ -316,7 +316,7 @@ export function AbnahmeprotokollCreateWizard({
                   void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
                     if (!u.ok) toast.error(u.message)
                     else {
-                      toast.success('Abschluss rückgängig gemacht')
+                      toast.success('Abschluss rückgängig')
                       router.refresh()
                     }
                   })
@@ -327,7 +327,7 @@ export function AbnahmeprotokollCreateWizard({
         } else {
           toast.success(
             r.sentToKunde
-              ? 'Abnahme gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
+              ? 'Abnahme gesendet — Auftrag abgeschlossen'
               : 'Abnahme gespeichert — Auftrag abgeschlossen',
             {
               action: {
@@ -336,7 +336,7 @@ export function AbnahmeprotokollCreateWizard({
                   void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
                     if (!u.ok) toast.error(u.message)
                     else {
-                      toast.success('Abschluss rückgängig gemacht')
+                      toast.success('Abschluss rückgängig')
                       router.refresh()
                     }
                   })
@@ -365,7 +365,7 @@ export function AbnahmeprotokollCreateWizard({
           toast.error(r.message)
           return
         }
-        toast.success('Abnahmeprotokoll gespeichert und an den Kunden gesendet')
+        toast.success('Protokoll gesendet')
         router.push(`/auftraege/${auftragId}?tab=leistungen`)
         router.refresh()
         return

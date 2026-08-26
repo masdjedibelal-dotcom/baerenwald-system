@@ -24,11 +24,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CRM = 'https://staging--baerenwald-backend.netlify.app'
 const OUT_DIR = path.join(__dirname, '../../docs/test')
 const SHOT = path.join(OUT_DIR, 'screenshots/aktions-matrix')
-const JSON_OUT = path.join(OUT_DIR, 'aktions-matrix-r3-results.json')
-const MD_OUT = path.join(OUT_DIR, 'AKTIONS-SMOKE-R3.md')
 
-const CRM_USER = 'admin@staging.baerenwald.test'
-const CRM_PASS = 'StagingTest!2026'
+const CRM_USER = process.env.CRM_SMOKE_USER || 'admin@staging.baerenwald.test'
+const CRM_PASS = process.env.CRM_SMOKE_PASS || 'StagingTest!2026'
+const SMOKE_LABEL = process.env.CRM_SMOKE_LABEL || (CRM_USER.includes('staff2') ? 'staff2' : 'admin')
+const JSON_OUT = path.join(
+  OUT_DIR,
+  SMOKE_LABEL === 'admin' ? 'aktions-matrix-r3-results.json' : `aktions-matrix-r3-${SMOKE_LABEL}-results.json`
+)
+const MD_OUT = path.join(
+  OUT_DIR,
+  SMOKE_LABEL === 'admin' ? 'AKTIONS-SMOKE-R3.md' : `AKTIONS-SMOKE-R3-${SMOKE_LABEL.toUpperCase()}.md`
+)
 
 /** LEGACY IDs aus seed-legacy-edgecases.mjs */
 const L = {
@@ -263,7 +270,20 @@ async function clickAndExpect(page, entity, action, patterns, expectOk = true) {
 
 function writeReport() {
   fs.mkdirSync(SHOT, { recursive: true })
-  fs.writeFileSync(JSON_OUT, JSON.stringify({ finished_at: new Date().toISOString(), crm: CRM, results }, null, 2))
+  fs.writeFileSync(
+    JSON_OUT,
+    JSON.stringify(
+      {
+        finished_at: new Date().toISOString(),
+        crm: CRM,
+        user: CRM_USER,
+        label: SMOKE_LABEL,
+        results,
+      },
+      null,
+      2
+    )
+  )
 
   const byEntity = {}
   for (const r of results) {
@@ -271,11 +291,12 @@ function writeReport() {
     byEntity[r.entity].push(r)
   }
   const icon = { ok: '✅', disabled: '🔒', fail: '❌', crash: '💥', skip: '⏭️' }
-  let md = `# Aktions-Smoke Runde 3 (Staging)
+  let md = `# Aktions-Smoke Runde 3 (Staging) — ${SMOKE_LABEL}
 
 **Datum:** ${new Date().toISOString()}  
 **CRM:** ${CRM}  
-**Daten:** LEGACY-Seed + Staging-Seed  
+**Login:** \`${CRM_USER}\`  
+**Daten:** LEGACY-Seed + Staging-Seed (+ PRODSIM falls vorhanden)  
 **Legende:** ✅ funktioniert · 🔒 deaktiviert-mit-Grund · ❌ Fehler/„nicht gefunden“ · 💥 Crash · ⏭️ UI nicht angeboten
 
 > Hinweis: Mutationen nur selektiv ausgeführt (Parity-kritisch / LEGACY). Viele Zellen = UI-Probe (sichtbar/disabled) ohne Side-Effect.
@@ -305,9 +326,120 @@ function writeReport() {
     }
   }
 
+  md += `\n## Rechnung menuItems={[]}\n\n`
+  md += `Detail-Header: \`menuItems={[]}\` → ⋯-Menü **leer/unsichtbar**. `
+  md += `Storno/Mahnung am Detail **nicht verdrahtet** (Modal-Code ohne CTA). `
+  md += `PDF: Tab Akte/Dokumente. Löschen: nur Listen-⋯ am Auftrag (Entwurf).\n`
+
   fs.writeFileSync(MD_OUT, md)
   console.log(`\nWrote ${MD_OUT}`)
   console.log(`Wrote ${JSON_OUT}`)
+}
+
+async function resetParityRechnung(supabase) {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({
+      status: 'gesendet',
+      bezahlt_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', L.reForeign)
+  if (error) console.warn('resetParityRechnung:', error.message)
+  else console.log('Reset LEGACY-fremd RE → gesendet (für Als-bezahlt-Probe)')
+}
+
+async function resolveProdsimIds(supabase) {
+  if (!supabase) return []
+  const out = []
+  const { data: re } = await supabase
+    .from('rechnungen')
+    .select('id, rechnungsnummer, status')
+    .or('rechnungsnummer.ilike.PRODSIM%,notizen.ilike.%PRODSIM%')
+    .limit(5)
+  for (const r of re || []) {
+    out.push({ entity: 'Rechnung', id: r.id, label: r.rechnungsnummer || r.id, status: r.status })
+  }
+  const { data: auf } = await supabase
+    .from('auftraege')
+    .select('id, titel, status')
+    .ilike('titel', 'PRODSIM%')
+    .limit(3)
+  for (const a of auf || []) {
+    out.push({ entity: 'Auftrag', id: a.id, label: a.titel || a.id, status: a.status })
+  }
+  return out
+}
+
+async function assertAltStatusBadge(page, entity, expectedRaw) {
+  const badges = (
+    await page.locator('.mock-badge, [class*="Badge"], [data-kind]').allTextContents().catch(() => [])
+  ).map((t) => String(t || '').trim())
+  const body = (await page.locator('body').innerText().catch(() => '')) || ''
+  const inBadge = badges.some((b) => new RegExp(`^${expectedRaw}$`, 'i').test(b))
+  const entwurfBadge = badges.some((b) => /^entwurf$/i.test(b))
+  if (entity === 'Angebot' && entwurfBadge && !inBadge) {
+    mark(
+      entity,
+      `Alt-Status Badge (${expectedRaw})`,
+      'fail',
+      `Badge zeigt Entwurf statt Rohwert (badges=${badges.slice(0, 8).join('|')})`
+    )
+    return
+  }
+  if (inBadge) {
+    mark(entity, `Alt-Status Badge (${expectedRaw})`, 'ok', `Rohwert im Badge (${badges.filter(Boolean).slice(0, 6).join('|')})`)
+    return
+  }
+  if (new RegExp(expectedRaw, 'i').test(body) && !entwurfBadge) {
+    mark(entity, `Alt-Status Badge (${expectedRaw})`, 'ok', 'Rohwert auf Seite sichtbar')
+    return
+  }
+  mark(
+    entity,
+    `Alt-Status Badge (${expectedRaw})`,
+    'fail',
+    `Rohwert nicht im Badge (badges=${badges.slice(0, 8).join('|') || '—'})`
+  )
+}
+
+async function probeRechnungOverflowAndPdf(page) {
+  // ⋯ am Detail-Header
+  const more = page.getByRole('button', { name: /weitere aktionen|mehr|⋯/i }).first()
+  const moreVisible = await more.isVisible().catch(() => false)
+  if (!moreVisible) {
+    mark('Rechnung', '⋯-Menü Detail', 'skip', 'kein Overflow-Trigger (menuItems=[] → hasMenuContent false)')
+  } else {
+    await more.click().catch(() => {})
+    await page.waitForTimeout(400)
+    const items = await page.locator('[role=menuitem], [data-actions-menu] button').allTextContents().catch(() => [])
+    const joined = items.map((t) => t.trim()).filter(Boolean).join(' | ')
+    if (!joined) {
+      mark('Rechnung', '⋯-Menü Detail', 'skip', 'Menü leer — Storno/Mahnung/PDF/Löschen nicht im Header')
+    } else {
+      mark('Rechnung', '⋯-Menü Detail', 'ok', `Items: ${joined.slice(0, 160)}`)
+    }
+    await page.keyboard.press('Escape').catch(() => {})
+  }
+
+  // PDF über Akte/Dokumente-Tab
+  for (const name of ['Akte', 'Dokumente', 'Dokument']) {
+    const tab = page.getByRole('button', { name: new RegExp(`^${name}$`, 'i') }).or(
+      page.getByRole('tab', { name: new RegExp(name, 'i') })
+    )
+    if (await tab.first().isVisible().catch(() => false)) {
+      await tab.first().click().catch(() => {})
+      await page.waitForTimeout(800)
+      break
+    }
+  }
+  const pdfLink = page.getByRole('link', { name: /pdf|rechnung/i }).or(page.getByRole('button', { name: /pdf|öffnen/i }))
+  if (await pdfLink.first().isVisible().catch(() => false)) {
+    mark('Rechnung', 'PDF (Akte/Dokumente)', 'ok', 'PDF-Link/CTA im Dokumente-Bereich sichtbar — Header-Menü nicht nötig')
+  } else {
+    mark('Rechnung', 'PDF (Akte/Dokumente)', 'skip', 'kein PDF-CTA im Dokumente-Tab gefunden')
+  }
 }
 
 async function main() {
@@ -320,8 +452,23 @@ async function main() {
   })
 
   fs.mkdirSync(SHOT, { recursive: true })
+  const url = process.env.STAGING_SUPABASE_URL
+  const key = process.env.STAGING_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabase =
+    url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null
+  await resetParityRechnung(supabase)
+  const prodsim = await resolveProdsimIds(supabase)
+  if (!prodsim.length) {
+    mark('PRODSIM', 'Datensatz-Suche', 'skip', 'keine PRODSIM-Zeilen auf Staging — Import nachziehen')
+  } else {
+    mark('PRODSIM', 'Datensatz-Suche', 'ok', `${prodsim.length} Treffer`, {
+      ids: prodsim.map((p) => `${p.entity}:${p.id}`),
+    })
+  }
+
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  console.log(`Smoke-Login: ${CRM_USER} (${SMOKE_LABEL})`)
 
   try {
     await loginCrm(page)
@@ -329,11 +476,12 @@ async function main() {
     // ════════ RECHNUNG ════════
     const reOpen = await openDetail(page, 'Rechnung', 'öffnen (fremd/gesendet)', `${CRM}/rechnungen/${L.reForeign}`)
     if (reOpen.ok) {
-      await page.screenshot({ path: path.join(SHOT, 're-foreign.png'), fullPage: false })
+      await page.screenshot({ path: path.join(SHOT, `re-foreign-${SMOKE_LABEL}.png`), fullPage: false })
       await classifyButton(page, 'Rechnung', 'bearbeiten', [/bearbeiten|korrigieren|ändern/i], { execute: true })
       // Parity-kritisch: Als bezahlt
       await clickAndExpect(page, 'Rechnung', 'als bezahlt', [/als bezahlt|bezahlt markieren|auf bezahlt/i])
       await clickAndExpect(page, 'Rechnung', 'bezahlt zurücknehmen', [/zurück|unbezahlt|nicht bezahlt|auf gesendet/i])
+      await probeRechnungOverflowAndPdf(page)
       await classifyButton(page, 'Rechnung', 'storno ohne Ersatz', [/stornieren|soft-storno|ohne ersatz/i], {
         execute: true,
         confirm: false,
@@ -345,13 +493,20 @@ async function main() {
       await classifyButton(page, 'Rechnung', 'storno zurücknehmen', [/storno zurück|wiederherstellen|entsperren/i])
       await classifyButton(page, 'Rechnung', 'Mahnung', [/mahnung|erinnerung|zahlungserinnerung/i], { execute: true })
       await classifyButton(page, 'Rechnung', 'löschen', [/löschen|delete/i], { execute: true, confirm: false })
-      await classifyButton(page, 'Rechnung', 'PDF', [/pdf|vorschau|download/i], { execute: true })
+      await classifyButton(page, 'Rechnung', 'PDF (Header)', [/pdf|vorschau|download/i], { execute: true })
     }
 
     await openDetail(page, 'Rechnung', 'öffnen (ohne Nummer/gesendet)', `${CRM}/rechnungen/${L.reNoNr}`)
     await openDetail(page, 'Rechnung', 'öffnen (Alt-Status teilbezahlt)', `${CRM}/rechnungen/${L.reTeil}`)
+    await assertAltStatusBadge(page, 'Rechnung', 'teilbezahlt')
     await openDetail(page, 'Rechnung', 'öffnen (>20k)', `${CRM}/rechnungen/${L.reBig}`)
 
+    for (const p of prodsim.filter((x) => x.entity === 'Rechnung')) {
+      await openDetail(page, 'Rechnung', `öffnen (PRODSIM ${p.label})`, `${CRM}/rechnungen/${p.id}`)
+      await clickAndExpect(page, 'Rechnung', `als bezahlt (PRODSIM ${p.label})`, [
+        /als bezahlt|bezahlt markieren|auf bezahlt/i,
+      ])
+    }
     // ════════ ANGEBOT ════════
     const angOpen = await openDetail(page, 'Angebot', 'öffnen (fremd)', `${CRM}/angebote/${L.angForeign}`)
     if (angOpen.ok) {
@@ -370,6 +525,8 @@ async function main() {
     }
     await openDetail(page, 'Angebot', 'öffnen (ohne Positionen)', `${CRM}/angebote/${L.angEmpty}`)
     await openDetail(page, 'Angebot', 'öffnen (Alt-Status versendet)', `${CRM}/angebote/${L.angAlt}`)
+    await assertAltStatusBadge(page, 'Angebot', 'versendet')
+    await page.screenshot({ path: path.join(SHOT, `ang-alt-${SMOKE_LABEL}.png`), fullPage: false })
 
     // ════════ AUFTRAG ════════
     const aufOpen = await openDetail(page, 'Auftrag', 'öffnen (fremd)', `${CRM}/auftraege/${L.aufForeign}`)
@@ -393,7 +550,12 @@ async function main() {
     await openDetail(page, 'Auftrag', 'öffnen (tote Angebot-FK)', `${CRM}/auftraege/${L.aufOrphan}`)
     await openDetail(page, 'Auftrag', 'öffnen (Zahlplan)', `${CRM}/auftraege/${L.aufPlan}`)
     await openDetail(page, 'Auftrag', 'öffnen (Alt wartend)', `${CRM}/auftraege/${L.aufAlt}`)
+    await assertAltStatusBadge(page, 'Auftrag', 'wartend')
     await openDetail(page, 'Auftrag', 'öffnen (HW halb-migriert)', `${CRM}/auftraege/${L.aufHalb}`)
+
+    for (const p of prodsim.filter((x) => x.entity === 'Auftrag')) {
+      await openDetail(page, 'Auftrag', `öffnen (PRODSIM ${String(p.label).slice(0, 40)})`, `${CRM}/auftraege/${p.id}`)
+    }
 
     // Zahlplan an LEGACY-Auftrag
     const zp = await openDetail(page, 'Zahlplan', 'öffnen (Auftrag mit Plan)', `${CRM}/auftraege/${L.aufPlan}`)

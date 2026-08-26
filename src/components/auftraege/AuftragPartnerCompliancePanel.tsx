@@ -189,7 +189,7 @@ export function AuftragPartnerCompliancePanel({
       const r = await freigebenPartnerDokument(docId, handwerkerId)
       if (!r.ok) toast.error(r.message)
       else {
-        toast.success('Dokument bestätigt — Partner sieht den Status im Portal.')
+        toast.success('Dokument bestätigt')
         onChanged()
       }
     })
@@ -202,7 +202,7 @@ export function AuftragPartnerCompliancePanel({
       const r = await ablehnenPartnerDokument(docId, handwerkerId, grund)
       if (!r.ok) toast.error(r.message)
       else {
-        toast.success('Abgelehnt — Partner kann neu hochladen.')
+        toast.success('Abgelehnt — neu hochladen')
         onChanged()
       }
     })
@@ -520,13 +520,18 @@ export function AuftragPartnerCompliancePanel({
                       <td>
                         <span
                           className={cn(
-                            'inline-flex rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                             partnerDocStatusPill(doc.status)
                           )}
                         >
-                          {partnerDokumentIstFreigegeben(doc.status)
-                            ? 'Bestätigt'
-                            : partnerDokumentStatusLabel(doc.status)}
+                          {partnerDokumentIstFreigegeben(doc.status) ? (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden />
+                              Bestätigt
+                            </>
+                          ) : (
+                            partnerDokumentStatusLabel(doc.status)
+                          )}
                         </span>
                         {compStatus === 'warnung' || compStatus === 'abgelaufen' ? (
                           <span className="mt-0.5 block text-[length:var(--fs-meta)] text-amber-800">

@@ -418,7 +418,13 @@ async function main() {
       const planJson = {
         modus: 'abschlagsplan',
         zeilen: [
-          { id: ID.planZeile, titel: PREFIX + 'Abschlag 1', typ: 'prozent', wert: 30 },
+          {
+            id: ID.planZeile,
+            titel: PREFIX + 'Abschlag 1',
+            typ: 'prozent',
+            wert: 30,
+            rechnung_id: ID.rechnungPlanGone,
+          },
           { id: 'leg-plan-rest', titel: PREFIX + 'Schluss', typ: 'rest', wert: 0 },
         ],
       }

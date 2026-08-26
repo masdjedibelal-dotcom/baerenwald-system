@@ -23,6 +23,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import type { KundenObjekt } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -332,12 +333,7 @@ export function KundenObjekteCard({
         <MockEmpty
           icon="building"
           title="Noch keine Objekte"
-          hint="Objekt anlegen für Gebäude, WEGs und Melde-Links"
-          action={
-            <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Hinzufügen
-            </MockBtn>
-          }
+          hint="Objekt anlegen für Gebäude, WEGs und Melde-Links. Über „+“ oben hinzufügen."
         />
       ) : (
         <div className="objekte-cards vg-selectmode">
@@ -362,28 +358,11 @@ export function KundenObjekteCard({
                 )}
               >
                 <div className="objekte-card__body">
-                  <div
-                    className="vg-check"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleSel(o.id)
-                    }}
-                    role="checkbox"
-                    aria-checked={isChecked}
-                    aria-label={`${o.titel} auswählen`}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        toggleSel(o.id)
-                      }
-                    }}
-                  >
-                    <span className={cn('vg-box', isChecked && 'on')}>
-                      {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                    </span>
-                  </div>
+                  <ListRowCheck
+                    checked={isChecked}
+                    onToggle={() => toggleSel(o.id)}
+                    title={`${o.titel} auswählen`}
+                  />
                   <button
                     type="button"
                     className="objekte-card__main objekte-card__hit"

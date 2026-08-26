@@ -52,8 +52,8 @@ function ratesToPlan(
   const frozen = new Set(frozenIds)
   const initialById = new Map((initial?.zeilen ?? []).map((z) => [z.id, z]))
   const zeilen: ZahlungsplanZeile[] = rates.map((r) => {
+    const orig = initialById.get(r.id)
     if (frozen.has(r.id)) {
-      const orig = initialById.get(r.id)
       if (orig) {
         // Eingefroren: Betrag/Typ fest, Titel/Fällig dürfen bleiben wie im Editor nur wenn nicht eingefroren —
         // Gates erlauben Titel-Änderung nicht am Server für typ/wert; Titel behalten wir aus orig.
@@ -70,6 +70,11 @@ function ratesToPlan(
       typ: r.typ,
       wert: r.typ === 'rest' ? 0 : Number(r.wert) || 0,
       faellig_am: r.faellig_am.trim() || null,
+      rechnung_id: orig?.rechnung_id ?? null,
+      position_ids: orig?.position_ids,
+      pdf_einleitung_vorlage: orig?.pdf_einleitung_vorlage,
+      mail_einleitung_vorlage: orig?.mail_einleitung_vorlage,
+      mail_betreff_vorlage: orig?.mail_betreff_vorlage,
     })
   })
   return { modus: 'abschlagsplan', zeilen }
@@ -127,6 +132,7 @@ export function AbschlagsplanEditorModal({
   onSave,
   saving,
   frozenIds = [],
+  frozenMeta = {},
 }: {
   open: boolean
   onClose: () => void
@@ -138,6 +144,8 @@ export function AbschlagsplanEditorModal({
   saving?: boolean
   /** Rate-IDs die gestellt/bezahlt sind — Betrag/Typ nicht änderbar/löschbar */
   frozenIds?: string[]
+  /** Optional: Rechnungsnr. für Hint „Gebunden an gesendete Rechnung …“ */
+  frozenMeta?: Record<string, { rechnungsnummer?: string | null }>
 }) {
   const frozen = new Set(frozenIds)
   const baseline = useMemo(
@@ -290,6 +298,10 @@ export function AbschlagsplanEditorModal({
         {rates.map((r) => {
           const betrag = bruttoById.get(r.id) ?? 0
           const isFrozen = frozen.has(r.id)
+          const frozenNr = frozenMeta[r.id]?.rechnungsnummer?.trim() || null
+          const frozenHint = frozenNr
+            ? `Gebunden an gesendete Rechnung ${frozenNr}`
+            : 'Gebunden an gesendete Rechnung'
           return (
             <article
               key={r.id}
@@ -307,8 +319,21 @@ export function AbschlagsplanEditorModal({
                   />
                 </label>
                 {isFrozen ? (
-                  <span className="zahlplan-rate-card__badge" title="Eingefroren">
-                    fest
+                  <span
+                    className="zahlplan-rate-card__frozen-actions"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <span className="zahlplan-rate-card__badge" title={frozenHint}>
+                      fest
+                    </span>
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="trash"
+                      disabled
+                      title={frozenHint}
+                      aria-label={frozenHint}
+                    />
                   </span>
                 ) : (
                   <MockBtn

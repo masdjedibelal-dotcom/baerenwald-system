@@ -11,6 +11,7 @@ import { IconText } from '@/components/ui/IconText'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { formatDatum, formatDatumZeit } from '@/lib/utils'
+import { aktuellePhaseIndexFromEntities } from '@/lib/auftraege/projekt-phasen'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {
@@ -45,17 +46,6 @@ function telHref(tel: string) {
 
 const PHASEN = ['Anfrage', 'Angebot', 'Auftrag', 'Abnahme', 'Fertig'] as const
 
-function aktuellePhaseIndex(leadStatus: LeadStatus | null, aufStatus: AuftragStatus): number {
-  if (aufStatus === 'abgeschlossen') return 4
-  if (aufStatus === 'abnahme') return 3
-  if (aufStatus === 'storniert') return 0
-  if (aufStatus === 'offen' || aufStatus === 'in_arbeit') return 2
-  if (leadStatus === 'angebot') return 1
-  if (leadStatus === 'neu' || leadStatus === 'kontaktiert' || leadStatus === 'termin') return 0
-  if (leadStatus === 'auftrag') return 2
-  return 2
-}
-
 export function ProjektStatusClient({
   initial,
   tel,
@@ -66,9 +56,13 @@ export function ProjektStatusClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const highlightUpdateId = searchParams.get('update')?.trim() || null
-  const [lastRefresh, setLastRefresh] = useState(() => new Date())
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [angebotOpen, setAngebotOpen] = useState(false)
   const [alleUpdates, setAlleUpdates] = useState(false)
+
+  useEffect(() => {
+    setLastRefresh(new Date())
+  }, [])
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -108,7 +102,10 @@ export function ProjektStatusClient({
     return () => window.clearTimeout(t)
   }, [highlightUpdateId, initial, alleUpdates, timelineEarly.length])
 
-  const minuten = useMemo(() => Math.max(0, Math.floor((Date.now() - lastRefresh.getTime()) / 60000)), [lastRefresh])
+  const minuten = useMemo(() => {
+    if (!lastRefresh) return 0
+    return Math.max(0, Math.floor((Date.now() - lastRefresh.getTime()) / 60000))
+  }, [lastRefresh])
 
   const siteFooter = process.env.NEXT_PUBLIC_WEBSITE_URL?.replace(/\/$/, '') ?? ''
 
@@ -131,7 +128,12 @@ export function ProjektStatusClient({
       return s + (Number.isFinite(a) ? a : 0)
     }, 0) || 0
 
-  const phaseIdx = aktuellePhaseIndex(leadStatus, auftrag.status)
+  const phaseIdx = aktuellePhaseIndexFromEntities({
+    aufStatus: auftrag.status,
+    hasAuftrag: true,
+    hasAngebot: Boolean(angebote),
+    leadStatus,
+  })
   const pctBase = statusProgress(auftrag.status)
   const pct =
     typeof auftrag.fortschritt === 'number' && auftrag.fortschritt > 0 ? auftrag.fortschritt : pctBase
@@ -149,7 +151,9 @@ export function ProjektStatusClient({
             <BrandLogo variant="white" height={32} />
             <span className="text-sm font-medium opacity-95">Ihr Projekt</span>
           </div>
-          <p className="text-[10px] opacity-80">Aktualisiert vor {minuten} Min.</p>
+          <p className="text-[10px] opacity-80" suppressHydrationWarning>
+            {lastRefresh ? `Aktualisiert vor ${minuten} Min.` : 'Aktualisiert …'}
+          </p>
         </div>
       </header>
 
@@ -231,6 +235,24 @@ export function ProjektStatusClient({
           <section className="mt-6 rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-[#1A3D2B]">Nächster Schritt</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm text-bw-text-mid">{naechsterFreitext}</p>
+          </section>
+        ) : null}
+
+        {auftrag.abnahme_protokoll_url?.trim() ? (
+          <section className="mt-6 rounded-xl border border-[#2E7D52]/30 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-[#1A3D2B]">Dokumente</h2>
+            <p className="mt-1 text-sm text-[#6B7280]">
+              Abnahmeprotokoll
+              {auftrag.abnahme_datum ? ` · ${formatDatum(auftrag.abnahme_datum)}` : ''}
+            </p>
+            <a
+              href={auftrag.abnahme_protokoll_url.trim()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex min-h-[52px] items-center justify-center rounded-xl bg-[#2E7D52] px-4 text-base font-semibold text-white"
+            >
+              Abnahmeprotokoll öffnen (PDF)
+            </a>
           </section>
         ) : null}
 
@@ -347,8 +369,13 @@ export function ProjektStatusClient({
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm font-semibold text-amber-950">
-              Gesamt Nachträge: +{nachtragSumme.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+            <p className="mt-3 text-sm font-semibold text-amber-950" suppressHydrationWarning>
+              Gesamt Nachträge: +
+              {nachtragSumme.toLocaleString('de-DE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
+              €
             </p>
           </section>
         ) : null}

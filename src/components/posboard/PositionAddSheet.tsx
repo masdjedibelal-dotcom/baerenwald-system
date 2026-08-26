@@ -429,8 +429,8 @@ export function PositionAddSheet({
             className="editor-sheet__confirm"
             disabled={headerConfirmDisabled}
             onClick={onConfirm}
-            aria-label="Übernehmen"
-            title="Übernehmen"
+            aria-label="Speichern"
+            title="Speichern"
           >
             <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
           </button>

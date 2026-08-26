@@ -151,6 +151,10 @@ export type AngebotHtmlInput = {
   /** Rechnung: voll | abschlag | schluss — steuert PDF-Überschrift */
   rechnung_typ?: 'voll' | 'abschlag' | 'schluss' | null
   rechnung_abschlag_index?: number | null
+  /** rechnung | gutschrift — steuert Titel „Gutschrift“ / Storno */
+  beleg_typ?: 'rechnung' | 'gutschrift' | null
+  /** Bezug-Rechnungsnummer (Storno-Gutschrift) */
+  bezug_rechnungsnummer?: string | null
   /**
    * Schlussrechnung (v. a. Privatkunde): klarer Summenblock
    * Netto → MwSt → Brutto → bereits gezahlt → Restsumme
@@ -581,19 +585,27 @@ export function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
   </div>`
 }
 
+/** Dokumenttitel für Rechnungs-PDF (Gutschrift / Storno / Abschlag / Schluss). */
+export function rechnungDokumentTitel(props: AngebotHtmlInput): string {
+  const bezug = props.bezug_rechnungsnummer?.trim() || ''
+  if (props.beleg_typ === 'gutschrift') {
+    return bezug ? `Stornorechnung zu ${bezug}` : 'Gutschrift'
+  }
+  if (props.rechnung_typ === 'schluss') return 'Schlussrechnung'
+  if (props.rechnung_typ === 'abschlag') {
+    return props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
+      ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
+      : 'Abschlagsrechnung'
+  }
+  return 'Rechnung'
+}
+
 /** Rechnungs-Briefkopf — gleiches Layout wie Projektangebot (Logo + grüner Kopfbalken). */
 function rechnungBriefkopfHtml(props: AngebotHtmlInput): string {
   const projektTitel =
     props.projekt_titel?.trim() || props.leistungsumfang?.trim() || 'Rechnung'
   const teamLabel = `${firmennameZeile(props)} Team`
-  const dokumentLabel =
-    props.rechnung_typ === 'schluss'
-      ? 'Schlussrechnung'
-      : props.rechnung_typ === 'abschlag'
-        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
-          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
-          : 'Abschlagsrechnung'
-        : 'Rechnung'
+  const dokumentLabel = rechnungDokumentTitel(props)
   return `<header style="border-bottom:3px solid ${PROJEKT_ACCENT};padding-bottom:14px;margin-bottom:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
       <div style="flex:1;min-width:0;">
@@ -649,8 +661,11 @@ function briefMetaHtml(props: AngebotHtmlInput): string {
   if (props.dokument_art === 'rechnung') {
     const lz = props.leistungszeitraum_text?.trim() || '—'
     const ld = props.leistungsdatum_text?.trim() || props.datum || '—'
+    const bezug = props.bezug_rechnungsnummer?.trim()
+    const nrLabel = props.beleg_typ === 'gutschrift' ? 'Belegnr.:' : 'Rechnungsnr.:'
     return `<div style="text-align:right;min-width:200px;">
-      ${zeile('Rechnungsnr.:', props.angebotsnr)}
+      ${zeile(nrLabel, props.angebotsnr)}
+      ${bezug ? zeile('Bezug Rechnung:', bezug) : ''}
       ${zeile('Kundennr.:', props.kundennr)}
       ${zeile('Rechnungsdatum:', props.datum)}
       ${zeile('Leistungsdatum:', ld)}
@@ -1133,16 +1148,7 @@ export function buildAngebotHtml(
   }
 
   const istRechnung = props.dokument_art === 'rechnung'
-  const dokumentTitel =
-    props.rechnung_typ === 'schluss'
-      ? 'Schlussrechnung'
-      : props.rechnung_typ === 'abschlag'
-        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
-          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
-          : 'Abschlagsrechnung'
-        : istRechnung
-          ? 'Rechnung'
-          : 'Angebot'
+  const dokumentTitel = istRechnung ? rechnungDokumentTitel(props) : 'Angebot'
 
   const einl = richTextToSafePdfHtml(props.einleitung?.trim() || '')
   const begr = esc(props.begruessung.trim() || 'Guten Tag,')

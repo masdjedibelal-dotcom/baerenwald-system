@@ -289,8 +289,8 @@ export function HandwerkerZuweisenModal({
         const neuN = positionMoves?.filter((m) => m.ziel === 'neu').length ?? replacePositionen.length
         toast.success(
           altN > 0
-            ? `Neuer Partner — ${neuN} Leistung${neuN === 1 ? '' : 'en'} neu angefragt, ${altN} bleiben beim Alten.`
-            : 'Neuer Partner — Anfrage gesendet, muss neu annehmen.'
+            ? `Partner gewechselt — ${neuN} neu, ${altN} beim Alten`
+            : 'Partner gewechselt — Anfrage gesendet'
         )
         onDone()
         onClose()

@@ -318,8 +318,16 @@ function LoginPageContent() {
                   className={cn('crm-login__submit', loading && 'is-loading')}
                   disabled={loading || !email.trim() || !password}
                   onClick={() => void handleLogin()}
+                  aria-busy={loading}
                 >
-                  {loading ? 'Bitte warten…' : 'Anmelden'}
+                  {loading ? (
+                    <>
+                      <span className="crm-login__submit-spinner" aria-hidden />
+                      Anmelden…
+                    </>
+                  ) : (
+                    'Anmelden'
+                  )}
                 </button>
               </div>
             </>

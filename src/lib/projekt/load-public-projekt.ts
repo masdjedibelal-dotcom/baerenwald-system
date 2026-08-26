@@ -30,6 +30,8 @@ export type PublicProjektPayload = {
     end_datum: string | null
     fortschritt: number | null
     naechster_schritt: string | null
+    abnahme_protokoll_url: string | null
+    abnahme_datum: string | null
   }
   leadStatus: LeadStatus | null
   kunde: Pick<Kunde, 'name' | 'email' | 'telefon' | 'adresse' | 'plz' | 'ort'>
@@ -53,6 +55,7 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
     .select(
       `
       id, status, titel, start_datum, end_datum, kunden_token, fortschritt, naechster_schritt, lead_id,
+      abnahme_protokoll_url, abnahme_datum,
       kunden(name, email, telefon, adresse, plz, ort),
       leads(status),
       angebote(gesamt_min, gesamt_max, positionen),
@@ -157,6 +160,10 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
       end_datum: row.end_datum ? String(row.end_datum) : null,
       fortschritt,
       naechster_schritt: row.naechster_schritt ? String(row.naechster_schritt) : null,
+      abnahme_protokoll_url: row.abnahme_protokoll_url
+        ? String(row.abnahme_protokoll_url).trim() || null
+        : null,
+      abnahme_datum: row.abnahme_datum ? String(row.abnahme_datum) : null,
     },
     leadStatus,
     kunde: {

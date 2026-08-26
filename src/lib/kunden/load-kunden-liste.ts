@@ -16,14 +16,14 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
     db
       .from('kunden')
       .select(
-        'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
+        'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, org_anzeigename, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
       )
       .order('created_at', { ascending: false })
       .limit(500)
   )
   if (kundenRes.error) {
-    // Ältere DBs ohne portal_modus
-    if (/portal_modus/i.test(kundenRes.error.message)) {
+    // Ältere DBs ohne portal_modus / org_anzeigename
+    if (/portal_modus|org_anzeigename/i.test(kundenRes.error.message)) {
       const retry = await withCrmReadFallback(async (db) =>
         db
           .from('kunden')

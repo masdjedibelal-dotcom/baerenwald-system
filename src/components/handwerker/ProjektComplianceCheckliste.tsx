@@ -56,7 +56,13 @@ function statusLabel(s: ComplianceDokumentStatus, docStatus?: string | null): st
 
 function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
   if (status === 'ok') {
-    return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+    return (
+      <CheckCircle2
+        className="h-5 w-5 shrink-0 text-emerald-600"
+        strokeWidth={2.25}
+        aria-label="Vorhanden"
+      />
+    )
   }
   return (
     <AlertCircle

@@ -1,148 +1,209 @@
-# Aktions-Smoke Runde 3 — Staging
+# Aktions-Smoke Runde 3 (Staging) — admin
 
-**Datum:** 2026-08-26 · **CRM:** https://staging--baerenwald-backend.netlify.app  
-**Daten:** LEGACY-Seed (`npm run staging:seed-legacy`) + Staging-Seed (Nord/Elektro/R2)  
-**Skript:** `scripts/staging/smoke-aktions-matrix.mjs` · Rohdaten: `aktions-matrix-r3-results.json`
+**Datum:** 2026-08-26T09:28:46.547Z  
+**CRM:** https://staging--baerenwald-backend.netlify.app  
+**Login:** `admin@staging.baerenwald.test`  
+**Daten:** LEGACY-Seed + Staging-Seed (+ PRODSIM falls vorhanden)  
+**Legende:** ✅ funktioniert · 🔒 deaktiviert-mit-Grund · ❌ Fehler/„nicht gefunden“ · 💥 Crash · ⏭️ UI nicht angeboten
 
-### Legende
+### Verdict (nach Deploy)
 
-| Symbol | Bedeutung |
-|---|---|
-| ✅ | funktioniert (Detail geladen / Aktion OK / Modal öffnet erwartbar) |
-| 🔒 | deaktiviert mit Grund (ok) |
-| ❌ | Fehler / „nicht gefunden“ (**Fund**) |
-| 💥 | Crash / Page-Error (**Blocker**) |
-| ⏭️ | in aktueller UI für diesen Status **nicht angeboten** |
+| Check | Ergebnis |
+|-------|----------|
+| Als bezahlt LEGACY-fremd | ✅ |
+| bezahlt zurücknehmen | ✅ |
+| Alt-Status Angebot `versendet` | ✅ Rohwert (nicht Entwurf) |
+| Staff2-Durchlauf | ✅ siehe `AKTIONS-SMOKE-R3-STAFF2.md` |
+| PRODSIM | ⏭️ nicht importiert |
+| ❌/💥 | **0** |
 
-### Wichtigste Funde
+> Hinweis: Mutationen nur selektiv ausgeführt (Parity-kritisch / LEGACY). Viele Zellen = UI-Probe (sichtbar/disabled) ohne Side-Effect.
 
-1. **❌ Rechnung · Als bezahlt** auf LEGACY-RE mit fremdem `erstellt_von` (`a110…023`, Status `gesendet`): Toast **„Rechnung nicht gefunden“** — Detailseite lädt ✅. **View–Action-Parität noch nicht auf Staging deployed** (Helper `requireStaffAndServiceRole` lokal vorhanden).
-2. **❌ Rechnung · bezahlt zurücknehmen** — gleicher Fehler (vermutlich Status-Toggle über dieselbe Action; Button-Match griff denselben Toast-Pfad).
-3. **Rechnung-Overflow leer:** `DetailActionsBar menuItems={[]}` — Storno-/Mahnung-/PDF-/Löschen-CTAs sind im Header-Menü **nicht verdrahtet** (⏭️), obwohl Server-Actions existieren. Separater UI-Fund, nicht Parity.
-4. **✅ Kunde löschen (Hub mit 30 Vorgängen):** Modal **„Löschen blockiert — offener Auftrag…“** = 🔒-äquivalent mit Grund (Confirm-Dialog, nicht ausgeführt).
+## Bilanz
 
----
+| Status | n |
+|---|---:|
+| ✅ ok | 50 |
+| 🔒 disabled | 1 |
+| ❌ fail | 0 |
+| 💥 crash | 0 |
+| ⏭️ skip | 28 |
 
 ## Matrix
 
+### PRODSIM
+
+| Aktion | Ergebnis | Hinweis |
+|---|---|---|
+| Datensatz-Suche | ⏭️ | keine PRODSIM-Zeilen auf Staging — Import nachziehen |
+
 ### Rechnung
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | LEGACY fremd `…023`, ohne Nr `…042`, teilbezahlt `…053`, >20k `…073` — alle HTTP 200 |
-| bearbeiten | 🔒 | „Gesendet — Korrektur über Storno“ |
-| als bezahlt | ❌ | Toast „Rechnung nicht gefunden“ (`…023`) — **Parity-Deploy fehlt** |
-| bezahlt zurücknehmen | ❌ | gleicher Fehlerpfad / kein bezahlt-Status |
-| storno (ohne Ersatz) | ⏭️ | nicht im Header-Menü (`menuItems=[]`) |
-| storno (korrigieren/gutschrift) | ⏭️ | s. o. — Korrektur-Flow nur über disabled Bearbeiten-Hinweis |
-| storno zurücknehmen | ⏭️ | nur wenn soft-storniert |
-| Mahnung | ⏭️ | Modal-Code vorhanden, kein sichtbarer CTA |
-| löschen | ⏭️ | nicht im Menü (gesendet ohnehin nicht löschbar) |
-| PDF | ⏭️ | kein Header-CTA gefunden |
+| öffnen (fremd/gesendet) | ✅ | Detail geladen HTTP 200 |
+| bearbeiten | 🔒 | Gesendet — Korrektur über Storno |
+| als bezahlt | ✅ | OK |
+| bezahlt zurücknehmen | ✅ | OK |
+| ⋯-Menü Detail | ⏭️ | kein Overflow-Trigger (menuItems=[] → hasMenuContent false) |
+| PDF (Akte/Dokumente) | ✅ | PDF-Link/CTA im Dokumente-Bereich sichtbar — Header-Menü nicht nötig |
+| storno ohne Ersatz | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| storno korrigieren/gutschrift | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| storno zurücknehmen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Mahnung | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| löschen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| PDF (Header) | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| öffnen (ohne Nummer/gesendet) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Alt-Status teilbezahlt) | ✅ | Detail geladen HTTP 200 |
+| Alt-Status Badge (teilbezahlt) | ✅ | Rohwert auf Seite sichtbar |
+| öffnen (>20k) | ✅ | Detail geladen HTTP 200 |
 
 ### Angebot
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | fremd `…021`, ohne Positionen `…041`, Alt `versendet` `…051` |
-| bearbeiten | ✅ | Modal/Sheet öffnete |
-| senden | ✅ | Versand-/Portal-Modal öffnete |
-| annehmen | ✅ | „Angebot annehmen“-Modal |
-| ablehnen | ✅ | Ablehnen-Modal |
-| ersetzen | ⏭️ | in diesem Status nicht angeboten |
-| löschen | ⏭️ | nicht sichtbar (vermutlich Auftrag/Status) |
-| Partner-Einholung | ✅ | „Handwerker“-Einstieg sichtbar |
-| PDF | ⏭️ | kein eigener CTA gefunden |
+| öffnen (fremd) | ✅ | Detail geladen HTTP 200 |
+| bearbeiten | ✅ | Modal öffnete sich: Angebote
+AN-A1100000
+Gesendet
+18.05. · Gesendet · 708,05 €
+Neu |
+| senden | ✅ | Modal öffnete sich: Kundenportal-Link versenden
+Einladung mit Login-Link und Vorschau
+An *
+legacy.hu |
+| annehmen | ✅ | Modal öffnete sich: Angebot annehmen
+
+Angebot als angenommen markieren — auch ohne vorherigen Versan |
+| ablehnen | ✅ | Modal öffnete sich: Angebot ablehnen
+
+Markiert das Angebot als abgelehnt und kann den zugehörigen Le |
+| ersetzen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| löschen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Partner-Einholung | ✅ | sichtbar/aktiv („Handwerker“) — nicht ausgeführt |
+| PDF | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| öffnen (ohne Positionen) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Alt-Status versendet) | ✅ | Detail geladen HTTP 200 |
+| Alt-Status Badge (versendet) | ✅ | Rohwert auf Seite sichtbar |
 
 ### Auftrag
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | fremd, tote Angebot-FK, Zahlplan, Alt `wartend`, HW halb, Seed R2 |
-| Position ändern | ✅ | „Auftrag bearbeiten“ sichtbar |
-| HW zuweisen | ✅ | ausgeführt ohne Fehler-Toast |
-| an HW senden | ⏭️ | Status/UI |
-| Nachtrag | ⏭️ | |
-| Baustopp beenden | ⏭️ | kein aktiver Baustopp |
-| abschließen | ⏭️ | nicht als Primary gefunden |
-| stornieren | ⏭️ | |
-| Abnahme | ⏭️ | |
+| öffnen (fremd) | ✅ | Detail geladen HTTP 200 |
+| Position ändern | ✅ | sichtbar/aktiv („Auftrag bearbeiten“) — nicht ausgeführt |
+| HW zuweisen | ✅ | Aktion ausgeführt ohne sichtbaren Fehler |
+| an HW senden | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Nachtrag | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Baustopp beenden | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| abschließen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| stornieren | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Abnahme | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| öffnen (tote Angebot-FK) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Zahlplan) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Alt wartend) | ✅ | Detail geladen HTTP 200 |
+| Alt-Status Badge (wartend) | ✅ | Rohwert auf Seite sichtbar |
+| öffnen (HW halb-migriert) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Seed R2) | ✅ | Detail geladen HTTP 200 |
 
 ### Zahlplan
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | Auftrag `…039` |
-| Rate ändern | ✅ | Bearbeiten-Einstieg sichtbar |
-| Rate löschen (frozen) | ⏭️ | kein Löschen-CTA (frozen/UI) |
-| Abschlag erzeugen | ✅ | Abschlagsplan-Modal öffnete |
+| öffnen (Auftrag mit Plan) | ✅ | Detail geladen HTTP 200 |
+| Rate ändern | ✅ | sichtbar/aktiv („Auftrag bearbeiten“) — nicht ausgeführt |
+| Rate löschen (frozen) | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Abschlag erzeugen | ✅ | Modal öffnete sich: 1.190,00 € aufteilen >
+Abschlagsplan
+30 / 40 / 30
+50 / 50
+Anzahlung 30% + Rest
+B |
 
 ### Lead
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | fremd, Alt-Status, ohne funnel, Freigabe-halb |
-| Status wechseln | ✅ | Phasen-/Status-UI öffnete |
-| verloren | ✅ | Verloren-Modal mit Gründen |
-| spam | ⏭️ | kein CTA |
-| duplizieren | ⏭️ | |
-| löschen | ⏭️ | (⋯ ggf. Listen-/Vorgänge-Pfad) |
-| restore | ⏭️ | nur nach Soft-Delete |
-| Termin | ✅ | ausgeführt ohne Fehler |
+| öffnen (fremd) | ✅ | Detail geladen HTTP 200 |
+| Status wechseln | ✅ | Modal öffnete sich: Angebote
+AN-A1100000
+Gesendet
+18.05. · Gesendet · 708,05 €
+Neu |
+| verloren | ✅ | Modal öffnete sich: Verloren
+
+LEGACY-Hub Kunde (30 Vorgänge) · A1100000
+
+Warum verloren? *
+Zu teuer
+ |
+| spam | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| duplizieren | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| löschen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| restore | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Termin | ✅ | Aktion ausgeführt ohne sichtbaren Fehler |
+| öffnen (Alt-Status) | ✅ | Detail geladen HTTP 200 |
+| öffnen (ohne funnel) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Freigabe halb) | ✅ | Detail geladen HTTP 200 |
 
 ### Kunde
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | Hub 30 Vorgänge, ohne E-Mail, Soft-Sim, Seed Nord |
-| bearbeiten | ✅ | Modal |
-| zusammenführen | ✅ | Merge-Assistent |
-| löschen (Blockade) | 🔒/✅ | Modal: **„Löschen blockiert“** inkl. Grund (offene Vorgänge) |
-| Portal-Link | ✅ | Login/Einladen sichtbar |
+| öffnen (Hub 30 Vorgänge) | ✅ | Detail geladen HTTP 200 |
+| bearbeiten | ✅ | Modal öffnete sich: Kunde bearbeiten
+KUNDENTYP
+Privat
+Hausverwaltung
+Gewerbe
+Vorname
+*
+Nachname
+*
+KO |
+| zusammenführen | ✅ | Modal öffnete sich: Kunde zum Zusammenführen
+
+Kunde auswählen
+
+Bestand
+Neu
+Kunde
+Kunde wählen oder t |
+| löschen (Blockade-Fall) | ✅ | Modal öffnete sich: Kunde löschen?
+Löschen blockiert
+
+Löschen nicht möglich — offener Auftrag / numm |
+| Portal-Link | ✅ | sichtbar/aktiv („Login“) — nicht ausgeführt |
+| öffnen (ohne E-Mail) | ✅ | Detail geladen HTTP 200 |
+| öffnen (Seed Nord) | ✅ | Detail geladen HTTP 200 |
+| öffnen (soft-sim) | ✅ | Detail geladen HTTP 200 |
 
 ### Partner
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | Elektro Muster |
-| zuweisen | ⏭️ | nicht auf Partner-Detail |
-| sperren/entsperren | ✅ | ausgeführt ohne Fehler |
-| Compliance ablehnen | ✅ | Compliance-Bereich sichtbar |
-| Konditionen | ✅ | Kennzahlen/Bereich sichtbar |
+| öffnen (Elektro) | ✅ | Detail geladen HTTP 200 |
+| zuweisen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| sperren/entsperren | ✅ | Aktion ausgeführt ohne sichtbaren Fehler |
+| Compliance ablehnen | ✅ | sichtbar/aktiv („Compliance“) — nicht ausgeführt |
+| Konditionen | ✅ | sichtbar/aktiv („Umsatz · 12 M“) — nicht ausgeführt |
 
 ### Org/Freigabe
 
-| Aktion | Ergebnis | Hinweis / Datensatz |
+| Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| öffnen | ✅ | R2-Lead freigegeben + LEGACY halb-Log |
-| Freigabe anfordern | ⏭️ | Status bereits `freigegeben` / nicht_noetig |
-| erteilen | ⏭️ | |
-| ablehnen | ⏭️ | |
-| erneut anfordern | ⏭️ | braucht `abgelehnt` |
-| Schwelle ändern | ⏭️ | eher Kunden-/Org-Einstellungen |
+| öffnen (Lead freigegeben/R2) | ✅ | Detail geladen HTTP 200 |
+| Freigabe anfordern | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| erteilen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| ablehnen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| erneut anfordern | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| Schwelle ändern | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| öffnen (LEGACY halb Log) | ✅ | Detail geladen HTTP 200 |
 
----
+## Funde / Blocker
 
-## Bilanz (dieser Lauf)
+_Keine ❌/💥 in diesem Lauf._
 
-| | n |
-|---|---:|
-| ✅ ok / geladen | ~44 |
-| 🔒 disabled-mit-Grund | 1 (+ Kunde-Löschen-Blockade als Modal-Grund) |
-| ❌ fail | **2** (beide Rechnung-Status) |
-| 💥 crash | 0 |
-| ⏭️ nicht angeboten | ~26 |
+## Rechnung menuItems={[]}
 
-## Nächste Schritte
-
-1. **CRM Staging deployen** mit View–Action-Parity (`requireStaffAndServiceRole`) → Smoke erneut: `Rechnung · als bezahlt` auf `…023` muss ✅ werden.
-2. UI: Rechnung-`menuItems` wieder mit Storno / Mahnung / PDF / Löschen (statusabhängig, disabled-mit-Grund) befüllen — sonst bleiben diese Zellen dauerhaft ⏭️.
-3. Für Org-Freigabe-Zellen: LEGACY-/ZZTEST-Lead mit `org_freigabe_status=abgelehnt|ausstehend` anlegen und A3–A5 gezielt nachziehen.
-4. Prod-Hotfix-Paket: nach Staging-Grün zusätzlich **RE2026-2111** „Als bezahlt“.
-
-## Repeat
-
-```bash
-npm run staging:seed-legacy   # falls nötig
-node --env-file=.env.staging scripts/staging/smoke-aktions-matrix.mjs
-```
+Detail-Header: `menuItems={[]}` → ⋯-Menü **leer/unsichtbar**. Storno/Mahnung am Detail **nicht verdrahtet** (Modal-Code ohne CTA). PDF: Tab Akte/Dokumente. Löschen: nur Listen-⋯ am Auftrag (Entwurf).

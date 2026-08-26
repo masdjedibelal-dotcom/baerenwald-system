@@ -584,20 +584,18 @@ export function RechnungWizard({
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Noch keine Position — Erstellen/Senden erst mit mindestens einer Position.')
+        toast.error('Noch keine Position')
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Abschlagsplan noch nicht 100 % — vor Versand anpassen.')
+      toast.error('Plan anpassen (100 %)')
     }
     const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
     if (enteringVersand) {
       const id = await persistDraft()
       if (!id) {
-        toast.error(
-          'Entwurf noch nicht gespeichert — Mail-Vorschau ggf. unvollständig. Pflichtfelder vor Erstellen prüfen.'
-        )
+        toast.error('Entwurf prüfen')
       }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
@@ -851,7 +849,7 @@ export function RechnungWizard({
     }
     if (!planOk) {
       if (!silent) {
-        toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+        toast.error('Plan anpassen (100 %)')
       }
       return null
     }
@@ -926,7 +924,7 @@ export function RechnungWizard({
   }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
       if (!opts?.silent) {
-        toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
+        toast.error('Abschlag nur mit Auftrag')
       }
       return null
     }
@@ -940,7 +938,7 @@ export function RechnungWizard({
 
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Plan anpassen (100 %)')
       return
     }
     if (sendMail) {

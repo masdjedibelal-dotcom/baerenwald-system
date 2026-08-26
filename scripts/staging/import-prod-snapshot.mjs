@@ -14,7 +14,8 @@
  * Regeln:
  * - Keine Dokumente/Fotos/Mail-Bodies/Storage-Blobs
  * - Anonymisierung PFLICHT vor Import (DSGVO)
- * - IDs, Status, Beträge, Daten, Verknüpfungen, erstellt_von BEIBEHALTEN
+ * - IDs, Status, Beträge, Daten, Verknüpfungen behalten
+ * - Auth-User-FKs (erstellt_von u.ä.) → NULL (Staging hat andere user_profiles)
  * - Titel/Namen mit Präfix PRODSIM- (unterscheidbar von ZZTEST)
  * - Report: Zeilenzahlen + Anomalien (tote FKs, Null-Pflichtfelder) = erstes Testergebnis
  */
@@ -238,8 +239,12 @@ function withPrefix(value, seed) {
 
 function scrubFreeText(value, seed, max = 120) {
   if (value == null) return value
-  const s = String(value).trim()
+  // Booleans/Zahlen nie zu Strings machen (z. B. leads.duplikat_hinweis = bool)
+  if (typeof value !== 'string') return value
+  let s = value.trim()
   if (!s) return s
+  // E-Mails in Freitext maskieren (PII-Guard)
+  s = s.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, prodsimEmail(seed))
   return `${PREFIX}Text ${hashHex(seed, 6)} · ${s.slice(0, Math.min(40, max))}…`
 }
 
@@ -250,6 +255,7 @@ function scrubJsonPii(obj, seed) {
   const out = { ...obj }
   for (const key of Object.keys(out)) {
     const k = key.toLowerCase()
+    if (typeof out[key] === 'boolean' || typeof out[key] === 'number') continue
     if (k.includes('foto') || k.includes('photo') || k.includes('image') || k.includes('url')) {
       out[key] = Array.isArray(out[key]) ? [] : null
       continue
@@ -277,6 +283,26 @@ function scrubJsonPii(obj, seed) {
   return out
 }
 
+/** Staging hat andere Auth-User — Prod-UUIDs würden FK sprengen. */
+function nullAuthUserFks(row, { keepRequiredCreatedBy = false } = {}) {
+  const out = { ...row }
+  for (const key of Object.keys(out)) {
+    if (keepRequiredCreatedBy && (key === 'created_by' || key === 'erstellt_von')) continue
+    if (
+      key === 'erstellt_von' ||
+      key === 'storniert_von' ||
+      key === 'updated_by' ||
+      key === 'created_by' ||
+      key === 'betreuer_id' ||
+      key.endsWith('_von_user_id') ||
+      key === 'auth_user_id'
+    ) {
+      out[key] = null
+    }
+  }
+  return out
+}
+
 function stripBlobFields(row) {
   const out = { ...row }
   for (const key of Object.keys(out)) {
@@ -291,106 +317,123 @@ function stripBlobFields(row) {
 function anonymizeHandwerker(row) {
   const id = row.id
   const name = `${PREFIX}${fakerName(id)}`
-  return stripBlobFields({
-    ...row,
-    name,
-    firma: `${PREFIX}Firma ${fakerLast(id)}`,
-    vorname: fakerFirst(id),
-    nachname: fakerLast(id),
-    email: prodsimEmail(`hw:${id}`),
-    telefon: dummyPhone(`hw:${id}`),
-    whatsapp: null,
-    adresse: `${dummyStreet(id)} 1, 80331 München`,
-    strasse: dummyStreet(id),
-    hausnummer: '1',
-    plz: '80331',
-    ort: 'München',
-    notizen: scrubFreeText(row.notizen, `hw-notiz:${id}`),
-    steuernummer: null,
-    ustid: null,
-    iban: null,
-    bic: null,
-    bank: null,
-    handelsregister: null,
-    webseite: null,
-    auth_user_id: null,
-    logo_url: null,
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      name,
+      firma: `${PREFIX}Firma ${fakerLast(id)}`,
+      vorname: fakerFirst(id),
+      nachname: fakerLast(id),
+      email: prodsimEmail(`hw:${id}`),
+      telefon: dummyPhone(`hw:${id}`),
+      whatsapp: null,
+      adresse: `${dummyStreet(id)} 1, 80331 München`,
+      strasse: dummyStreet(id),
+      hausnummer: '1',
+      plz: '80331',
+      ort: 'München',
+      notizen: scrubFreeText(row.notizen, `hw-notiz:${id}`),
+      steuernummer: null,
+      ustid: null,
+      iban: null,
+      bic: null,
+      bank: null,
+      handelsregister: null,
+      webseite: null,
+      auth_user_id: null,
+      logo_url: null,
+      // Staging partner_kategorien ≠ Prod — tot → null
+      partner_kategorie_id: null,
+    })
+  )
 }
 
 function anonymizeKunde(row) {
   const id = row.id
   const name = withPrefix(row.org_anzeigename || row.name || fakerName(id), `k:${id}`)
-  return stripBlobFields({
+  const orgKennung =
+    row.org_kennung != null && String(row.org_kennung).trim()
+      ? `prodsim-${hashHex(String(row.org_kennung), 10)}`
+      : row.org_kennung
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      name,
+      vorname: fakerFirst(id),
+      nachname: fakerLast(id),
+      email: prodsimEmail(`kunde:${id}`),
+      telefon: dummyPhone(`kunde:${id}`),
+      adresse: `${dummyStreet(id)} 12, 80331 München`,
+      strasse: dummyStreet(id),
+      hausnummer: '12',
+      plz: row.plz || '80331',
+      ort: row.ort || 'München',
+      ansprechpartner: row.ansprechpartner ? `${PREFIX}${fakerName(`${id}:ap`)}` : row.ansprechpartner,
+      notizen: scrubFreeText(row.notizen, `k-notiz:${id}`),
+      webseite: null,
+      ust_id: null,
+      auth_user_id: null,
+      org_kennung: orgKennung,
+      org_anzeigename: row.org_anzeigename ? withPrefix(row.org_anzeigename, `org:${id}`) : row.org_anzeigename,
+      org_telefon: row.org_telefon ? dummyPhone(`orgtel:${id}`) : row.org_telefon,
+      org_strasse: row.org_strasse ? dummyStreet(`orgst:${id}`) : row.org_strasse,
+      org_ort: row.org_ort || row.ort || 'München',
+      mieter_kontakt_telefon: row.mieter_kontakt_telefon
+        ? dummyPhone(`mieter:${id}`)
+        : row.mieter_kontakt_telefon,
+      mieter_kontakt_email: row.mieter_kontakt_email
+        ? prodsimEmail(`mieter:${id}`)
+        : row.mieter_kontakt_email,
+      mieter_kontakt_hinweis: scrubFreeText(row.mieter_kontakt_hinweis, `mieterh:${id}`, 60),
+      av_akzeptiert_von: null,
+      wl_ansprache_am: row.wl_ansprache_am,
+    })
+  )
+}
+
+function anonymizeObjekt(row) {
+  const id = row.id
+  // Staging: created_by ist 'crm'|'portal' (CHECK), nicht User-UUID
+  const createdBy =
+    row.created_by === 'portal' || row.created_by === 'crm' ? row.created_by : 'crm'
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      titel: withPrefix(row.titel || 'Objekt', `obj:${id}`),
+      strasse: dummyStreet(id),
+      hausnummer: String((parseInt(hashHex(id, 2), 16) % 80) + 1),
+      plz: row.plz || '80331',
+      ort: row.ort || 'München',
+      melde_slug: row.melde_slug
+        ? `prodsim-${hashHex(row.melde_slug, 10)}`
+        : row.melde_slug,
+      einheiten_hinweis: scrubFreeText(row.einheiten_hinweis, `eh:${id}`, 60),
+      notizen_intern: scrubFreeText(row.notizen_intern, `oin:${id}`),
+      versicherer: row.versicherer ? `${PREFIX}Versicherer` : row.versicherer,
+      versicherungs_nr: row.versicherungs_nr
+        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
+        : row.versicherungs_nr,
+      created_by: createdBy,
+    }),
+    { keepRequiredCreatedBy: true }
+  )
+}
+
+function anonymizeEinheit(row) {
+  return nullAuthUserFks({
     ...row,
-    name,
-    vorname: fakerFirst(id),
-    nachname: fakerLast(id),
-    email: prodsimEmail(`kunde:${id}`),
-    telefon: dummyPhone(`kunde:${id}`),
-    adresse: `${dummyStreet(id)} 12, 80331 München`,
-    strasse: dummyStreet(id),
-    hausnummer: '12',
-    plz: row.plz || '80331',
-    ort: row.ort || 'München',
-    ansprechpartner: row.ansprechpartner ? `${PREFIX}${fakerName(`${id}:ap`)}` : row.ansprechpartner,
-    notizen: scrubFreeText(row.notizen, `k-notiz:${id}`),
-    webseite: null,
-    ust_id: null,
-    auth_user_id: null,
-    org_anzeigename: row.org_anzeigename ? withPrefix(row.org_anzeigename, `org:${id}`) : row.org_anzeigename,
-    org_telefon: row.org_telefon ? dummyPhone(`orgtel:${id}`) : row.org_telefon,
-    org_strasse: row.org_strasse ? dummyStreet(`orgst:${id}`) : row.org_strasse,
-    org_ort: row.org_ort || row.ort || 'München',
-    mieter_kontakt_telefon: row.mieter_kontakt_telefon
-      ? dummyPhone(`mieter:${id}`)
-      : row.mieter_kontakt_telefon,
-    mieter_kontakt_email: row.mieter_kontakt_email
-      ? prodsimEmail(`mieter:${id}`)
-      : row.mieter_kontakt_email,
-    mieter_kontakt_hinweis: scrubFreeText(row.mieter_kontakt_hinweis, `mieterh:${id}`, 60),
-    av_akzeptiert_von: null,
-    wl_ansprache_am: row.wl_ansprache_am,
+    bezeichnung: withPrefix(row.bezeichnung || 'WE', `ein:${row.id}`),
   })
 }
 
 function anonymizeAnsprechpartner(row) {
   const id = row.id
-  return {
+  return nullAuthUserFks({
     ...row,
     name: `${PREFIX}${fakerName(id)}`,
     email: prodsimEmail(`ap:${id}`),
     telefon: dummyPhone(`ap:${id}`),
-  }
-}
-
-function anonymizeObjekt(row) {
-  const id = row.id
-  return stripBlobFields({
-    ...row,
-    titel: withPrefix(row.titel || 'Objekt', `obj:${id}`),
-    strasse: dummyStreet(id),
-    hausnummer: String((parseInt(hashHex(id, 2), 16) % 80) + 1),
-    plz: row.plz || '80331',
-    ort: row.ort || 'München',
-    melde_slug: row.melde_slug
-      ? `prodsim-${hashHex(row.melde_slug, 10)}`
-      : row.melde_slug,
-    einheiten_hinweis: scrubFreeText(row.einheiten_hinweis, `eh:${id}`, 60),
-    notizen_intern: scrubFreeText(row.notizen_intern, `oin:${id}`),
-    versicherer: row.versicherer ? `${PREFIX}Versicherer` : row.versicherer,
-    versicherungs_nr: row.versicherungs_nr
-      ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-      : row.versicherungs_nr,
-    // created_by bewusst behalten (Ownership-Historie)
   })
-}
-
-function anonymizeEinheit(row) {
-  return {
-    ...row,
-    bezeichnung: withPrefix(row.bezeichnung || 'WE', `ein:${row.id}`),
-  }
 }
 
 function anonymizeLead(row) {
@@ -400,152 +443,160 @@ function anonymizeLead(row) {
     funnel.fotos = []
     funnel.prodsim = true
   }
-  return stripBlobFields({
-    ...row,
-    situation: withPrefix(row.situation || 'Meldung', `sit:${id}`),
-    kontakt_name: `${PREFIX}${fakerName(`kn:${id}`)}`,
-    kontakt_email: prodsimEmail(`ke:${id}`),
-    kontakt_telefon: dummyPhone(`kt:${id}`),
-    kontakt_nachricht: scrubFreeText(row.kontakt_nachricht, `km:${id}`),
-    notizen: scrubFreeText(row.notizen, `ln:${id}`),
-    vor_ort_notizen: scrubFreeText(row.vor_ort_notizen, `von:${id}`),
-    melder_name: row.melder_name ? `${PREFIX}${fakerName(`mn:${id}`)}` : row.melder_name,
-    melder_email: row.melder_email ? prodsimEmail(`me:${id}`) : row.melder_email,
-    melder_telefon: row.melder_telefon ? dummyPhone(`mt:${id}`) : row.melder_telefon,
-    melder_einheit: row.melder_einheit
-      ? withPrefix(row.melder_einheit, `meu:${id}`)
-      : row.melder_einheit,
-    ki_zusammenfassung: scrubFreeText(row.ki_zusammenfassung, `ki:${id}`, 80),
-    strasse: row.strasse ? dummyStreet(`ls:${id}`) : row.strasse,
-    hausnummer: row.hausnummer ? '7' : row.hausnummer,
-    funnel_daten: funnel,
-    einladung_token: row.einladung_token ? rotateToken('einladung', id) : row.einladung_token,
-    melde_tracking_token: row.melde_tracking_token
-      ? rotateToken('melde', id)
-      : row.melde_tracking_token,
-    versicherungs_nr: row.versicherungs_nr
-      ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-      : row.versicherungs_nr,
-    storniert_grund: scrubFreeText(row.storniert_grund, `sg:${id}`, 60),
-    wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `wv:${id}`, 60),
-    duplikat_hinweis: scrubFreeText(row.duplikat_hinweis, `dup:${id}`, 60),
-    // erstellt_von / storniert_von behalten
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      situation: withPrefix(row.situation || 'Meldung', `sit:${id}`),
+      kontakt_name: `${PREFIX}${fakerName(`kn:${id}`)}`,
+      kontakt_email: prodsimEmail(`ke:${id}`),
+      kontakt_telefon: dummyPhone(`kt:${id}`),
+      kontakt_nachricht: scrubFreeText(row.kontakt_nachricht, `km:${id}`),
+      notizen: scrubFreeText(row.notizen, `ln:${id}`),
+      vor_ort_notizen: scrubFreeText(row.vor_ort_notizen, `von:${id}`),
+      melder_name: row.melder_name ? `${PREFIX}${fakerName(`mn:${id}`)}` : row.melder_name,
+      melder_email: row.melder_email ? prodsimEmail(`me:${id}`) : row.melder_email,
+      melder_telefon: row.melder_telefon ? dummyPhone(`mt:${id}`) : row.melder_telefon,
+      melder_einheit: row.melder_einheit
+        ? withPrefix(row.melder_einheit, `meu:${id}`)
+        : row.melder_einheit,
+      ki_zusammenfassung: scrubFreeText(row.ki_zusammenfassung, `ki:${id}`, 80),
+      strasse: row.strasse ? dummyStreet(`ls:${id}`) : row.strasse,
+      hausnummer: row.hausnummer ? '7' : row.hausnummer,
+      funnel_daten: funnel,
+      einladung_token: row.einladung_token ? rotateToken('einladung', id) : row.einladung_token,
+      melde_tracking_token: row.melde_tracking_token
+        ? rotateToken('melde', id)
+        : row.melde_tracking_token,
+      versicherungs_nr: row.versicherungs_nr
+        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
+        : row.versicherungs_nr,
+      storniert_grund: scrubFreeText(row.storniert_grund, `sg:${id}`, 60),
+      wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `wv:${id}`, 60),
+      // duplikat_hinweis ist boolean — nicht als Text scrubben
+      duplikat_hinweis: typeof row.duplikat_hinweis === 'boolean' ? row.duplikat_hinweis : null,
+    })
+  )
 }
 
 function anonymizeAngebot(row) {
   const id = row.id
-  return stripBlobFields({
-    ...row,
-    notizen: scrubFreeText(row.notizen, `an:${id}`),
-    leistungsumfang: withPrefix(row.leistungsumfang || 'Leistung', `lu:${id}`),
-    einleitung: scrubFreeText(row.einleitung, `ae:${id}`, 80),
-    hinweise: scrubFreeText(row.hinweise, `ah:${id}`, 80),
-    wichtige_hinweise: scrubFreeText(row.wichtige_hinweise, `aw:${id}`, 80),
-    projektbeschreibung: scrubFreeText(row.projektbeschreibung, `ap:${id}`),
-    zahlungsbedingungen: row.zahlungsbedingungen
-      ? `${PREFIX}Zahlungsziel unverändert (anonym)`
-      : row.zahlungsbedingungen,
-    ablehnung_notiz: scrubFreeText(row.ablehnung_notiz, `abl:${id}`, 60),
-    ablehnung_grund: scrubFreeText(row.ablehnung_grund, `abg:${id}`, 60),
-    wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `anwv:${id}`, 60),
-    // status, betraege, positionen-Struktur, erstellt_von behalten
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      notizen: scrubFreeText(row.notizen, `an:${id}`),
+      leistungsumfang: withPrefix(row.leistungsumfang || 'Leistung', `lu:${id}`),
+      einleitung: scrubFreeText(row.einleitung, `ae:${id}`, 80),
+      hinweise: scrubFreeText(row.hinweise, `ah:${id}`, 80),
+      wichtige_hinweise: scrubFreeText(row.wichtige_hinweise, `aw:${id}`, 80),
+      projektbeschreibung: scrubFreeText(row.projektbeschreibung, `ap:${id}`),
+      zahlungsbedingungen: row.zahlungsbedingungen
+        ? `${PREFIX}Zahlungsziel unverändert (anonym)`
+        : row.zahlungsbedingungen,
+      ablehnung_notiz: scrubFreeText(row.ablehnung_notiz, `abl:${id}`, 60),
+      ablehnung_grund: scrubFreeText(row.ablehnung_grund, `abg:${id}`, 60),
+      wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `anwv:${id}`, 60),
+    })
+  )
 }
 
 function anonymizeAngebotHw(row) {
   const id = row.id
-  return stripBlobFields({
-    ...row,
-    notizen: scrubFreeText(row.notizen, `ahw:${id}`, 60),
-    antwort_notiz: scrubFreeText(row.antwort_notiz, `ahw-a:${id}`, 60),
-    hw_notiz: scrubFreeText(row.hw_notiz, `ahw-h:${id}`, 60),
-    hw_crm_notiz: scrubFreeText(row.hw_crm_notiz, `ahw-c:${id}`, 60),
-    ablehnung_grund: scrubFreeText(row.ablehnung_grund, `ahw-abl:${id}`, 60),
-    aufgabe_notiz: scrubFreeText(row.aufgabe_notiz, `ahw-auf:${id}`, 60),
-    token: row.token ? rotateToken('hw', id) : row.token,
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      notizen: scrubFreeText(row.notizen, `ahw:${id}`, 60),
+      antwort_notiz: scrubFreeText(row.antwort_notiz, `ahw-a:${id}`, 60),
+      hw_notiz: scrubFreeText(row.hw_notiz, `ahw-h:${id}`, 60),
+      hw_crm_notiz: scrubFreeText(row.hw_crm_notiz, `ahw-c:${id}`, 60),
+      ablehnung_grund: scrubFreeText(row.ablehnung_grund, `ahw-abl:${id}`, 60),
+      aufgabe_notiz: scrubFreeText(row.aufgabe_notiz, `ahw-auf:${id}`, 60),
+      token: row.token ? rotateToken('hw', id) : row.token,
+    })
+  )
 }
 
 function anonymizeAuftrag(row) {
   const id = row.id
-  return stripBlobFields({
-    ...row,
-    titel: withPrefix(row.titel || 'Auftrag', `auf:${id}`),
-    notizen: scrubFreeText(row.notizen, `aufn:${id}`),
-    kunden_token: row.kunden_token ? rotateToken('projekt', id) : row.kunden_token,
-    bauleiter_name: row.bauleiter_name ? `${PREFIX}${fakerName(`bl:${id}`)}` : row.bauleiter_name,
-    bauleiter_telefon: row.bauleiter_telefon ? dummyPhone(`blt:${id}`) : row.bauleiter_telefon,
-    bauleiter_email: row.bauleiter_email ? prodsimEmail(`ble:${id}`) : row.bauleiter_email,
-    bau_mannschaft: scrubFreeText(row.bau_mannschaft, `bm:${id}`, 60),
-    bau_nachunternehmer_name: row.bau_nachunternehmer_name
-      ? `${PREFIX}${fakerName(`nu:${id}`)}`
-      : row.bau_nachunternehmer_name,
-    bau_nachunternehmer_firma: row.bau_nachunternehmer_firma
-      ? `${PREFIX}NU ${fakerLast(id)}`
-      : row.bau_nachunternehmer_firma,
-    versicherungs_nr: row.versicherungs_nr
-      ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-      : row.versicherungs_nr,
-    wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `aufwv:${id}`, 60),
-    naechster_schritt: scrubFreeText(row.naechster_schritt, `ns:${id}`, 60),
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      titel: withPrefix(row.titel || 'Auftrag', `auf:${id}`),
+      notizen: scrubFreeText(row.notizen, `aufn:${id}`),
+      kunden_token: row.kunden_token ? rotateToken('projekt', id) : row.kunden_token,
+      bauleiter_name: row.bauleiter_name ? `${PREFIX}${fakerName(`bl:${id}`)}` : row.bauleiter_name,
+      bauleiter_telefon: row.bauleiter_telefon ? dummyPhone(`blt:${id}`) : row.bauleiter_telefon,
+      bauleiter_email: row.bauleiter_email ? prodsimEmail(`ble:${id}`) : row.bauleiter_email,
+      bau_mannschaft: scrubFreeText(row.bau_mannschaft, `bm:${id}`, 60),
+      bau_nachunternehmer_name: row.bau_nachunternehmer_name
+        ? `${PREFIX}${fakerName(`nu:${id}`)}`
+        : row.bau_nachunternehmer_name,
+      bau_nachunternehmer_firma: row.bau_nachunternehmer_firma
+        ? `${PREFIX}NU ${fakerLast(id)}`
+        : row.bau_nachunternehmer_firma,
+      versicherungs_nr: row.versicherungs_nr
+        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
+        : row.versicherungs_nr,
+      wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `aufwv:${id}`, 60),
+      naechster_schritt: scrubFreeText(row.naechster_schritt, `ns:${id}`, 60),
+    })
+  )
 }
 
 function anonymizeAuftragHw(row) {
-  return {
+  return nullAuthUserFks({
     ...row,
     notizen: scrubFreeText(row.notizen, `aufhw:${row.id}`, 60),
     absprachen: scrubFreeText(row.absprachen, `aufhwa:${row.id}`, 60),
     abnahme_protokoll_id: null,
-  }
+  })
 }
 
 function anonymizeRechnung(row) {
   const id = row.id
-  return stripBlobFields({
-    ...row,
-    notizen: scrubFreeText(row.notizen, `re:${id}`),
-    einleitung: scrubFreeText(row.einleitung, `rei:${id}`, 80),
-    hinweise: scrubFreeText(row.hinweise, `reh:${id}`, 80),
-    mail_einleitung: null,
-    mail_betreff: null,
-    reklamation_grund: scrubFreeText(row.reklamation_grund, `rek:${id}`, 60),
-    wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `rewv:${id}`, 60),
-    zahlungsbedingungen: row.zahlungsbedingungen
-      ? `${PREFIX}Zahlungsziel unverändert (anonym)`
-      : row.zahlungsbedingungen,
-  })
+  return nullAuthUserFks(
+    stripBlobFields({
+      ...row,
+      notizen: scrubFreeText(row.notizen, `re:${id}`),
+      einleitung: scrubFreeText(row.einleitung, `rei:${id}`, 80),
+      hinweise: scrubFreeText(row.hinweise, `reh:${id}`, 80),
+      mail_einleitung: null,
+      mail_betreff: null,
+      reklamation_grund: scrubFreeText(row.reklamation_grund, `rek:${id}`, 60),
+      wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `rewv:${id}`, 60),
+      zahlungsbedingungen: row.zahlungsbedingungen
+        ? `${PREFIX}Zahlungsziel unverändert (anonym)`
+        : row.zahlungsbedingungen,
+    })
+  )
 }
 
 function anonymizeLeadNotiz(row) {
-  // Nur Meta + gekürzter Inhalt — keine Dateien
-  return {
+  return nullAuthUserFks({
     id: row.id,
     lead_id: row.lead_id,
     titel: withPrefix(row.titel || 'Notiz', `nt:${row.id}`),
     inhalt: scrubFreeText(row.inhalt, `ni:${row.id}`, 100),
-    erstellt_von: row.erstellt_von,
+    erstellt_von: null,
     created_at: row.created_at,
     kalender_termin_id: null,
     datei_url: null,
     datei_urls: [],
     quelle_notiz_id: row.quelle_notiz_id,
-  }
+  })
 }
 
 function anonymizeLeadTimeline(row) {
-  return {
+  return nullAuthUserFks({
     id: row.id,
     lead_id: row.lead_id,
     typ: row.typ,
     titel: withPrefix(row.titel || 'Ereignis', `tt:${row.id}`),
     beschreibung: scrubFreeText(row.beschreibung, `td:${row.id}`, 100),
-    erstellt_von: row.erstellt_von,
+    erstellt_von: null,
     created_at: row.created_at,
     angebot_id: row.angebot_id,
     email_log_id: null,
-  }
+  })
 }
 
 const ANON = {
@@ -719,8 +770,14 @@ async function exportAndAnonymize(prod) {
 async function importTables(staging, tables, anomalies, dryRun) {
   const counts = {}
   for (const table of TABLE_ORDER) {
-    const rows = tables[table] ?? []
-    counts[table] = { exported: rows.length, upserted: 0, errors: 0 }
+    const rows = (tables[table] ?? []).map((row) => {
+      const out = { ...row }
+      for (const k of Object.keys(out)) {
+        if (k.startsWith('_')) delete out[k]
+      }
+      return out
+    })
+    counts[table] = { exported: (tables[table] ?? []).length, upserted: 0, errors: 0 }
     if (!rows.length) {
       console.log(`  ${table}: 0`)
       continue
@@ -732,7 +789,6 @@ async function importTables(staging, tables, anomalies, dryRun) {
     }
     for (let i = 0; i < rows.length; i += BATCH) {
       const chunk = rows.slice(i, i + BATCH)
-      // Pflichtfeld-Check grob
       for (const row of chunk) {
         if (!row.id) {
           anomalies.push({ type: 'null_required', table, column: 'id', id: null })
@@ -748,7 +804,6 @@ async function importTables(staging, tables, anomalies, dryRun) {
           chunkFrom: i,
           chunkSize: chunk.length,
         })
-        // Fallback: einzeln, damit Anomalien granular werden
         for (const row of chunk) {
           const one = await staging.from(table).upsert(row, { onConflict: 'id' })
           if (one.error) {
@@ -758,7 +813,6 @@ async function importTables(staging, tables, anomalies, dryRun) {
               id: row.id,
               message: one.error.message,
             })
-            // Null-Pflicht heuristisch aus PostgREST-Text
             if (/null value|not-null|violates not-null/i.test(one.error.message)) {
               anomalies.push({
                 type: 'null_required',
@@ -892,6 +946,34 @@ async function main() {
   }
 
   const staging = clientFor(stagingUrl, stagingKey, 'Staging')
+
+  // kunden_objekte.created_by = 'crm'|'portal' (nicht User-UUID)
+  for (const row of tables.kunden_objekte ?? []) {
+    row.created_by =
+      row.created_by === 'portal' || row.created_by === 'crm' ? row.created_by : 'crm'
+  }
+
+  // betreuer_id / Auth-FKs auf Aufträgen hart nullen
+  for (const row of tables.auftraege ?? []) {
+    row.betreuer_id = null
+  }
+  const reIds = idSet(tables.rechnungen)
+  for (const row of tables.rechnungen ?? []) {
+    if (row.bezug_rechnung_id && !reIds.has(row.bezug_rechnung_id)) {
+      anomalies.push({
+        type: 'fk_dead_optional',
+        table: 'rechnungen',
+        id: row.id,
+        column: 'bezug_rechnung_id',
+        value: row.bezug_rechnung_id,
+      })
+      row.bezug_rechnung_id = null
+    }
+    if (row.bezug_rechnung_id) {
+      row._bezug_rechnung_id = row.bezug_rechnung_id
+      row.bezug_rechnung_id = null
+    }
+  }
 
   // Gewerke auf Staging für FK-Check
   const { data: gewerkeRows, error: gErr } = await staging.from('gewerke').select('id')

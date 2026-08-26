@@ -83,7 +83,9 @@ export function formatDatum(datum: string): string {
 export function formatDatumZeit(datum: string): string {
   const d = new Date(datum)
   if (Number.isNaN(d.getTime())) return '—'
+  // Feste Zone — sonst Hydration-Mismatch SSR (UTC) vs. Browser (lokal)
   return d.toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

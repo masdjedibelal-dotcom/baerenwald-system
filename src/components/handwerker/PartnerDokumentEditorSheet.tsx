@@ -295,7 +295,7 @@ export function PartnerDokumentEditorSheet({
         toast.error(r.message)
         return
       }
-      toast.success('Dokument angenommen — Partner sieht den Status im Portal.')
+      toast.success('Dokument angenommen')
       setDirty(false)
       onSaved?.()
       onClose()
@@ -315,7 +315,7 @@ export function PartnerDokumentEditorSheet({
         toast.error(r.message)
         return
       }
-      toast.success('Abgelehnt — Partner sieht den Grund im Portal und kann neu hochladen.')
+      toast.success('Abgelehnt — neu hochladen')
       setAblehnenOpen(false)
       setAblehnGrund('')
       onSaved?.()
