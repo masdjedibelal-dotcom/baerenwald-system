@@ -1,0 +1,64 @@
+[
+  {
+    "id": "zahlplan_tote_re",
+    "status": "✅",
+    "note": "UI rendert Plan/Zahlung; stack=false",
+    "rateHint": [
+      "LEGACY-Abschlag 1",
+      "Geplant",
+      "Geplant",
+      "Bezahlt 0,00 €"
+    ],
+    "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n12\nDemo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).\nTransaktionsdaten leeren\nZurück zu den Suchergebnissen\nLEGACY-Hub Kunde (30 Vorgänge)\nIn Arbeit\nAuftrag bearbeiten\nAuftrag abschließen\nÜbersicht\nLeistungen\nZahlung\nAkte\nZahlung\n0,00 € von 1.1"
+  },
+  {
+    "id": "zahlplan_rate_loeschen",
+    "status": "⏭️",
+    "note": "Kein Löschen-CTA an Rate"
+  },
+  {
+    "id": "zahlplan_abschlag_cta",
+    "status": "✅",
+    "note": "CTA sichtbar: "
+  },
+  {
+    "id": "auftrag_totes_angebot",
+    "status": "✅",
+    "note": "Detail lädt; stack=false; chainHint=true",
+    "angClick": "toast= dlg= url=https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000034",
+    "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n12\nDemo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).\nTransaktionsdaten leeren\nZurück zu den Suchergebnissen\nLEGACY-Hub Kunde (30 Vorgänge)\nOffen\nAuftrag bearbeiten\nAuftrag abschließen\nÜbersicht\nLeistungen\nZahlung\nAkte\nSTAMMDATEN\nLEGACY-Hub Kunde (30 Vorgänge)\nPrivat\nTyp\nPrivat\nAdresse\n—\nTelefon\n089 0000 0001\nE-Mail\nlegacy.hub@example.test\nKun"
+  },
+  {
+    "id": "lead_ohne_re",
+    "status": "✅",
+    "note": "Lead-Detail ok",
+    "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n12\nDemo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).\nTransaktionsdaten leeren\nZurück zu den Suchergebnissen\nLEGACY-Hub Kunde (30 Vorgänge)\nDirek"
+  },
+  {
+    "id": "mieter_status_token",
+    "status": "✅",
+    "note": "Neutrale/Inaktiv-Seite",
+    "snippet": "ST\n\nStatus\n\nVerwaltung\n\n!\nLink nicht verfügbar\n\nDieser Link ist ungültig oder nicht mehr aktiv.\n\nCookies & Datenschutz\n\nWir verwenden technisch notwendige Speicher (z. B. für Login im Kunden- und Partner-Portal). Mit Ihrer Einwilligung nutzen wir zusätzlich Statistik (PostHog, EU), um unsere Website zu verbessern.\n\nDatenschutz\n·\nImpressum\nAblehnen\nAkzeptieren",
+    "url": "https://staging--baerenwald.netlify.app/melden/status/legacy_mieter_status_deadref_probe_01"
+  },
+  {
+    "id": "projekt_token_orphan_angebot",
+    "status": "✅",
+    "note": "Seite rendert",
+    "snippet": "Ihr Projekt\n\nAktualisiert vor 0 Min.\n\nPROJEKT\n\nLEGACY-Auftrag → Angebot weg\n\n—\n\nAnfrage\n\nAngebot\n\nAuftrag\n\nAbnahme\n\nFertig\n\nFortschritt\n\nOffen\n\nNoch keine Updates. Wir melden uns bald.\n\nFragen zu Ihrem Projekt?\n\n089 8095 5726\nlegacy.hub@example.test\nBärenwald Handwerksgruppe München\nDatenschutz · Impressum (siehe Webseite)",
+    "url": "https://staging--baerenwald-backend.netlify.app/projekt/46df433a9c2e9ef618dabca72f9a3f7a0a57df9874cd9f97c6aad9fbc398980c"
+  },
+  {
+    "id": "portal_partner",
+    "status": "✅",
+    "note": "Liste/Empty ohne Crash",
+    "snippet": "Bärenwald\n\nIhr Portal für alle Vorgänge.\n\nAnfragen melden, Angebote freigeben, Termine bestätigen und den Fortschritt in Echtzeit verfolgen — an einem Ort.\n\n✓\nEnde-zu-Ende verschlüsselt\n✓\nKein Papier, keine E-Mail-Ketten\n✓\nDSGVO-konform, Server in DE\nWillkommen zurück\n\nMelden Sie sich bei Ihrem Portal von Bärenwald an.\n\nStaging — partner-elektro@ex"
+  },
+  {
+    "id": "portal_hv",
+    "status": "✅",
+    "note": "HV-Portal geladen",
+    "snippet": "M\nMeinBärenwald\nVERWALTUNG\nAbmelden\n\nMUSTERVERWALTUNG NORD\n\n+ Neuer Vorgang\nDashboard\nVorgänge\n1\nObjekte\nServiceabos\nIN KÜRZE\nMarktplatz\nIN KÜRZE\nEinstellungen\n\nVERWALTUNG\n\nMusterverwaltung Nord\n\n1\n\nOffen\n\n2\n\nIn Arbeit\n\n0\n\nErledigt\n\nZuletzt\nAlle ansehen\n\nWasser tritt aus in der Küche\n\nLeopoldstraße 10 · 80802 · München\n\nAngebot\n\nZZTEST-R2 Steckdose",
+    "url": "https://staging--baerenwald.netlify.app/portal"
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "F-178-header",
+    "status": "SKIP",
+    "note": "Keine Checkboxen auf /vorgaenge"
+  },
+  {
+    "id": "F-179-verify",
+    "status": "FAIL",
+    "note": "Button „Freigabe erneut anfordern“ nicht sichtbar"
+  },
+  {
+    "id": "A6-refreeze-up",
+    "status": "WARN",
+    "note": "nach Erhöhung 950€ status=freigegeben (letzter freigegeben betrag=n/a)"
+  },
+  {
+    "id": "A7-refreeze-down",
+    "status": "OK",
+    "note": "nach Senkung 400€ status=freigegeben"
+  },
+  {
+    "id": "A8-notmassnahme",
+    "status": "OK",
+    "note": "hv=notmassnahme + org=ausstehend gesetzt; Partner-UI sichtbar=false (Gate-Ausnahme laut Code)"
+  },
+  {
+    "id": "E8-staff2",
+    "status": "WARN",
+    "note": "Kein Notiz-Feld gefunden"
+  },
+  {
+    "id": "FATAL",
+    "status": "FAIL",
+    "note": "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('input[type=password]') to be visible\n    - waiting for \"https://staging--baerenwald-backend.netlify.app/\" navigation to finish...\n    - navigated to \"https://staging--baerenwald-backend.netlify.app/\"\n"
+  }
+]

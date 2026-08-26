@@ -63,6 +63,11 @@ export function AngebotOrgFreigabeBanner({
         toast.error(r.message)
         return
       }
+      if (r.mailOk === false) {
+        toast.error(r.mailError ?? 'Freigabe gesetzt, Mail an HV fehlgeschlagen')
+        onDone?.()
+        return
+      }
       toast.success('Freigabe erneut angefordert')
       setAnpassung('')
       onDone?.()

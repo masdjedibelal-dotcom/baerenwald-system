@@ -748,9 +748,14 @@ Dokumentiert in `docs/claude-project/06-PROZESSE.md` (Ist: Kundenversand erlaubt
 
 | Item | Status |
 |---|---|
-| F-177/178/179 Live nach Deploy | ⏳ **blockiert** bis Belal CRM committed+deployed |
-| Skript bereit | `scripts/r2-1b-part5.mjs` |
-| A1 Klick-Matrix / A6–A8 / Block B / E2E .6–.11 / E8–F9 / N-* | ⏳ nach Deploy bzw. parallel Nachlauf |
+| Website Deploy (bautagebuch TS-Fix) | ✅ live (`age` ~frisch) |
+| F-177 Modal listet Namen | ✅ live (`Sanitär · Musterverwaltung Nord`) |
+| F-178 Header nur Sichtbare | ✅ (`.vg-check`, sichtbare Zeilen) |
+| F-178 Filterwechsel leert Bulkbar | ✅ bei **Phasen-Chip**; TopBar-Suche filtert die Liste nicht (kein Clear erwartet) |
+| F-179 `email_log` nach „erneut anfordern“ | ❌ **FAIL** — Toast/Log/Status `ausstehend` ok, **0** neue `email_log`-Zeilen → **CRM-Build mit F-179-await noch nicht auf Staging** (Website-Deploy ≠ CRM) |
+| A1 / A6–A8 / Block B / E2E-Rest | ⏳ nach CRM-Deploy F-179 |
+
+**Nacharbeit Code (noch nicht deployed):** `mail-service.ts` behandelt Catcher ohne `email_log`-ID als Fehler; Banner zeigt `mailOk:false` ehrlich.
 
 ## Commit-Vorlage Teil 5 (GitHub Desktop) — CRM `baerenwald-system`
 

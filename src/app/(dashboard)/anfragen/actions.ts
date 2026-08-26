@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin, LeadDetail, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
@@ -32,10 +33,10 @@ export async function updateLeadStatus(
   neuerStatus: LeadStatus,
   notiz?: string | null
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
+  const user = gate.user
 
   const { data: lead, error: fetchErr } = await supabase
     .from('leads')
@@ -65,7 +66,7 @@ export async function updateLeadStatus(
     lead_id: leadId,
     status_alt: alterStatus,
     status_neu: neuerStatus,
-    user_id: user?.id ?? null,
+    user_id: user.id,
     notiz: notiz ?? null,
   })
 
@@ -79,7 +80,7 @@ export async function updateLeadStatus(
     typ: 'status_change',
     titel,
     beschreibung: notiz ?? null,
-    erstellt_von: user?.id ?? null,
+    erstellt_von: user.id,
   })
   if (tlErr) {
     console.warn('lead_timeline:', tlErr.message)
@@ -891,11 +892,9 @@ export async function setLeadAlsAkut(
   const id = leadId?.trim()
   if (!id) return { ok: false, message: 'Anfrage fehlt.' }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   const { data: lead, error: fetchErr } = await supabase
     .from('leads')
@@ -1596,7 +1595,9 @@ export async function softDeleteAnfrage(
   const id = leadId.trim()
   if (!id) return { ok: false, message: 'Anfrage-ID fehlt.' }
 
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const [{ count: angCount }, { count: aufCount }] = await Promise.all([
     supabase
       .from('angebote')
@@ -1638,8 +1639,9 @@ export async function deleteAnfrage(
 export async function restoreAnfrage(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { error } = await gate.db
     .from('leads')
     .update({ geloescht_am: null, updated_at: new Date().toISOString() })
     .eq('id', leadId)

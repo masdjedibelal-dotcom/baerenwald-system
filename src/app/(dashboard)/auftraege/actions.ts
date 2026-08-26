@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { handwerkerAusGeschwisterPositionen, ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { metaNeueLeistungMitPartner } from '@/lib/auftraege/partner-vorgang-meta'
@@ -61,7 +62,9 @@ async function setAuftragStatus(
   status: AuftragStatus,
   opts?: { timelineBeschreibung?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const fortschritt = FORTSCHRITT_BY_STATUS[status] ?? 0
   const patch: Record<string, unknown> = {
     status,
@@ -158,7 +161,9 @@ export async function completeAuftragNachEndabrechnung(input: {
   const art = (input.rechnungArt ?? 'voll').trim().toLowerCase()
   if (art !== 'voll' && art !== 'schluss') return { ok: true, changed: false }
 
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: row, error } = await supabase
     .from('auftraege')
     .select('id, status')

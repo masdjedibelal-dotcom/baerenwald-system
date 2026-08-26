@@ -234,7 +234,12 @@ export async function sendMail(
         internet_message_id: opts.internetMessageId ?? null,
       }
       if (opts.emailLogId) insertRow.id = opts.emailLogId
-      const { id: loggedId } = await insertEmailLogRow(insertRow)
+      const { id: loggedId, error: logErr } = await insertEmailLogRow(insertRow)
+      if (!loggedId && !opts.emailLogId) {
+        const msg = logErr ?? 'email_log Insert fehlgeschlagen (Catcher)'
+        await logMailError(opts, msg)
+        return { success: false, error: msg }
+      }
       return { success: true, resendId: catchId, emailLogId: loggedId ?? opts.emailLogId ?? null }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -299,7 +304,12 @@ export async function sendMail(
     }
     if (opts.emailLogId) insertRow.id = opts.emailLogId
 
-    const { id: loggedId } = await insertEmailLogRow(insertRow)
+    const { id: loggedId, error: logErr } = await insertEmailLogRow(insertRow)
+    if (!loggedId && !opts.emailLogId) {
+      const msg = logErr ?? 'email_log Insert fehlgeschlagen'
+      await logMailError(opts, msg)
+      return { success: false, error: msg, resendId }
+    }
 
     return { success: true, resendId, emailLogId: loggedId ?? opts.emailLogId ?? null }
   } catch (e: unknown) {

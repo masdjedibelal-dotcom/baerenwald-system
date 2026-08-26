@@ -1,0 +1,43 @@
+{
+  "interestingTabs": [
+    "Zahlung",
+    "AngebotEntwurf1.416,10 €",
+    "Rechnungnoch nicht erstellt"
+  ],
+  "zahlSnips": [
+    "RATE",
+    "LEGACY-Abschlag 1",
+    "Geplant",
+    "30 % der Auftragssumme",
+    "Geplant",
+    "2 Raten",
+    "Bezahlt 0,00 €"
+  ],
+  "korrTexts": [
+    {
+      "t": "KI",
+      "dis": false
+    },
+    {
+      "t": "Login",
+      "dis": false
+    },
+    {
+      "t": "ANGEBOT\nnoch nicht erstellt",
+      "dis": true
+    }
+  ],
+  "orphanSnips": [
+    "Noch nicht registriert",
+    "ANGEBOT",
+    "noch nicht erstellt",
+    "noch nicht erstellt"
+  ],
+  "toastAfter": null,
+  "mieter": "ST\n\nStatus\n\nVerwaltung\n\n!\nLink nicht verfügbar\n\nDieser Link ist ungültig oder nicht mehr aktiv.\n\nCookies & Datenschutz\n\nWir verwenden technisch notwendige Speicher (z. B. für Login im Kunden- und Partner-Portal). Mit Ihrer Einwilligung nutzen wir zusätzlich Statistik (PostHog, EU), um unsere Website zu verbessern.\n\nDatenschutz\n·\nImpressum\nAblehnen\nAkzeptieren",
+  "projH": [
+    "LEGACY-Auftrag → Angebot weg"
+  ],
+  "proj": "Ihr Projekt\n\nAktualisiert vor 0 Min.\n\nPROJEKT\n\nLEGACY-Auftrag → Angebot weg\n\n—\n\nAnfrage\n\nAngebot\n\nAuftrag\n\nAbnahme\n\nFertig\n\nFortschritt\n\nOffen\n\nNoch keine Updates. Wir melden uns bald.\n\nFragen zu Ihrem Projekt?\n\n089 8095 5726\nlegacy.hub@example.test\nBärenwald Handwerksgruppe München\nDatenschutz · Impressum (siehe Webseite)",
+  "consoleErrs": []
+}

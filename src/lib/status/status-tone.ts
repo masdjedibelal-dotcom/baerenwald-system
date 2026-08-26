@@ -68,12 +68,15 @@ export const STATUS_TONE: Record<string, StatusTone> = Object.fromEntries(
   Object.entries(STATUSES).map(([k, v]) => [k, v.tone])
 ) as Record<string, StatusTone>
 
-/** Spec-Fallback: STATUSES[x] || { label: x, kind/tone: neu→blau } */
+/**
+ * Spec-Fallback + R3-ALTDATEN Teil D:
+ * STATUSES[x] || { label: Rohwert|"Unbekannt", tone: grau } → neutrales Badge.
+ */
 export function resolveStatus(status: string | null | undefined): StatusEntry {
   const raw = String(status ?? '').trim()
-  if (!raw) return { label: '—', tone: 'grau' }
+  if (!raw) return { label: 'Unbekannt', tone: 'grau' }
   const key = raw.toLowerCase()
-  return STATUSES[key] || { label: raw, tone: 'blau' }
+  return STATUSES[key] || { label: raw, tone: 'grau' }
 }
 
 export function statusTone(status: string | null | undefined): StatusTone {

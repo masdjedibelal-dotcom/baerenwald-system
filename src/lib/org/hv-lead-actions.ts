@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase-server'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
@@ -11,12 +11,8 @@ import {
 } from '@/lib/org/org-freigabe-logic'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 
-async function crmActorId(): Promise<string | null> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user?.id ?? null
+async function requireCrmStaffDb() {
+  return requireStaffAndServiceRole()
 }
 
 async function resolveNotmassnahmeHandwerkerId(explicit?: string): Promise<string | null> {
@@ -45,10 +41,13 @@ export async function disponiereHavarieNotmassnahme(
   leadId: string,
   handwerkerId?: string
 ): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
+  const gate = await requireCrmStaffDb()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const db = gate.db
   const id = leadId?.trim()
   if (!id) return { ok: false, message: 'Lead fehlt.' }
 
-  const { data: lead, error } = await supabaseAdmin
+  const { data: lead, error } = await db
     .from('leads')
     .select(
       'id, auftraggeber_kunde_id, situation, funnel_daten, hv_meldung_status, org_freigabe_status, melder_einheit, kunde_objekt_id, kontakt_nachricht'
@@ -66,11 +65,11 @@ export async function disponiereHavarieNotmassnahme(
     return { ok: false, message: 'Kein Partner für Notmaßnahme gefunden.' }
   }
 
-  const uid = await crmActorId()
+  const uid = gate.user.id
   const now = new Date().toISOString()
 
   let auftragId: string
-  const { data: existingAuftrag } = await supabaseAdmin
+  const { data: existingAuftrag } = await db
     .from('auftraege')
     .select('id')
     .eq('lead_id', id)
@@ -82,7 +81,7 @@ export async function disponiereHavarieNotmassnahme(
     auftragId = String(existingAuftrag.id)
   } else {
     const titel = `Notmaßnahme — ${String(lead.melder_einheit ?? 'Havarie').trim() || 'Havarie'}`
-    const { data: neu, error: aErr } = await supabaseAdmin
+    const { data: neu, error: aErr } = await db
       .from('auftraege')
       .insert({
         lead_id: id,
@@ -100,7 +99,7 @@ export async function disponiereHavarieNotmassnahme(
     auftragId = String(neu.id)
   }
 
-  const { data: zuweisung } = await supabaseAdmin
+  const { data: zuweisung } = await db
     .from('auftrag_handwerker')
     .select('id')
     .eq('auftrag_id', auftragId)
@@ -108,14 +107,14 @@ export async function disponiereHavarieNotmassnahme(
     .maybeSingle()
 
   if (!zuweisung?.id) {
-    await supabaseAdmin.from('auftrag_handwerker').insert({
+    await db.from('auftrag_handwerker').insert({
       auftrag_id: auftragId,
       handwerker_id: hwId,
       status: 'zugewiesen',
     })
   }
 
-  await supabaseAdmin
+  await db
     .from('leads')
     .update({
       hv_meldung_status: 'notmassnahme',
@@ -144,11 +143,14 @@ export async function schlageKostentraegerVor(
   kostentraeger: string,
   versicherungsNr?: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireCrmStaffDb()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const db = gate.db
   const id = leadId?.trim()
   const kt = kostentraeger?.trim()
   if (!id || !kt) return { ok: false, message: 'Lead oder Kostenträger fehlt.' }
 
-  const { data: lead } = await supabaseAdmin
+  const { data: lead } = await db
     .from('leads')
     .select('id, auftraggeber_kunde_id, kostentraeger')
     .eq('id', id)
@@ -158,7 +160,7 @@ export async function schlageKostentraegerVor(
     return { ok: false, message: 'Kein HV-Vorgang.' }
   }
 
-  const uid = await crmActorId()
+  const uid = gate.user.id
   const patch: Record<string, unknown> = {
     kostentraeger: kt,
     kostentraeger_vorgeschlagen: true,
@@ -166,7 +168,7 @@ export async function schlageKostentraegerVor(
   }
   if (versicherungsNr?.trim()) patch.versicherungs_nr = versicherungsNr.trim()
 
-  await supabaseAdmin.from('leads').update(patch).eq('id', id)
+  await db.from('leads').update(patch).eq('id', id)
 
   await writeAuditEvent({
     entityType: 'lead',
@@ -190,6 +192,9 @@ export async function syncAngebotMitOrgFreigabe(input: {
   gesamtFix?: number | null
   gesamtMax?: number | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireCrmStaffDb()
+  if (!gate.ok) return { ok: false, message: gate.message }
+
   const r = await syncOrgFreigabeNachAngebot(input)
   if (!r.ok) return r
   return { ok: true }
@@ -202,9 +207,13 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
   anpassungNotiz: string
   gesamtFix?: number | null
   gesamtMax?: number | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const uid = await crmActorId()
-  if (!uid) return { ok: false, message: 'Nicht angemeldet.' }
+}): Promise<
+  | { ok: true; mailOk?: boolean; mailError?: string }
+  | { ok: false; message: string }
+> {
+  const gate = await requireCrmStaffDb()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const uid = gate.user.id
 
   const r = await erneutOrgFreigabeCore(input)
   if (!r.ok) return r
@@ -220,5 +229,9 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
 
   revalidatePath(`/anfragen/${input.leadId.trim()}`)
   revalidatePath(`/angebote/${input.angebotId.trim()}`)
-  return { ok: true }
+  return {
+    ok: true,
+    mailOk: r.mailOk,
+    ...(r.mailError ? { mailError: r.mailError } : {}),
+  }
 }

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "F-178-header",
+    "status": "OK",
+    "note": "Header .vg-check; rows=2; selHint=?; Alle-N=false"
+  },
+  {
+    "id": "F-178-clear",
+    "status": "FAIL",
+    "note": "Bulk-Aktionen nach Filter noch da"
+  },
+  {
+    "id": "F-177-modal",
+    "status": "OK",
+    "note": "Modal: Vorgang löschen?Dauerhaft entfernen — Kunde bleibt erhalten.Dieser Vorgang wird unwiderruflich gelöscht:Sanitär · Musterverwaltung NordAbbrechenLöschen"
+  },
+  {
+    "id": "F-179-verify",
+    "status": "FAIL",
+    "note": "status=ausstehend; neueMails=0; catch=—"
+  }
+]

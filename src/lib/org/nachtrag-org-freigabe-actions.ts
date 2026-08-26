@@ -1,6 +1,6 @@
 'use server'
 
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { syncOrgFreigabeNachNachtrag } from '@/lib/org/org-freigabe-logic'
 import { revalidatePath } from 'next/cache'
@@ -10,7 +10,10 @@ export async function genehmigeOrgNachtrag(
   nachtragId: string,
   auftragId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { data: nachtrag } = await supabaseAdmin
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const db = gate.db
+  const { data: nachtrag } = await db
     .from('nachtraege')
     .select('id, gesamt_max, gesamt_min, status')
     .eq('id', nachtragId)
@@ -24,7 +27,7 @@ export async function genehmigeOrgNachtrag(
     return { ok: false, message: 'Nachtrag ohne gültigen Betrag.' }
   }
 
-  const { data: auftrag } = await supabaseAdmin
+  const { data: auftrag } = await db
     .from('auftraege')
     .select('lead_id')
     .eq('id', auftragId)
@@ -33,7 +36,7 @@ export async function genehmigeOrgNachtrag(
   const leadId = (auftrag as { lead_id?: string } | null)?.lead_id?.trim()
   if (!leadId) return { ok: false, message: 'Kein Lead — Org-Freigabe nicht anwendbar.' }
 
-  await supabaseAdmin
+  await db
     .from('nachtraege')
     .update({ status: 'genehmigt', updated_at: new Date().toISOString() })
     .eq('id', nachtragId)

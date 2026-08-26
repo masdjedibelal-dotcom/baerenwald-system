@@ -1,0 +1,7 @@
+[07:08:52] vg-rows visible checks=2
+[07:08:53] F-178-header OK — Header .vg-check; rows=2; selHint=?; Alle-N=false
+[07:08:54] F-178-clear FAIL — Bulk-Aktionen nach Filter noch da
+[07:08:57] F-177-modal OK — Modal: Vorgang löschen?Dauerhaft entfernen — Kunde bleibt erhalten.Dieser Vorgang wird unwiderruflich gelöscht:Sanitär · Musterverwaltung NordAbbrechenLöschen
+[07:09:04] banner visible=true
+[07:09:10] F-179-verify FAIL — status=ausstehend; neueMails=0; catch=—
+[07:09:10] DONE → /Users/belalmasdjedi/code/baerenwald-system/docs/test/r2-1b-p5b-results.json

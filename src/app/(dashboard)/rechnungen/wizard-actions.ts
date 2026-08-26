@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import {
   createGutschriftFromRechnung,
   createRechnungEntwurf,
@@ -1685,7 +1686,9 @@ export async function finalizeRechnungWizardWithoutMail(
 export async function deleteRechnungEntwurf(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: rec } = await supabase
     .from('rechnungen')
     .select('status, auftrag_id, rechnungsnummer')

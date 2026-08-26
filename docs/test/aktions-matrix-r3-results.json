@@ -1,0 +1,560 @@
+{
+  "finished_at": "2026-08-26T07:50:30.215Z",
+  "crm": "https://staging--baerenwald-backend.netlify.app",
+  "results": [
+    {
+      "entity": "Rechnung",
+      "action": "öffnen (fremd/gesendet)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/rechnungen/a1100000-0000-4000-8000-000000000023",
+      "at": "2026-08-26T07:48:29.106Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "bearbeiten",
+      "status": "disabled",
+      "note": "Gesendet — Korrektur über Storno",
+      "title": "Gesendet — Korrektur über Storno",
+      "text": "Rechnung bearbeiten",
+      "at": "2026-08-26T07:48:29.595Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "als bezahlt",
+      "status": "fail",
+      "note": "Rechnung nicht gefunden",
+      "at": "2026-08-26T07:48:31.578Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "bezahlt zurücknehmen",
+      "status": "fail",
+      "note": "Rechnung nicht gefunden",
+      "at": "2026-08-26T07:48:33.553Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "storno ohne Ersatz",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:34.006Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "storno korrigieren/gutschrift",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:34.435Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "storno zurücknehmen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:34.876Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "Mahnung",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:35.315Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "löschen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:35.749Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "PDF",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:36.184Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "öffnen (ohne Nummer/gesendet)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/rechnungen/a1100000-0000-4000-8000-000000000042",
+      "at": "2026-08-26T07:48:39.197Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "öffnen (Alt-Status teilbezahlt)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/rechnungen/a1100000-0000-4000-8000-000000000053",
+      "at": "2026-08-26T07:48:42.482Z"
+    },
+    {
+      "entity": "Rechnung",
+      "action": "öffnen (>20k)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/rechnungen/a1100000-0000-4000-8000-000000000073",
+      "at": "2026-08-26T07:48:46.703Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "öffnen (fremd)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/angebote/a1100000-0000-4000-8000-000000000021",
+      "at": "2026-08-26T07:48:49.320Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "bearbeiten",
+      "status": "ok",
+      "note": "Modal öffnete sich: Angebote\nAN-A1100000\nGesendet\n18.05. · Gesendet · 708,05 €\nNeu",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:48:51.101Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "senden",
+      "status": "ok",
+      "note": "Modal öffnete sich: Kundenportal-Link versenden\nEinladung mit Login-Link und Vorschau\nAn *\nlegacy.hu",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:48:53.126Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "annehmen",
+      "status": "ok",
+      "note": "Modal öffnete sich: Angebot annehmen\n\nAngebot als angenommen markieren — auch ohne vorherigen Versan",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:48:54.862Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "ablehnen",
+      "status": "ok",
+      "note": "Modal öffnete sich: Angebot ablehnen\n\nMarkiert das Angebot als abgelehnt und kann den zugehörigen Le",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:48:56.575Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "ersetzen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:57.016Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "löschen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:57.453Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "Partner-Einholung",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Handwerker“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:48:57.892Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "PDF",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:48:58.331Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "öffnen (ohne Positionen)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/angebote/a1100000-0000-4000-8000-000000000041",
+      "at": "2026-08-26T07:49:01.203Z"
+    },
+    {
+      "entity": "Angebot",
+      "action": "öffnen (Alt-Status versendet)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/angebote/a1100000-0000-4000-8000-000000000051",
+      "at": "2026-08-26T07:49:04.212Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (fremd)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000022",
+      "at": "2026-08-26T07:49:08.613Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "Position ändern",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Auftrag bearbeiten“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:49:09.129Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "HW zuweisen",
+      "status": "ok",
+      "note": "Aktion ausgeführt ohne sichtbaren Fehler",
+      "at": "2026-08-26T07:49:10.784Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "an HW senden",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:11.221Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "Nachtrag",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:11.651Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "Baustopp beenden",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:12.102Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "abschließen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:12.551Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "stornieren",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:13.001Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "Abnahme",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:13.436Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (tote Angebot-FK)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000034",
+      "at": "2026-08-26T07:49:16.447Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (Zahlplan)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000039",
+      "at": "2026-08-26T07:49:19.319Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (Alt wartend)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000052",
+      "at": "2026-08-26T07:49:22.113Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (HW halb-migriert)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000062",
+      "at": "2026-08-26T07:49:24.940Z"
+    },
+    {
+      "entity": "Zahlplan",
+      "action": "öffnen (Auftrag mit Plan)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/a1100000-0000-4000-8000-000000000039",
+      "at": "2026-08-26T07:49:27.551Z"
+    },
+    {
+      "entity": "Zahlplan",
+      "action": "Rate ändern",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Auftrag bearbeiten“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:49:28.837Z"
+    },
+    {
+      "entity": "Zahlplan",
+      "action": "Rate löschen (frozen)",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:29.266Z"
+    },
+    {
+      "entity": "Zahlplan",
+      "action": "Abschlag erzeugen",
+      "status": "ok",
+      "note": "Modal öffnete sich: 1.190,00 € aufteilen >\nAbschlagsplan\n30 / 40 / 30\n50 / 50\nAnzahlung 30% + Rest\nB",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:31.004Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "öffnen (fremd)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/a1100000-0000-4000-8000-000000000020",
+      "at": "2026-08-26T07:49:33.664Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "Status wechseln",
+      "status": "ok",
+      "note": "Modal öffnete sich: Angebote\nAN-A1100000\nGesendet\n18.05. · Gesendet · 708,05 €\nNeu",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:35.444Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "verloren",
+      "status": "ok",
+      "note": "Modal öffnete sich: Verloren\n\nLEGACY-Hub Kunde (30 Vorgänge) · A1100000\n\nWarum verloren? *\nZu teuer\n",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:37.461Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "spam",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:38.236Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "duplizieren",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:38.663Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "löschen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:39.101Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "restore",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:49:39.529Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "Termin",
+      "status": "ok",
+      "note": "Aktion ausgeführt ohne sichtbaren Fehler",
+      "at": "2026-08-26T07:49:41.216Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "öffnen (Alt-Status)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/a1100000-0000-4000-8000-000000000050",
+      "at": "2026-08-26T07:49:43.853Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "öffnen (ohne funnel)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/a1100000-0000-4000-8000-000000000040",
+      "at": "2026-08-26T07:49:46.558Z"
+    },
+    {
+      "entity": "Lead",
+      "action": "öffnen (Freigabe halb)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/a1100000-0000-4000-8000-000000000060",
+      "at": "2026-08-26T07:49:49.299Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "öffnen (Hub 30 Vorgänge)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/kunden/a1100000-0000-4000-8000-000000000001",
+      "at": "2026-08-26T07:49:53.118Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "bearbeiten",
+      "status": "ok",
+      "note": "Modal öffnete sich: Kunde bearbeiten\nKUNDENTYP\nPrivat\nHausverwaltung\nGewerbe\nVorname\n*\nNachname\n*\nKO",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:55.024Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "zusammenführen",
+      "status": "ok",
+      "note": "Modal öffnete sich: Kunde zum Zusammenführen\n\nKunde auswählen\n\nBestand\nNeu\nKunde\nKunde wählen oder t",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:57.043Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "löschen (Blockade-Fall)",
+      "status": "ok",
+      "note": "Modal öffnete sich: Kunde löschen?\nLöschen blockiert\n\nLöschen nicht möglich — offener Auftrag / numm",
+      "mode": "modal-probe",
+      "at": "2026-08-26T07:49:59.055Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "Portal-Link",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Login“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:49:59.510Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "öffnen (ohne E-Mail)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/kunden/a1100000-0000-4000-8000-000000000003",
+      "at": "2026-08-26T07:50:02.831Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "öffnen (Seed Nord)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/kunden/1b6cccda-6fdf-4b9c-84b3-b58ade30da94",
+      "at": "2026-08-26T07:50:06.451Z"
+    },
+    {
+      "entity": "Kunde",
+      "action": "öffnen (soft-sim)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/kunden/a1100000-0000-4000-8000-000000000002",
+      "at": "2026-08-26T07:50:10.357Z"
+    },
+    {
+      "entity": "Partner",
+      "action": "öffnen (Elektro)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/handwerker/6f9b423c-44e1-49ec-839f-576fd4f5f0f5",
+      "at": "2026-08-26T07:50:15.593Z"
+    },
+    {
+      "entity": "Partner",
+      "action": "zuweisen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:16.049Z"
+    },
+    {
+      "entity": "Partner",
+      "action": "sperren/entsperren",
+      "status": "ok",
+      "note": "Aktion ausgeführt ohne sichtbaren Fehler",
+      "at": "2026-08-26T07:50:17.762Z"
+    },
+    {
+      "entity": "Partner",
+      "action": "Compliance ablehnen",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Compliance“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:50:18.210Z"
+    },
+    {
+      "entity": "Partner",
+      "action": "Konditionen",
+      "status": "ok",
+      "note": "sichtbar/aktiv („Umsatz · 12 M“) — nicht ausgeführt",
+      "mode": "probe",
+      "at": "2026-08-26T07:50:18.656Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "öffnen (Lead freigegeben/R2)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/22eac221-036c-42c2-bd24-21bf9a448b98",
+      "at": "2026-08-26T07:50:21.948Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "Freigabe anfordern",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:22.382Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "erteilen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:22.844Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "ablehnen",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:23.287Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "erneut anfordern",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:23.713Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "Schwelle ändern",
+      "status": "skip",
+      "note": "Aktion in UI nicht gefunden (Status/Feature)",
+      "at": "2026-08-26T07:50:24.148Z"
+    },
+    {
+      "entity": "Org/Freigabe",
+      "action": "öffnen (LEGACY halb Log)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/anfragen/a1100000-0000-4000-8000-000000000060",
+      "at": "2026-08-26T07:50:26.833Z"
+    },
+    {
+      "entity": "Auftrag",
+      "action": "öffnen (Seed R2)",
+      "status": 200,
+      "note": "Detail geladen HTTP 200",
+      "url": "https://staging--baerenwald-backend.netlify.app/auftraege/231716aa-0215-4560-9253-1492632981de",
+      "at": "2026-08-26T07:50:30.175Z"
+    }
+  ]
+}

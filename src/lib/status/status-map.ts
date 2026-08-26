@@ -86,31 +86,49 @@ const PHASE_MAPS: Record<VorgangPhaseKey, Record<string, StatusMapEntry>> = {
   rechnung: RECHNUNG_STATUS_MAP,
 }
 
+/**
+ * LEGACY-/Alt-Status außerhalb der kanonischen Map (Teil D / R3-ALTDATEN).
+ * Rohwert anzeigen; leerer String → „Unbekannt“. Nie leer, nie crashen.
+ */
+export function unknownStatusEntry(
+  unterstatus: string | null | undefined
+): StatusMapEntry {
+  const raw = String(unterstatus ?? '').trim()
+  return { label: raw || 'Unbekannt' }
+}
+
 export function statusMapEntry(
   phase: VorgangPhaseKey,
   unterstatus: string
 ): StatusMapEntry | null {
   const key = unterstatus.trim().toLowerCase()
+  if (!key) return null
   return PHASE_MAPS[phase][key] ?? null
 }
 
-/** Kanonisches Label (Vollform). */
+/** Kanonischer Eintrag oder Unknown-Fallback (Rohwert / „Unbekannt“). */
+export function statusMapEntryOrUnknown(
+  phase: VorgangPhaseKey,
+  unterstatus: string
+): StatusMapEntry {
+  return statusMapEntry(phase, unterstatus) ?? unknownStatusEntry(unterstatus)
+}
+
+/** Kanonisches Label (Vollform); Default-Zweig = unknownStatusEntry. */
 export function statusLabel(
   phase: VorgangPhaseKey,
   unterstatus: string
 ): string {
-  const entry = statusMapEntry(phase, unterstatus)
-  if (entry) return entry.label
-  return unterstatus.trim() || '—'
+  return statusMapEntryOrUnknown(phase, unterstatus).label
 }
 
-/** Kurzlabel wenn definiert, sonst Vollform. */
+/** Kurzlabel wenn definiert, sonst Vollform; Default = unknownStatusEntry. */
 export function statusShortLabel(
   phase: VorgangPhaseKey,
   unterstatus: string
 ): string {
   const entry = statusMapEntry(phase, unterstatus)
-  if (!entry) return unterstatus.trim() || '—'
+  if (!entry) return unknownStatusEntry(unterstatus).label
   return entry.shortLabel ?? entry.label
 }
 
