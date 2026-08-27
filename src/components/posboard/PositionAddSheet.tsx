@@ -56,14 +56,14 @@ const emptyFrei = (gewerk: string): FreiePositionDraft => ({
   einheit: 'Stück',
   preis: 0,
   ust: 19,
-  gewerk: gewerk.trim() || 'Allgemein',
+  gewerk: gewerk.trim(),
   regie: false,
 })
 
 const emptyFreitext = (gewerk: string): FreitextDraft => ({
   name: '',
   beschreibung: '',
-  gewerk: gewerk.trim() || 'Allgemein',
+  gewerk: gewerk.trim(),
 })
 
 const emptyNachlass = (): NachlassDraft => ({
@@ -74,7 +74,7 @@ const emptyNachlass = (): NachlassDraft => ({
 
 /**
  * Position hinzufügen: Desktop Split-over · mobil Bottom Sheet.
- * Chips: Preisliste | Frei | Freitext | Nachlass | (optional) Gewerk.
+ * Chips: Preisliste | Frei — Freitext/Nachlass/Gewerk laufen über PosAddRow.
  */
 export function PositionAddSheet({
   open,
@@ -83,8 +83,9 @@ export function PositionAddSheet({
   preferredGewerkName,
   gewerke = [],
   showUst = true,
-  allowGewerk = true,
-  allowNachlass = true,
+  allowGewerk = false,
+  allowNachlass = false,
+  allowOhneGewerk = false,
   onPickKatalog,
   onAddFrei,
   onAddFreitext,
@@ -97,9 +98,11 @@ export function PositionAddSheet({
   preferredGewerkName?: string | null
   gewerke?: string[]
   showUst?: boolean
-  /** Gewerk-Chip (komplexe Dokumente) */
+  /** Gewerk-Chip (meist aus) — Gewerk läuft über „Gewerk hinzufügen“ */
   allowGewerk?: boolean
   allowNachlass?: boolean
+  /** Leeres Gewerk = „Ohne Gewerk“ (Komplex) */
+  allowOhneGewerk?: boolean
   onPickKatalog: (result: KatalogPickResult) => void
   onAddFrei: (draft: FreiePositionDraft) => void
   onAddFreitext?: (draft: FreitextDraft) => void
@@ -203,22 +206,33 @@ export function PositionAddSheet({
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0], 'de'))
   }, [filtered])
 
-  const gewerkOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...gewerke,
-            preferredGewerkName || '',
-            activeGewerk,
-            frei.gewerk,
-            freitext.gewerk,
-            'Allgemein',
-          ].filter(Boolean)
-        )
-      ),
-    [gewerke, preferredGewerkName, activeGewerk, frei.gewerk, freitext.gewerk]
-  )
+  const gewerkOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        [
+          ...gewerke,
+          preferredGewerkName || '',
+          activeGewerk,
+          frei.gewerk,
+          freitext.gewerk,
+          allowOhneGewerk ? '' : 'Allgemein',
+        ]
+          .map((g) => (g ?? '').trim())
+          .filter((g) => (allowOhneGewerk ? true : Boolean(g)))
+      )
+    )
+    if (allowOhneGewerk) {
+      return ['', ...names.filter(Boolean)]
+    }
+    return names.length ? names : ['Allgemein']
+  }, [
+    gewerke,
+    preferredGewerkName,
+    activeGewerk,
+    frei.gewerk,
+    freitext.gewerk,
+    allowOhneGewerk,
+  ])
 
   const stammdatenGewerke = useMemo(
     () =>
@@ -258,11 +272,18 @@ export function PositionAddSheet({
 
   function confirmFrei() {
     if (!frei.name.trim()) return
+    const fallbackGewerk = allowOhneGewerk
+      ? ''
+      : 'Allgemein'
     onAddFrei({
       ...frei,
       name: frei.name.trim(),
       beschreibung: frei.beschreibung.trim(),
-      gewerk: frei.gewerk.trim() || activeGewerk || preferredGewerkName?.trim() || 'Allgemein',
+      gewerk:
+        frei.gewerk.trim() ||
+        activeGewerk ||
+        preferredGewerkName?.trim() ||
+        fallbackGewerk,
       menge: Number.isFinite(frei.menge) && frei.menge > 0 ? frei.menge : 1,
     })
     onClose()
@@ -588,8 +609,8 @@ export function PositionAddSheet({
               onChange={(e) => setFrei((f) => ({ ...f, gewerk: e.target.value }))}
             >
               {gewerkOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
+                <option key={g || '__ohne__'} value={g}>
+                  {g || 'Ohne Gewerk'}
                 </option>
               ))}
             </select>

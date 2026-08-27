@@ -17,6 +17,7 @@ import {
   type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
+import { clearAuftragHandwerkerPositionen } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
@@ -266,6 +267,26 @@ export function AuftragLeistungenTab({
     })
   }
 
+  function abwaehlenZuweisung(ids: string[]) {
+    if (disabled || !ids.length) return
+    void actionBusy.run('Zuweisung wird zurückgezogen…', async () => {
+      const r = await clearAuftragHandwerkerPositionen({
+        auftragId: detail.id,
+        positionIds: ids,
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
+      }
+      toast.success(
+        r.cleared === 1
+          ? 'Zuweisung zurückgezogen — Partner sieht die Leistung nicht mehr.'
+          : `${r.cleared} Zuweisungen zurückgezogen.`
+      )
+      onSaved?.()
+    })
+  }
+
   function decideNachtrag(positionId: string, status: 'anerkannt' | 'abgelehnt') {
     if (disabled || pendingNachtrag) return
     setPendingNachtrag(true)
@@ -335,6 +356,11 @@ export function AuftragLeistungenTab({
                 ? undefined
                 : [
                     { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
+                    {
+                      id: 'abwaehlen',
+                      label: 'Abwählen',
+                      onClick: (ids) => abwaehlenZuweisung(ids),
+                    },
                     { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
                   ]
             }
@@ -345,6 +371,16 @@ export function AuftragLeistungenTab({
                     row.brauchtFreigabe
                       ? []
                       : [
+                          ...(row.handwerkerId
+                            ? [
+                                {
+                                  id: 'abwaehlen',
+                                  label: 'Abwählen',
+                                  icon: 'user-x',
+                                  onClick: () => abwaehlenZuweisung([row.id]),
+                                },
+                              ]
+                            : []),
                           {
                             id: 'zuweisen',
                             label: 'Zuweisen',

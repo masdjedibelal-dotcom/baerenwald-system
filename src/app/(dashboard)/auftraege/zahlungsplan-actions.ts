@@ -10,6 +10,7 @@ import {
   berechneZahlungsplan,
   rechnungArtFuerZeile,
   abschlagBereitsAbgerechnet,
+  normalizeAbschlagsplanSchluss,
   type Zahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
@@ -56,7 +57,16 @@ export async function saveAuftragZahlungsplan(
   auftragId: string,
   plan: Zahlungsplan,
   opts?: { force?: boolean }
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<
+  | {
+      ok: true
+      erstellt: number
+      aktualisiert: number
+      storniertOrphan: number
+      gestellteUnveraendert: number
+    }
+  | { ok: false; message: string }
+> {
   if (!plan.zeilen.length) {
     return { ok: false, message: 'Mindestens eine Abschlagszeile erforderlich.' }
   }
@@ -90,19 +100,19 @@ export async function saveAuftragZahlungsplan(
     faellig_am: r.faellig_am as string | null,
   }))
 
-  let normalized: Zahlungsplan = {
+  let normalized: Zahlungsplan = normalizeAbschlagsplanSchluss({
     modus: 'abschlagsplan',
     zeilen: plan.zeilen.map((z) => ({
       ...z,
       titel: z.titel.trim() || 'Abschlag',
       position_ids: z.position_ids?.length ? [...z.position_ids] : [],
     })),
-  }
+  })
 
   if (!opts?.force && bisher.zeilen.length) {
     const merged = zahlplanMergeMitEinfrieren(bisher, normalized, links)
     if (!merged.ok) return merged
-    normalized = merged.plan
+    normalized = normalizeAbschlagsplanSchluss(merged.plan)
   }
 
   const { data: auftragPosRows } = await supabase
@@ -147,7 +157,13 @@ export async function saveAuftragZahlungsplan(
   revalidatePath(`/angebote/${angRef.angebotId}`)
   revalidatePath('/vorgaenge')
   revalidatePath('/rechnungen')
-  return { ok: true }
+  return {
+    ok: true,
+    erstellt: entwuerfe.erstellt,
+    aktualisiert: entwuerfe.aktualisiert,
+    storniertOrphan: entwuerfe.storniertOrphan,
+    gestellteUnveraendert: entwuerfe.gestellteUnveraendert,
+  }
 }
 
 /** Gesamten Abschlagsplan-Vorschlag am Angebot entfernen (nur wenn keine Rate gestellt/bezahlt). */

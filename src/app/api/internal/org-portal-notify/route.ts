@@ -18,7 +18,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { leadId?: string; typ?: string; aktion?: string; notiz?: string } = {}
+  let body: {
+    leadId?: string
+    typ?: string
+    aktion?: string
+    notiz?: string
+    ergebnis?: string
+  } = {}
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -40,6 +46,17 @@ export async function POST(req: Request) {
   if (body.typ === 'angebot_entscheidung') {
     const aktion = body.aktion === 'abgelehnt' ? 'abgelehnt' : 'angenommen'
     const res = await notifyAngebotEntscheidung({ leadId, aktion, notiz: body.notiz })
+    if (!res.ok) return NextResponse.json({ ok: false, error: res.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  if (body.typ === 'hm_befund') {
+    const ergebnis =
+      body.ergebnis === 'fachfirma_akut' ? 'fachfirma_akut' : 'fachfirma_angebot'
+    const res = await notifyInterneNeueMeldung(leadId, {
+      quelle: 'hm_befund',
+      ergebnis,
+    })
     if (!res.ok) return NextResponse.json({ ok: false, error: res.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   }

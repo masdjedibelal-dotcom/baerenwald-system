@@ -17,6 +17,8 @@ import {
 } from '@/components/vorgang/RateDrawer'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { loadRechnungWizardBootstrap as loadWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
+import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   abschlagWeichtVonAktuellerAuftragssummeAb,
@@ -504,7 +506,16 @@ export function VorgangZahlungTab({
       }
       setPlan(next)
       setEditorOpen(false)
-      toast.success('Gespeichert')
+      const teile: string[] = []
+      if (res.aktualisiert > 0) teile.push(`${res.aktualisiert} Entwurf(e) neu berechnet`)
+      if (res.erstellt > 0) teile.push(`${res.erstellt} neu`)
+      if (res.storniertOrphan > 0) teile.push(`${res.storniertOrphan} verwaiste Entwürfe storniert`)
+      if (res.gestellteUnveraendert > 0) {
+        teile.push(
+          `${res.gestellteUnveraendert} gestellte Rate(n) unverändert — ggf. korrigieren & erneut senden`
+        )
+      }
+      toast.success(teile.length ? `Plan gespeichert · ${teile.join(' · ')}` : 'Plan gespeichert')
       onRefresh?.()
       router.refresh()
     })
@@ -517,15 +528,34 @@ export function VorgangZahlungTab({
       return
     }
     startTransition(async () => {
+      const row = rechnungById.get(rechnungId)
+      const modus = rechnungKorrekturModus(row?.status)
+      let targetId = rechnungId
+
+      if (modus === 'storno_neu') {
+        const korr = await korrigiereRechnung(rechnungId)
+        if (!korr.ok) {
+          toast.error(korr.message)
+          return
+        }
+        if (korr.mode === 'storno_neu') {
+          targetId = korr.neuId
+          toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+        }
+      } else if (modus === 'gesperrt') {
+        toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+        return
+      }
+
       const boot = auftragId
-        ? await loadWizardBootstrap(rechnungId, auftragId)
-        : await loadRechnungWizardBootstrapStandalone(rechnungId)
+        ? await loadWizardBootstrap(targetId, auftragId)
+        : await loadRechnungWizardBootstrapStandalone(targetId)
       if (boot.ok && onOpenWizard) {
         onOpenWizard(boot.bootstrap)
       } else if (!boot.ok) {
         toast.error(boot.message)
       } else {
-        router.push(`/rechnungen/${rechnungId}?tab=leistungen`)
+        router.push(`/rechnungen/${targetId}?tab=leistungen`)
       }
     })
   }
@@ -619,7 +649,7 @@ export function VorgangZahlungTab({
       })
       ctas.push({
         id: 'edit',
-        label: 'Bearbeiten',
+        label: 'Korrigieren',
         icon: 'pencil',
         onClick: () => openRechnungBearbeiten(rechnungId),
       })
@@ -811,6 +841,15 @@ export function VorgangZahlungTab({
                   ? `${abschlagSummeAbweichungen[0]!.rechnungsnummer ?? 'Abschlag'} bleibt bei ${formatEurBetrag(abschlagSummeAbweichungen[0]!.gestelltBrutto)} (Soll ${formatEurBetrag(abschlagSummeAbweichungen[0]!.sollBrutto)}). Gestellte Rechnungen bleiben; Schlussrechnung gleicht ab.`
                   : `${abschlagSummeAbweichungen.length} gestellte Abschläge auf alter Summe. Schlussrechnung gleicht ab — oder stornieren und Rate neu stellen.`
               }
+            />
+          </div>
+        ) : null}
+
+        {variant === 'auftrag' && frozenRateIds.length > 0 ? (
+          <div className="zahlung-tab-hint">
+            <MockInfoTip
+              label="Gestellte Raten eingefroren"
+              tip="Bereits versendete Abschläge ändern sich nicht automatisch. Plan-Änderung aktualisiert nur Entwürfe (Betrag, Schluss vs. Abschlag, PDF). Gestellte Raten: über „Korrigieren“ Storno + neu, dann erneut senden."
             />
           </div>
         ) : null}

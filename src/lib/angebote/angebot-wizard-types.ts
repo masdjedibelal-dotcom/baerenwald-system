@@ -447,6 +447,28 @@ export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
   return (ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(status)
 }
 
+/**
+ * Auftrags-Korrektur („Auftrag bearbeiten“): angenommenes Angebot darf geladen/gespeichert werden.
+ * Abgelehnt / ersetzt / storniert bleiben gesperrt.
+ */
+export function angebotDarfFuerAuftragKorrektur(status: string): boolean {
+  const st = String(status ?? '').toLowerCase()
+  if (st === 'abgelehnt' || st === 'ersetzt' || st.includes('storn')) return false
+  return true
+}
+
+/** Wizard-Load/Save: Entwurf… oder angenommen (AG-Korrektur), sonst sperren. */
+export function angebotStatusErlaubtImWizard(
+  status: string,
+  opts?: { forAuftragKorrektur?: boolean }
+): boolean {
+  if (opts?.forAuftragKorrektur) return angebotDarfFuerAuftragKorrektur(status)
+  const st = String(status ?? '').toLowerCase()
+  // Angenommen → Auftrag existiert; Load für „Auftrag bearbeiten“ (Flag kann bei SA-Aufruf fehlen)
+  if (st === 'kunde_akzeptiert' || st === 'angenommen') return true
+  return angebotDarfImWizardBearbeitetWerden(status)
+}
+
 /** Deaktiviert-mit-Grund für Detail-CTA „Angebot bearbeiten“. */
 export function angebotWizardBearbeitenSperrgrund(status: string): string | null {
   if (angebotDarfImWizardBearbeitetWerden(status)) return null

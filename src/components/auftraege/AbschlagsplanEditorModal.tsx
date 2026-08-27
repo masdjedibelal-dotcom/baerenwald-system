@@ -9,6 +9,7 @@ import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   berechneZahlungsplan,
   neueZahlungsplanZeile,
+  normalizeAbschlagsplanSchluss,
   validateZahlungsplanGegenGesamt,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
@@ -77,7 +78,7 @@ function ratesToPlan(
       mail_betreff_vorlage: orig?.mail_betreff_vorlage,
     })
   })
-  return { modus: 'abschlagsplan', zeilen }
+  return normalizeAbschlagsplanSchluss({ modus: 'abschlagsplan', zeilen })
 }
 
 function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
@@ -220,21 +221,60 @@ export function AbschlagsplanEditorModal({
 
   function add() {
     setRates((prev) => {
-      const withoutTrailingRest = [...prev]
-      const last = withoutTrailingRest[withoutTrailingRest.length - 1]
-      // Neue Zeile vor Rest einfügen, falls letzte Rest ist
+      if (prev.length === 0) {
+        return [
+          {
+            id: neueZahlungsplanZeile().id,
+            label: 'Anzahlung',
+            typ: 'prozent',
+            wert: 30,
+            faellig_am: '',
+          },
+          {
+            id: neueZahlungsplanZeile().id,
+            label: 'Schlussrechnung',
+            typ: 'rest',
+            wert: 0,
+            faellig_am: '',
+          },
+        ]
+      }
+      const abschlagCount = prev.filter((x) => x.typ !== 'rest').length
       const neue: EditorRate = {
         id: neueZahlungsplanZeile().id,
-        label: `${withoutTrailingRest.filter((x) => x.typ !== 'rest').length + 1}. Abschlag`,
+        label: `${abschlagCount + 1}. Abschlag`,
         typ: 'prozent',
         wert: 0,
         faellig_am: '',
       }
-      if (last?.typ === 'rest') {
-        withoutTrailingRest.splice(withoutTrailingRest.length - 1, 0, neue)
-        return withoutTrailingRest
-      }
-      return [...prev, neue]
+      // Immer vor der letzten Rate (Schluss) einfügen — auch bei %-Schluss ohne typ rest
+      const next = [...prev]
+      next.splice(Math.max(0, next.length - 1), 0, neue)
+      return next.map((r, i) => {
+        const isLast = i === next.length - 1
+        if (isLast) {
+          const looksSchluss =
+            r.typ === 'rest' ||
+            r.label.trim().toLowerCase().startsWith('schluss') ||
+            r.label.trim().toLowerCase() === 'schlussrechnung'
+          return {
+            ...r,
+            label: looksSchluss || !r.label.trim() ? 'Schlussrechnung' : r.label,
+          }
+        }
+        if (
+          r.label.trim().toLowerCase().startsWith('schluss') ||
+          r.label.trim().toLowerCase() === 'schlussrechnung'
+        ) {
+          return {
+            ...r,
+            typ: r.typ === 'rest' ? 'prozent' : r.typ,
+            label: i === 0 ? 'Anzahlung' : `${i + 1}. Abschlag`,
+            wert: r.typ === 'rest' ? 0 : r.wert,
+          }
+        }
+        return r
+      })
     })
   }
 

@@ -108,7 +108,7 @@ export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
   return s === 'entwurf'
 }
 
-/** Deaktiviert-mit-Grund für Detail-CTA „Rechnung bearbeiten“. */
+/** Deaktiviert-mit-Grund — Detail-CTA wechselt bei Gesendet/Bezahlt auf „Rechnung korrigieren“. */
 export function rechnungWizardBearbeitenSperrgrund(status: string): string | null {
   if (rechnungDarfImWizardBearbeitetWerden(status)) return null
   const s = (status ?? '').toLowerCase()

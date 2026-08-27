@@ -1262,7 +1262,11 @@ export function RechnungWizard({
         badgeOf={(p) =>
           p.regieSchein
             ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
-            : null
+            : p.kind === 'freitext'
+              ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
+              : p.kind === 'nachlass'
+                ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
+                : null
         }
       />
 

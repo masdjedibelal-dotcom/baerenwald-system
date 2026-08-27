@@ -743,8 +743,6 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
     .map(
       (b) => `<tr>
         <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:10pt;color:#111;">${esc(b.titel)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;text-align:right;font-size:10pt;white-space:nowrap;">${euro(b.summen.netto)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;text-align:right;font-size:10pt;font-weight:600;white-space:nowrap;">${euro(b.summen.brutto)}</td>
       </tr>`
     )
     .join('')
@@ -753,8 +751,6 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
       <thead>
         <tr style="background:#F3F4F6;font-size:9pt;text-transform:uppercase;letter-spacing:0.04em;color:${TEXT_PRIMARY};">
           <th style="padding:8px 10px;text-align:left;font-weight:600;">Gewerk</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:600;width:96px;">Netto</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:600;width:96px;">Brutto</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -833,7 +829,6 @@ function projektBlockHtml(
     <h2 style="font-size:13pt;font-weight:700;color:${PROJEKT_ACCENT};margin:0 0 12px;line-height:1.35;padding-bottom:6px;border-bottom:2px solid ${PROJEKT_ACCENT};">${esc(titel)}</h2>
     ${bullets}
     ${inhalt}
-    ${summenBlockKompaktHtml(block.summen)}
   </section>`
 }
 

@@ -20,9 +20,16 @@ import {
   updateRechnungEntwurf,
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
+import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 
 type EnsureResult =
-  | { ok: true; erstellt: number; aktualisiert: number }
+  | {
+      ok: true
+      erstellt: number
+      aktualisiert: number
+      storniertOrphan: number
+      gestellteUnveraendert: number
+    }
   | { ok: false; message: string }
 
 /** Verwaiste Voll-Entwürfe (ohne Plan-Zeile) stornieren — verhindert Doppel-Vorgang „Gesamt + Abschlag“. */
@@ -51,6 +58,17 @@ export async function storniereVerwaisteVollEntwuerfe(
     }
   }
   return { ok: true, count }
+}
+
+function findAktiverBelegFuerZeile(
+  bestehend: RechnungAbschlagLink[],
+  zeileId: string
+): RechnungAbschlagLink | null {
+  const matches = bestehend.filter((r) => r.zahlungsplan_abschlag_id === zeileId)
+  const entwurf = matches.find((r) => String(r.status ?? '').toLowerCase() === 'entwurf')
+  if (entwurf) return entwurf
+  const aktiv = matches.find((r) => String(r.status ?? '').toLowerCase() !== 'storniert')
+  return aktiv ?? null
 }
 
 /** Alle Planzeilen als Entwürfe anlegen/aktualisieren (gestellte Raten unangetastet). */
@@ -98,18 +116,18 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
   let bestehend: RechnungAbschlagLink[] = (rechnungen ?? [])
     .filter((r) => String((r as { richtung?: string | null }).richtung ?? '') !== 'eingehend')
     .map((r) => ({
-    id: r.id as string,
-    status: r.status as string | null,
-    zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id as string | null,
-    rechnung_art: r.rechnung_art as string | null,
-    abschlag_index: r.abschlag_index as number | null,
-    brutto: r.brutto as number | null,
-    netto: r.netto as number | null,
-    mwst_satz: r.mwst_satz as number | null,
-    mwst_betrag: r.mwst_betrag as number | null,
-    rechnungsnummer: r.rechnungsnummer as string | null,
-    beleg_typ: r.beleg_typ as string | null,
-  }))
+      id: r.id as string,
+      status: r.status as string | null,
+      zahlungsplan_abschlag_id: r.zahlungsplan_abschlag_id as string | null,
+      rechnung_art: r.rechnung_art as string | null,
+      abschlag_index: r.abschlag_index as number | null,
+      brutto: r.brutto as number | null,
+      netto: r.netto as number | null,
+      mwst_satz: r.mwst_satz as number | null,
+      mwst_betrag: r.mwst_betrag as number | null,
+      rechnungsnummer: r.rechnungsnummer as string | null,
+      beleg_typ: r.beleg_typ as string | null,
+    }))
 
   const kontext = berechneZahlungsplan(
     plan,
@@ -130,11 +148,14 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
 
   let erstellt = 0
   let aktualisiert = 0
+  let gestellteUnveraendert = 0
+  const planZeileIds = new Set(kontext.zeilen.map((z) => z.id))
 
   for (const zeile of kontext.zeilen) {
     const rechnungArt = rechnungArtFuerZeile(zeile) as 'abschlag' | 'schluss'
-    const existing = bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)
-    if (existing && existing.status !== 'entwurf') {
+    const existing = findAktiverBelegFuerZeile(bestehend, zeile.id)
+    if (existing && String(existing.status ?? '').toLowerCase() !== 'entwurf') {
+      gestellteUnveraendert += 1
       continue
     }
 
@@ -208,6 +229,7 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
         ...payload,
       })
       if (!upd.ok) return upd
+      await persistPdfForRechnung(existing.id).catch(() => null)
       aktualisiert += 1
     } else {
       const created = await createRechnungEntwurf({
@@ -232,7 +254,26 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
     }
   }
 
-  return { ok: true, erstellt, aktualisiert }
+  // Entwürfe zu entfernten Planzeilen stornieren
+  let storniertOrphan = 0
+  for (const r of bestehend) {
+    if (String(r.status ?? '').toLowerCase() !== 'entwurf') continue
+    const art = String(r.rechnung_art ?? '').toLowerCase()
+    if (art !== 'abschlag' && art !== 'schluss') continue
+    const zeileId = r.zahlungsplan_abschlag_id?.trim()
+    if (!zeileId || planZeileIds.has(zeileId)) continue
+    const res = await updateRechnungStatus(r.id, 'storniert')
+    if (!res.ok) return res
+    storniertOrphan += 1
+  }
+
+  return {
+    ok: true,
+    erstellt,
+    aktualisiert,
+    storniertOrphan,
+    gestellteUnveraendert,
+  }
 }
 
 /** Beim Löschen des Plans: Abschlag-/Schluss-Entwürfe stornieren. */

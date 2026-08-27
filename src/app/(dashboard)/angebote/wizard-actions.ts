@@ -24,7 +24,7 @@ import {
   angebotTitelFuerKopie,
   type AngebotWizardBootstrap,
   type AngebotVariantenPersistJson,
-  angebotDarfImWizardBearbeitetWerden,
+  angebotStatusErlaubtImWizard,
 } from '@/lib/angebote/angebot-wizard-types'
 import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
@@ -229,35 +229,42 @@ export async function saveAngebotWizardDraft(
   const objektAnlageId = input.meta.objekt_anlage_id?.trim() || null
 
   if (input.angebotId) {
-    const upd = await updateAngebot(input.angebotId, {
-      lead_id: input.lead_id,
-      kunde_id: input.kunde_id,
-      kunde_objekt_id: kundeObjektId,
-      objekt_anlage_id: objektAnlageId,
-      positionen,
-      notizen,
-      preis_typ: 'range',
-      gesamt_min: summen.nettoMin,
-      gesamt_max: summen.nettoMax,
-      leistungsumfang: input.meta.leistungsumfang,
-      einleitung: input.meta.einleitung,
-      hinweise: projektFelder.hinweise,
-      zahlungsbedingungen: input.meta.zahlungsbedingungen,
-      gueltig_bis: input.meta.gueltig_bis,
-      zahlungsplan:
-        input.meta.zahlungsbedingungen === 'abschlagsplan' ||
-        input.meta.zahlungsbedingungen === 'anzahlung_50'
-          ? input.zahlungsplan ?? null
-          : null,
-      dokument_typ: projektFelder.dokument_typ,
-      projektbeschreibung: projektFelder.projektbeschreibung,
-      fotos_urls: projektFelder.fotos_urls,
-      wichtige_hinweise: projektFelder.wichtige_hinweise,
-      varianten: projektFelder.varianten,
-      handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-      ist_wiederkehrend: input.ist_wiederkehrend,
-      wiederkehr_turnus: input.wiederkehr_turnus,
-    }, { asSystem: opts?.asSystem })
+    const upd = await updateAngebot(
+      input.angebotId,
+      {
+        lead_id: input.lead_id,
+        kunde_id: input.kunde_id,
+        kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
+        positionen,
+        notizen,
+        preis_typ: 'range',
+        gesamt_min: summen.nettoMin,
+        gesamt_max: summen.nettoMax,
+        leistungsumfang: input.meta.leistungsumfang,
+        einleitung: input.meta.einleitung,
+        hinweise: projektFelder.hinweise,
+        zahlungsbedingungen: input.meta.zahlungsbedingungen,
+        gueltig_bis: input.meta.gueltig_bis,
+        zahlungsplan:
+          input.meta.zahlungsbedingungen === 'abschlagsplan' ||
+          input.meta.zahlungsbedingungen === 'anzahlung_50'
+            ? input.zahlungsplan ?? null
+            : null,
+        dokument_typ: projektFelder.dokument_typ,
+        projektbeschreibung: projektFelder.projektbeschreibung,
+        fotos_urls: projektFelder.fotos_urls,
+        wichtige_hinweise: projektFelder.wichtige_hinweise,
+        varianten: projektFelder.varianten,
+        handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
+        ist_wiederkehrend: input.ist_wiederkehrend,
+        wiederkehr_turnus: input.wiederkehr_turnus,
+      },
+      {
+        asSystem: opts?.asSystem,
+        forAuftragKorrektur: Boolean(input.auftragKorrekturId?.trim()),
+      }
+    )
     if (!upd.ok) return upd
     const db = opts?.asSystem ? supabaseAdmin : createClient()
     const { data: nrRow } = await db
@@ -386,7 +393,7 @@ function normalizeVariantenFromDb(raw: unknown): AngebotVariantenPersistJson | n
 export async function loadAngebotWizardBootstrap(
   angebotId: string,
   leadId: string,
-  opts?: { asSystem?: boolean }
+  opts?: { asSystem?: boolean; /** Angenommenes Angebot für Auftrags-Korrektur/Nachtrag laden */ forAuftragKorrektur?: boolean }
 ): Promise<{ ok: true; bootstrap: AngebotWizardBootstrap } | { ok: false; message: string }> {
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
 
@@ -466,8 +473,13 @@ export async function loadAngebotWizardBootstrap(
   if (ang.lead_id !== leadId) {
     return { ok: false, message: 'Angebot gehört nicht zu dieser Anfrage.' }
   }
-  if (!angebotDarfImWizardBearbeitetWerden(ang.status)) {
-    return { ok: false, message: 'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.' }
+  if (!angebotStatusErlaubtImWizard(ang.status, opts)) {
+    return {
+      ok: false,
+      message: opts?.forAuftragKorrektur
+        ? 'Abgelehnte oder ersetzte Angebote können nicht korrigiert werden.'
+        : 'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.',
+    }
   }
 
   const kundeTyp = resolveAngebotKundeTyp(

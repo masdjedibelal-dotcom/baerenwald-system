@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
+import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
@@ -36,13 +37,25 @@ export function RechnungKorrekturWahlModal({
   function waehleKorrigieren() {
     setMode('korrigieren')
     startTransition(async () => {
+      // Gesendet/Bezahlt: Storno-Gutschrift + Ersatz-Entwurf, dann Wizard auf dem Entwurf
+      const korr = await korrigiereRechnung(rechnungId)
+      if (!korr.ok) {
+        setMode(null)
+        toast.error(korr.message)
+        return
+      }
+
+      const targetId = korr.mode === 'storno_neu' ? korr.neuId : rechnungId
       const res = auftragId?.trim()
-        ? await loadRechnungWizardBootstrap(rechnungId, auftragId.trim())
-        : await loadRechnungWizardBootstrapStandalone(rechnungId)
+        ? await loadRechnungWizardBootstrap(targetId, auftragId.trim())
+        : await loadRechnungWizardBootstrapStandalone(targetId)
       setMode(null)
       if (!res.ok) {
         toast.error(res.message)
         return
+      }
+      if (korr.mode === 'storno_neu') {
+        toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
       }
       onClose()
       onKorrigieren(res.bootstrap)
@@ -60,7 +73,7 @@ export function RechnungKorrekturWahlModal({
     <Modal
       open={open}
       onClose={() => !pending && onClose()}
-      title="Rechnung bearbeiten"
+      title="Rechnung korrigieren"
       subtitle="Was möchtest du tun?"
       size="md"
       footer={
@@ -95,7 +108,7 @@ export function RechnungKorrekturWahlModal({
             </span>
             <span className="hint">
               {pending && mode === 'korrigieren'
-                ? 'Lädt…'
+                ? 'Storno + Entwurf werden angelegt…'
                 : 'Nur wenn Betrag oder Positionen falsch sind: Storno-Gutschrift zur alten RE + neue Rechnung. Beide PDFs gehen in einer Mail raus.'}
             </span>
           </span>

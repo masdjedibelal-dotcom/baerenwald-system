@@ -32,19 +32,26 @@ const OPTIONS: {
   },
 ]
 
-/** Toolbar: Position (Sheet) · Freitext · Nachlass. */
+/** Toolbar: Position (Sheet) · Freitext · Nachlass — optional gefiltert via `kinds`. */
 export function PosAddRow({
   onAdd,
   disabledKinds,
+  kinds,
   className,
 }: {
   onAdd: (kind: PosAddKind) => void
   disabledKinds?: Partial<Record<PosAddKind, boolean>>
+  /** Welche Buttons zeigen — Default: Position · Freitext · Nachlass */
+  kinds?: PosAddKind[]
   className?: string
 }) {
+  const visible = kinds?.length
+    ? OPTIONS.filter((o) => kinds.includes(o.kind))
+    : OPTIONS.filter((o) => o.kind !== 'preisliste')
+
   return (
     <div className={cn('pos-add-row', className)}>
-      {OPTIONS.map((opt) => {
+      {visible.map((opt) => {
         const disabled = Boolean(disabledKinds?.[opt.kind])
         return (
           <button

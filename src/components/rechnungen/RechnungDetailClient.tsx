@@ -37,7 +37,6 @@ import {
 import {
   rechnungDarfGeloeschtWerden,
   rechnungDarfImWizardBearbeitetWerden,
-  rechnungWizardBearbeitenSperrgrund,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
@@ -523,14 +522,13 @@ export function RechnungDetailClient({
         disabled: pending,
       }
     }
-    const sperrgrund = rechnungWizardBearbeitenSperrgrund(detail.status)
-    if (sperrgrund) {
+    if (rechnungKorrekturModus(detail.status) === 'storno_neu') {
       return {
-        label: 'Rechnung bearbeiten',
+        label: 'Rechnung korrigieren',
         icon: 'pencil',
-        onClick: () => toast.info(sperrgrund),
-        disabled: true,
-        title: sperrgrund,
+        onClick: handleKorrigieren,
+        disabled: pending,
+        title: 'Storno-Gutschrift + neue Rechnung',
       }
     }
     return null
@@ -974,12 +972,22 @@ export function RechnungDetailClient({
             firm={firm}
             zahlungszielTage={zahlungszielFallback}
             onClose={() => {
+              const neuId = wizardBootstrap.rechnungId
               setWizardOpen(false)
               setWizardBootstrap(null)
+              if (neuId && neuId !== detail.id) {
+                router.replace(`/rechnungen/${neuId}`)
+                return
+              }
+              refresh()
             }}
-            onDone={() => {
+            onDone={(id) => {
               setWizardOpen(false)
               setWizardBootstrap(null)
+              if (id && id !== detail.id) {
+                router.replace(`/rechnungen/${id}`)
+                return
+              }
               refresh()
             }}
           />

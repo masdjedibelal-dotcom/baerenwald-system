@@ -56,13 +56,14 @@ export function LeistungDrawer({
       <div className="flex items-center gap-2">
         {actions.map((a) => {
           const isZuweisen = a.id === 'zuweisen'
+          const isAbwaehlen = a.id === 'abwaehlen'
           const label = isZuweisen ? 'Zuweisen' : a.label
-          if (isZuweisen) {
+          if (isZuweisen || isAbwaehlen) {
             return (
               <button
                 key={a.id}
                 type="button"
-                className="btn primary sm"
+                className={isAbwaehlen ? 'btn secondary sm' : 'btn primary sm'}
                 disabled={a.disabled}
                 aria-label={label}
                 onClick={() => {

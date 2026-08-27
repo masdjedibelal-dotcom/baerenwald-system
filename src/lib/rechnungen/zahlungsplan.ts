@@ -93,6 +93,53 @@ export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): Zah
   }
 }
 
+function titelSiehtAusWieSchluss(titel: string): boolean {
+  const t = titel.trim().toLowerCase()
+  return t === 'schlussrechnung' || t.startsWith('schluss')
+}
+
+/** Index der Schluss-Zeile: typ rest, sonst letzte Zeile. */
+export function abschlagsplanSchlussIndex(plan: Zahlungsplan): number {
+  const restIdx = plan.zeilen.findIndex((z) => z.typ === 'rest')
+  if (restIdx >= 0) return restIdx
+  return Math.max(0, plan.zeilen.length - 1)
+}
+
+/**
+ * Nach Plan-Änderung: letzte Rate = Schlussrechnung, frühere „Schlussrechnung“-Titel → Abschlag N.
+ * Beträge/Typen bleiben (außer fälschlichem rest in der Mitte → prozent).
+ */
+export function normalizeAbschlagsplanSchluss(plan: Zahlungsplan): Zahlungsplan {
+  if (!plan.zeilen.length) return plan
+  const schlussIdx = abschlagsplanSchlussIndex(plan)
+  let abschlagNr = 0
+  const zeilen = plan.zeilen.map((z, i) => {
+    const istSchluss = i === schlussIdx
+    if (istSchluss) {
+      return {
+        ...z,
+        titel: titelSiehtAusWieSchluss(z.titel) || !z.titel.trim() ? 'Schlussrechnung' : z.titel.trim(),
+      }
+    }
+    abschlagNr += 1
+    const titel = z.titel.trim()
+    if (titelSiehtAusWieSchluss(titel) || !titel) {
+      return {
+        ...z,
+        typ: z.typ === 'rest' ? 'prozent' : z.typ,
+        titel: abschlagNr === 1 ? 'Anzahlung' : `${abschlagNr}. Abschlag`,
+        wert: z.typ === 'rest' ? 0 : z.wert,
+      }
+    }
+    if (z.typ === 'rest') {
+      // Nur eine Rest-Zeile — mittlere rest → prozent behalten Betrag 0 bis User setzt
+      return { ...z, typ: 'prozent' as const, wert: Number(z.wert) || 0 }
+    }
+    return z
+  })
+  return { ...plan, modus: 'abschlagsplan', zeilen }
+}
+
 function plusDaysIso(days: number): string {
   const d = new Date()
   d.setHours(12, 0, 0, 0)

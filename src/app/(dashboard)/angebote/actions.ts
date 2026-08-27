@@ -27,6 +27,7 @@ import { formatDatumDeFromIso, projektOderStatusLink } from '@/lib/mail/versand-
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import {
   angebotDarfImWizardBearbeitetWerden,
+  angebotStatusErlaubtImWizard,
   defaultAngebotZahlungsbedingungen,
   resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
@@ -605,7 +606,7 @@ export async function updateAngebotProjektFelder(
 export async function updateAngebot(
   angebotId: string,
   input: Omit<CreateAngebotInput, 'lead_id'> & { lead_id: string | null },
-  opts?: { asSystem?: boolean }
+  opts?: { asSystem?: boolean; /** Auftrags-Korrektur: angenommenes Angebot darf Positionen ändern */ forAuftragKorrektur?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const user = opts?.asSystem
@@ -620,7 +621,7 @@ export async function updateAngebot(
     .maybeSingle()
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
-  if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
+  if (!angebotStatusErlaubtImWizard(current.status, opts)) {
     return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
   }
 

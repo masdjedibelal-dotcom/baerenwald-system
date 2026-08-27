@@ -449,13 +449,17 @@ export function PosTable({
   ust,
   brutto,
   disabledAddKinds,
+  /** Unter Gewerk-Plus: nur diese Kinds (Komplex: Freitext + Nachlass) */
+  gewerkAddKinds,
+  /** Dokument-Toolbar unter den Gruppen (Komplex: Position/Freitext/Nachlass ohne Gewerk) */
+  documentAddKinds,
   /** Mobil: keine Inline-Add-Row/Gewerk-+ — ein zentraler Plus-Button außen */
   unifiedAdd = false,
 }: {
   groups: PosTableGroup[]
   /** @deprecated Prefer onAddKind — kept for per-group fallback */
   onAddItem?: (group: PosTableGroup) => void
-  /** 4 Optionen; optional mit Ziel-Gewerk (bei Plus pro Gruppe) */
+  /** Optionen; optional mit Ziel-Gewerk (bei Plus pro Gruppe) */
   onAddKind?: (kind: PosAddKind, gewerk?: string) => void
   onAddGroup?: () => void
   groupActions?: (group: PosTableGroup) => EntityMenuItem[]
@@ -477,6 +481,8 @@ export function PosTable({
   ust?: number
   brutto?: number
   disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
+  gewerkAddKinds?: PosAddKind[]
+  documentAddKinds?: PosAddKind[]
   unifiedAdd?: boolean
 }) {
   const isMobile = useIsMobile()
@@ -606,6 +612,7 @@ export function PosTable({
             {addOpen && !unifiedAdd ? (
               <div className="pt2-gewerk-add-panel">
                 <PosAddRow
+                  kinds={gewerkAddKinds}
                   onAdd={(kind) => {
                     onAddKind?.(kind, g.gewerk)
                     setAddOpenFor(null)
@@ -684,9 +691,18 @@ export function PosTable({
           </div>
         )
       })}
-      {onAddKind && !hasGroups && !unifiedAdd ? (
+      {onAddKind && !hasGroups && !unifiedAdd && !documentAddKinds ? (
         <div style={{ padding: '12px 0 4px' }}>
           <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
+        </div>
+      ) : null}
+      {onAddKind && documentAddKinds && !unifiedAdd ? (
+        <div style={{ padding: '12px 0 4px' }}>
+          <PosAddRow
+            kinds={documentAddKinds}
+            onAdd={(kind) => onAddKind(kind)}
+            disabledKinds={disabledAddKinds}
+          />
         </div>
       ) : null}
       {onAddGroup && !unifiedAdd ? (

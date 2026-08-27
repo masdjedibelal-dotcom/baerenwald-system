@@ -24,10 +24,14 @@ function funnelFotoCount(funnelDaten: unknown): number {
 
 /**
  * Internes Team: BW soll handeln (nach HV-Freigabe „Angebot erstellen“,
- * oder sofort bei Akut-Direktauftrag).
+ * oder sofort bei Akut-Direktauftrag, oder nach Hausmeister-Vorbefund).
  */
 export async function notifyInterneNeueMeldung(
-  leadId: string
+  leadId: string,
+  opts?: {
+    quelle?: 'hm_befund'
+    ergebnis?: 'fachfirma_angebot' | 'fachfirma_akut'
+  }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = leadId?.trim()
   if (!id) return { ok: false, message: 'Lead-ID fehlt.' }
@@ -73,7 +77,11 @@ export async function notifyInterneNeueMeldung(
     typeof row.funnel_daten === 'object' &&
     !Array.isArray(row.funnel_daten) &&
     (row.funnel_daten as { direktauftrag?: unknown }).direktauftrag === true
-  const istAkut = bypass === 'akut' || funnelDirekt === true
+  const vonHm = opts?.quelle === 'hm_befund'
+  const istAkut =
+    opts?.ergebnis === 'fachfirma_akut' ||
+    bypass === 'akut' ||
+    funnelDirekt === true
   const hvStatus = String(row.hv_meldung_status ?? '').trim().toLowerCase()
 
   const branding = await getMailBranding(supabaseAdmin)
@@ -97,12 +105,22 @@ export async function notifyInterneNeueMeldung(
     branding
   )
 
-  const pushTitle = istAkut ? 'Akut — Direkt beauftragen' : 'Angebot erstellen'
-  const pushBody = istAkut
-    ? `${melderName} · ${objektTitel} — Sofortmaßnahme, Direktauftrag möglich.`
-    : hvStatus === 'angebot_eingefordert' || hvStatus === 'kleinreparatur'
-      ? `${melderName} · ${objektTitel} — HV hat freigegeben.`
-      : `${melderName} · ${objektTitel}`
+  const pushTitle = vonHm
+    ? istAkut
+      ? 'HM-Vorbefund — Akut'
+      : 'HM-Vorbefund — Angebot erstellen'
+    : istAkut
+      ? 'Akut — Direkt beauftragen'
+      : 'Angebot erstellen'
+  const pushBody = vonHm
+    ? istAkut
+      ? `${melderName} · ${objektTitel} — Hausmeister meldet Soforteinsatz.`
+      : `${melderName} · ${objektTitel} — Hausmeister-Vorbefund liegt vor.`
+    : istAkut
+      ? `${melderName} · ${objektTitel} — Sofortmaßnahme, Direktauftrag möglich.`
+      : hvStatus === 'angebot_eingefordert' || hvStatus === 'kleinreparatur'
+        ? `${melderName} · ${objektTitel} — HV hat freigegeben.`
+        : `${melderName} · ${objektTitel}`
   const subject = `${pushTitle} — ${objektTitel}`
 
   await sendInternNotifyEmail({
@@ -112,11 +130,11 @@ export async function notifyInterneNeueMeldung(
 
   // Best-effort Push (kein Mail): Fire-and-forget bewusst — Glocke/Mail sind die Quelle der Wahrheit.
   void sendCrmPushToStaff({
-    typ: 'neue_anfrage',
+    typ: vonHm ? 'hm_befund_freigabe' : 'neue_anfrage',
     title: pushTitle,
     body: pushBody,
     url: `/anfragen/${id}`,
-    tag: `org-meldung-${id}`,
+    tag: vonHm ? `hm-befund-${id}` : `org-meldung-${id}`,
   }).catch((e) => console.warn('[notifyInterneNeueMeldung] push', e))
 
   return { ok: true }

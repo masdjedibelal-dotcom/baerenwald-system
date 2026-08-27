@@ -4910,12 +4910,12 @@ select.sel option {
   z-index: 150;
   animation: menupop 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-/* Portaliert auf document.body — über DocumentCanvas (400), unter Modal (500) */
+/* Portaliert auf document.body — über DocumentCanvas (400) und EditorSheets (500) */
 .menu.menu--portal {
   position: fixed;
   top: auto;
   right: auto;
-  z-index: 450;
+  z-index: 620;
 }
 
 .menu-item {

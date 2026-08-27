@@ -77,7 +77,8 @@ import {
   parseZahlungsplan,
   zahlplanAbgerechnetAusLinks,
 } from '@/lib/rechnungen/zahlungsplan'
-import { sendRechnung, updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
+import { sendRechnung, updateRechnungStatus, korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
+import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -918,7 +919,29 @@ export function AuftragDetailClient({
         const { loadRechnungWizardBootstrap } = await import(
           '@/app/(dashboard)/rechnungen/wizard-actions'
         )
-        const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
+        const row = rechnungenListe.find((r) => r.id === rechnungId)
+        const status = row?.status
+        const modus = status
+          ? rechnungKorrekturModus(status)
+          : ('direkt' as const) // unbekannter Status → Entwurf-Load versuchen
+
+        let targetId = rechnungId
+        if (modus === 'storno_neu') {
+          const korr = await korrigiereRechnung(rechnungId)
+          if (!korr.ok) {
+            toast.error(korr.message)
+            return
+          }
+          if (korr.mode === 'storno_neu') {
+            targetId = korr.neuId
+            toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+          }
+        } else if (modus === 'gesperrt') {
+          toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+          return
+        }
+
+        const res = await loadRechnungWizardBootstrap(targetId, detail.id)
         if (!res.ok) {
           toast.error(res.message)
           return
@@ -926,7 +949,7 @@ export function AuftragDetailClient({
         openRechnungWizard(res.bootstrap)
       })
     },
-    [detail.id, openRechnungWizard]
+    [detail.id, openRechnungWizard, rechnungenListe]
   )
 
   const versendeNaechsteRechnung = useCallback(

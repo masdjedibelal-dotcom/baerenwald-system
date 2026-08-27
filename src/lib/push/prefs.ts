@@ -73,6 +73,7 @@ export function pushPrefKeyForNotificationTyp(
 ): CrmPushPrefKey | null {
   switch (typ) {
     case 'neue_anfrage':
+    case 'hm_befund_freigabe':
       return 'neue_anfragen'
     case 'handwerker_update':
     case 'handwerker_angenommen':

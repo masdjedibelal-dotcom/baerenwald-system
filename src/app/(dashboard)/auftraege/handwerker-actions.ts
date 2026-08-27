@@ -452,6 +452,131 @@ export async function assignAuftragHandwerkerPosition(input: {
   return { ok: true }
 }
 
+/**
+ * Zuweisung einer oder mehrerer Auftragspositionen zurückziehen.
+ * Partner sieht die Leistung danach nicht mehr (Filter über handwerker_id).
+ */
+export async function clearAuftragHandwerkerPositionen(input: {
+  auftragId: string
+  positionIds: string[]
+}): Promise<{ ok: true; cleared: number } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+
+  const supabase = gate.db
+  const auftragId = input.auftragId.trim()
+  const positionIds = [
+    ...new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)),
+  ]
+  if (!auftragId || !positionIds.length) {
+    return { ok: false, message: 'Auftrag oder Position fehlt.' }
+  }
+
+  const { data: auftrag, error: aErr } = await supabase
+    .from('auftraege')
+    .select('id, status, angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
+  if (String(auftrag.status ?? '') === 'storniert') {
+    return { ok: false, message: 'Stornierte Aufträge können nicht geändert werden.' }
+  }
+
+  const { data: positions, error: pErr } = await supabase
+    .from('auftrag_positionen')
+    .select(
+      'id, auftrag_id, handwerker_id, gewerk_slug, gewerk_name, leistung_name, handwerker(name)'
+    )
+    .eq('auftrag_id', auftragId)
+    .in('id', positionIds)
+
+  if (pErr) return { ok: false, message: pErr.message }
+  const rows = positions ?? []
+  if (!rows.length) return { ok: false, message: 'Positionen nicht gefunden.' }
+
+  const assigned = rows.filter((r) => String(r.handwerker_id ?? '').trim())
+  if (!assigned.length) {
+    return { ok: false, message: 'Keine Zuweisung zum Zurückziehen.' }
+  }
+
+  const { error: upErr } = await supabase
+    .from('auftrag_positionen')
+    .update({
+      handwerker_id: null,
+      handwerker_status: null,
+      handwerker_angefragt_at: null,
+    })
+    .eq('auftrag_id', auftragId)
+    .in(
+      'id',
+      assigned.map((r) => String(r.id))
+    )
+
+  if (upErr) return { ok: false, message: upErr.message }
+
+  // auftrag_handwerker aufräumen, wenn keine Positionen mehr für HW+Gewerk
+  const touched = new Map<string, { handwerkerId: string; gewerkSlug: string | null }>()
+  for (const r of assigned) {
+    const hwId = String(r.handwerker_id ?? '').trim()
+    if (!hwId) continue
+    const slug = (r.gewerk_slug as string | null)?.trim() || null
+    touched.set(`${hwId}::${slug ?? ''}`, { handwerkerId: hwId, gewerkSlug: slug })
+  }
+
+  for (const { handwerkerId, gewerkSlug } of Array.from(touched.values())) {
+    let restQ = supabase
+      .from('auftrag_positionen')
+      .select('id')
+      .eq('auftrag_id', auftragId)
+      .eq('handwerker_id', handwerkerId)
+      .limit(1)
+    if (gewerkSlug) restQ = restQ.eq('gewerk_slug', gewerkSlug)
+    const { data: rest } = await restQ
+    if ((rest ?? []).length > 0) continue
+
+    if (gewerkSlug) {
+      const { data: gw } = await supabase
+        .from('gewerke')
+        .select('id')
+        .eq('slug', gewerkSlug)
+        .maybeSingle()
+      if (gw?.id) {
+        await supabase
+          .from('auftrag_handwerker')
+          .delete()
+          .eq('auftrag_id', auftragId)
+          .eq('handwerker_id', handwerkerId)
+          .eq('gewerk_id', gw.id)
+      }
+    } else {
+      await supabase
+        .from('auftrag_handwerker')
+        .delete()
+        .eq('auftrag_id', auftragId)
+        .eq('handwerker_id', handwerkerId)
+    }
+  }
+
+  const names = assigned.map((r) => {
+    const hw = Array.isArray(r.handwerker) ? r.handwerker[0] : r.handwerker
+    const hwName = (hw as { name?: string } | null)?.name?.trim() || 'Partner'
+    return `${r.leistung_name ?? 'Leistung'} ← ${hwName}`
+  })
+  await logHwTimeline(
+    auftragId,
+    assigned.length === 1 ? 'Zuweisung zurückgezogen' : 'Zuweisungen zurückgezogen',
+    names.join('; '),
+    String(assigned[0]?.handwerker_id ?? '') || null
+  )
+
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+  const angebotId = String(auftrag.angebot_id ?? '').trim()
+  if (angebotId) revalidatePath(`/angebote/${angebotId}`)
+
+  return { ok: true, cleared: assigned.length }
+}
+
 /** TC-11d: Partner hat abgelehnt → anderen Partner zuweisen und erneut anfragen. */
 export async function replaceAuftragHandwerkerUndSenden(input: {
   auftragId: string

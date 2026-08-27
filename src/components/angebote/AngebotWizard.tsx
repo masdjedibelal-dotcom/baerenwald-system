@@ -21,10 +21,9 @@ import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { Check, FileText } from 'lucide-react'
+import { Check, FileText, Send } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
@@ -732,7 +731,8 @@ export function AngebotWizard({
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
       }
-      const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
+      const titelOk =
+        meta.titel.trim() || meta.leistungsumfang.trim() || projekt.trim()
       if (!titelOk) {
         toast.error('Bitte einen Angebotstitel angeben.')
         return null
@@ -747,19 +747,19 @@ export function AngebotWizard({
         return null
       }
 
-      const leadId = await ensureLeadId()
-      if (!leadId) return null
-
-      const metaPersist: AngebotWizardMeta = {
-        ...meta,
-        ...angebotMetaPatchFromZahlfrist(zahlfristSeg, zahlfristDatum),
-        leistungsumfang: meta.leistungsumfang.trim() || meta.titel.trim() || projekt,
-        mit_anfahrt: mitAnfahrt,
-      }
-
       const manageBusy = opts?.manageBusy !== false
       if (manageBusy) setSaving(true)
       try {
+        const leadId = await ensureLeadId()
+        if (!leadId) return null
+
+        const metaPersist: AngebotWizardMeta = {
+          ...meta,
+          ...angebotMetaPatchFromZahlfrist(zahlfristSeg, zahlfristDatum),
+          leistungsumfang: meta.leistungsumfang.trim() || meta.titel.trim() || projekt,
+          mit_anfahrt: mitAnfahrt,
+        }
+
         const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
         const res = await saveAngebotWizardDraft({
           angebotId,
@@ -842,8 +842,13 @@ export function AngebotWizard({
         return res.angebotId
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
-        if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
-          await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
+        if (
+          deferredLeadCreate &&
+          sessionCreatedLeadRef.current &&
+          !angebotId
+        ) {
+          const orphan = sessionCreatedLeadRef.current
+          await discardOrphanDirektAngebotLead(orphan).catch(() => undefined)
           sessionCreatedLeadRef.current = null
           setLeadState((prev) => ({ ...prev, id: '' }))
         }
@@ -1100,37 +1105,29 @@ export function AngebotWizard({
       >
         <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
       </button>
-      <ActionsMenu
-        sheetTitle="Angebot"
-        align="right"
-        trigger={
-          <span
-            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Als Entwurf speichern oder senden"
-            title="Als Entwurf speichern oder senden"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </span>
-        }
-        items={[
-          {
-            label: saving ? 'Speichern…' : 'Als Entwurf speichern',
-            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinishSpeichern()
-            },
-          },
-          {
-            label: saving ? 'E-Mail…' : 'E-Mail senden',
-            icon: <MockIcon ctx="btn" n="send" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinishVersenden()
-            },
-          },
-        ]}
-      />
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={() => void handleFinishVersenden()}
+        aria-label="E-Mail senden"
+        title="E-Mail senden"
+      >
+        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+        disabled={saving}
+        onClick={() => {
+          if (saving) return
+          void handleFinishSpeichern()
+        }}
+        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+      >
+        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
     </>
   )
 
