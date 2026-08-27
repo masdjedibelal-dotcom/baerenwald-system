@@ -70,6 +70,10 @@ export function ObjektAkteDetailClient({
   const jahr = new Date().getFullYear()
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
   const [objektState, setObjektState] = useState(objekt)
+  const [legalUrls, setLegalUrls] = useState({
+    impressum_url: kunde.impressum_url ?? null,
+    datenschutz_url: kunde.datenschutz_url ?? null,
+  })
 
   useEffect(() => {
     setFreigabeErben(objektErbtFreigabe(objekt))
@@ -78,6 +82,13 @@ export function ObjektAkteDetailClient({
   useEffect(() => {
     setObjektState(objekt)
   }, [objekt])
+
+  useEffect(() => {
+    setLegalUrls({
+      impressum_url: kunde.impressum_url ?? null,
+      datenschutz_url: kunde.datenschutz_url ?? null,
+    })
+  }, [kunde.id, kunde.impressum_url, kunde.datenschutz_url])
 
   const orgSlug = kunde.org_kennung?.trim().toLowerCase() || null
   const objektMeldeSlug = objektState.melde_slug?.trim() || null
@@ -184,12 +195,13 @@ export function ObjektAkteDetailClient({
 
       {zeigtMeldeLinks && orgSlug && objektMeldeSlug ? (
         <MeldeLinksCard
+          kundeId={kunde.id}
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
           aushangPdfHref={`/api/objekte/${objektState.id}/aushang-pdf`}
-          impressumUrl={kunde.impressum_url}
-          datenschutzUrl={kunde.datenschutz_url}
-          organisationHref={`/kunden/${kunde.id}?tab=organisation`}
+          impressumUrl={legalUrls.impressum_url}
+          datenschutzUrl={legalUrls.datenschutz_url}
+          onSaved={(next) => setLegalUrls(next)}
         />
       ) : null}
 

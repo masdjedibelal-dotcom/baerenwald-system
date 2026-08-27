@@ -494,11 +494,18 @@ export function KundeDetailClient({
       />
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
+          kundeId={kunde.id}
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
           aushangPdfHref={`/api/kunden/${kunde.id}/aushang-pdf`}
           impressumUrl={kunde.impressum_url}
           datenschutzUrl={kunde.datenschutz_url}
-          organisationHref={`/kunden/${kunde.id}?tab=organisation`}
+          onSaved={(next) => {
+            setKunde((prev) => ({
+              ...prev,
+              impressum_url: next.impressum_url,
+              datenschutz_url: next.datenschutz_url,
+            }))
+          }}
         />
       ) : null}
       {zeigtOrganisationTab ? (

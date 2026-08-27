@@ -147,6 +147,56 @@ export async function saveKundeOrganisation(
   return { ok: true }
 }
 
+/** Nur Impressum-/Datenschutz-URLs (HV-Übersicht Links-Card). */
+export async function saveKundeMeldeLegalUrls(
+  kundeId: string,
+  input: {
+    impressum_url: string | null
+    datenschutz_url: string | null
+  }
+): Promise<
+  | { ok: true; impressum_url: string | null; datenschutz_url: string | null }
+  | { ok: false; message: string }
+> {
+  const id = kundeId?.trim()
+  if (!id) return { ok: false, message: 'Kunde fehlt.' }
+
+  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('typ').eq('id', id).maybeSingle()
+  )
+  if (kundeErr) return { ok: false, message: kundeErr.message }
+  if (!istKundeHausverwaltungTyp((kundeRow as { typ?: string } | null)?.typ)) {
+    return { ok: false, message: 'Legal-Links nur für Hausverwaltung.' }
+  }
+
+  const impressumRaw = input.impressum_url?.trim() || ''
+  const datenschutzRaw = input.datenschutz_url?.trim() || ''
+  const impressumUrl = impressumRaw ? normalizeOrgHttpUrl(impressumRaw) : null
+  const datenschutzUrl = datenschutzRaw ? normalizeOrgHttpUrl(datenschutzRaw) : null
+
+  if (impressumRaw && !impressumUrl) {
+    return { ok: false, message: 'Impressum-URL ungültig (z. B. www.firma.de/impressum).' }
+  }
+  if (datenschutzRaw && !datenschutzUrl) {
+    return { ok: false, message: 'Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).' }
+  }
+
+  const { error } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .update({
+        impressum_url: impressumUrl,
+        datenschutz_url: datenschutzUrl,
+      })
+      .eq('id', id)
+  )
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true, impressum_url: impressumUrl, datenschutz_url: datenschutzUrl }
+}
+
 /** Nur Freigabe-Regeln (HV-Übersicht) — ohne Org-Kennung/Logo. */
 export async function saveKundeFreigabeRegeln(
   kundeId: string,
