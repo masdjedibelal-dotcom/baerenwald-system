@@ -1,28 +1,43 @@
 import type { BrandLogoVariant } from '@/lib/brand'
 
-/** Content-IDs für eingebettete Logos (Resend CID — wie lokales Asset im Portal). */
+/**
+ * Mail-Logos als HTTPS auf baerenwaldmuenchen.de — kein CID-Anhang.
+ * Apple Mail zeigt CID oft als Büroklammer + kaputtes Bild.
+ */
+
+export const MAIL_LOGO_HOST = 'https://baerenwaldmuenchen.de'
+export const MAIL_LOGO_URL_GREEN = `${MAIL_LOGO_HOST}/mail-logo-green.png`
+export const MAIL_LOGO_URL_WHITE = `${MAIL_LOGO_HOST}/mail-logo-white.png`
+
+/** @deprecated früher CID */
 export const MAIL_LOGO_CID_GREEN = 'baerenwald-logo-green'
+/** @deprecated */
 export const MAIL_LOGO_CID_WHITE = 'baerenwald-logo-white'
 
 /**
- * Logo als CID-Anhang (unabhängig von Website/CRM-URL).
- * Abschalten nur mit MAIL_LOGO_INLINE=false.
+ * CID-Anhänge nur wenn explizit MAIL_LOGO_INLINE=true (Debug).
+ * Default: aus — gehostete URLs.
  */
 export function mailLogoInlineEnabled(): boolean {
-  return process.env.MAIL_LOGO_INLINE !== 'false'
+  return process.env.MAIL_LOGO_INLINE === 'true'
 }
 
-/** Remote-Logo-URLs (auch localhost / CRM-Host) auf cid: umbiegen. */
-export function rewriteMailLogoUrlsToCid(html: string): string {
+/** Alle Logo-src → stabile HTTPS-URLs (kein cid:). */
+export function rewriteMailLogoUrlsToHosted(html: string): string {
   return html
     .replace(
       /src=(["'])([^"']*(?:logo-mark-green|mail-logo-green)\.png[^"']*|cid:baerenwald-logo-green)\1/gi,
-      `src=$1cid:${MAIL_LOGO_CID_GREEN}$1`
+      `src=$1${MAIL_LOGO_URL_GREEN}$1`
     )
     .replace(
       /src=(["'])([^"']*(?:logo-mark-white|mail-logo-white)\.png[^"']*|cid:baerenwald-logo-white)\1/gi,
-      `src=$1cid:${MAIL_LOGO_CID_WHITE}$1`
+      `src=$1${MAIL_LOGO_URL_WHITE}$1`
     )
+}
+
+/** @deprecated — schreibt auf Hosted-URLs, nicht mehr CID */
+export function rewriteMailLogoUrlsToCid(html: string): string {
+  return rewriteMailLogoUrlsToHosted(html)
 }
 
 export function mailLogoCid(variant: BrandLogoVariant): string {
@@ -30,5 +45,6 @@ export function mailLogoCid(variant: BrandLogoVariant): string {
 }
 
 export function mailLogoCidSrc(variant: BrandLogoVariant): string {
-  return `cid:${mailLogoCid(variant)}`
+  // Templates sollen HTTPS nutzen, nicht cid:
+  return variant === 'white' ? MAIL_LOGO_URL_WHITE : MAIL_LOGO_URL_GREEN
 }

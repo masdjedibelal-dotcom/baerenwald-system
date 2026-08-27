@@ -1,11 +1,8 @@
 import { Resend } from 'resend'
 import { cache } from 'react'
 import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
-import { mailLogoInlineEnabled, rewriteMailLogoUrlsToCid } from '@/lib/mail/mail-logo-inline'
-import {
-  inlineLogoAttachmentsForHtml,
-  type MailInlineLogoAttachment,
-} from '@/lib/mail/mail-logo-inline.server'
+import { rewriteMailLogoUrlsToHosted } from '@/lib/mail/mail-logo-inline'
+import { type MailInlineLogoAttachment } from '@/lib/mail/mail-logo-inline.server'
 import { createClient } from '@/lib/supabase-server'
 import 'server-only'
 
@@ -158,10 +155,9 @@ function mergeAttachments(
 export async function sendMail(
   opts: SendMailOptions
 ): Promise<{ success: boolean; error?: string; resendId?: string | null; emailLogId?: string | null }> {
-  const html = mailLogoInlineEnabled()
-    ? rewriteMailLogoUrlsToCid(opts.html)
-    : opts.html
-  const inlineLogos = mailLogoInlineEnabled() ? inlineLogoAttachmentsForHtml(html) : []
+  // Logos als HTTPS (baerenwaldmuenchen.de) — kein CID-Anhang (Apple-Mail-Büroklammer).
+  const html = rewriteMailLogoUrlsToHosted(opts.html)
+  const inlineLogos: MailInlineLogoAttachment[] = []
 
   if (opts.pdfBuffer && opts.pdfBuffer.byteLength === 0) {
     const msg = 'PDF-Anhang ist leer — Versand abgebrochen'
