@@ -258,27 +258,15 @@ export function ObjektBewohnerSection({
         title={liste.length ? `Bewohner · ${liste.length}` : 'Bewohner'}
         icon="users"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {liste.length > 0 ? (
-              <MockBtn
-                sm
-                kind="ghost"
-                onClick={toggleAll}
-                title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-              >
-                {allSelected ? 'Keine' : 'Alle'}
-              </MockBtn>
-            ) : null}
-            <MockBtn
-              sm
-              kind="primary"
-              icon="plus"
-              onClick={openNeu}
-              disabled={einheiten.length === 0}
-            >
-              Hinzufügen
-            </MockBtn>
-          </div>
+          <MockBtn
+            sm
+            kind="primary"
+            icon="plus"
+            onClick={openNeu}
+            disabled={einheiten.length === 0}
+          >
+            Hinzufügen
+          </MockBtn>
         }
       >
         <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
@@ -290,6 +278,14 @@ export function ObjektBewohnerSection({
             <span className="bulkbar-count">
               <b>{selectedCount}</b> ausgewählt
             </span>
+            <MockBtn
+              kind="ghost"
+              sm
+              onClick={toggleAll}
+              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              {allSelected ? 'Keine' : 'Alle'}
+            </MockBtn>
             <div style={{ flex: 1 }} />
             {selectedCount === 1 ? (
               <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeitenBulk} disabled={pending}>

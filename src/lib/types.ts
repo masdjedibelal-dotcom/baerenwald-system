@@ -111,6 +111,9 @@ export type Kunde = {
   org_kennung?: string | null
   org_anzeigename?: string | null
   org_logo_url?: string | null
+  /** Absolute URL — Pflicht für Melde-Link / QR / Aushang (Mieter). */
+  impressum_url?: string | null
+  datenschutz_url?: string | null
   freigabe_modus?: FreigabeModus | null
   freigabe_schwelle_eur?: number | null
   notfall_direkt?: boolean | null

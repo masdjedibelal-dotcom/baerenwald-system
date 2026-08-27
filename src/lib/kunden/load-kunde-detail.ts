@@ -142,6 +142,7 @@ const KUNDE_DETAIL_SELECT_BASE = `
 
 const KUNDE_ORG_FIELDS = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      impressum_url, datenschutz_url,
       freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
       kleinreparaturen_ohne_angebot,
       ist_spam, spam_markiert_am,
@@ -149,6 +150,7 @@ const KUNDE_ORG_FIELDS = `
 
 const KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      impressum_url, datenschutz_url,
       freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
       ist_spam, spam_markiert_am,
     `

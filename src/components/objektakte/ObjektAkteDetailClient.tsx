@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
@@ -17,6 +17,7 @@ import { ObjektHistorieSection } from '@/components/objektakte/ObjektHistorieSec
 import { ObjektUebersichtKpiCard } from '@/components/objektakte/ObjektUebersichtKpiCard'
 import { VersammlungsberichtDialog } from '@/components/objektakte/VersammlungsberichtDialog'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
@@ -49,6 +50,8 @@ export function ObjektAkteDetailClient({
     | 'vorname'
     | 'nachname'
     | 'org_kennung'
+    | 'impressum_url'
+    | 'datenschutz_url'
     | 'freigabe_schwelle_eur'
     | 'notfall_direkt'
   >
@@ -63,6 +66,7 @@ export function ObjektAkteDetailClient({
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
   const [berichtOpen, setBerichtOpen] = useState(false)
+  const [objektModalOpen, setObjektModalOpen] = useState(false)
   const jahr = new Date().getFullYear()
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
   const [objektState, setObjektState] = useState(objekt)
@@ -140,6 +144,13 @@ export function ObjektAkteDetailClient({
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Objektdaten</div>
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="pencil"
+            title="Objektdaten bearbeiten"
+            onClick={() => setObjektModalOpen(true)}
+          />
         </div>
         <div className="card-b">
           <div className="vgid">
@@ -176,6 +187,9 @@ export function ObjektAkteDetailClient({
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
           aushangPdfHref={`/api/objekte/${objektState.id}/aushang-pdf`}
+          impressumUrl={kunde.impressum_url}
+          datenschutzUrl={kunde.datenschutz_url}
+          organisationHref={`/kunden/${kunde.id}?tab=organisation`}
         />
       ) : null}
 
@@ -243,6 +257,8 @@ export function ObjektAkteDetailClient({
           objektId={objektState.id}
           einheiten={akte.einheiten}
           bewohner={akte.bewohner}
+          verwaltungName={kunde.name}
+          objektLabel={objektState.titel}
           onChanged={refresh}
         />
       ),
@@ -326,6 +342,18 @@ export function ObjektAkteDetailClient({
         onClose={() => setBerichtOpen(false)}
         objektId={objektState.id}
         kundeId={kunde.id}
+      />
+      <KundenObjektModal
+        open={objektModalOpen}
+        onClose={() => setObjektModalOpen(false)}
+        kundeId={kunde.id}
+        verwaltungName={kunde.name}
+        editObjekt={objektState}
+        onSaved={(saved) => {
+          setObjektState(saved)
+          setObjektModalOpen(false)
+          refresh()
+        }}
       />
     </EntityDetailLayout>
   )

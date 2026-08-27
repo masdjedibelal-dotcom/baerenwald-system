@@ -36,7 +36,12 @@ async function loadObjektAnlagen(
 ): Promise<ObjektAnlage[]> {
   const fullSelect =
     '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
-  const basicSelect = 'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+  const fullSelectNoEtage =
+    '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
+  const basicSelect =
+    'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+  const basicSelectNoEtage =
+    'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
 
   let res = await supabase
     .from('objekt_anlagen')
@@ -46,6 +51,16 @@ async function loadObjektAnlagen(
     .order('sort_order', { ascending: true })
     .order('bezeichnung', { ascending: true })
 
+  if (res.error && /etage/i.test(res.error.message)) {
+    res = await supabase
+      .from('objekt_anlagen')
+      .select(fullSelectNoEtage)
+      .eq('kunde_id', kundeId)
+      .eq('kunde_objekt_id', objektId)
+      .order('sort_order', { ascending: true })
+      .order('bezeichnung', { ascending: true })
+  }
+
   if (res.error && /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|does not exist|Could not find/i.test(res.error.message)) {
     res = await supabase
       .from('objekt_anlagen')
@@ -54,6 +69,15 @@ async function loadObjektAnlagen(
       .eq('kunde_objekt_id', objektId)
       .order('sort_order', { ascending: true })
       .order('bezeichnung', { ascending: true })
+    if (res.error && /etage/i.test(res.error.message)) {
+      res = await supabase
+        .from('objekt_anlagen')
+        .select(basicSelectNoEtage)
+        .eq('kunde_id', kundeId)
+        .eq('kunde_objekt_id', objektId)
+        .order('sort_order', { ascending: true })
+        .order('bezeichnung', { ascending: true })
+    }
   }
 
   if (res.error) {

@@ -27,7 +27,7 @@ export default async function KundeDetailPage({ params }: { params: Promise<{ id
     getCustomFields('kunde'),
     getCustomValues(id),
     istKundeGewerbeTyp(kunde.typ) ? fetchKundenObjekte(id) : Promise.resolve([]),
-    loadVorgaengeListe(),
+    loadVorgaengeListe({ kundeId: id }),
     loadBewohnerLinksForPrivatkunde(id),
   ])
 

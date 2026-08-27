@@ -124,6 +124,19 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
   rows: VorgangListeRow[]
   error: string | null
 }> {
+  try {
+    return await loadVorgaengeListeInner(opts)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Vorgänge konnten nicht geladen werden.'
+    console.error('loadVorgaengeListe', e)
+    return { rows: [], error: msg }
+  }
+}
+
+async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
+  rows: VorgangListeRow[]
+  error: string | null
+}> {
   const supabase = createClient()
   const {
     data: { user },

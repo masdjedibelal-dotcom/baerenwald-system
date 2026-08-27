@@ -2,8 +2,9 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { showRouteBusy } from '@/components/ui/action-busy'
 import { leadStubFromKunde } from '@/lib/angebote/lead-stub-from-kunde'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, Handwerker, Kunde, Preisliste } from '@/lib/types'
@@ -37,17 +38,32 @@ export function AngebotNeuFromKundeClient({
   const [open, setOpen] = useState(true)
   const initialLead = useMemo(() => leadStubFromKunde(kunde), [kunde])
   const [sessionKey] = useState(0)
+  /** onDone + onClose feuern oft nacheinander — nur einmal navigieren. */
+  const leaveLock = useRef(false)
 
   const leave = useCallback(
     (angebotId?: string) => {
+      if (leaveLock.current) return
+      leaveLock.current = true
       setOpen(false)
-      if (angebotId) {
-        router.replace(`/angebote/${angebotId}`)
-        return
-      }
-      router.replace('/vorgaenge?tab=angebot')
+
+      const href = angebotId?.trim()
+        ? `/angebote/${encodeURIComponent(angebotId.trim())}`
+        : `/kunden/${encodeURIComponent(kunde.id)}`
+
+      showRouteBusy(angebotId?.trim() ? 'Angebot wird geöffnet…' : 'Wird geschlossen…')
+      router.replace(href)
+
+      // Soft-Nav kann hängen (schwere Zielseite) — Hard-Fallback
+      const targetPath = href.split('?')[0] ?? href
+      window.setTimeout(() => {
+        if (typeof window === 'undefined') return
+        if (window.location.pathname === targetPath) return
+        if (window.location.pathname.startsWith(`${targetPath}/`)) return
+        window.location.assign(href)
+      }, 4000)
     },
-    [router]
+    [router, kunde.id]
   )
 
   if (!open) {

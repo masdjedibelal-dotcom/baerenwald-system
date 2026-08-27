@@ -13,31 +13,44 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function VorgaengePage() {
-  const supabase = createClient()
-  const [{ rows, error }, hw] = await Promise.all([
-    loadVorgaengeListe(),
-    loadHwEingangsrechnungen(supabase),
-  ])
+  try {
+    const supabase = createClient()
+    const [{ rows, error }, hw] = await Promise.all([
+      loadVorgaengeListe(),
+      loadHwEingangsrechnungen(supabase),
+    ])
 
-  if (error) {
-    const isSession = /sitzung|anmelden|session|auth/i.test(error)
+    if (error) {
+      const isSession = /sitzung|anmelden|session|auth/i.test(error)
+      return (
+        <div className="space-y-3 p-6 text-sm">
+          <p className="text-red-700">
+            Vorgänge konnten nicht geladen werden: {error}
+          </p>
+          {isSession ? (
+            <a href="/login?error=session" className="text-bw-link underline">
+              Zur Anmeldung
+            </a>
+          ) : null}
+        </div>
+      )
+    }
+
+    return (
+      <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
+        <VorgaengeListeClient rows={rows} hwEingangsrechnungen={hw.rows} />
+      </Suspense>
+    )
+  } catch (e) {
+    console.error('VorgaengePage', e)
+    const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
     return (
       <div className="space-y-3 p-6 text-sm">
-        <p className="text-red-700">
-          Vorgänge konnten nicht geladen werden: {error}
-        </p>
-        {isSession ? (
-          <a href="/login?error=session" className="text-bw-link underline">
-            Zur Anmeldung
-          </a>
-        ) : null}
+        <p className="text-red-700">Vorgänge konnten nicht geladen werden: {msg}</p>
+        <a href="/" className="text-bw-link underline">
+          Zurück zum Dashboard
+        </a>
       </div>
     )
   }
-
-  return (
-    <Suspense fallback={<CrmInlineLoading label="Vorgänge werden geladen …" />}>
-      <VorgaengeListeClient rows={rows} hwEingangsrechnungen={hw.rows} />
-    </Suspense>
-  )
 }

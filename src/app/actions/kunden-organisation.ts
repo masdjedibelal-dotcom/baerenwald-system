@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
+import { normalizeOrgHttpUrl } from '@/lib/org/melde-legal-urls'
 import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
 import type { FreigabeModus, PortalModus } from '@/lib/types'
 
@@ -11,6 +12,8 @@ export type SaveKundeOrganisationInput = {
   org_kennung?: string | null
   org_anzeigename?: string | null
   org_logo_url?: string | null
+  impressum_url?: string | null
+  datenschutz_url?: string | null
   freigabe_modus: FreigabeModus
   freigabe_schwelle_eur?: number | null
   notfall_direkt: boolean
@@ -73,6 +76,40 @@ export async function saveKundeOrganisation(
   if (!unique.ok) return unique
 
   const freigabeModus: FreigabeModus = input.freigabe_modus === 'direkt' ? 'direkt' : 'freigabe'
+
+  let impressumUrl: string | null | undefined
+  let datenschutzUrl: string | null | undefined
+  if (input.impressum_url !== undefined) {
+    const raw = input.impressum_url?.trim() || ''
+    if (!raw) {
+      impressumUrl = null
+    } else {
+      const n = normalizeOrgHttpUrl(raw)
+      if (!n) {
+        return {
+          ok: false,
+          message: 'Impressum-URL ungültig (z. B. www.firma.de/impressum).',
+        }
+      }
+      impressumUrl = n
+    }
+  }
+  if (input.datenschutz_url !== undefined) {
+    const raw = input.datenschutz_url?.trim() || ''
+    if (!raw) {
+      datenschutzUrl = null
+    } else {
+      const n = normalizeOrgHttpUrl(raw)
+      if (!n) {
+        return {
+          ok: false,
+          message: 'Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).',
+        }
+      }
+      datenschutzUrl = n
+    }
+  }
+
   const payload: Record<string, unknown> = {
     portal_modus: 'organisation',
     org_kennung: slug,
@@ -83,6 +120,8 @@ export async function saveKundeOrganisation(
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
     kleinreparaturen_ohne_angebot: Boolean(input.kleinreparaturen_ohne_angebot),
   }
+  if (impressumUrl !== undefined) payload.impressum_url = impressumUrl
+  if (datenschutzUrl !== undefined) payload.datenschutz_url = datenschutzUrl
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {

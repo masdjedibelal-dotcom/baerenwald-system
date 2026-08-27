@@ -52,7 +52,6 @@ export type PosBoardProps = {
     helpers: {
       onChange: (patch: Partial<PosBoardLine>) => void
       onClose: () => void
-      onRemove: () => void
     }
   ) => ReactNode
   lineOf?: (p: PosBoardLine) => number
@@ -621,7 +620,6 @@ export function PosBoard({
           guardSheetPointerFallthrough()
           setEditId(null)
         },
-        onRemove: () => requestRemove(editP.id),
       }
     : null
 
@@ -794,7 +792,6 @@ export function PosBoard({
                 position={editP}
                 onChange={helpers.onChange}
                 onClose={helpers.onClose}
-                onRemove={editable ? helpers.onRemove : undefined}
                 showUst={showUst}
                 gewerke={gewerkOptions}
               />

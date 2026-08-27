@@ -280,25 +280,13 @@ export function ObjektAnlagenSection({
         title={liste.length ? `Anlagen & Teile · ${liste.length}` : 'Anlagen & Teile'}
         icon="tool"
         actions={
-          <MockBtn sm kind="ghost" icon="plus" onClick={openNeu}>
-            Anlage hinzufügen
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+            Hinzufügen
           </MockBtn>
         }
       >
-        <p
-          className="mb-3 text-[length:var(--fs-meta)] leading-relaxed"
-          style={{ color: 'var(--text-3)' }}
-        >
-          Technische Anlagen und Bauteile am Objekt — z. B. Heizungspumpe, Aufzug, Dachfläche.
-          Vorgänge können später einer Anlage zugeordnet werden.
-        </p>
-
         {liste.length === 0 ? (
-          <MockEmpty
-            icon="tool"
-            title="Noch keine Anlagen"
-            hint="Über „Anlage hinzufügen“ das Register starten."
-          />
+          <MockEmpty icon="tool" title="Noch keine Anlagen" />
         ) : isMobile ? (
           <div className="ap-cards">{liste.map(rowBody)}</div>
         ) : (

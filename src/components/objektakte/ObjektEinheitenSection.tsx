@@ -13,15 +13,19 @@ import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
+  assignExistingEigentuemerToEinheit,
+  checkPortalEmailRegistered,
   createEinheitBewohner,
   createObjektEinheit,
   createPrivatkundeFromBewohner,
   deleteEinheitBewohner,
   deleteObjektEinheit,
+  inviteEinheitBewohnerPortal,
   linkPrivatkundeToBewohner,
   updateEinheitBewohner,
   updateObjektEinheit,
 } from '@/app/actions/objektakte-actions'
+import { Select } from '@/components/ui/Select'
 import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import type {
@@ -34,11 +38,34 @@ import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 const PERSON_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 44px'
+const EINHEIT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1fr) 44px'
 
 type PersonForm = {
   einheitId: string
   rolle: EinheitBewohnerRolle
   edit: EinheitBewohner | null
+}
+
+type ObjektEigentuemerOption = {
+  sourceBewohnerId: string
+  name: string
+  email: string | null
+  telefon: string | null
+  sondereigentum_verwaltung: boolean
+  einheitLabel: string
+}
+
+function personKey(b: EinheitBewohner): string {
+  const portal = b.portal_kunde_id?.trim()
+  if (portal) return `portal:${portal}`
+  const email = b.email?.trim().toLowerCase()
+  if (email) return `email:${email}`
+  return `bewohner:${b.id}`
+}
+
+function splitName(name: string): { vorname: string; nachname: string } {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return { vorname: parts[0] ?? '', nachname: parts.slice(1).join(' ') }
 }
 
 /**
@@ -50,12 +77,17 @@ export function ObjektEinheitenSection({
   objektId,
   einheiten: initialEinheiten,
   bewohner: initialBewohner,
+  verwaltungName,
+  objektLabel,
   onChanged,
 }: {
   kundeId: string
   objektId: string
   einheiten: ObjektEinheit[]
   bewohner: EinheitBewohner[]
+  /** HV-Anzeigename für Portal-Einladungs-Mailto */
+  verwaltungName?: string | null
+  objektLabel?: string | null
   onChanged: () => void
 }) {
   const router = useRouter()
@@ -72,6 +104,8 @@ export function ObjektEinheitenSection({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ObjektEinheit | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   const [einheitFormOpen, setEinheitFormOpen] = useState(false)
   const [einheitEdit, setEinheitEdit] = useState<ObjektEinheit | null>(null)
@@ -82,12 +116,17 @@ export function ObjektEinheitenSection({
   const [einheitErr, setEinheitErr] = useState<string | null>(null)
 
   const [personForm, setPersonForm] = useState<PersonForm | null>(null)
+  const [eigentuemerMode, setEigentuemerMode] = useState<'existing' | 'new'>('new')
+  const [existingEigentuemerId, setExistingEigentuemerId] = useState('')
+  const [objektEigentuemer, setObjektEigentuemer] = useState<ObjektEigentuemerOption[]>([])
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
   const [email, setEmail] = useState('')
   const [telefon, setTelefon] = useState('')
   const [seVerwaltung, setSeVerwaltung] = useState(false)
   const [mieteHinweis, setMieteHinweis] = useState('')
+  const [portalInvite, setPortalInvite] = useState(false)
+  const [portalRegistered, setPortalRegistered] = useState<boolean | null>(null)
   const [personDirty, setPersonDirty] = useState(false)
   const [personErr, setPersonErr] = useState<string | null>(null)
 
@@ -202,19 +241,65 @@ export function ObjektEinheitenSection({
     setEinheitFormOpen(true)
   }
 
+  function listObjektEigentuemer(excludeEinheitId: string): ObjektEigentuemerOption[] {
+    const einheitLabel = (id: string) =>
+      einheiten.find((e) => e.id === id)?.bezeichnung?.trim() || 'Einheit'
+    const onTarget = new Set(
+      bewohner
+        .filter(
+          (b) =>
+            b.objekt_einheit_id === excludeEinheitId &&
+            b.rolle === 'eigentuemer' &&
+            b.aktiv !== false
+        )
+        .map(personKey)
+    )
+    const byKey = new Map<string, ObjektEigentuemerOption>()
+    for (const b of bewohner) {
+      if (b.rolle !== 'eigentuemer' || b.aktiv === false) continue
+      if (b.objekt_einheit_id === excludeEinheitId) continue
+      const key = personKey(b)
+      if (onTarget.has(key)) continue
+      const existing = byKey.get(key)
+      const label = einheitLabel(b.objekt_einheit_id)
+      if (existing) {
+        if (!existing.einheitLabel.includes(label)) {
+          existing.einheitLabel = `${existing.einheitLabel}, ${label}`
+        }
+        continue
+      }
+      byKey.set(key, {
+        sourceBewohnerId: b.id,
+        name: b.name.trim() || 'Eigentümer',
+        email: b.email?.trim() || null,
+        telefon: b.telefon?.trim() || null,
+        sondereigentum_verwaltung: Boolean(b.sondereigentum_verwaltung),
+        einheitLabel: label,
+      })
+    }
+    return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  }
+
   function openPersonForm(
     einheitId: string,
     rolle: EinheitBewohnerRolle,
     edit: EinheitBewohner | null = null
   ) {
+    setPortalInvite(false)
+    setPortalRegistered(null)
+    setPersonErr(null)
+    setPersonDirty(false)
     if (edit) {
-      const parts = edit.name.trim().split(/\s+/).filter(Boolean)
-      setVorname(parts[0] ?? '')
-      setNachname(parts.slice(1).join(' '))
+      const parts = splitName(edit.name)
+      setVorname(parts.vorname)
+      setNachname(parts.nachname)
       setEmail(edit.email ?? '')
       setTelefon(edit.telefon ?? '')
       setSeVerwaltung(Boolean(edit.sondereigentum_verwaltung))
       setMieteHinweis(edit.miete_hinweis ?? '')
+      setEigentuemerMode('new')
+      setExistingEigentuemerId('')
+      setObjektEigentuemer([])
     } else {
       setVorname('')
       setNachname('')
@@ -222,10 +307,60 @@ export function ObjektEinheitenSection({
       setTelefon('')
       setSeVerwaltung(false)
       setMieteHinweis('')
+      if (rolle === 'eigentuemer') {
+        const list = listObjektEigentuemer(einheitId)
+        setObjektEigentuemer(list)
+        setEigentuemerMode(list.length > 0 ? 'existing' : 'new')
+        setExistingEigentuemerId('')
+      } else {
+        setObjektEigentuemer([])
+        setEigentuemerMode('new')
+        setExistingEigentuemerId('')
+      }
     }
-    setPersonErr(null)
-    setPersonDirty(false)
     setPersonForm({ einheitId, rolle, edit })
+  }
+
+  useEffect(() => {
+    const mail = email.trim()
+    if (!personForm || !mail.includes('@')) {
+      setPortalRegistered(null)
+      return
+    }
+    let cancelled = false
+    const t = window.setTimeout(() => {
+      void checkPortalEmailRegistered(mail).then((r) => {
+        if (cancelled) return
+        if (!r.ok) {
+          setPortalRegistered(null)
+          return
+        }
+        setPortalRegistered(r.registered)
+        if (r.registered) setPortalInvite(false)
+      })
+    }, 400)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [email, personForm])
+
+  async function maybeInvitePortal(bewohnerId: string, rolle: EinheitBewohnerRolle) {
+    if (!portalInvite) return
+    const inv = await inviteEinheitBewohnerPortal(kundeId, objektId, bewohnerId, {
+      hvName: verwaltungName,
+      objektLabel,
+    })
+    if (!inv.ok) {
+      toast.error(inv.message)
+      return
+    }
+    toast.success(
+      rolle === 'eigentuemer'
+        ? 'Eigentümer-Einladung bereit — Mail öffnet sich'
+        : 'Mieter-Einladung bereit — Mail öffnet sich'
+    )
+    window.location.href = inv.mailto
   }
 
   function speichernEinheit() {
@@ -269,9 +404,42 @@ export function ObjektEinheitenSection({
 
   function speichernPerson() {
     if (!personForm) return
+    const assigningExisting =
+      !personForm.edit &&
+      personForm.rolle === 'eigentuemer' &&
+      eigentuemerMode === 'existing'
+
+    if (assigningExisting) {
+      if (!existingEigentuemerId.trim()) {
+        setPersonErr('Bitte einen bestehenden Eigentümer wählen.')
+        return
+      }
+      setPersonErr(null)
+      startTransition(async () => {
+        const r = await assignExistingEigentuemerToEinheit(kundeId, objektId, {
+          einheitId: personForm.einheitId,
+          sourceBewohnerId: existingEigentuemerId,
+          sondereigentum_verwaltung: seVerwaltung,
+        })
+        if (!r.ok) {
+          setPersonErr(r.message)
+          return
+        }
+        toast.success('Eigentümer zugeordnet')
+        setPersonForm(null)
+        onChanged()
+        await maybeInvitePortal(r.bewohner.id, 'eigentuemer')
+      })
+      return
+    }
+
     const name = [vorname, nachname].map((s) => s.trim()).filter(Boolean).join(' ')
     if (!name) {
       setPersonErr('Vor- und Nachname sind erforderlich.')
+      return
+    }
+    if (portalInvite && !email.trim()) {
+      setPersonErr('E-Mail ist für die Portal-Einladung erforderlich.')
       return
     }
     setPersonErr(null)
@@ -291,6 +459,9 @@ export function ObjektEinheitenSection({
           return
         }
         toast.success('Gespeichert')
+        setPersonForm(null)
+        onChanged()
+        await maybeInvitePortal(personForm.edit.id, rolle)
       } else {
         const r = await createEinheitBewohner(kundeId, objektId, {
           objekt_einheit_id: personForm.einheitId,
@@ -306,9 +477,10 @@ export function ObjektEinheitenSection({
           return
         }
         toast.success(`${EINHEIT_BEWOHNER_ROLLE_LABELS[rolle]} angelegt`)
+        setPersonForm(null)
+        onChanged()
+        await maybeInvitePortal(r.bewohner.id, rolle)
       }
-      setPersonForm(null)
-      onChanged()
     })
   }
 
@@ -325,17 +497,39 @@ export function ObjektEinheitenSection({
     })
   }
 
-  function entfernenEinheit(u: ObjektEinheit) {
-    startTransition(async () => {
-      const r = await deleteObjektEinheit(kundeId, objektId, u.id)
+  async function confirmDeleteEinzel() {
+    if (!deleteTarget || deletePending) return
+    setDeletePending(true)
+    try {
+      const r = await deleteObjektEinheit(kundeId, objektId, deleteTarget.id)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      if (detail?.id === u.id) setDetail(null)
+      if (detail?.id === deleteTarget.id) setDetail(null)
+      setDeleteTarget(null)
       toast.success('Einheit gelöscht')
       onChanged()
-    })
+    } finally {
+      setDeletePending(false)
+    }
+  }
+
+  function einheitRowMenu(u: ObjektEinheit): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openEinheitBearbeiten(u),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => setDeleteTarget(u),
+      },
+    ]
   }
 
   async function runBulkDelete() {
@@ -464,7 +658,35 @@ export function ObjektEinheitenSection({
   const detailMieter = detailPeople.filter((p) => p.rolle !== 'eigentuemer')
   const personEinheitLabel =
     personForm && einheiten.find((e) => e.id === personForm.einheitId)?.bezeichnung
-  const canSavePerson = Boolean(vorname.trim() && nachname.trim())
+  const assigningExistingEigentuemer =
+    Boolean(personForm) &&
+    !personForm?.edit &&
+    personForm?.rolle === 'eigentuemer' &&
+    eigentuemerMode === 'existing'
+  const canSavePerson = assigningExistingEigentuemer
+    ? Boolean(existingEigentuemerId.trim())
+    : Boolean(vorname.trim() && nachname.trim())
+  const showPortalInviteCheckbox =
+    Boolean(personForm) &&
+    email.trim().includes('@') &&
+    portalRegistered === false
+  const showPortalRegisteredHint =
+    Boolean(personForm) &&
+    email.trim().includes('@') &&
+    portalRegistered === true
+
+  const eigentuemerSelectOptions = useMemo(
+    () => [
+      { value: '', label: 'Bitte wählen…' },
+      ...objektEigentuemer.map((p) => ({
+        value: p.sourceBewohnerId,
+        label: p.name,
+        sub: [p.email, p.einheitLabel].filter(Boolean).join(' · ') || undefined,
+      })),
+      { value: '__new__', label: '＋ Neu anlegen' },
+    ],
+    [objektEigentuemer]
+  )
 
   function renderPersonBlock(rolle: EinheitBewohnerRolle, people: EinheitBewohner[]) {
     if (!detail) return null
@@ -566,6 +788,7 @@ export function ObjektEinheitenSection({
           isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
           isChecked && 'is-checked'
         )}
+        style={isMobile ? undefined : { gridTemplateColumns: EINHEIT_LIST_COLS }}
       >
         <ListRowCheck
           checked={isChecked}
@@ -595,6 +818,13 @@ export function ObjektEinheitenSection({
             </>
           )}
         </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={einheitRowMenu(u)} title={u.bezeichnung} />
+        </div>
       </div>
     )
   }
@@ -605,35 +835,24 @@ export function ObjektEinheitenSection({
         title={einheiten.length ? `Einheiten · ${einheiten.length}` : 'Einheiten'}
         icon="building"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {einheiten.length > 0 ? (
-              <MockBtn
-                sm
-                kind="ghost"
-                onClick={toggleAll}
-                title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-              >
-                {allSelected ? 'Keine' : 'Alle'}
-              </MockBtn>
-            ) : null}
-            <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
-              Hinzufügen
-            </MockBtn>
-          </div>
+          <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
+            Hinzufügen
+          </MockBtn>
         }
       >
-        <p
-          className="mb-3 text-[length:var(--fs-meta)] leading-relaxed"
-          style={{ color: 'var(--text-3)' }}
-        >
-          Einheit öffnen → Eigentümer und Mieter verwalten (wie im HV-Portal).
-        </p>
-
         {selectedCount > 0 ? (
           <div className="bulkbar" style={{ marginBottom: 12 }}>
             <span className="bulkbar-count">
               <b>{selectedCount}</b> ausgewählt
             </span>
+            <MockBtn
+              kind="ghost"
+              sm
+              onClick={toggleAll}
+              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              {allSelected ? 'Keine' : 'Alle'}
+            </MockBtn>
             <div style={{ flex: 1 }} />
             {selectedCount === 1 ? (
               <MockBtn
@@ -667,20 +886,20 @@ export function ObjektEinheitenSection({
         ) : null}
 
         {einheiten.length === 0 ? (
-          <MockEmpty
-            icon="building"
-            title="Noch keine Einheiten"
-            hint="Einheit anlegen — danach Eigentümer und Mieter zuordnen. Über „+“ oben hinzufügen."
-          />
+          <MockEmpty icon="building" title="Noch keine Einheiten" />
         ) : isMobile ? (
           <div className="ap-cards vg-selectmode">{einheiten.map(einheitRow)}</div>
         ) : (
           <div className="ap-list vg-selectmode">
-            <div className="ap-list__head ap-list__head--select">
+            <div
+              className="ap-list__head ap-list__head--select"
+              style={{ gridTemplateColumns: EINHEIT_LIST_COLS }}
+            >
               <span aria-hidden />
               <span>Einheit</span>
               <span>Details</span>
               <span>Status</span>
+              <span aria-hidden />
             </div>
             {einheiten.map(einheitRow)}
           </div>
@@ -722,6 +941,39 @@ export function ObjektEinheitenSection({
         </div>
       </MockModal>
 
+      <MockModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        icon="trash"
+        title="Einheit löschen?"
+        sub="Zugeordnete Personen werden mitgelöscht."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={deletePending ? undefined : 'trash'}
+              disabled={deletePending}
+              onClick={() => void confirmDeleteEinzel()}
+            >
+              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {deletePending
+            ? 'Bitte warten…'
+            : `„${deleteTarget?.bezeichnung ?? 'Einheit'}“ wird unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
+
       {/* Detail: Einheit + Personen */}
       <EditorSheet
         open={Boolean(detail)}
@@ -729,33 +981,6 @@ export function ObjektEinheitenSection({
         title={detail?.bezeichnung ?? 'Einheit'}
         crumb="Einheiten >"
         size="md"
-        footer={
-          detail ? (
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <MockBtn
-                kind="danger"
-                sm
-                icon="trash"
-                disabled={pending}
-                onClick={() => {
-                  if (!detail || pending) return
-                  entfernenEinheit(detail)
-                }}
-              >
-                Löschen
-              </MockBtn>
-              <MockBtn
-                kind="ghost"
-                sm
-                icon="pencil"
-                disabled={pending}
-                onClick={() => openEinheitBearbeiten(detail)}
-              >
-                Bearbeiten
-              </MockBtn>
-            </div>
-          ) : null
-        }
       >
         {detail ? (
           <div className="space-y-5">
@@ -856,6 +1081,14 @@ export function ObjektEinheitenSection({
         onConfirm={speichernPerson}
         confirmDisabled={pending || !canSavePerson}
         confirmBusy={pending}
+        compose
+        composeLabel={
+          personForm?.edit
+            ? 'Speichern'
+            : assigningExistingEigentuemer
+              ? 'Zuordnen'
+              : 'Hinzufügen'
+        }
       >
         <div className="kunde-create">
           {personErr ? <p className="kunde-create__err">{personErr}</p> : null}
@@ -863,56 +1096,189 @@ export function ObjektEinheitenSection({
             title={personForm ? EINHEIT_BEWOHNER_ROLLE_LABELS[personForm.rolle] : 'Person'}
             icon="users"
           >
-            <MockField label="Vorname" required>
-              <input
-                className="input"
-                value={vorname}
-                onChange={(e) => {
-                  setVorname(e.target.value)
-                  setPersonDirty(true)
+            {!personForm?.edit && personForm?.rolle === 'eigentuemer' && objektEigentuemer.length > 0 ? (
+              <>
+                <Select
+                  label="Eigentümer"
+                  value={eigentuemerMode === 'new' ? '__new__' : existingEigentuemerId}
+                  options={eigentuemerSelectOptions}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setPersonDirty(true)
+                    if (v === '__new__') {
+                      setEigentuemerMode('new')
+                      setExistingEigentuemerId('')
+                      setVorname('')
+                      setNachname('')
+                      setEmail('')
+                      setTelefon('')
+                      setSeVerwaltung(false)
+                      setPortalInvite(false)
+                      setPortalRegistered(null)
+                      return
+                    }
+                    if (!v) {
+                      setEigentuemerMode('existing')
+                      setExistingEigentuemerId('')
+                      setVorname('')
+                      setNachname('')
+                      setEmail('')
+                      setTelefon('')
+                      setPortalInvite(false)
+                      setPortalRegistered(null)
+                      return
+                    }
+                    setEigentuemerMode('existing')
+                    setExistingEigentuemerId(v)
+                    const found = objektEigentuemer.find((x) => x.sourceBewohnerId === v)
+                    if (found) {
+                      const parts = splitName(found.name)
+                      setVorname(parts.vorname)
+                      setNachname(parts.nachname)
+                      setEmail(found.email ?? '')
+                      setTelefon(found.telefon ?? '')
+                      setSeVerwaltung(found.sondereigentum_verwaltung)
+                    }
+                  }}
+                />
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 'var(--fs-meta)',
+                    color: 'var(--text-3)',
+                    lineHeight: 1.4,
+                    gridColumn: '1 / -1',
+                  }}
+                >
+                  Bestehenden Eigentümer einer weiteren Einheit zuordnen oder neu anlegen.
+                </p>
+              </>
+            ) : null}
+
+            {assigningExistingEigentuemer ? (
+              <MockField label="Auswahl" full>
+                <div
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    fontSize: 'var(--fs-text)',
+                    color: 'var(--text-2)',
+                  }}
+                >
+                  {(() => {
+                    const sel = objektEigentuemer.find(
+                      (x) => x.sourceBewohnerId === existingEigentuemerId
+                    )
+                    if (!sel) {
+                      return 'Bitte einen bestehenden Eigentümer wählen.'
+                    }
+                    return (
+                      <>
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{sel.name}</p>
+                        {sel.email ? (
+                          <p style={{ margin: '4px 0 0' }}>{sel.email}</p>
+                        ) : null}
+                        <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                          Bereits: {sel.einheitLabel}
+                        </p>
+                      </>
+                    )
+                  })()}
+                </div>
+              </MockField>
+            ) : (
+              <>
+                <MockField label="Vorname" required>
+                  <input
+                    className="input"
+                    value={vorname}
+                    onChange={(e) => {
+                      setVorname(e.target.value)
+                      setPersonDirty(true)
+                    }}
+                    placeholder="Max"
+                    autoComplete="given-name"
+                  />
+                </MockField>
+                <MockField label="Nachname" required>
+                  <input
+                    className="input"
+                    value={nachname}
+                    onChange={(e) => {
+                      setNachname(e.target.value)
+                      setPersonDirty(true)
+                    }}
+                    placeholder="Mustermann"
+                    autoComplete="family-name"
+                  />
+                </MockField>
+                <MockField label="E-Mail (optional)" full>
+                  <input
+                    className="input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setPersonDirty(true)
+                      setPortalInvite(false)
+                    }}
+                    placeholder="max@example.de"
+                    autoComplete="email"
+                  />
+                </MockField>
+                <MockField label="Telefon (optional)" full>
+                  <input
+                    className="input"
+                    type="tel"
+                    value={telefon}
+                    onChange={(e) => {
+                      setTelefon(e.target.value)
+                      setPersonDirty(true)
+                    }}
+                    placeholder="+49 …"
+                    autoComplete="tel"
+                  />
+                </MockField>
+              </>
+            )}
+
+            {showPortalRegisteredHint ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 'var(--fs-meta)',
+                  color: 'var(--text-2)',
+                  gridColumn: '1 / -1',
                 }}
-                placeholder="Max"
-                autoComplete="given-name"
-              />
-            </MockField>
-            <MockField label="Nachname" required>
-              <input
-                className="input"
-                value={nachname}
-                onChange={(e) => {
-                  setNachname(e.target.value)
-                  setPersonDirty(true)
-                }}
-                placeholder="Mustermann"
-                autoComplete="family-name"
-              />
-            </MockField>
-            <MockField label="E-Mail (optional)" full>
-              <input
-                className="input"
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value)
-                  setPersonDirty(true)
-                }}
-                placeholder="max@example.de"
-                autoComplete="email"
-              />
-            </MockField>
-            <MockField label="Telefon (optional)" full>
-              <input
-                className="input"
-                type="tel"
-                value={telefon}
-                onChange={(e) => {
-                  setTelefon(e.target.value)
-                  setPersonDirty(true)
-                }}
-                placeholder="+49 …"
-                autoComplete="tel"
-              />
-            </MockField>
+              >
+                Portal bereits registriert — keine Einladung nötig.
+              </p>
+            ) : null}
+
+            {showPortalInviteCheckbox ? (
+              <MockField label="Portal-Zugang" full>
+                <label
+                  className="flex items-start gap-2"
+                  style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={portalInvite}
+                    onChange={(e) => {
+                      setPortalInvite(e.target.checked)
+                      setPersonDirty(true)
+                    }}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    Einladung zur Portal-Registrierung per E-Mail senden (öffnet Mail-App nach
+                    Speichern)
+                  </span>
+                </label>
+              </MockField>
+            ) : null}
+
             {personForm?.rolle === 'eigentuemer' ? (
               <MockField label="Sondereigentumsverwaltung" full>
                 <label
@@ -930,7 +1296,7 @@ export function ObjektEinheitenSection({
                   HV führt SE-Aufträge (Freigabe über Schwelle beim Eigentümer)
                 </label>
               </MockField>
-            ) : (
+            ) : !assigningExistingEigentuemer ? (
               <MockField label="Miet-Hinweis (optional)" full>
                 <input
                   className="input"
@@ -942,7 +1308,7 @@ export function ObjektEinheitenSection({
                   placeholder="z. B. seit 2022"
                 />
               </MockField>
-            )}
+            ) : null}
           </MockFormSection>
         </div>
       </EditorSheet>

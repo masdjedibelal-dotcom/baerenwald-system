@@ -5,7 +5,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
@@ -117,6 +117,14 @@ export function KundeDetailClient({
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const t = searchParams.get('tab')?.trim()
+    if (t === 'organisation' || t === 'objekte' || t === 'akte' || t === 'uebersicht') {
+      setTab(t)
+    }
+  }, [searchParams])
   const [pending, startTransition] = useLocalTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -488,6 +496,9 @@ export function KundeDetailClient({
         <MeldeLinksCard
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
           aushangPdfHref={`/api/kunden/${kunde.id}/aushang-pdf`}
+          impressumUrl={kunde.impressum_url}
+          datenschutzUrl={kunde.datenschutz_url}
+          organisationHref={`/kunden/${kunde.id}?tab=organisation`}
         />
       ) : null}
       {zeigtOrganisationTab ? (

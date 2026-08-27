@@ -418,6 +418,270 @@ export async function deleteEinheitBewohner(
   return { ok: true }
 }
 
+/**
+ * Bestehenden Eigentümer (andere Einheit desselben Objekts) an diese Einheit hängen.
+ * Kopiert Stammdaten + portal_kunde_id in eine neue einheit_bewohner-Zeile.
+ */
+export async function assignExistingEigentuemerToEinheit(
+  kundeId: string,
+  objektId: string,
+  input: {
+    einheitId: string
+    sourceBewohnerId: string
+    sondereigentum_verwaltung?: boolean
+  }
+): Promise<
+  | { ok: true; bewohner: EinheitBewohner }
+  | { ok: false; message: string }
+> {
+  const einheitId = input.einheitId.trim()
+  const sourceId = input.sourceBewohnerId.trim()
+  if (!einheitId || !sourceId) {
+    return { ok: false, message: 'Einheit und Eigentümer sind erforderlich.' }
+  }
+  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: source, error: srcErr } = await supabase
+    .from('einheit_bewohner')
+    .select(
+      'id, name, email, telefon, portal_kunde_id, sondereigentum_verwaltung, rolle, objekt_einheit_id, aktiv'
+    )
+    .eq('id', sourceId)
+    .eq('kunde_id', kundeId)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (srcErr || !source?.id) {
+    return { ok: false, message: 'Eigentümer nicht gefunden.' }
+  }
+  if (String(source.rolle) !== 'eigentuemer') {
+    return { ok: false, message: 'Quelle ist kein Eigentümer.' }
+  }
+
+  // Quelle muss zu einer Einheit dieses Objekts gehören
+  const { data: srcEinheit } = await supabase
+    .from('objekt_einheiten')
+    .select('id')
+    .eq('id', String(source.objekt_einheit_id))
+    .eq('kunde_objekt_id', objektId)
+    .maybeSingle()
+  if (!srcEinheit?.id) {
+    return { ok: false, message: 'Eigentümer gehört nicht zu diesem Objekt.' }
+  }
+
+  if (String(source.objekt_einheit_id) === einheitId) {
+    return { ok: false, message: 'Eigentümer ist dieser Einheit bereits zugeordnet.' }
+  }
+
+  const portalId =
+    source.portal_kunde_id != null ? String(source.portal_kunde_id).trim() : ''
+  const email = source.email != null ? String(source.email).trim() : ''
+
+  let alreadyQ = supabase
+    .from('einheit_bewohner')
+    .select('id')
+    .eq('objekt_einheit_id', einheitId)
+    .eq('kunde_id', kundeId)
+    .eq('rolle', 'eigentuemer')
+    .eq('aktiv', true)
+    .is('anonymisiert_am', null)
+
+  if (portalId) {
+    alreadyQ = alreadyQ.eq('portal_kunde_id', portalId)
+  } else if (email) {
+    alreadyQ = alreadyQ.ilike('email', email)
+  } else {
+    alreadyQ = alreadyQ.eq('id', source.id)
+  }
+
+  const { data: already } = await alreadyQ.maybeSingle()
+  if (already?.id) {
+    return { ok: false, message: 'Eigentümer ist dieser Einheit bereits zugeordnet.' }
+  }
+
+  const se =
+    input.sondereigentum_verwaltung !== undefined
+      ? Boolean(input.sondereigentum_verwaltung)
+      : Boolean(source.sondereigentum_verwaltung)
+
+  const insertRow: Record<string, unknown> = {
+    kunde_id: kundeId,
+    objekt_einheit_id: einheitId,
+    name: String(source.name ?? '').trim() || 'Eigentümer',
+    email: email || null,
+    telefon: source.telefon != null ? String(source.telefon).trim() || null : null,
+    rolle: 'eigentuemer',
+    sondereigentum_verwaltung: se,
+    portal_kunde_id: portalId || null,
+    aktiv: true,
+  }
+
+  let { data, error } = await supabase
+    .from('einheit_bewohner')
+    .insert(insertRow)
+    .select('*, objekt_einheiten(bezeichnung, etage)')
+    .single()
+
+  if (error && /portal_kunde_id/i.test(error.message)) {
+    delete insertRow.portal_kunde_id
+    const retry = await supabase
+      .from('einheit_bewohner')
+      .insert(insertRow)
+      .select('*, objekt_einheiten(bezeichnung, etage)')
+      .single()
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error && /etage/i.test(error.message)) {
+    const retry = await supabase
+      .from('einheit_bewohner')
+      .insert(insertRow)
+      .select('*, objekt_einheiten(bezeichnung)')
+      .single()
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error || !data) {
+    return { ok: false, message: error?.message ?? 'Zuordnung fehlgeschlagen.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, bewohner: data as EinheitBewohner }
+}
+
+/** E-Mail → bereits Portal-Konto (kunden.auth_user_id) vorhanden? */
+export async function checkPortalEmailRegistered(
+  email: string
+): Promise<
+  | { ok: true; registered: boolean; kundeId: string | null }
+  | { ok: false; message: string }
+> {
+  const mail = email.trim().toLowerCase()
+  if (!mail || !mail.includes('@')) {
+    return { ok: true, registered: false, kundeId: null }
+  }
+
+  const { withCrmReadFallback } = await import('@/lib/kunden/kunden-db')
+  const { data, error } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select('id, auth_user_id')
+      .ilike('email', mail)
+      .not('auth_user_id', 'is', null)
+      .limit(1)
+      .maybeSingle()
+  )
+
+  if (error) return { ok: false, message: error.message }
+  const row = data as { id?: string; auth_user_id?: string | null } | null
+  const kid = row?.id ? String(row.id) : null
+  return {
+    ok: true,
+    registered: Boolean(kid && row?.auth_user_id),
+    kundeId: kid,
+  }
+}
+
+/**
+ * Portal-Einladung für Mieter/Eigentümer anlegen (mailto öffnet HV-Mail-App).
+ */
+export async function inviteEinheitBewohnerPortal(
+  kundeId: string,
+  objektId: string,
+  bewohnerId: string,
+  opts?: { hvName?: string | null; objektLabel?: string | null }
+): Promise<
+  | { ok: true; url: string; mailto: string }
+  | { ok: false; message: string }
+> {
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
+    return { ok: false, message: 'Objekt nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: bewohner, error: bErr } = await supabase
+    .from('einheit_bewohner')
+    .select('id, name, email, rolle, objekt_einheit_id, aktiv')
+    .eq('id', bewohnerId)
+    .eq('kunde_id', kundeId)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (bErr || !bewohner?.id) {
+    return { ok: false, message: 'Person nicht gefunden.' }
+  }
+
+  const email = String(bewohner.email ?? '').trim()
+  if (!email) {
+    return { ok: false, message: 'E-Mail ist für die Einladung erforderlich.' }
+  }
+
+  const einheitId = String(bewohner.objekt_einheit_id)
+  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const { data: einheit } = await supabase
+    .from('objekt_einheiten')
+    .select('bezeichnung')
+    .eq('id', einheitId)
+    .maybeSingle()
+
+  const {
+    createPortalEinladungToken,
+    portalEinladungExpiresAt,
+    buildPortalEinladungUrl,
+    buildBewohnerPortalEinladungMailto,
+  } = await import('@/lib/portal/portal-einladungen')
+
+  const token = createPortalEinladungToken()
+  const expires_at = portalEinladungExpiresAt().toISOString()
+  const { data, error } = await supabase
+    .from('portal_einladungen')
+    .insert({
+      token,
+      kunde_id: kundeId,
+      objekt_id: objektId,
+      einheit_id: einheitId,
+      einheit_ref: einheit?.bezeichnung?.trim() || null,
+      bewohner_id: bewohnerId,
+      status: 'offen',
+      expires_at,
+    })
+    .select('token')
+    .single()
+
+  if (error) {
+    const missing = /portal_einladungen|does not exist|relation/i.test(error.message)
+    return {
+      ok: false,
+      message: missing
+        ? 'Einladungs-Tabelle noch nicht freigeschaltet (Migration).'
+        : error.message,
+    }
+  }
+
+  const t = String(data?.token ?? token)
+  const url = buildPortalEinladungUrl(t)
+  const rolle = String(bewohner.rolle) === 'eigentuemer' ? 'eigentuemer' : 'mieter'
+  const mailto = buildBewohnerPortalEinladungMailto({
+    link: url,
+    hvName: opts?.hvName?.trim() || 'Ihre Verwaltung',
+    objektLabel: opts?.objektLabel?.trim() || 'Objekt',
+    einheitRef: einheit?.bezeichnung?.trim() || null,
+    toEmail: email,
+    rolle,
+  })
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, url, mailto }
+}
+
 export async function createObjektEinheit(
   kundeId: string,
   objektId: string,
@@ -898,10 +1162,47 @@ function stripAnlageDetailFields(row: Record<string, unknown>): Record<string, u
   return copy
 }
 
+function isObjektEinheitEtageSchemaError(message: string): boolean {
+  return /objekt_einheiten.*etage|etage.*does not exist|column.*etage/i.test(message)
+}
+
 function isAnlageDetailSchemaError(message: string): boolean {
+  if (isObjektEinheitEtageSchemaError(message)) return false
   return /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|wartungsintervall|does not exist|Could not find|schema cache/i.test(
     message
   )
+}
+
+const ANLAGE_SELECT_WITH_ETAGE =
+  '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+const ANLAGE_SELECT_WITHOUT_ETAGE =
+  '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
+
+async function selectAnlageAfterWrite(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  id: string
+): Promise<{ data: ObjektAnlage | null; error: string | null }> {
+  const full = await supabase
+    .from('objekt_anlagen')
+    .select(ANLAGE_SELECT_WITH_ETAGE)
+    .eq('id', id)
+    .maybeSingle()
+  if (!full.error && full.data) {
+    return { data: full.data as ObjektAnlage, error: null }
+  }
+  if (full.error && isObjektEinheitEtageSchemaError(full.error.message)) {
+    const basic = await supabase
+      .from('objekt_anlagen')
+      .select(ANLAGE_SELECT_WITHOUT_ETAGE)
+      .eq('id', id)
+      .maybeSingle()
+    if (!basic.error && basic.data) {
+      return { data: basic.data as ObjektAnlage, error: null }
+    }
+    return { data: null, error: basic.error?.message ?? full.error.message }
+  }
+  return { data: null, error: full.error?.message ?? 'Anlage nicht geladen.' }
 }
 
 function anlageRowFromInput(
@@ -970,39 +1271,42 @@ export async function createObjektAnlage(
     updated_at: now,
   }
 
-  const { data, error } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from('objekt_anlagen')
     .insert(row)
-    .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+    .select('id')
     .single()
 
-  if ((error || !data) && isAnlageDetailSchemaError(error?.message ?? '')) {
+  let anlageId = inserted?.id ? String(inserted.id) : ''
+  let lastError = insertError?.message ?? null
+
+  if ((!anlageId || insertError) && isAnlageDetailSchemaError(insertError?.message ?? '')) {
     const retry = await supabase
       .from('objekt_anlagen')
       .insert(stripAnlageDetailFields(row))
-      .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+      .select('id')
       .single()
-    if (!retry.error && retry.data) {
-      revalidateObjektAkte(kundeId, objektId)
-      return {
-        ok: true,
-        anlage: {
-          ...(retry.data as ObjektAnlage),
-          dokument_urls: [],
-          vorgang_count: 0,
-        },
-      }
+    if (!retry.error && retry.data?.id) {
+      anlageId = String(retry.data.id)
+      lastError = null
+    } else {
+      lastError = retry.error?.message ?? lastError
     }
   }
 
-  if (error || !data) {
-    return { ok: false, message: error?.message ?? 'Anlage konnte nicht angelegt werden.' }
+  if (!anlageId) {
+    return { ok: false, message: lastError ?? 'Anlage konnte nicht angelegt werden.' }
+  }
+
+  const loaded = await selectAnlageAfterWrite(supabase, anlageId)
+  if (!loaded.data) {
+    return { ok: false, message: loaded.error ?? 'Anlage angelegt, aber nicht lesbar.' }
   }
 
   revalidateObjektAkte(kundeId, objektId)
   const anlage = {
-    ...(data as ObjektAnlage),
-    dokument_urls: (data as ObjektAnlage).dokument_urls ?? [],
+    ...loaded.data,
+    dokument_urls: loaded.data.dokument_urls ?? [],
     vorgang_count: 0,
   }
   return { ok: true, anlage }
@@ -1034,32 +1338,33 @@ export async function updateObjektAnlage(
   }
   delete (patch as { sort_order?: number }).sort_order
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('objekt_anlagen')
     .update(patch)
     .eq('id', anlageId)
-    .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
-    .single()
 
-  if ((error || !data) && isAnlageDetailSchemaError(error?.message ?? '')) {
+  let lastError = error?.message ?? null
+
+  if (error && isAnlageDetailSchemaError(error.message)) {
     const retry = await supabase
       .from('objekt_anlagen')
       .update(stripAnlageDetailFields(patch))
       .eq('id', anlageId)
-      .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
-      .single()
-    if (!retry.error && retry.data) {
-      revalidateObjektAkte(kundeId, objektId)
-      return { ok: true, anlage: retry.data as ObjektAnlage }
+    if (retry.error) {
+      return { ok: false, message: retry.error.message }
     }
+    lastError = null
+  } else if (error) {
+    return { ok: false, message: error.message }
   }
 
-  if (error || !data) {
-    return { ok: false, message: error?.message ?? 'Anlage konnte nicht gespeichert werden.' }
+  const loaded = await selectAnlageAfterWrite(supabase, anlageId)
+  if (!loaded.data) {
+    return { ok: false, message: loaded.error ?? lastError ?? 'Anlage nicht geladen.' }
   }
 
   revalidateObjektAkte(kundeId, objektId)
-  return { ok: true, anlage: data as ObjektAnlage }
+  return { ok: true, anlage: loaded.data }
 }
 
 export async function deleteObjektAnlage(

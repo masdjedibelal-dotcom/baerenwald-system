@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -21,11 +20,15 @@ import { toast } from '@/components/ui/app-toast'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { KundenObjekt } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
+
+const OBJEKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr) 44px'
 
 type Props = {
   kundeId: string
@@ -51,14 +54,16 @@ export function KundenObjekteCard({
   className,
 }: Props) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [modalOpen, setModalOpen] = useState(false)
   const [editObjekt, setEditObjekt] = useState<KundenObjekt | null>(null)
-  const [pending, startTransition] = useTransition()
   const [localObjekte, setLocalObjekte] = useState(() => filterObjekteFuerKunde(objekte, kundeId))
   const [statsById, setStatsById] = useState<Record<string, KundenObjektListenStats>>({})
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<KundenObjekt | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   useEffect(() => {
     setLocalObjekte(filterObjekteFuerKunde(objekte, kundeId))
@@ -145,8 +150,114 @@ export function KundenObjekteCard({
 
   function openBearbeiten() {
     if (selectedRows.length !== 1) return
-    setEditObjekt(selectedRows[0]!)
+    openBearbeitenObjekt(selectedRows[0]!)
+  }
+
+  function openBearbeitenObjekt(o: KundenObjekt) {
+    setEditObjekt(o)
     setModalOpen(true)
+  }
+
+  async function confirmDeleteEinzel() {
+    if (!deleteTarget || deletePending) return
+    setDeletePending(true)
+    try {
+      const r = await deleteKundenObjekt(deleteTarget.id, kundeId)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setLocalObjekte((prev) => prev.filter((x) => x.id !== deleteTarget.id))
+      if (selectedId === deleteTarget.id) onSelect?.(null)
+      setDeleteTarget(null)
+      toast.success('Objekt gelöscht')
+      onChanged()
+    } finally {
+      setDeletePending(false)
+    }
+  }
+
+  function objektRowMenu(o: KundenObjekt): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openBearbeitenObjekt(o),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => setDeleteTarget(o),
+      },
+    ]
+  }
+
+  function statsLabel(o: KundenObjekt): string {
+    const st = statsById[o.id]
+    if (!st) return '—'
+    if (st.mieterTotal > 0) {
+      return `${st.mieterTotal} ${st.mieterTotal === 1 ? 'Mieter' : 'Mieter'}`
+    }
+    if (st.einheitenTotal > 0) {
+      return `${st.einheitenTotal} ${st.einheitenTotal === 1 ? 'Einheit' : 'Einheiten'}`
+    }
+    return '—'
+  }
+
+  function objektRow(o: KundenObjekt) {
+    const strasse = kundenObjektStrasseZeile(o) || '—'
+    const ort = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
+    const adresse = [strasse !== '—' ? strasse : null, ort || null].filter(Boolean).join(', ') || '—'
+    const isChecked = Boolean(selected[o.id])
+    const bezug = statsLabel(o)
+
+    return (
+      <div
+        key={o.id}
+        className={cn(
+          isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
+          isChecked && 'is-checked',
+          selectedId === o.id && 'is-checked'
+        )}
+        style={isMobile ? undefined : { gridTemplateColumns: OBJEKT_LIST_COLS }}
+      >
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(o.id)}
+          title={`${o.titel} auswählen`}
+        />
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={() => openAkte(o)}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{o.titel}</span>
+              </div>
+              <div className="ap-mobile-card__meta">{adresse}</div>
+              {bezug !== '—' ? <div className="ap-mobile-card__meta">{bezug}</div> : null}
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">{o.titel}</span>
+              <span className="ap-list__dim">{adresse}</span>
+              <span className="ap-list__dim">{bezug}</span>
+            </>
+          )}
+        </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={objektRowMenu(o)} title={o.titel} />
+        </div>
+      </div>
+    )
   }
 
   function openAkte(o: KundenObjekt) {
@@ -242,57 +353,78 @@ export function KundenObjekteCard({
   }
 
   return (
-    <div className={cn('objekte-tab', className)}>
-      <div className="objekte-tab__head">
-        <span className="objekte-tab__title">Objekte</span>
-        <div style={{ flex: 1 }} />
-        {liste.length > 0 ? (
-          <MockBtn
-            sm
-            kind="ghost"
-            onClick={toggleAll}
-            title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            {allSelected ? 'Keine' : 'Alle'}
+    <>
+      <MockCard
+        title={liste.length ? `Objekte · ${liste.length}` : 'Objekte'}
+        icon="building"
+        className={className}
+        actions={
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+            Hinzufügen
           </MockBtn>
-        ) : null}
-        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Hinzufügen
-        </MockBtn>
-      </div>
+        }
+      >
+        {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
 
-      {onSelect ? <div className="mb-4">{selectBlock}</div> : null}
-
-      {selectedCount > 0 ? (
-        <div className="bulkbar">
-          <span className="bulkbar-count">
-            <b>{selectedCount}</b> ausgewählt
-          </span>
-          <div style={{ flex: 1 }} />
-          {selectedCount === 1 ? (
-            <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeiten} disabled={pending}>
-              Bearbeiten
+        {selectedCount > 0 ? (
+          <div className="bulkbar" style={{ marginBottom: 12 }}>
+            <span className="bulkbar-count">
+              <b>{selectedCount}</b> ausgewählt
+            </span>
+            <MockBtn
+              kind="ghost"
+              sm
+              onClick={toggleAll}
+              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              {allSelected ? 'Keine' : 'Alle'}
             </MockBtn>
-          ) : null}
-          <MockBtn
-            kind="danger"
-            sm
-            icon="trash"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={bulkDeletePending || pending}
-          >
-            Löschen
-          </MockBtn>
-          <MockBtn
-            kind="ghost"
-            sm
-            className="qa-btn bulkbar-clear"
-            icon="x"
-            onClick={() => setSelected({})}
-            title="Auswahl aufheben"
-          />
-        </div>
-      ) : null}
+            <div style={{ flex: 1 }} />
+            {selectedCount === 1 ? (
+              <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeiten}>
+                Bearbeiten
+              </MockBtn>
+            ) : null}
+            <MockBtn
+              kind="danger"
+              sm
+              icon="trash"
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={bulkDeletePending}
+            >
+              Löschen
+            </MockBtn>
+            <MockBtn
+              kind="ghost"
+              sm
+              className="qa-btn bulkbar-clear"
+              icon="x"
+              onClick={() => setSelected({})}
+              title="Auswahl aufheben"
+            />
+          </div>
+        ) : null}
+
+        {liste.length === 0 ? (
+          <MockEmpty icon="building" title="Noch keine Objekte" />
+        ) : isMobile ? (
+          <div className="ap-cards vg-selectmode">{liste.map(objektRow)}</div>
+        ) : (
+          <div className="ap-list vg-selectmode">
+            <div
+              className="ap-list__head ap-list__head--select"
+              style={{ gridTemplateColumns: OBJEKT_LIST_COLS }}
+            >
+              <span aria-hidden />
+              <span>Objekt</span>
+              <span>Adresse</span>
+              <span>Bezug</span>
+              <span aria-hidden />
+            </div>
+            {liste.map(objektRow)}
+          </div>
+        )}
+      </MockCard>
 
       <MockModal
         open={bulkDeleteOpen}
@@ -329,67 +461,40 @@ export function KundenObjekteCard({
         </div>
       </MockModal>
 
-      {liste.length === 0 ? (
-        <MockEmpty
-          icon="building"
-          title="Noch keine Objekte"
-          hint="Objekt anlegen für Gebäude, WEGs und Melde-Links. Über „+“ oben hinzufügen."
-        />
-      ) : (
-        <div className="objekte-cards vg-selectmode">
-          {liste.map((o) => {
-            const strasse = kundenObjektStrasseZeile(o) || '—'
-            const st = statsById[o.id]
-            const mieterAnzahl =
-              st && st.mieterTotal > 0
-                ? st.mieterTotal
-                : st && st.einheitenTotal > 0
-                  ? st.einheitenTotal
-                  : null
-            const isChecked = Boolean(selected[o.id])
-
-            return (
-              <div
-                key={o.id}
-                className={cn(
-                  'card objekte-card dshell-framed',
-                  selectedId === o.id && 'is-sel',
-                  isChecked && 'objekte-card--checked'
-                )}
-              >
-                <div className="objekte-card__body">
-                  <ListRowCheck
-                    checked={isChecked}
-                    onToggle={() => toggleSel(o.id)}
-                    title={`${o.titel} auswählen`}
-                  />
-                  <button
-                    type="button"
-                    className="objekte-card__main objekte-card__hit"
-                    onClick={() => openAkte(o)}
-                  >
-                    <div className="objekte-card__name">{o.titel}</div>
-                    <div className="objekte-card__sub" title={strasse}>
-                      {strasse}
-                    </div>
-                    {mieterAnzahl != null ? (
-                      <div className="objekte-card__meta">{mieterAnzahl} Mieter</div>
-                    ) : null}
-                  </button>
-                  <MockIcon
-                    ctx="default"
-                    n="chevron-right"
-                    size={16}
-                    className="objekte-card__chevron"
-                  />
-                </div>
-              </div>
-            )
-          })}
+      <MockModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        icon="trash"
+        title="Objekt löschen?"
+        sub="Einheiten und Kontakte gehen mit verloren."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={deletePending ? undefined : 'trash'}
+              disabled={deletePending}
+              onClick={() => void confirmDeleteEinzel()}
+            >
+              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {deletePending
+            ? 'Bitte warten…'
+            : `„${deleteTarget?.titel ?? 'Objekt'}“ wird unwiderruflich gelöscht.`}
         </div>
-      )}
+      </MockModal>
 
       {modal}
-    </div>
+    </>
   )
 }

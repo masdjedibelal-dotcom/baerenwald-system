@@ -268,32 +268,24 @@ export function ObjektKontakteSection({
         title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
         icon="user"
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {liste.length > 0 ? (
-              <MockBtn
-                sm
-                kind="ghost"
-                onClick={toggleAll}
-                title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-              >
-                {allSelected ? 'Keine' : 'Alle'}
-              </MockBtn>
-            ) : null}
-            <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-              Hinzufügen
-            </MockBtn>
-          </div>
+          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+            Hinzufügen
+          </MockBtn>
         }
       >
-        <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
-          Beirat, Notfall, Dienstleister — der Hausmeister steht in der Karte darüber und bleibt hiervon unberührt.
-        </p>
-
         {selectedCount > 0 ? (
           <div className="bulkbar" style={{ marginBottom: 12 }}>
             <span className="bulkbar-count">
               <b>{selectedCount}</b> ausgewählt
             </span>
+            <MockBtn
+              kind="ghost"
+              sm
+              onClick={toggleAll}
+              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+            >
+              {allSelected ? 'Keine' : 'Alle'}
+            </MockBtn>
             <div style={{ flex: 1 }} />
             {selectedCount === 1 ? (
               <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeitenBulk} disabled={pending}>
@@ -321,11 +313,7 @@ export function ObjektKontakteSection({
         ) : null}
 
         {liste.length === 0 ? (
-          <MockEmpty
-            icon="user"
-            title="Noch keine Kontakte"
-            hint="Hausmeister bitte in der Karte darüber anlegen. Über „+“ oben hinzufügen."
-          />
+          <MockEmpty icon="user" title="Noch keine Kontakte" />
         ) : isMobile ? (
           <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>
         ) : (

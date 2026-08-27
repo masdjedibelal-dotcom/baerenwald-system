@@ -22,6 +22,7 @@ import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { Check, FileText } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
@@ -394,6 +395,7 @@ export function AngebotWizard({
   const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
   /** Lead, der in dieser Direkt-Angebot-Session angelegt wurde (für Abbruch-Cleanup). */
@@ -929,32 +931,38 @@ export function AngebotWizard({
     if (mail && isValidEmail(mail)) setMailTo([mail])
   }
 
-  async function handleCanvasClose() {
+  async function closeWizardClean() {
+    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
-    if (draftDirty && !saving) {
-      /* S9: X speichert best-effort — ohne Validierungs-Toasts bei leerem Entwurf */
-      const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
-      const canSilentSave =
-        Boolean(kundeId) &&
-        Boolean(titelOk) &&
-        artikelA.length > 0 &&
-        !artikelA.some((z) => !z.bezeichnung.trim())
-      if (canSilentSave) {
-        try {
-          const id = await persistDraft({ notify: false })
-          if (id) toast.autoSaved({ label: 'Entwurf' })
-        } catch {
-          /* ignore */
-        }
-      }
-    }
+    setFotoLightboxUrl(null)
+    setSheet(null)
     await discardSessionLeadIfOrphan()
     onClose()
   }
 
+  async function handleSaveDraftAndClose() {
+    if (saving) return
+    const id = await persistDraft({ notify: true })
+    if (!id) return
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setFotoLightboxUrl(null)
+    setSheet(null)
+    onDone?.(id, {
+      mode: 'saved',
+      auftragKorrektur: istAuftragKorrektur || undefined,
+    })
+    onClose()
+    router.refresh()
+  }
+
   function handleRequestClose() {
-    void handleCanvasClose()
+    if (saving) return
+    if (!draftDirty) {
+      void closeWizardClean()
+      return
+    }
+    setCloseConfirmOpen(true)
   }
 
   async function handleFinishSpeichern() {
@@ -1098,15 +1106,15 @@ export function AngebotWizard({
         trigger={
           <span
             className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Speichern oder senden"
-            title="Speichern oder senden"
+            aria-label="Als Entwurf speichern oder senden"
+            title="Als Entwurf speichern oder senden"
           >
             <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
           </span>
         }
         items={[
           {
-            label: saving ? 'Speichern…' : 'Speichern',
+            label: saving ? 'Speichern…' : 'Als Entwurf speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
             onClick: () => {
               if (saving) return
@@ -1569,6 +1577,24 @@ export function AngebotWizard({
           </div>
         </div>
       </EditorSheet>
+
+      <ConfirmPopup
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title="Änderungen speichern?"
+        cancelLabel="Weiter bearbeiten"
+        discardLabel="Beenden ohne Speichern"
+        saveDraftLabel="Als Entwurf speichern"
+        danger
+        onConfirm={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraft={() => {
+          void handleSaveDraftAndClose()
+        }}
+      >
+        Ungespeicherte Eingaben gehen sonst verloren.
+      </ConfirmPopup>
     </>
   )
 

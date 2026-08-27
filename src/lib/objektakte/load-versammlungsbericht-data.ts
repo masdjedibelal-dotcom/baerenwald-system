@@ -150,30 +150,50 @@ async function loadAnlagenRowsForBericht(oid: string): Promise<AnlageDbRow[]> {
   const supabase = createClient()
   const fullSelect =
     'id, bezeichnung, standort, status, einbau_datum, garantie_bis, gewaehrleistung_bis, anschaffungswert_eur, gewerke(name), objekt_einheiten(bezeichnung, etage)'
+  const fullSelectNoEtage =
+    'id, bezeichnung, standort, status, einbau_datum, garantie_bis, gewaehrleistung_bis, anschaffungswert_eur, gewerke(name), objekt_einheiten(bezeichnung)'
   const basicSelect =
     'id, bezeichnung, standort, status, einbau_datum, gewerke(name), objekt_einheiten(bezeichnung, etage)'
+  const basicSelectNoEtage =
+    'id, bezeichnung, standort, status, einbau_datum, gewerke(name), objekt_einheiten(bezeichnung)'
 
-  const full = await supabase
+  let res = await supabase
     .from('objekt_anlagen')
     .select(fullSelect)
     .eq('kunde_objekt_id', oid)
     .neq('status', 'stillgelegt')
     .order('bezeichnung', { ascending: true })
 
+  if (res.error && /etage/i.test(res.error.message)) {
+    res = await supabase
+      .from('objekt_anlagen')
+      .select(fullSelectNoEtage)
+      .eq('kunde_objekt_id', oid)
+      .neq('status', 'stillgelegt')
+      .order('bezeichnung', { ascending: true })
+  }
+
   if (
-    full.error &&
-    /garantie|gewaehrleistung|anschaffungswert|dokument/i.test(full.error.message)
+    res.error &&
+    /garantie|gewaehrleistung|anschaffungswert|dokument/i.test(res.error.message)
   ) {
-    const basic = await supabase
+    res = await supabase
       .from('objekt_anlagen')
       .select(basicSelect)
       .eq('kunde_objekt_id', oid)
       .neq('status', 'stillgelegt')
       .order('bezeichnung', { ascending: true })
-    return (basic.data ?? []) as AnlageDbRow[]
+    if (res.error && /etage/i.test(res.error.message)) {
+      res = await supabase
+        .from('objekt_anlagen')
+        .select(basicSelectNoEtage)
+        .eq('kunde_objekt_id', oid)
+        .neq('status', 'stillgelegt')
+        .order('bezeichnung', { ascending: true })
+    }
   }
 
-  return (full.data ?? []) as AnlageDbRow[]
+  return (res.data ?? []) as AnlageDbRow[]
 }
 
 export async function loadVersammlungsberichtPayload(input: {

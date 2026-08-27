@@ -38,7 +38,12 @@ export async function withCrmReadFallback<T>(
       'Dauerhaft: npm run db:rls-recursion-fix oder db:portal-fix (SQL Editor).',
     result.error?.message
   )
-  result = await run(getSupabaseAdmin())
+  try {
+    result = await run(getSupabaseAdmin())
+  } catch (e) {
+    console.error('[crm] Service-Role-Fallback fehlgeschlagen', e)
+    return result
+  }
   return result
 }
 

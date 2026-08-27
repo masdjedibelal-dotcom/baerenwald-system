@@ -276,21 +276,9 @@ export function KundenAnsprechpartnerCard({
       icon="users"
       className={cn(className)}
       actions={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {rows.length > 0 ? (
-            <MockBtn
-              sm
-              kind="ghost"
-              onClick={toggleAll}
-              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-            >
-              {allSelected ? 'Keine' : 'Alle'}
-            </MockBtn>
-          ) : null}
-            <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-              Hinzufügen
-            </MockBtn>
-        </div>
+        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+          Hinzufügen
+        </MockBtn>
       }
     >
       {selectedCount > 0 ? (
@@ -298,6 +286,14 @@ export function KundenAnsprechpartnerCard({
           <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
+          <MockBtn
+            kind="ghost"
+            sm
+            onClick={toggleAll}
+            title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            {allSelected ? 'Keine' : 'Alle'}
+          </MockBtn>
           <div style={{ flex: 1 }} />
           {selectedCount === 1 ? (
             <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeitenBulk} disabled={pending}>

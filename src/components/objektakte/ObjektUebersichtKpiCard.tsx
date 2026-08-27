@@ -14,19 +14,11 @@ export function ObjektUebersichtKpiCard({
   onHistorieClick?: () => void
   onBerichtClick?: () => void
 }) {
-  const gewerkHint =
-    kpis.nachGewerk.length > 0
-      ? kpis.nachGewerk.slice(0, 3).map((g) => `${g.gewerk} (${g.count})`).join(' · ')
-      : '—'
-
   return (
     <div className="card">
       <div className="card-h flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="card-title title">Kennzahlen</div>
-          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-            Objektübersicht — leere Register zeigen Nullen, keine Fehler.
-          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {onBerichtClick ? (
@@ -70,12 +62,6 @@ export function ObjektUebersichtKpiCard({
             },
           ]}
         />
-        <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-          Nach Gewerk: {gewerkHint}
-          {kpis.kostenOhneAngabeImJahr > 0
-            ? ` · ${kpis.kostenOhneAngabeImJahr} Maßnahme${kpis.kostenOhneAngabeImJahr === 1 ? '' : 'n'} in ${jahr} ohne Kostenangabe`
-            : ''}
-        </p>
       </div>
     </div>
   )

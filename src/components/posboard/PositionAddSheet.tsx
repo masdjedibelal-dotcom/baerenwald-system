@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -109,7 +108,7 @@ export function PositionAddSheet({
   onAddGewerk?: (name: string) => void
 }) {
   const [mode, setMode] = useState<PositionAddMode>(initialMode)
-  const [pending, startTransition] = useTransition()
+  const [katalogLoading, setKatalogLoading] = useState(false)
   const [rows, setRows] = useState<KatalogPosition[]>([])
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -145,27 +144,36 @@ export function PositionAddSheet({
     setGewerkPick('')
     setGewerkCustom('')
     setGewerkFilter(null)
-    if (initialMode !== 'preisliste') return
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: true })
-      setRows(list)
-      if (preferredGewerkName?.trim()) {
-        const hit = list.find(
-          (p) =>
-            (p.gewerk_name || '').toLowerCase() === preferredGewerkName.trim().toLowerCase()
-        )
-        if (hit) setGewerkFilter(hit.gewerk_id)
-      }
-    })
   }, [open, initialMode, preferredGewerkName])
 
+  /** Katalog lokal laden — kein globales action-busy (hängt sonst nach Gewerk-Sheet). */
   useEffect(() => {
-    if (!open || mode !== 'preisliste' || rows.length) return
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: true })
-      setRows(list)
-    })
-  }, [open, mode, rows.length])
+    if (!open) return
+    if (mode !== 'preisliste' && initialMode !== 'preisliste') return
+    let cancelled = false
+    setKatalogLoading(true)
+    void listKatalogPositionen({ nurAktiv: true })
+      .then((list) => {
+        if (cancelled) return
+        setRows(list)
+        const preferred = preferredGewerkName?.trim()
+        if (preferred) {
+          const hit = list.find(
+            (p) => (p.gewerk_name || '').toLowerCase() === preferred.toLowerCase()
+          )
+          if (hit) setGewerkFilter(hit.gewerk_id)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setKatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, mode, initialMode, preferredGewerkName])
 
   const katalogGewerke = useMemo(() => {
     const m = new Map<string, string>()
@@ -396,7 +404,7 @@ export function PositionAddSheet({
     return null
   })()
 
-  const headerConfirmDisabled = confirmDisabled || (mode === 'preisliste' && pending)
+  const headerConfirmDisabled = confirmDisabled || (mode === 'preisliste' && katalogLoading)
 
   return (
     <EditorSheet
@@ -479,9 +487,9 @@ export function PositionAddSheet({
             </div>
           ) : null}
 
-          {pending && !rows.length ? (
+          {katalogLoading && !rows.length ? (
             <p className="picker-sheet__empty">Lädt…</p>
-          ) : !pending && !filtered.length ? (
+          ) : !katalogLoading && !filtered.length ? (
             <p className="picker-sheet__empty">Keine Treffer.</p>
           ) : (
             <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">

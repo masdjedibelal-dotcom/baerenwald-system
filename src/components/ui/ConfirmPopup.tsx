@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 /**
  * Zentriertes Bestätigungs-Popup (Mobil + Desktop) —
  * für kurze Hinweise wie „Änderungen verwerfen?“, nicht für Formulare.
+ *
+ * Optional `onSaveDraft`: Drei Wege (Entwurf speichern / ohne Speichern / weiter).
  */
 export function ConfirmPopup({
   open,
@@ -20,6 +22,9 @@ export function ConfirmPopup({
   cancelLabel = 'Abbrechen',
   onConfirm,
   danger = false,
+  saveDraftLabel = 'Als Entwurf speichern',
+  onSaveDraft,
+  discardLabel,
 }: {
   open: boolean
   onClose: () => void
@@ -29,6 +34,11 @@ export function ConfirmPopup({
   cancelLabel?: string
   onConfirm: () => void
   danger?: boolean
+  /** Wenn gesetzt: dritter Weg „Als Entwurf speichern“ (gestapelter Footer). */
+  saveDraftLabel?: string
+  onSaveDraft?: () => void
+  /** Label für den Verwerfen-/Schließen-Button (Default = confirmLabel). */
+  discardLabel?: string
 }) {
   const [mounted, setMounted] = useState(false)
   const titleId = useId()
@@ -47,6 +57,9 @@ export function ConfirmPopup({
   }, [open, mounted])
 
   if (!open || !mounted) return null
+
+  const leaveLabel = discardLabel ?? confirmLabel
+  const unsavedClose = Boolean(onSaveDraft)
 
   return createPortal(
     <div
@@ -70,8 +83,47 @@ export function ConfirmPopup({
           </h2>
           {children ? <div className="confirm-popup__text">{children}</div> : null}
         </div>
-        <div className={cn('confirm-popup__footer', danger && 'confirm-popup__footer--danger')}>
-          {danger ? (
+        <div
+          className={cn(
+            'confirm-popup__footer',
+            unsavedClose && 'confirm-popup__footer--stack',
+            danger && 'confirm-popup__footer--danger'
+          )}
+        >
+          {unsavedClose ? (
+            <>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSaveDraft?.()
+                }}
+              >
+                {saveDraftLabel}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onConfirm()
+                }}
+              >
+                {leaveLabel}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose()
+                }}
+              >
+                {cancelLabel}
+              </Button>
+            </>
+          ) : danger ? (
             <>
               <Button
                 type="button"

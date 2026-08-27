@@ -12,6 +12,15 @@ export type KundeListeZeile = Kunde & {
 
 /** Aggregiert nur für die geladenen Kunden-IDs — kein Full-Table-Scan. */
 export async function loadKundenListe(): Promise<KundeListeZeile[]> {
+  try {
+    return await loadKundenListeInner()
+  } catch (e) {
+    console.error('loadKundenListe', e)
+    return []
+  }
+}
+
+async function loadKundenListeInner(): Promise<KundeListeZeile[]> {
   const kundenRes = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
@@ -65,7 +74,7 @@ async function finalizeKundenListe(kunden: Kunde[]): Promise<KundeListeZeile[]> 
       .select(
         `
         kunde_id, status,
-        angebote(gesamt_fix, gesamt_min, gesamt_max, positionen)
+        angebote(gesamt_fix, gesamt_min, gesamt_max)
       `
       )
       .in('kunde_id', ids)

@@ -19,6 +19,7 @@ import { LeistungszeitraumFields } from '@/components/dokumente/Leistungszeitrau
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { DateInput } from '@/components/ui/DateInput'
 import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -349,7 +350,12 @@ export function RechnungWizard({
     bootstrap.rechnungsnummer?.trim() || ''
   )
   const [saving, setSaving] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewRechnungId, setPreviewRechnungId] = useState<string | null>(
+    bootstrap.rechnungId
+  )
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
@@ -555,6 +561,7 @@ export function RechnungWizard({
   /** Rechnung versendet immer nur die Rechnung — kein Abschluss-/Dokumentpaket-Frage. */
   const previewNr = rechnungsnummer.trim() || 'Rechnung'
   const activeVersandId = versandRechnungId ?? rechnungId
+  const vorschauRechnungId = previewRechnungId ?? activeVersandId
   const istKorrekturVersand = Boolean(korrekturKontext)
   const defaultBetreff = istKorrekturVersand
     ? `Korrektur · ${previewNr} · ${rTitel}`
@@ -785,6 +792,7 @@ export function RechnungWizard({
         )
         setRechnungId(res.rechnungId)
         setVersandRechnungId(res.rechnungId)
+        setPreviewRechnungId(res.rechnungId)
         if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
         if (switched) {
           setKorrekturKontext({
@@ -891,6 +899,7 @@ export function RechnungWizard({
       setAbschlagRechnungen(res.rechnungen)
       setVersandRechnungId(res.versandRechnungId)
       setRechnungId(res.versandRechnungId)
+      setPreviewRechnungId(res.versandRechnungId)
       const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
       if (nr?.trim()) setRechnungsnummer(nr.trim())
       setMeta(nextMeta)
@@ -946,6 +955,21 @@ export function RechnungWizard({
     return persistEinzel(opts)
   }
 
+  async function openVorschauSheet() {
+    setPreviewLoading(true)
+    setSheet('vorschau')
+    try {
+      const id = await persistDraft({ manageBusy: false, silent: false })
+      if (!id) {
+        setSheet(null)
+        return
+      }
+      setPreviewRechnungId(id)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
       toast.error('Plan anpassen (100 %)')
@@ -989,7 +1013,7 @@ export function RechnungWizard({
           return
         }
         toast.success(
-          `Rechnung gespeichert${res.rechnungsnummer?.trim() ? ` · ${res.rechnungsnummer.trim()}` : ''} · ${formatEurBetrag(rBrutto)} brutto`
+          `Entwurf gespeichert${res.rechnungsnummer?.trim() ? ` · ${res.rechnungsnummer.trim()}` : ''} · ${formatEurBetrag(rBrutto)} brutto`
         )
         setSheet(null)
         setKundeEditOpen(false)
@@ -1031,31 +1055,38 @@ export function RechnungWizard({
     }
   }
 
-  async function handleCanvasClose() {
-    if (draftDirty && !saving) {
-      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      const canSilentSave =
-        Boolean(kundeId?.trim()) &&
-        artikel.length > 0 &&
-        !artikel.some((z) => !z.bezeichnung.trim()) &&
-        !(hasPlan && !hatAuftrag) &&
-        !(hasPlan && !aktivRate && !planOk)
-      if (canSilentSave) {
-        try {
-          const id = await persistDraft({ manageBusy: false, silent: true, notify: true })
-          if (!id) {
-            /* unvollständig — schließen ohne Toast */
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-    }
+  async function closeWizardClean() {
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setPlanEditorOpen(false)
+    setSheet(null)
     onClose()
   }
 
+  async function handleSaveDraftAndClose() {
+    if (saving) return
+    if (hasPlan && !planOk) {
+      toast.error('Plan anpassen (100 %)')
+      return
+    }
+    const id = await persistDraft({ manageBusy: true, notify: true })
+    if (!id) return
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setPlanEditorOpen(false)
+    setSheet(null)
+    onDone?.(id)
+    onClose()
+    router.refresh()
+  }
+
   function handleRequestClose() {
-    void handleCanvasClose()
+    if (saving || previewLoading) return
+    if (!draftDirty) {
+      void closeWizardClean()
+      return
+    }
+    setCloseConfirmOpen(true)
   }
 
   async function handleWeiter() {
@@ -1289,9 +1320,9 @@ export function RechnungWizard({
       <button
         type="button"
         className="editor-sheet__icon-btn"
-        disabled={saving}
+        disabled={saving || previewLoading}
         onClick={() => {
-          void persistDraft().then(() => setSheet('vorschau'))
+          void openVorschauSheet()
         }}
         aria-label="Vorschau"
         title="Vorschau"
@@ -1304,15 +1335,15 @@ export function RechnungWizard({
         trigger={
           <span
             className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Speichern oder senden"
-            title="Speichern oder senden"
+            aria-label="Als Entwurf speichern oder senden"
+            title="Als Entwurf speichern oder senden"
           >
             <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
           </span>
         }
         items={[
           {
-            label: saving ? 'Speichern…' : 'Speichern',
+            label: saving ? 'Speichern…' : 'Als Entwurf speichern',
             icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
             onClick: () => {
               if (saving || (hasPlan && !planOk)) return
@@ -1729,56 +1760,11 @@ export function RechnungWizard({
         context="canvas"
         size="lg"
       >
-        {activeVersandId ? (
-          <RechnungWizardPdfPreview
-            rechnungId={activeVersandId}
-            kundeName={kundeName}
-          />
-        ) : (
-          <div className="rw-preview-card">
-            <div className="rw-preview-card__banner">
-              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
-              {rTitel ? ` · ${rTitel}` : ''}
-            </div>
-            <div className="rw-preview-card__body">
-              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
-                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
-              </p>
-              <ul className="rw-preview-card__pos">
-                {positionenBerechnet.slice(0, 6).map((p, i) => (
-                  <li key={`${p.leistung}-${i}`}>
-                    <span>
-                      {p.leistung}
-                      {p.menge != null
-                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
-                        : ''}
-                    </span>
-                    <b>
-                      {formatEurBetrag(
-                        (p.vk_netto ??
-                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
-                          (p.menge ?? 1) *
-                          1.19
-                      )}
-                    </b>
-                  </li>
-                ))}
-              </ul>
-              <div className="rw-preview-card__sum">
-                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
-                <b>{formatEurBetrag(displayBrutto)}</b>
-              </div>
-              {rFaellig ? (
-                <div className="rw-preview-card__faellig">
-                  Fällig am {formatDateDe(rFaellig)}
-                </div>
-              ) : null}
-            </div>
-            <div className="rw-preview-card__foot">
-              Bärenwald · an {kundeName}
-            </div>
-          </div>
-        )}
+        <RechnungWizardPdfPreview
+          rechnungId={vorschauRechnungId}
+          loading={previewLoading || !vorschauRechnungId}
+          kundeName={kundeName}
+        />
       </EditorSheet>
 
       <EditorSheet
@@ -1954,6 +1940,24 @@ export function RechnungWizard({
           </div>
         </div>
       </EditorSheet>
+
+      <ConfirmPopup
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title="Änderungen speichern?"
+        cancelLabel="Weiter bearbeiten"
+        discardLabel="Beenden ohne Speichern"
+        saveDraftLabel="Als Entwurf speichern"
+        danger
+        onConfirm={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraft={() => {
+          void handleSaveDraftAndClose()
+        }}
+      >
+        Ungespeicherte Eingaben gehen sonst verloren.
+      </ConfirmPopup>
     </>
   )
 
