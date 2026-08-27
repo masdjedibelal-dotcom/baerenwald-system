@@ -466,7 +466,7 @@ export function FormularBearbeitenPanel({
                 Abbrechen
               </button>
               <button type="button" onClick={saveEditFeld} className="btn primary flex-1">
-                Übernehmen
+                Speichern
               </button>
             </div>
           </div>

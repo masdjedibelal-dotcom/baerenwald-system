@@ -6,16 +6,19 @@ import { PushSwRegistrar } from '@/components/push/PushSwRegistrar'
 import { PwaStandaloneClass } from '@/components/push/PwaStandaloneClass'
 import { ActionBusyProvider } from '@/components/ui/action-busy'
 import { ConfirmDeleteProvider } from '@/components/ui/confirm-delete'
+import { ConfirmKundeDeleteProvider } from '@/components/ui/confirm-kunde-delete'
 
 export function DashboardProviders({ children }: { children: React.ReactNode }) {
   return (
     <ActionBusyProvider>
       <ConfirmDeleteProvider>
-        {children}
-        <SessionGuard />
-        <ChunkLoadRecovery />
-        <PwaStandaloneClass />
-        <PushSwRegistrar />
+        <ConfirmKundeDeleteProvider>
+          {children}
+          <SessionGuard />
+          <ChunkLoadRecovery />
+          <PwaStandaloneClass />
+          <PushSwRegistrar />
+        </ConfirmKundeDeleteProvider>
       </ConfirmDeleteProvider>
     </ActionBusyProvider>
   )

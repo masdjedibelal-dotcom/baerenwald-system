@@ -11,6 +11,7 @@ import {
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -18,6 +19,8 @@ import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   abschlussdokumentZeile,
@@ -240,7 +243,10 @@ export function AuftragDokumenteTab({
         kundeBenachrichtigen: false,
       })
       if (!r.ok) toast.error(r.message)
-      else onChanged()
+      else {
+        toast.success(fuerKunde ? 'Für Kunde freigegeben' : 'Intern markiert')
+        onChanged()
+      }
     })
   }
 
@@ -255,6 +261,7 @@ export function AuftragDokumenteTab({
       })
       if (!r.ok) toast.error(r.message)
       else {
+        toast.success('Metadaten gespeichert')
         setEditRow(null)
         onChanged()
       }
@@ -262,15 +269,53 @@ export function AuftragDokumenteTab({
   }
 
   function removeRow(row: AuftragDokumentZeile) {
-    if (!row.timelineId || !confirm(`„${row.name}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deleteAuftragDokumentEintrag({
-        auftragId: detail.id,
-        timelineId: row.timelineId!,
+    if (!row.timelineId) return
+    confirmDelete(
+      'Dokument löschen?',
+      async () => {
+        const r = await deleteAuftragDokumentEintrag({
+          auftragId: detail.id,
+          timelineId: row.timelineId!,
+        })
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Dokument gelöscht')
+        onChanged()
+      },
+      { sub: row.name }
+    )
+  }
+
+  function docMenuItems(row: AuftragDokumentZeile): EntityMenuItem[] {
+    const items: EntityMenuItem[] = []
+    const href = rowHref(row)
+    const ready = rowPdfReady(row)
+    if (ready && href) {
+      items.push({
+        icon: 'eye',
+        label: 'Ansehen',
+        onClick: () => window.open(href, '_blank', 'noopener,noreferrer'),
       })
-      if (!r.ok) toast.error(r.message)
-      else onChanged()
-    })
+    }
+    if (row.quelle === 'timeline' && row.timelineId) {
+      if (items.length) items.push('sep')
+      items.push({
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        disabled: busy,
+        onClick: () => openEdit(row),
+      })
+      items.push({
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        disabled: busy,
+        onClick: () => removeRow(row),
+      })
+    }
+    return items
   }
 
   const timelineById = useMemo(() => {
@@ -334,41 +379,11 @@ export function AuftragDokumenteTab({
   }
 
   function renderActions(row: AuftragDokumentZeile) {
-    const href = rowHref(row)
-    const ready = rowPdfReady(row)
-    const canEdit = row.quelle === 'timeline' && Boolean(row.timelineId)
+    const items = docMenuItems(row)
+    if (!items.length) return <div className="dok-list__actions" />
     return (
-      <div className="dok-list__actions inline-flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-        {ready && href ? (
-          <button
-            type="button"
-            className="icon-btn"
-            title="Ansehen"
-            onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}
-          >
-            <MockIcon ctx="row" n="eye" size={15} />
-          </button>
-        ) : null}
-        {canEdit ? (
-          <>
-            <button
-              type="button"
-              className="icon-btn dok-list__action--extra"
-              title="Bearbeiten"
-              onClick={() => openEdit(row)}
-            >
-              <MockIcon ctx="row" n="pencil" size={15} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn text-status-cancel-text dok-list__action--extra"
-              title="Löschen"
-              onClick={() => removeRow(row)}
-            >
-              <MockIcon ctx="row" n="trash" size={15} />
-            </button>
-          </>
-        ) : null}
+      <div className="dok-list__actions inline-flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <MockEntityRowMenu items={items} title="Dokument" />
       </div>
     )
   }

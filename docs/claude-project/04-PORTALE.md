@@ -57,13 +57,54 @@ Ein Login, **Inhalt je nach Kontotyp**:
 ### HV-Portal — Funktionen
 
 - Dashboard mit KPIs (offen / in Arbeit / erledigt) und letzten Vorgängen
+- **SLA-KPIs** unter den Kacheln: typische und **median** Reaktions- sowie Erledigungszeit (Rollfenster 90 Tage, API `/api/org/dashboard/sla`)
 - Vorgänge filtern (Alle · Offen · In Arbeit · Erledigt), Objektfilter, Detail
-- **Freigaben:** Kosten-/Angebotsfreigabe annehmen oder ablehnen
+- **Freigaben:** Kosten-/Angebotsfreigabe — siehe unten
 - **Objekte:** anlegen/bearbeiten, Melde-Link kopieren, QR, Aushang-PDF, Einheiten/Mieter, Einladungen
 - Neuer Vorgang (Funnel ähnlich Rechner, Kanal HV)
 - Einstellungen: Profil, Logo/Whitelabel, Freigaberegeln, Benachrichtigungen, Team
 - Onboarding-Hinweis bis Branding vollständig („Whitelabel-Gate“)
 - Serviceabos/Marktplatz ggf. als „In Kürze“
+
+### HV-Portal — Objekt-Akte (Detail)
+
+Eine UI-Wahrheit: **kein paralleles Tab-Layout** — kanonische Tab-Reihenfolge:
+
+**Stamm · Einheiten · Anlagen · Prüfpflichten · Historie · Vorgänge · Freigabe · Dokumente**
+
+| Tab / Bereich | Inhalt |
+|---------------|--------|
+| **Stamm** | Stammdaten, KPI-Kacheln, **Kosten & Belege** (Jahres-/Monatswerte, Belegliste, CSV-Download) |
+| **Einheiten** | Einheiten, Mieter, Einladungen |
+| **Anlagen** | Technische Anlagen am Objekt |
+| **Prüfpflichten** | Fristen, Status, Bearbeitung (PATCH); Badges auf Objekt-Card und Tab |
+| **Historie** | Chronik am Objekt |
+| **Vorgänge** | Vorgänge dieses Objekts |
+| **Freigabe** | Freigabe-Queue / Meldungen zur Entscheidung |
+| **Dokumente** | Objekt-Dokumente |
+
+### HV-Portal — Vorgang-Detail (Organisation)
+
+- **Versicherung & Abrechnung:** Kostenträger, Versicherungs-/Schaden-Nr., Versicherungsakte (PDF); bei geänderten Daten Hinweis + „Akte aktualisieren“
+- Mobile: bei offener Angebots-Freigabe zuerst Freigabe-Banner, sonst Versicherungsblock vor Freigabe
+
+### HV-Portal — Angebots-Freigabe (`org_freigabe_status`)
+
+Gilt für Angebote **über der Freigabe-Schwelle** (nach Zustellung an die HV). Bypass Akut / unter Schwelle entfällt der Schritt.
+
+| Status | Bedeutung | HV-Aktionen |
+|--------|-----------|-------------|
+| `ausstehend` | Angebot liegt zur Freigabe vor | **Freigeben** · **Ablehnen** · **Beschluss erforderlich** |
+| `beschluss_ausstehend` | Parkzustand — wartet auf Eigentümerbeschluss | Banner „Wartet auf Eigentümerbeschluss“; optional **Versammlung am**, **Protokoll-Link**; danach **Freigeben** / **Ablehnen** (kein Zurücksetzen) |
+| `freigegeben` | HV hat freigegeben | Partner-Versand im CRM möglich |
+| `abgelehnt` | HV hat abgelehnt | Partner-Versand blockiert |
+| `nicht_noetig` | Keine Freigabe nötig (Schwelle/Akut/Direkt) | — |
+
+**Partner-Gate:** Solange Status ∈ {`ausstehend`, `beschluss_ausstehend`, `abgelehnt`}, kein Handwerker-Versand — analog `06-PROZESSE.md` § Org-Freigabe. Kunden-/HV-Angebotsversand bei `ausstehend` / `beschluss_ausstehend` weiterhin erlaubt (HV braucht das PDF).
+
+**API (Website):** `POST /api/org/freigabe` (Aktionen oben), `PATCH /api/org/freigabe` (Meta: `beschluss_versammlung_am`, `beschluss_protokoll_url` im Parkzustand).
+
+**UI:** `OrgFreigabeBanner` in Freigabe-Tab, Eingang und Angebots-Detail.
 
 ### Privatkunden-Portal
 
@@ -118,6 +159,6 @@ Diese Seiten liegen im **CRM-Repo**, gehören aber zur Portal-Erfahrung:
 
 1. HV legt Objekt + Melde-Link im CRM an → Mieter meldet auf Website.
 2. Meldung wird Anfrage im CRM → Staff arbeitet Angebot aus.
-3. Freigabe im HV-Portal kann nötig sein, bevor Partner angeschrieben werden.
+3. Freigabe im HV-Portal kann nötig sein, bevor Partner angeschrieben werden — inkl. Parkzustand **Beschluss erforderlich** (`beschluss_ausstehend`).
 4. Partner arbeitet im Partner-Portal oder per Token-Link.
 5. Kunde sieht Fortschritt in MeinBärenwald und/oder `/projekt/[token]`.

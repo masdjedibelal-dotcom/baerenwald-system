@@ -5,8 +5,8 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
@@ -236,28 +236,11 @@ export function KundenAnsprechpartnerCard({
           isChecked && 'is-checked'
         )}
       >
-        <div
-          className="vg-check"
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleSel(r.id)
-          }}
-          role="checkbox"
-          aria-checked={isChecked}
-          aria-label={`${r.name} auswählen`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              e.stopPropagation()
-              toggleSel(r.id)
-            }
-          }}
-        >
-          <span className={cn('vg-box', isChecked && 'on')}>
-            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-          </span>
-        </div>
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(r.id)}
+          title={`${r.name} auswählen`}
+        />
         <button
           type="button"
           className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
@@ -384,12 +367,7 @@ export function KundenAnsprechpartnerCard({
         <MockEmpty
           icon="users"
           title="Noch keine Ansprechpartner"
-          hint="Weitere E-Mails und Kontakte ohne neuen Kunden-Account"
-          action={
-            <MockBtn kind="primary" icon="plus" onClick={openNeu}>
-              Hinzufügen
-            </MockBtn>
-          }
+          hint="Weitere E-Mails und Kontakte ohne neuen Kunden-Account. Über „+“ oben hinzufügen."
         />
       ) : isMobile ? (
         <div className="ap-cards vg-selectmode">{rows.map(rowBody)}</div>

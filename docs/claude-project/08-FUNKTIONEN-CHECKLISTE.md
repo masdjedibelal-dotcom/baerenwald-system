@@ -55,8 +55,14 @@ Legende: ✅ vorhanden · ◐ teilweise / eingeschränkt · ⏸ UI ausgeblendet 
 | Modus Eigentümer | ✅ |
 | Modus Hausmeister | ✅ |
 | HV Dashboard + Vorgänge + Filter | ✅ |
+| HV Dashboard SLA-KPIs (Median Reaktion/Erledigung, 90 Tage) | ✅ |
 | Kosten-/Angebotsfreigabe | ✅ |
+| Angebots-Freigabe: Beschluss-Parkzustand (`beschluss_ausstehend`) | ✅ |
 | Objekte + Melde-Link + QR + Aushang | ✅ |
+| Objekt-Akte: einheitliche Tabs (Stamm · Einheiten · Anlagen · Prüfpflichten · Historie · Vorgänge · Freigabe · Dokumente) | ✅ |
+| Objekt Stamm: Kosten & Belege + CSV-Export | ✅ |
+| Objekt Prüfpflichten-Tab + Fälligkeits-Badges (Liste/Tab) | ✅ |
+| HV Vorgang: Versicherung & Schaden-Nr. + Akte aktualisieren | ✅ |
 | Einheiten / Mieter verwalten | ✅ |
 | Neuer Vorgang (HV) | ✅ |
 | Einstellungen Whitelabel + Freigabe + Team | ✅ |
@@ -143,6 +149,7 @@ Legende: ✅ vorhanden · ◐ teilweise / eingeschränkt · ⏸ UI ausgeblendet 
 | Inbound-Mail in Akte | ✅ |
 | Wartung & Pflege Filter | ✅ |
 | Org-Freigabe-Gate vor HW-Versand | ✅ |
+| Org-Freigabe: Status `beschluss_ausstehend` (Badge, Filter, Partner-Gate) | ✅ |
 
 ## CRM — Token-Portale
 

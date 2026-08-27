@@ -186,6 +186,9 @@ export function RechnungWizard({
   const [kundeObjektId, setKundeObjektId] = useState<string | null>(
     () => bootstrap.kundeObjektId?.trim() || null
   )
+  const [objektAnlageId, setObjektAnlageId] = useState<string | null>(
+    () => bootstrap.objektAnlageId?.trim() || null
+  )
   const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
@@ -197,6 +200,7 @@ export function RechnungWizard({
     melder_email: '',
     melder_einheit: '',
     kunde_objekt_id: kundeObjektId,
+    objekt_anlage_id: objektAnlageId,
   }
   const gewaehltesObjekt =
     (kundeObjektId ? hvObjekte.find((o) => o.id === kundeObjektId) : null) ?? null
@@ -584,20 +588,18 @@ export function RechnungWizard({
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Noch keine Position — Erstellen/Senden erst mit mindestens einer Position.')
+        toast.error('Noch keine Position')
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Abschlagsplan noch nicht 100 % — vor Versand anpassen.')
+      toast.error('Plan anpassen (100 %)')
     }
     const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
     if (enteringVersand) {
       const id = await persistDraft()
       if (!id) {
-        toast.error(
-          'Entwurf noch nicht gespeichert — Mail-Vorschau ggf. unvollständig. Pflichtfelder vor Erstellen prüfen.'
-        )
+        toast.error('Entwurf prüfen')
       }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
@@ -640,6 +642,7 @@ export function RechnungWizard({
         zahlfristDatum,
         ansprechpartnerId,
         kundeObjektId,
+        objektAnlageId,
       }),
     [
       zeilen,
@@ -653,6 +656,7 @@ export function RechnungWizard({
       zahlfristDatum,
       ansprechpartnerId,
       kundeObjektId,
+      objektAnlageId,
     ]
   )
   useEffect(() => {
@@ -755,6 +759,7 @@ export function RechnungWizard({
           kunde_id: kundeId,
           ansprechpartner_id: ansprechpartnerId,
           kunde_objekt_id: kundeObjektId,
+          objekt_anlage_id: objektAnlageId,
           positionen: positionenBerechnet,
           meta: nextMeta,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
@@ -811,6 +816,7 @@ export function RechnungWizard({
       kundeId,
       ansprechpartnerId,
       kundeObjektId,
+      objektAnlageId,
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
@@ -851,7 +857,7 @@ export function RechnungWizard({
     }
     if (!planOk) {
       if (!silent) {
-        toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+        toast.error('Plan anpassen (100 %)')
       }
       return null
     }
@@ -870,6 +876,7 @@ export function RechnungWizard({
         kunde_id: kundeId,
         ansprechpartner_id: ansprechpartnerId,
         kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
         positionen: positionenBerechnet,
         meta: nextMeta,
         zahlungsplan: plan,
@@ -905,6 +912,7 @@ export function RechnungWizard({
     kundeId,
     ansprechpartnerId,
     kundeObjektId,
+    objektAnlageId,
     planOk,
     plan,
     positionenBerechnet,
@@ -926,7 +934,7 @@ export function RechnungWizard({
   }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
       if (!opts?.silent) {
-        toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
+        toast.error('Abschlag nur mit Auftrag')
       }
       return null
     }
@@ -940,7 +948,7 @@ export function RechnungWizard({
 
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Plan anpassen (100 %)')
       return
     }
     if (sendMail) {
@@ -966,6 +974,7 @@ export function RechnungWizard({
         kunde_id: kundeId,
         ansprechpartner_id: ansprechpartnerId,
         kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
         meta: nextMeta,
       })
       if (!sync.ok) {
@@ -1347,6 +1356,7 @@ export function RechnungWizard({
         meta={metaColumn}
         className="wizard-flow"
         manageHistory={false}
+        draftDirty={draftDirty}
       />
 
       <EditorSheet
@@ -1435,11 +1445,20 @@ export function RechnungWizard({
               onChange={(patch) => {
                 if (patch.kunde_objekt_id !== undefined) {
                   setKundeObjektId(patch.kunde_objekt_id)
+                  if (patch.objekt_anlage_id === undefined) {
+                    setObjektAnlageId(null)
+                  }
+                  setDraftDirty(true)
+                }
+                if (patch.objekt_anlage_id !== undefined) {
+                  setObjektAnlageId(patch.objekt_anlage_id)
                   setDraftDirty(true)
                 }
               }}
               objekte={hvObjekte}
               onNeuObjekt={() => setObjektNeuOpen(true)}
+              kundeId={kundeId}
+              gewerke={gewerke}
             />
           </div>
         ) : null}
@@ -1466,6 +1485,7 @@ export function RechnungWizard({
               return [...prev, objekt]
             })
             setKundeObjektId(objekt.id)
+            setObjektAnlageId(null)
             setDraftDirty(true)
             setObjektNeuOpen(false)
           }}

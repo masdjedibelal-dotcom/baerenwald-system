@@ -450,7 +450,7 @@ export function AuftragDetailClient({
       return
     }
     if (!detail.lead_id) {
-      toast.error('Keine Anfrage verknüpft — Korrektur nur über das Angebot möglich.')
+      toast.error('Keine Anfrage verknüpft')
       return
     }
     startTransition(async () => {
@@ -481,7 +481,7 @@ export function AuftragDetailClient({
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
-      toast.info('Nachtrag-Angebot — der laufende Auftrag bleibt bis zur Annahme unverändert.')
+      toast.info('Nachtrag — Auftrag unverändert')
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
@@ -668,7 +668,9 @@ export function AuftragDetailClient({
     return parts.filter(Boolean).join(' · ')
   }, [projektName, detail.created_at])
 
-  const freigabeAusstehend = (_leadDetail?.org_freigabe_status ?? '').trim() === 'ausstehend'
+  const freigabeStatus = (_leadDetail?.org_freigabe_status ?? '').trim()
+  const freigabeAusstehend =
+    freigabeStatus === 'ausstehend' || freigabeStatus === 'beschluss_ausstehend'
 
   const positionenAktiv = useMemo(
     () => auftragPositionenFuerSumme(detail.auftrag_positionen),
@@ -1111,7 +1113,14 @@ export function AuftragDetailClient({
       head={{
         title: name,
         titleBadges: freigabeAusstehend ? (
-          <StatusBadge status="termin" label="Wartet auf Freigabe" />
+          <StatusBadge
+            status="termin"
+            label={
+              freigabeStatus === 'beschluss_ausstehend'
+                ? 'Wartet auf Beschluss'
+                : 'Wartet auf Freigabe'
+            }
+          />
         ) : null,
         badges: (
           <StatusBadge status={detail.status} label={auftragStatus.label} />
@@ -1175,16 +1184,30 @@ export function AuftragDetailClient({
                 disabled: pending,
               }
             })()}
-            secondary={
-              !istStorniert && detail.angebot_id
-                ? {
-                    label: 'Auftrag bearbeiten',
-                    icon: 'pencil',
-                    onClick: openAngebotKorrektur,
-                    disabled: pending,
-                  }
-                : null
-            }
+            secondary={(() => {
+              if (istStorniert) return null
+              if (
+                detail.status === 'abgeschlossen' &&
+                naechsteRechnungAktion?.art === 'versenden' &&
+                naechsteRechnungAktion.rechnungId
+              ) {
+                return {
+                  label: 'Rechnung versenden',
+                  icon: 'send',
+                  onClick: () => versendeNaechsteRechnung(naechsteRechnungAktion.rechnungId!),
+                  disabled: pending,
+                }
+              }
+              if (detail.angebot_id) {
+                return {
+                  label: 'Auftrag bearbeiten',
+                  icon: 'pencil',
+                  onClick: openAngebotKorrektur,
+                  disabled: pending,
+                }
+              }
+              return null
+            })()}
             menuItems={
               !istStorniert && detail.angebot_id && detail.lead_id
                 ? [

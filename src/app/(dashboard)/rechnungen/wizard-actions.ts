@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import {
   createGutschriftFromRechnung,
   createRechnungEntwurf,
@@ -115,6 +116,8 @@ export type SaveRechnungWizardDraftPayload = {
   ansprechpartner_id?: string | null
   /** Ausführungsort / Verwaltungsobjekt. */
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort. */
+  objekt_anlage_id?: string | null
 }
 
 function materialSnapshotFromRec(rec: Record<string, unknown>): RechnungMaterialSnapshot {
@@ -203,6 +206,7 @@ async function positionenAusAuftrag(
   angebot_id: string | null
   kunde_id: string
   kunde_objekt_id: string | null
+  objekt_anlage_id: string | null
   auftragsReferenz: string
   projektTitel: string | null
   leistungszeitraum_von: string | null
@@ -230,7 +234,7 @@ async function positionenAusAuftrag(
       zahlungsplan,
       ist_wiederkehrend,
       wiederkehr_turnus,
-      angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan, kunde_objekt_id),
+      angebote(id, positionen, leistungsumfang, notizen, zahlungsbedingungen, zahlungsplan, kunde_objekt_id, objekt_anlage_id),
       auftrag_positionen(*)
     `
     )
@@ -349,6 +353,9 @@ async function positionenAusAuftrag(
     angebot_id: (auf.angebot_id as string | null) ?? null,
     kunde_id: kundeId,
     kunde_objekt_id: angJoin?.kunde_objekt_id?.trim() || null,
+    objekt_anlage_id:
+      (angJoin as { objekt_anlage_id?: string | null } | null)?.objekt_anlage_id?.trim() ||
+      null,
     auftragsReferenz,
     projektTitel,
     leistungszeitraum_von: (auf.start_datum as string | null) ?? null,
@@ -612,16 +619,20 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       let rechnungsnummer: string | null = null
       let ansprechpartnerId: string | null = null
       let kundeObjektId: string | null = basis.kunde_objekt_id
+      let objektAnlageId: string | null = basis.objekt_anlage_id
       if (rechnungId) {
         const { data: nrRow } = await supabase
           .from('rechnungen')
-          .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id')
+          .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id, objekt_anlage_id')
           .eq('id', rechnungId)
           .maybeSingle()
         rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
         ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
         if (nrRow?.kunde_objekt_id) {
           kundeObjektId = String(nrRow.kunde_objekt_id)
+        }
+        if (nrRow?.objekt_anlage_id) {
+          objektAnlageId = String(nrRow.objekt_anlage_id)
         }
       }
 
@@ -635,6 +646,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           kundeId: basis.kunde_id,
           ansprechpartnerId,
           kundeObjektId,
+          objektAnlageId,
           kunde: kunde ?? null,
           positionen,
           meta,
@@ -726,16 +738,20 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     let rechnungsnummer: string | null = null
     let ansprechpartnerId: string | null = null
     let kundeObjektId: string | null = basis.kunde_objekt_id
+    let objektAnlageId: string | null = basis.objekt_anlage_id
     if (draftRechnungId) {
       const { data: nrRow } = await supabase
         .from('rechnungen')
-        .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id')
+        .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id, objekt_anlage_id')
         .eq('id', draftRechnungId)
         .maybeSingle()
       rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
       ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
       if (nrRow?.kunde_objekt_id) {
         kundeObjektId = String(nrRow.kunde_objekt_id)
+      }
+      if (nrRow?.objekt_anlage_id) {
+        objektAnlageId = String(nrRow.objekt_anlage_id)
       }
     }
 
@@ -749,6 +765,7 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         kundeId: basis.kunde_id,
         ansprechpartnerId,
         kundeObjektId,
+        objektAnlageId,
         kunde: kunde ?? null,
         positionen,
         meta,
@@ -885,6 +902,10 @@ export async function loadRechnungWizardBootstrap(
         (rec.kunde_objekt_id as string | null)?.trim() ||
         basis.kunde_objekt_id ||
         null,
+      objektAnlageId:
+        (rec.objekt_anlage_id as string | null)?.trim() ||
+        basis.objekt_anlage_id ||
+        null,
       kunde: kunde ?? null,
       positionen,
       meta,
@@ -1016,6 +1037,7 @@ export async function loadRechnungWizardBootstrapStandalone(
       kundeId: (rec.kunde_id as string) ?? '',
       ansprechpartnerId: (rec.ansprechpartner_id as string | null) ?? null,
       kundeObjektId: (rec.kunde_objekt_id as string | null) ?? null,
+      objektAnlageId: (rec.objekt_anlage_id as string | null) ?? null,
       kunde: kunde ?? null,
       positionen,
       meta,
@@ -1213,6 +1235,7 @@ export async function saveRechnungWizardDraft(
     liste_berechnung,
     ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
     kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+    objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
   }
 
   if (input.rechnungId) {
@@ -1396,6 +1419,7 @@ function entwurfPayloadAusWizardMeta(
     wiederkehr_turnus: input.wiederkehr_turnus,
     ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
     kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+    objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
   }
 }
 
@@ -1580,7 +1604,7 @@ export async function syncRechnungWizardMetaToEntwurf(
   rechnungId: string,
   input: Pick<
     SaveRechnungWizardDraftPayload,
-    'kunde_id' | 'meta' | 'ansprechpartner_id' | 'kunde_objekt_id'
+    'kunde_id' | 'meta' | 'ansprechpartner_id' | 'kunde_objekt_id' | 'objekt_anlage_id'
   >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
@@ -1600,6 +1624,9 @@ export async function syncRechnungWizardMetaToEntwurf(
         : {}),
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+        : {}),
+      ...(input.objekt_anlage_id !== undefined
+        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
         : {}),
       leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
       leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
@@ -1685,7 +1712,9 @@ export async function finalizeRechnungWizardWithoutMail(
 export async function deleteRechnungEntwurf(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: rec } = await supabase
     .from('rechnungen')
     .select('status, auftrag_id, rechnungsnummer')
@@ -1697,11 +1726,13 @@ export async function deleteRechnungEntwurf(
   const status = String(rec.status ?? '')
     .trim()
     .toLowerCase()
-  const erlaubt = new Set(['entwurf', 'gesendet', 'versendet', 'bezahlt', 'storniert'])
-  if (!erlaubt.has(status)) {
+  if (status !== 'entwurf') {
     return {
       ok: false,
-      message: `Rechnung mit Status „${rec.status ?? 'unbekannt'}“ kann nicht gelöscht werden.`,
+      message:
+        status === 'gesendet' || status === 'versendet' || status === 'bezahlt'
+          ? 'Nur Entwürfe können gelöscht werden — Korrektur über Storno.'
+          : `Rechnung mit Status „${rec.status ?? 'unbekannt'}“ kann nicht gelöscht werden.`,
     }
   }
 
@@ -1714,7 +1745,7 @@ export async function deleteRechnungEntwurf(
   return { ok: true }
 }
 
-/** Alias — Löschen inkl. erledigter Rechnungen (bezahlt/storniert/gesendet). */
+/** Alias — gleiche Härte wie deleteRechnungEntwurf (nur Status entwurf). */
 export async function deleteRechnung(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {

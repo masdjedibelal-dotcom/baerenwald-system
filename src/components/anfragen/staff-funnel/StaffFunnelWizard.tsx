@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage, searchMieterFuerHv, type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
+import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
@@ -21,7 +22,7 @@ import {
 } from '@/lib/vorab-formular-config'
 import { defaultGroesseEinheit, GROESSEN_EINHEITEN, groesseEinheitLabel } from '@/lib/dokument-einheiten'
 import { KANAL_LABELS, cn } from '@/lib/utils'
-import type { Kunde, KundenObjekt, LeadKanal } from '@/lib/types'
+import type { Kunde, KundenObjekt, LeadKanal, Gewerk } from '@/lib/types'
 import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import {
   DRINGLICHKEIT_OPTIONS,
@@ -48,6 +49,7 @@ import {
   StaffChoiceGrid,
   StaffPreisIndikation,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
+import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
 
 const STAFF_KANAL: LeadKanal[] = [
   'telefon',
@@ -195,6 +197,7 @@ const MIETER_OBJEKT_CLEAR = {
   mieterTelefon: '',
   mieterKundeId: null as string | null,
   kundeObjektId: null as string | null,
+  objektAnlageId: null as string | null,
   objektPlz: '',
   objektOrt: '',
   objektStrasse: '',
@@ -207,11 +210,15 @@ function HvMieterObjektFields({
   patch,
   objekte,
   objekteLaden,
+  kundeId,
+  gewerke,
 }: {
   state: StaffFunnelState
   patch: (p: Partial<StaffFunnelState>) => void
   objekte: KundenObjekt[]
   objekteLaden: boolean
+  kundeId: string | null
+  gewerke: Gewerk[]
 }) {
   const [suche, setSuche] = useState('')
   const [treffer, setTreffer] = useState<MieterSuchTreffer[]>([])
@@ -238,6 +245,7 @@ function HvMieterObjektFields({
     if (!id) {
       patch({
         kundeObjektId: null,
+        objektAnlageId: null,
         objektStrasse: '',
         objektHausnummer: '',
         objektPlz: '',
@@ -247,11 +255,12 @@ function HvMieterObjektFields({
     }
     const o = objekte.find((x) => x.id === id)
     if (!o) {
-      patch({ kundeObjektId: id })
+      patch({ kundeObjektId: id, objektAnlageId: null })
       return
     }
     patch({
       kundeObjektId: o.id,
+      objektAnlageId: null,
       objektStrasse: o.strasse ?? '',
       objektHausnummer: o.hausnummer ?? '',
       objektPlz: o.plz ?? '',
@@ -441,6 +450,14 @@ function HvMieterObjektFields({
         </p>
       )}
 
+      <AnlageTeilPicker
+        kundeId={kundeId}
+        kundeObjektId={state.kundeObjektId}
+        value={state.objektAnlageId}
+        onChange={(objektAnlageId) => patch({ objektAnlageId })}
+        gewerke={gewerke}
+      />
+
       <MeldeadresseFields state={state} patch={patch} />
     </div>
   )
@@ -472,6 +489,7 @@ export function StaffFunnelWizard({
   const [meldeAbweichend, setMeldeAbweichend] = useState(false)
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
   const [hvObjekteLaden, setHvObjekteLaden] = useState(false)
+  const [gewerke, setGewerke] = useState<Gewerk[]>([])
   const [kundeAdresse, setKundeAdresse] = useState<{
     plz: string
     ort: string
@@ -480,6 +498,13 @@ export function StaffFunnelWizard({
   } | null>(null)
 
   useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    if (!open) return
+    void listGewerkeFuerFab()
+      .then((r) => setGewerke(r.ok ? (r.gewerke as Gewerk[]) : []))
+      .catch(() => setGewerke([]))
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -1126,6 +1151,8 @@ export function StaffFunnelWizard({
                 patch={patch}
                 objekte={hvObjekte}
                 objekteLaden={hvObjekteLaden}
+                kundeId={state.kundeId}
+                gewerke={gewerke}
               />
             ) : (
               <>

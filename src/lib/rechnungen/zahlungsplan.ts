@@ -26,6 +26,11 @@ export type ZahlungsplanZeile = {
   faellig_am?: string | null
   /** Auftragspositionen, die dieser Abschlagsrechnung zugeordnet sind (Schluss = Rest automatisch) */
   position_ids?: string[]
+  /**
+   * Gebundene Rechnung (wenn gesetzt, aber RE fehlt → tote Verknüpfung).
+   * Wird beim Erstellen/Verknüpfen gesetzt; bleibt nach Hard-Delete der RE stehen.
+   */
+  rechnung_id?: string | null
   pdf_einleitung_vorlage?: string | null
   mail_einleitung_vorlage?: string | null
   mail_betreff_vorlage?: string | null
@@ -81,6 +86,7 @@ export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): Zah
     wert: partial?.wert ?? 50,
     faellig_am: partial?.faellig_am?.trim() || null,
     position_ids: partial?.position_ids?.length ? [...partial.position_ids] : [],
+    rechnung_id: partial?.rechnung_id?.trim() || null,
     pdf_einleitung_vorlage: partial?.pdf_einleitung_vorlage ?? null,
     mail_einleitung_vorlage: partial?.mail_einleitung_vorlage ?? null,
     mail_betreff_vorlage: partial?.mail_betreff_vorlage ?? null,
@@ -115,6 +121,11 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
       position_ids: Array.isArray(z.position_ids)
         ? z.position_ids.map((id) => String(id)).filter(Boolean)
         : [],
+      rechnung_id:
+        typeof (z as ZahlungsplanZeile).rechnung_id === 'string' &&
+        (z as ZahlungsplanZeile).rechnung_id!.trim()
+          ? (z as ZahlungsplanZeile).rechnung_id!.trim()
+          : null,
       pdf_einleitung_vorlage: z.pdf_einleitung_vorlage?.trim() || null,
       mail_einleitung_vorlage: z.mail_einleitung_vorlage?.trim() || null,
       mail_betreff_vorlage: z.mail_betreff_vorlage?.trim() || null,
@@ -256,6 +267,21 @@ export function zahlplanRateStatus(
   if (st === 'entwurf') return 'geplant'
   if (st === 'bezahlt') return 'bezahlt'
   return 'gestellt'
+}
+
+/**
+ * Rate hatte eine Rechnung-ID (Plan oder Link), aber die RE fehlt in der geladenen Liste
+ * (Hard-Delete) → UI-Hinweis „vorherige Rechnung gelöscht“.
+ */
+export function zahlplanZeileVorherigeRechnungGeloescht(
+  zeile: Pick<ZahlungsplanZeile, 'id' | 'rechnung_id'>,
+  rechnungen: Array<{ id?: string | null; zahlungsplan_abschlag_id?: string | null }>
+): boolean {
+  const expectedId = zeile.rechnung_id?.trim() || null
+  if (expectedId) {
+    return !rechnungen.some((r) => String(r.id ?? '') === expectedId)
+  }
+  return false
 }
 
 /** Gestellte/bezahlte Raten → Ist-Brutto für Rest-Berechnung der Schlussrate.

@@ -140,7 +140,7 @@ export function AbnahmeMaengelBearbeitenFlow({
         Schließen
       </Button>
       <Button type="button" variant="primary" onClick={onDone} disabled={pending}>
-        Fertig
+        Speichern
       </Button>
     </div>
   )

@@ -1,6 +1,6 @@
 # Aktions-Smoke Runde 3 (Staging) — staff2
 
-**Datum:** 2026-08-26T09:31:15.380Z  
+**Datum:** 2026-08-26T13:00:07.828Z  
 **CRM:** https://staging--baerenwald-backend.netlify.app  
 **Login:** `staff2@staging.baerenwald.test`  
 **Daten:** LEGACY-Seed + Staging-Seed (+ PRODSIM falls vorhanden)  
@@ -12,11 +12,11 @@
 
 | Status | n |
 |---|---:|
-| ✅ ok | 50 |
+| ✅ ok | 55 |
 | 🔒 disabled | 1 |
 | ❌ fail | 0 |
 | 💥 crash | 0 |
-| ⏭️ skip | 28 |
+| ⏭️ skip | 26 |
 
 ## Matrix
 
@@ -24,7 +24,7 @@
 
 | Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| Datensatz-Suche | ⏭️ | keine PRODSIM-Zeilen auf Staging — Import nachziehen |
+| Datensatz-Suche | ✅ | 3 Treffer |
 
 ### Rechnung
 
@@ -41,7 +41,7 @@
 | storno zurücknehmen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
 | Mahnung | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
 | löschen | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
-| PDF (Header) | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
+| PDF (Header) | ✅ | Aktion ausgeführt ohne sichtbaren Fehler |
 | öffnen (ohne Nummer/gesendet) | ✅ | Detail geladen HTTP 200 |
 | öffnen (Alt-Status teilbezahlt) | ✅ | Detail geladen HTTP 200 |
 | Alt-Status Badge (teilbezahlt) | ✅ | Rohwert auf Seite sichtbar |
@@ -93,6 +93,9 @@ Markiert das Angebot als abgelehnt und kann den zugehörigen Le |
 | öffnen (Alt wartend) | ✅ | Detail geladen HTTP 200 |
 | Alt-Status Badge (wartend) | ✅ | Rohwert auf Seite sichtbar |
 | öffnen (HW halb-migriert) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-Allgemein — Aryan Nazar) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-Elektrik — Raphael Ensinger) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-reinigung — Genius Hausverwaltun) | ✅ | Detail geladen HTTP 200 |
 | öffnen (Seed R2) | ✅ | Detail geladen HTTP 200 |
 
 ### Zahlplan

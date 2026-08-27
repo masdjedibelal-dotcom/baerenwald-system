@@ -51,6 +51,8 @@ export type ProjektKontext = {
     titel: string | null
     status: string
     created_at?: string | null
+    /** Für Dead-Ref-Erkennung (Angebot gelöscht, FK noch gesetzt) */
+    angebot_id?: string | null
     /** Für konsolidierte Akte über alle Phasen */
     abnahme_protokoll_url?: string | null
     abschlussdokumentation_url?: string | null

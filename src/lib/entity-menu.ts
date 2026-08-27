@@ -17,6 +17,7 @@ export type EntityMenuItem =
       label: string
       hint?: string
       danger?: boolean
+      disabled?: boolean
       onClick: () => void
     }
 

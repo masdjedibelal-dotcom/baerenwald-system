@@ -66,19 +66,26 @@ export function formatPreis(fix?: number | null, min?: number | null, max?: numb
 }
 
 export function formatDatum(datum: string): string {
-  const d = new Date(datum)
+  const raw = (datum ?? '').trim()
+  if (!raw) return '—'
+  // YYYY-MM-DD → lokal mittags parsen (kein UTC-Tagesversatz)
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
+  const d = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
+    : new Date(raw)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}.${mm}.${yyyy}`
 }
 
 export function formatDatumZeit(datum: string): string {
   const d = new Date(datum)
   if (Number.isNaN(d.getTime())) return '—'
+  // Feste Zone — sonst Hydration-Mismatch SSR (UTC) vs. Browser (lokal)
   return d.toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -174,10 +181,10 @@ export const FORMULAR_PHASE_LABELS: Record<string, string> = {
 
 export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
   entwurf: 'Entwurf',
-  gesendet_handwerker: 'Gesendet Handwerker',
-  handwerker_akzeptiert: 'Handwerker akzeptiert',
-  gesendet_kunde: 'Gesendet Kunde',
-  kunde_akzeptiert: 'Kunde akzeptiert',
+  gesendet_handwerker: 'An Partner gesendet',
+  handwerker_akzeptiert: 'Partner akzeptiert',
+  gesendet_kunde: 'Gesendet',
+  kunde_akzeptiert: 'Angenommen',
   abgelehnt: 'Abgelehnt',
 }
 

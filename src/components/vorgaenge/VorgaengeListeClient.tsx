@@ -28,14 +28,17 @@ import {
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { toast } from '@/components/ui/app-toast'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import {
@@ -110,6 +113,14 @@ const VORGAENGE_CHECK_COL: ResizableColDef = {
   defaultWidth: 36,
   minWidth: 36,
   maxWidth: 36,
+  fixed: true,
+}
+
+const VORGAENGE_MENU_COL: ResizableColDef = {
+  id: 'menu',
+  defaultWidth: 40,
+  minWidth: 40,
+  maxWidth: 40,
   fixed: true,
 }
 
@@ -282,10 +293,10 @@ export function VorgaengeListeClient({
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const colDefs = useMemo(() => {
     const data = VORGAENGE_DATA_COLS.filter((c) => visibleCols[c.id as DataColId])
-    return [VORGAENGE_CHECK_COL, ...data]
+    return [VORGAENGE_CHECK_COL, ...data, VORGAENGE_MENU_COL]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v5.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v6.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -301,6 +312,11 @@ export function VorgaengeListeClient({
   useEffect(() => {
     setSelected({})
   }, [lifecycle])
+
+  /** F-178: Selektion bei Suche/Filter/Phase leeren — keine unsichtbaren Häkchen. */
+  useEffect(() => {
+    setSelected({})
+  }, [query, filter, statusFilter, fKunde, fTitel, fWertVon, fWertBis, fDatumVon, fDatumBis, rechnungRichtung])
 
   const syncPhaseToUrl = useCallback(
     (
@@ -818,12 +834,27 @@ export function VorgaengeListeClient({
     displayItems.length > 0 && displayItems.every((v) => selected[rowKey(v)])
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
+  const showSelectAllFilteredLink =
+    filtered.length > displayItems.length && !allFilteredSelected
 
-  const toggleSelectAll = () => {
-    if (allFilteredSelected) {
-      setSelected({})
+  /** Header: nur sichtbare Zeilen der aktuellen Ansicht (Seite / Infinite-Chunk). */
+  const toggleSelectVisible = () => {
+    if (allPageSelected) {
+      setSelected((prev) => {
+        const n = { ...prev }
+        for (const v of displayItems) delete n[rowKey(v)]
+        return n
+      })
       return
     }
+    setSelected((prev) => {
+      const n = { ...prev }
+      for (const v of displayItems) n[rowKey(v)] = true
+      return n
+    })
+  }
+
+  const selectAllFiltered = () => {
     const n: Record<string, boolean> = {}
     filtered.forEach((v) => {
       n[rowKey(v)] = true
@@ -835,7 +866,7 @@ export function VorgaengeListeClient({
 
   const filterFooter = (
     <div className="sheet-footer-actions">
-      <MockBtn kind="secondary" onClick={resetFilters}>
+      <MockBtn kind="ghost" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
@@ -1129,6 +1160,11 @@ export function VorgaengeListeClient({
           <span className="bulkbar-count">
             <b>{selectedCount}</b> ausgewählt
           </span>
+          {showSelectAllFilteredLink ? (
+            <MockBtn kind="ghost" sm onClick={selectAllFiltered}>
+              Alle {filtered.length} Treffer auswählen
+            </MockBtn>
+          ) : null}
           <div style={{ flex: 1 }} />
           <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
             Export
@@ -1160,9 +1196,9 @@ export function VorgaengeListeClient({
         }}
         icon="trash"
         title={
-          selectedCount === 1
+          selectedRows.length === 1
             ? 'Vorgang löschen?'
-            : `${selectedCount} Vorgänge löschen?`
+            : `${selectedRows.length} Vorgänge löschen?`
         }
         sub="Dauerhaft entfernen — Kunde bleibt erhalten."
         size="sm"
@@ -1175,7 +1211,7 @@ export function VorgaengeListeClient({
             <MockBtn
               kind="danger"
               icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
+              disabled={bulkDeletePending || selectedRows.length === 0}
               onClick={() => void runBulkDelete()}
             >
               {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
@@ -1184,11 +1220,37 @@ export function VorgaengeListeClient({
         }
       >
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-          {bulkDeletePending
-            ? 'Bitte warten…'
-            : selectedCount === 1
-              ? 'Der ausgewählte Vorgang wird unwiderruflich gelöscht.'
-              : `${selectedCount} ausgewählte Vorgänge werden unwiderruflich gelöscht.`}
+          {bulkDeletePending ? (
+            'Bitte warten…'
+          ) : selectedRows.length === 0 ? (
+            <p className="m-0">
+              Keine der ausgewählten Zeilen ist im aktuellen Filter sichtbar — bitte Filter
+              anpassen oder Auswahl aufheben.
+            </p>
+          ) : (
+            <>
+              <p className="m-0 mb-2">
+                {selectedRows.length === 1
+                  ? 'Dieser Vorgang wird unwiderruflich gelöscht:'
+                  : 'Diese Vorgänge werden unwiderruflich gelöscht:'}
+              </p>
+              <ul className="m-0 mb-0 pl-5" style={{ listStyle: 'disc' }}>
+                {selectedRows.slice(0, 10).map((v) => (
+                  <li key={rowKey(v)}>
+                    {(v.titel || 'Ohne Titel').trim()}
+                    {v.kundeName ? (
+                      <span style={{ color: 'var(--text-3)' }}> · {v.kundeName}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {selectedRows.length > 10 ? (
+                <p className="m-0 mt-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+                  + {selectedRows.length - 10} weitere
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </MockModal>
 
@@ -1198,20 +1260,18 @@ export function VorgaengeListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectAll()
-            }}
-            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          <ListRowCheck
+            checked={allPageSelected}
+            partial={
+              !allPageSelected && displayItems.some((v) => selected[rowKey(v)])
+            }
+            onToggle={toggleSelectVisible}
+            title={
+              allPageSelected
+                ? 'Auswahl dieser Ansicht aufheben'
+                : 'Sichtbare Zeilen auswählen'
+            }
+          />
           {visibleCols.kunde ? (
           <MockSortHead
             col="kunde"
@@ -1334,6 +1394,13 @@ export function VorgaengeListeClient({
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
             const edit = () => openDetail(v)
+            const rowMenu: EntityMenuItem[] = [
+              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(v) },
+              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
+              { icon: 'copy', label: 'Duplizieren', onClick: copy },
+              'sep',
+              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+            ]
             const row = (
               <div
                 className={cn(
@@ -1352,17 +1419,10 @@ export function VorgaengeListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(key)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[key] && 'on')}>
-                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[key])}
+                  onToggle={() => toggleSel(key)}
+                />
                 {visibleCols.kunde ? (
                 <div className="vg-kunde">
                   <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
@@ -1405,7 +1465,26 @@ export function VorgaengeListeClient({
                 </div>
                 ) : null}
                 {visibleCols.status ? (
-                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                  {v.badges?.notfall ? (
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title="Notfall"
+                      aria-label="Notfall"
+                    >
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          background: 'var(--danger, #c0392b)',
+                          display: 'inline-block',
+                          flexShrink: 0,
+                        }}
+                      />
+                    </span>
+                  ) : null}
                   {korrekturUi?.dualBadges ? (
                     <>
                       <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
@@ -1416,6 +1495,13 @@ export function VorgaengeListeClient({
                   )}
                 </div>
                 ) : null}
+                <div
+                  className="vg-row-menu"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+                </div>
               </div>
             )
             return (

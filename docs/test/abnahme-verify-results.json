@@ -1,0 +1,333 @@
+{
+  "finished_at": "2026-08-26T13:07:53.456Z",
+  "by": {
+    "warn": 3,
+    "ok": 23,
+    "fail": 3,
+    "skip": 17
+  },
+  "results": [
+    {
+      "block": "A-D",
+      "id": "C3-Login-Spinner",
+      "status": "warn",
+      "note": "Spinner nicht eingefangen (zu schnell)",
+      "at": "2026-08-26T13:05:53.937Z"
+    },
+    {
+      "block": "A-D",
+      "id": "C3-Callback-Splash",
+      "status": "ok",
+      "note": "Splash sichtbar",
+      "at": "2026-08-26T13:05:57.052Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A7-Suche-Org",
+      "status": "ok",
+      "note": "Treffer sichtbar",
+      "at": "2026-08-26T13:06:01.786Z"
+    },
+    {
+      "block": "A-D",
+      "id": "B1-RE-Overflow",
+      "status": "ok",
+      "note": "Menü: pdf=true storno=true mahnung=true del=true · PDF öffnen | Storno / Korrektur | Storno + neue RE | Zahlungserinnerung | Bezahlt — keine Erinnerung | Löschen | Bezahlt — nur Entwü",
+      "at": "2026-08-26T13:06:05.324Z"
+    },
+    {
+      "block": "A-D",
+      "id": "B1-Mahnung-Modal",
+      "status": "fail",
+      "note": "Modal nicht geöffnet",
+      "at": "2026-08-26T13:06:36.149Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A8-Freigabe-Label",
+      "status": "ok",
+      "note": "Freigabe-Text sichtbar",
+      "at": "2026-08-26T13:06:38.936Z"
+    },
+    {
+      "block": "A-D",
+      "id": "C1-Empty-Hints",
+      "status": "ok",
+      "note": "Kundenliste geladen (Empty-Header-Regel Code-Verify)",
+      "at": "2026-08-26T13:06:40.319Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A3-Notfall-Badge",
+      "status": "warn",
+      "note": "kein Notfall-Punkt in aktueller Liste (Seed ggf. ohne Flag)",
+      "at": "2026-08-26T13:06:42.650Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A5-Termin-Mail-Default",
+      "status": "ok",
+      "note": "Code-Verify: TerminModal HV default AUS (Deploy vorausgesetzt)",
+      "at": "2026-08-26T13:06:42.650Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A1-Gutschrift-PDF",
+      "status": "ok",
+      "note": "Gutschrift in DB 537d9dbf — Titel-Logik in angebot-template (Deploy)",
+      "at": "2026-08-26T13:06:42.823Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A9-Abnahme-Portal",
+      "status": "skip",
+      "note": "Portal-Login separat — siehe E2E/ALTDATEN",
+      "at": "2026-08-26T13:06:46.911Z"
+    },
+    {
+      "block": "A-D",
+      "id": "C5-Toasts",
+      "status": "ok",
+      "note": "Toast-Infra live (Mutationen in Smoke belegt)",
+      "at": "2026-08-26T13:06:49.476Z"
+    },
+    {
+      "block": "ALTDATEN-B",
+      "id": "PRODSIM-Daten",
+      "status": "ok",
+      "note": "5 PRODSIM-Kunden",
+      "at": "2026-08-26T13:06:52.376Z"
+    },
+    {
+      "block": "ALTDATEN-B",
+      "id": "PRODSIM-Detail-Staff2",
+      "status": "ok",
+      "note": "Kunde PRODSIM-Ralf Mörth",
+      "at": "2026-08-26T13:06:55.561Z"
+    },
+    {
+      "block": "ALTDATEN-D",
+      "id": "Lead-AltStatus",
+      "status": "ok",
+      "note": "Rohwert in_bearbeitung",
+      "at": "2026-08-26T13:06:57.365Z"
+    },
+    {
+      "block": "ALTDATEN-D",
+      "id": "Angebot-AltStatus-versendet",
+      "status": "ok",
+      "note": "Rohwert versendet",
+      "at": "2026-08-26T13:06:59.241Z"
+    },
+    {
+      "block": "ALTDATEN-D",
+      "id": "Auftrag-AltStatus-wartend",
+      "status": "ok",
+      "note": "Rohwert wartend",
+      "at": "2026-08-26T13:07:01.468Z"
+    },
+    {
+      "block": "ALTDATEN-D",
+      "id": "RE-AltStatus-teilbezahlt",
+      "status": "ok",
+      "note": "Rohwert teilbezahlt",
+      "at": "2026-08-26T13:07:03.542Z"
+    },
+    {
+      "block": "ALTDATEN-C",
+      "id": "Dead-Ref-Auftrag-Orphan",
+      "status": "ok",
+      "note": "Seite lädt ohne Crash",
+      "at": "2026-08-26T13:07:05.577Z"
+    },
+    {
+      "block": "ALTDATEN-B",
+      "id": "LEGACY-fremd-AlsBezahlt-Staff2",
+      "status": "skip",
+      "note": "Button nicht sichtbar (Status?)",
+      "at": "2026-08-26T13:07:08.235Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-02-Cookie",
+      "status": "ok",
+      "note": "Consent-Buttons",
+      "at": "2026-08-26T13:07:09.841Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-03-Impressum",
+      "status": "ok",
+      "note": "Footer-Link",
+      "at": "2026-08-26T13:07:09.844Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-01-Melde",
+      "status": "ok",
+      "note": "Funnel startet",
+      "at": "2026-08-26T13:07:14.873Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-07-Unauth",
+      "status": "ok",
+      "note": "https://staging--baerenwald-backend.netlify.app/login",
+      "at": "2026-08-26T13:07:16.033Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-05-CSV",
+      "status": "ok",
+      "note": "CSV-Export",
+      "at": "2026-08-26T13:07:21.595Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-08-Wizard",
+      "status": "ok",
+      "note": "Wizard lädt",
+      "at": "2026-08-26T13:07:23.624Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-09-HV-Portal",
+      "status": "ok",
+      "note": "https://staging--baerenwald.netlify.app/portal",
+      "at": "2026-08-26T13:07:27.966Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-10-Partner",
+      "status": "warn",
+      "note": "Partner-Portal wird geladen…  Einen Moment — wir bereiten deine Übersicht vor.",
+      "at": "2026-08-26T13:07:32.785Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-11-CTA",
+      "status": "skip",
+      "note": "Confirm-Seite hängt an E2E-.1",
+      "at": "2026-08-26T13:07:32.785Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-04-Notiz",
+      "status": "skip",
+      "note": "Schnelllauf — manuell/Smoke",
+      "at": "2026-08-26T13:07:32.785Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-06-Mobile",
+      "status": "skip",
+      "note": "Schnelllauf — Viewport separat",
+      "at": "2026-08-26T13:07:32.785Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-12-OrgFarbe",
+      "status": "skip",
+      "note": "Seed ohne org_primary_color",
+      "at": "2026-08-26T13:07:32.785Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".1-Melde-Confirm",
+      "status": "fail",
+      "note": "url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10 body=MN  Musterverwaltung Nord  Verwaltung  ORT & KONTAKT  Ihre Adresse und Kontaktdaten Ich stimme der V",
+      "at": "2026-08-26T13:07:53.210Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".1-Lead-DB",
+      "status": "fail",
+      "note": "kein Lead",
+      "at": "2026-08-26T13:07:53.317Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".2-CRM",
+      "status": "skip",
+      "note": "kein Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".2b-HV-Sheet",
+      "status": "skip",
+      "note": "hängt an .2",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".3",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".4",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".5",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".6",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".7",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".8",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".9",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".10",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".11",
+      "status": "skip",
+      "note": "hängt an Melde-Lead",
+      "at": "2026-08-26T13:07:53.318Z"
+    },
+    {
+      "block": "CLEANUP",
+      "id": "ZZTEST-Abnahme-Leads",
+      "status": "ok",
+      "note": "0 offen — Soft-Delete via CRM Confirm empfohlen",
+      "at": "2026-08-26T13:07:53.401Z"
+    }
+  ]
+}

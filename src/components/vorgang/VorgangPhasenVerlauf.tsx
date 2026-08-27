@@ -349,6 +349,8 @@ function buildPhaseRows(
   const angebot = kontext?.angebote[0]
   const hasAngebot = hasAngebotRecord(angebot)
   const auftrag = kontext?.auftrag ?? null
+  const deadAngebotId = auftrag?.angebot_id?.trim() || null
+  const angebotNichtMehrVorhanden = Boolean(deadAngebotId) && !hasAngebot
   const rechnungen = kontext?.rechnungen ?? []
   const latestRe = kontext
     ? [...rechnungen].sort((a, b) =>
@@ -387,12 +389,12 @@ function buildPhaseRows(
 
   if (hasRechnung) {
     anfrageState = 'done'
-    angebotState = 'done'
+    angebotState = angebotNichtMehrVorhanden ? 'open' : 'done'
     auftragState = 'done'
     rechnungState = 'current'
   } else if (auftrag) {
     anfrageState = 'done'
-    angebotState = 'done'
+    angebotState = angebotNichtMehrVorhanden ? 'open' : 'done'
     auftragState = 'current'
   } else if (hasAngebot) {
     anfrageState = 'done'
@@ -429,6 +431,10 @@ function buildPhaseRows(
         ? `${aktiveRechnungen.length} gestellt`
         : rechnungStatusKurz(latestRe!.status) || 'in Bearbeitung'
 
+  const angebotKopfLeer = angebotNichtMehrVorhanden
+    ? 'nicht mehr vorhanden'
+    : 'noch nicht erstellt'
+
   return [
     {
       kind: 'anfrage',
@@ -455,11 +461,13 @@ function buildPhaseRows(
       state: angebotState,
       kopf:
         angebotState === 'open'
-          ? 'noch nicht erstellt'
+          ? angebotKopfLeer
           : angebotState === 'current'
             ? angebotStatusKurz(angebot!.status, angebot!.status_einfach) ||
               'in Bearbeitung'
-            : `angenommen ${angebot?.created_at ? formatDatum(angebot.created_at) : ''}`.trim(),
+            : hasAngebot
+              ? `angenommen ${angebot?.created_at ? formatDatum(angebot.created_at) : ''}`.trim()
+              : angebotKopfLeer,
       betrag: hasAngebot
         ? formatAngebotEurKurzBrutto(
             angebot!.gesamt_fix,

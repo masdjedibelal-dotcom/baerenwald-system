@@ -92,7 +92,10 @@ export function BaustelleRegiearbeitenCard({
     startTransition(async () => {
       const r = await deleteAuftragRegiearbeit(id, auftragId)
       if (!r.ok) toast.error(r.message)
-      else onChanged()
+      else {
+        toast.success('Regiearbeit gelöscht')
+        onChanged()
+      }
     })
   }
 

@@ -605,7 +605,7 @@ function PositionAccordionItem({
         {display !== 'editor' ? (
           <button type="button" className="btn primary sm gap-1.5" onClick={onClose}>
             <Check className="h-3.5 w-3.5" />
-            Fertig
+            Speichern
           </button>
         ) : null}
       </div>

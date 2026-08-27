@@ -7,9 +7,12 @@ import {
   insertKundeDokument,
 } from '@/app/(dashboard)/kunden/dokumente-actions'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { KundenDokumentRow } from '@/lib/types'
-import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
+import type { EntityMenuItem } from '@/lib/entity-menu'
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
@@ -333,7 +336,7 @@ export function KundenDokumenteTab({
       rows.push({
         id,
         name: m?.name?.trim() || r.rechnungsnummer?.trim() || 'Rechnung',
-        href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
+        href: rechnungPdfHref(r.id, r.pdf_url),
         created_at: m?.created_at || r.rechnungsdatum || r.bezahlt_at || new Date().toISOString(),
         groesse_bytes: null,
         quelle: 'rechnung',
@@ -404,20 +407,45 @@ export function KundenDokumenteTab({
 
   function removeDoc(row: DocRow) {
     if (row.quelle !== 'upload' || !row.dokumentId) return
-    if (!confirm(`„${row.name}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deleteKundeDokument(row.dokumentId!, kundeId)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Dokument gelöscht')
-      if (editId === row.id) setEditId(null)
-      onReload()
-    })
+    confirmDelete(
+      'Dokument löschen?',
+      async () => {
+        const r = await deleteKundeDokument(row.dokumentId!, kundeId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Dokument gelöscht')
+        if (editId === row.id) setEditId(null)
+        onReload()
+      },
+      { sub: row.name }
+    )
   }
 
   const busy = uploading || pending
+
+  function docMenuItems(d: DocRow): EntityMenuItem[] {
+    const items: EntityMenuItem[] = []
+    if (d.href?.trim()) {
+      items.push({
+        icon: 'external-link',
+        label: 'Öffnen',
+        onClick: () => openDokumentDatei(d.href),
+      })
+    }
+    if (d.quelle === 'upload') {
+      if (items.length) items.push('sep')
+      items.push({
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        disabled: busy,
+        onClick: () => removeDoc(d),
+      })
+    }
+    return items
+  }
 
   function renderDocList(items: DocRow[]) {
     if (isMobile) {
@@ -501,7 +529,7 @@ export function KundenDokumenteTab({
               )}
               <div
                 className="dok-list__actions"
-                style={{ display: 'flex', gap: 0, justifyContent: 'flex-end' }}
+                style={{ display: 'flex', gap: 0, justifyContent: 'flex-end', alignItems: 'center' }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {editing ? (
@@ -509,20 +537,12 @@ export function KundenDokumenteTab({
                     sm
                     kind="ghost"
                     icon="check"
-                    title="Fertig"
+                    title="Erledigt"
                     onClick={() => setEditId(null)}
                   />
-                ) : null}
-                {d.quelle === 'upload' ? (
-                  <MockBtn
-                    sm
-                    kind="ghost"
-                    icon="trash"
-                    title="Löschen"
-                    disabled={busy}
-                    onClick={() => removeDoc(d)}
-                  />
-                ) : null}
+                ) : (
+                  <MockEntityRowMenu items={docMenuItems(d)} title="Dokument" />
+                )}
               </div>
             </div>
           )

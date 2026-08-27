@@ -13,6 +13,7 @@ import {
   validateKundeStammPflicht,
   type SaveKundeStammInput,
 } from '@/lib/kunde-stammdaten'
+import { crmRoleFromUser } from '@/lib/auth/crm-access'
 import type { Kunde } from '@/lib/types'
 
 /** Lange Auth-Sperre (gleiche Dauer wie bei deaktivierten CRM-Mitarbeitern). */
@@ -170,6 +171,27 @@ export async function deleteKundenNotiz(
   kundeId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const { data: notiz, error: loadErr } = await supabase
+    .from('kunden_notizen')
+    .select('id, erstellt_von')
+    .eq('id', notizId)
+    .eq('kunde_id', kundeId)
+    .maybeSingle()
+  if (loadErr) return { ok: false, message: loadErr.message }
+  if (!notiz) return { ok: false, message: 'Notiz nicht gefunden.' }
+
+  const authorId = (notiz as { erstellt_von?: string | null }).erstellt_von ?? null
+  const isAuthor = Boolean(authorId && authorId === user.id)
+  const isStaff = crmRoleFromUser(user) != null
+  if (!isAuthor && !isStaff) {
+    return { ok: false, message: 'Keine Berechtigung zum Löschen dieser Notiz.' }
+  }
+
   const { error } = await supabase.from('kunden_notizen').delete().eq('id', notizId)
   if (error) return { ok: false, message: error.message }
   revalidatePath(`/kunden/${kundeId}`)
@@ -336,18 +358,21 @@ export async function getPortalLoginHint(
 /** Globale Suche (Cmd+K) — Server Action wegen RLS-Fallback auf kunden. */
 export async function searchKundenGlobal(
   term: string
-): Promise<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>[]> {
+): Promise<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>[]> {
   const q = term.trim().slice(0, 80).replace(/[%]/g, '')
   if (q.length < 2) return []
   const pct = `%${q}%`
-  const byId = new Map<string, Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>>()
+  const byId = new Map<
+    string,
+    Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
+  >()
   const { istHvPortalRollenKunde } = await import('@/lib/kunde-stammdaten')
 
-  for (const column of ['name', 'email'] as const) {
+  for (const column of ['name', 'email', 'org_anzeigename'] as const) {
     const { data } = await withCrmReadFallback(async (db) =>
       db
         .from('kunden')
-        .select('id, name, vorname, nachname, typ, email, portal_modus')
+        .select('id, name, vorname, nachname, typ, email, portal_modus, org_anzeigename')
         .ilike(column, pct)
         .limit(8)
     )
@@ -358,7 +383,7 @@ export async function searchKundenGlobal(
       }
       byId.set(
         row.id as string,
-        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email'>
+        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
       )
       if (byId.size >= 8) break
     }
@@ -671,6 +696,121 @@ export async function duplicateKunde(
 }
 
 /**
+ * Vorschau vor Kunden-Löschen: echte Zähler + Blockade-Grund (kein Cascade).
+ */
+export type KundeDeletePreview = {
+  kundeId: string
+  kundeName: string
+  vorgaenge: number
+  angebote: number
+  auftraege: number
+  rechnungen: number
+  hasMieterStatusToken: boolean
+  blocked: boolean
+  blockReason: string | null
+}
+
+export async function getKundeDeletePreview(
+  kundeId: string
+): Promise<{ ok: true; preview: KundeDeletePreview } | { ok: false; message: string }> {
+  const id = kundeId.trim()
+  if (!id) return { ok: false, message: 'Kunden-ID fehlt.' }
+
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const { data: kunde, error: loadErr } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select('id, name, vorname, nachname')
+      .eq('id', id)
+      .maybeSingle()
+  )
+  if (loadErr || !kunde) {
+    return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
+  }
+
+  const kundeName =
+    String((kunde as { name?: string }).name ?? '').trim() ||
+    [String((kunde as { vorname?: string }).vorname ?? '').trim(), String((kunde as { nachname?: string }).nachname ?? '').trim()]
+      .filter(Boolean)
+      .join(' ') ||
+    'Kunde'
+
+  const [{ data: leadsAlsKunde }, { data: leadsAlsAg }] = await Promise.all([
+    supabaseAdmin
+      .from('leads')
+      .select('id, melde_tracking_token')
+      .eq('kunde_id', id),
+    supabaseAdmin
+      .from('leads')
+      .select('id, melde_tracking_token')
+      .eq('auftraggeber_kunde_id', id),
+  ])
+  const leadMap = new Map<string, { id: string; melde_tracking_token?: string | null }>()
+  for (const l of [...(leadsAlsKunde ?? []), ...(leadsAlsAg ?? [])]) {
+    const lid = String(l.id ?? '').trim()
+    if (lid) leadMap.set(lid, l as { id: string; melde_tracking_token?: string | null })
+  }
+  const leadIds = Array.from(leadMap.keys())
+
+  const [{ data: angebote }, { data: auftraege }, { data: rechnungen }] = await Promise.all([
+    supabaseAdmin.from('angebote').select('id').eq('kunde_id', id),
+    supabaseAdmin.from('auftraege').select('id, status').eq('kunde_id', id),
+    supabaseAdmin.from('rechnungen').select('id, rechnungsnummer').eq('kunde_id', id),
+  ])
+
+  let auftraegeExtra: { id: string; status: string | null }[] = []
+  if (leadIds.length) {
+    const { data: viaLeads } = await supabaseAdmin
+      .from('auftraege')
+      .select('id, status')
+      .in('lead_id', leadIds)
+    auftraegeExtra = (viaLeads ?? []) as { id: string; status: string | null }[]
+  }
+
+  const auftragById = new Map<string, string | null>()
+  for (const a of [...(auftraege ?? []), ...auftraegeExtra]) {
+    auftragById.set(String(a.id), (a as { status?: string | null }).status ?? null)
+  }
+
+  const openAuftraege = Array.from(auftragById.values()).filter(
+    (st) => (st ?? '').toLowerCase() !== 'storniert'
+  ).length
+
+  const numberedRechnungen = (rechnungen ?? []).filter((r) =>
+    Boolean(String((r as { rechnungsnummer?: string | null }).rechnungsnummer ?? '').trim())
+  ).length
+
+  const hasMieterStatusToken = Array.from(leadMap.values()).some((l) =>
+    Boolean(String(l.melde_tracking_token ?? '').trim())
+  )
+
+  const blocked = openAuftraege > 0 || numberedRechnungen > 0
+  const blockReason = blocked
+    ? 'Löschen nicht möglich — offener Auftrag / nummerierte Rechnung vorhanden. Erst stornieren oder Kunde stattdessen als inaktiv/Spam markieren.'
+    : null
+
+  return {
+    ok: true,
+    preview: {
+      kundeId: id,
+      kundeName,
+      vorgaenge: leadIds.length,
+      angebote: (angebote ?? []).length,
+      auftraege: auftragById.size,
+      rechnungen: (rechnungen ?? []).length,
+      hasMieterStatusToken,
+      blocked,
+      blockReason,
+    },
+  }
+}
+
+/**
  * Kunde löschen inkl. Vorgänge und HV-Hierarchie.
  *
  * Bei Hausverwaltung (und generell) entfernt das:
@@ -693,6 +833,17 @@ export async function deleteKunde(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+
+  const preview = await getKundeDeletePreview(id)
+  if (!preview.ok) return preview
+  if (preview.preview.blocked) {
+    return {
+      ok: false,
+      message:
+        preview.preview.blockReason ??
+        'Löschen nicht möglich — offener Auftrag / nummerierte Rechnung vorhanden.',
+    }
+  }
 
   const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
     db.from('kunden').select('id, auth_user_id').eq('id', id).maybeSingle()

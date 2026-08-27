@@ -1,0 +1,86 @@
+{
+  "summary": {
+    "ok": 8,
+    "warn": 1,
+    "fail": 1
+  },
+  "rows": [
+    {
+      "id": "status-fe37-hv-warte",
+      "status": "ok",
+      "note": "MN |  | Musterverwaltung Nord |  | Verwaltung |  | Status Ihrer Meldung |  | WEG Leopold 10 (Staging) |  | 1 |  | Eingegangen |  | Ihre Meldung ist bei Ihrer Verwaltung eingegangen. |  | 2 |  | In Bearbeitung |  | 3 |  |",
+      "phase": "Status",
+      "at": "2026-08-26T22:17:21.030Z"
+    },
+    {
+      "id": "hv-uebergeben-fe37",
+      "status": "ok",
+      "note": "Direkt Bärenwald / Übergeben geklickt",
+      "phase": "A2",
+      "at": "2026-08-26T22:17:35.623Z"
+    },
+    {
+      "id": "crm-primary-fe37-nach-hv",
+      "status": "ok",
+      "note": "Primary=\"Angebot erstellen\" (erwartet: Angebot erstellen)",
+      "phase": "A2",
+      "at": "2026-08-26T22:17:45.834Z"
+    },
+    {
+      "id": "db-fe37-nach-hv",
+      "status": "ok",
+      "note": "{\"hv_meldung_status\":\"angebot_eingefordert\",\"org_freigabe_status\":\"nicht_noetig\"}",
+      "phase": "A2",
+      "at": "2026-08-26T22:17:46.051Z"
+    },
+    {
+      "id": "status-fe37-nach-hv",
+      "status": "ok",
+      "note": "MN |  | Musterverwaltung Nord |  | Verwaltung |  | Status Ihrer Meldung |  | WEG Leopold 10 (Staging) |  | ✓ |  | Eingegangen |  | 2 |  | In Bearbeitung |  | Ihre Verwaltung prüft die Meldung und organisiert die nächsten",
+      "phase": "Status",
+      "at": "2026-08-26T22:17:48.391Z"
+    },
+    {
+      "id": "crm-primary-unter",
+      "status": "ok",
+      "note": "Primary=\"Angebot erstellen\" disabled=false",
+      "phase": "A2",
+      "at": "2026-08-26T22:17:55.358Z"
+    },
+    {
+      "id": "wizard-save-unter",
+      "status": "warn",
+      "note": "Keine Angebot-ID in URL: https://staging--baerenwald-backend.netlify.app/anfragen/fe37acab-e6ef-43ad-8bfc-2f72ecf5f5af",
+      "phase": "A2",
+      "at": "2026-08-26T22:17:59.674Z"
+    },
+    {
+      "id": "melde-2",
+      "status": "fail",
+      "note": "Zweite Meldung nicht in DB",
+      "phase": "A2",
+      "at": "2026-08-26T22:18:44.369Z"
+    },
+    {
+      "id": "gate-sued-crm",
+      "status": "ok",
+      "note": "Primary=\"Warte auf HV / Hausmeister\" (Gate auch bei freigabe_modus=direkt?)",
+      "phase": "A2",
+      "at": "2026-08-26T22:19:11.266Z"
+    },
+    {
+      "id": "gate-sued-modus",
+      "status": "info",
+      "note": "freigabe_modus=direkt hv=neu",
+      "phase": "A2",
+      "at": "2026-08-26T22:19:11.399Z"
+    },
+    {
+      "id": "gate-akut",
+      "status": "ok",
+      "note": "Primary=\"Direkt beauftragen\" — Akut soll HV-Start-Gate überspringen",
+      "phase": "A2",
+      "at": "2026-08-26T22:19:36.776Z"
+    }
+  ]
+}

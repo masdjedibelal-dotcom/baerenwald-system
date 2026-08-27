@@ -90,7 +90,14 @@ export function MockPopover({
 
 export type MockPopoverItem =
   | 'sep'
-  | { icon?: string; label: string; danger?: boolean; onClick: () => void }
+  | {
+      icon?: string
+      label: string
+      danger?: boolean
+      disabled?: boolean
+      hint?: string
+      onClick: () => void
+    }
 
 export function MockPopoverMenu({
   items,
@@ -110,14 +117,20 @@ export function MockPopoverMenu({
           <button
             key={it.label}
             type="button"
-            className={cn('pop-item', it.danger && 'danger')}
+            disabled={it.disabled}
+            title={it.disabled && it.hint ? it.hint : undefined}
+            className={cn('pop-item', it.danger && 'danger', it.disabled && 'opacity-50')}
             onClick={() => {
+              if (it.disabled) return
               onItemClick?.()
               it.onClick()
             }}
           >
             {it.icon ? iconFn(it.icon) : <span style={{ width: 18 }} />}
             <span>{it.label}</span>
+            {it.hint ? (
+              <span className="ml-auto pl-2 text-[10px] text-bw-text-muted">{it.hint}</span>
+            ) : null}
           </button>
         )
       )}

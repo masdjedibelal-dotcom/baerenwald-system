@@ -1,0 +1,157 @@
+{
+  "finished_at": "2026-08-26T13:14:39.303Z",
+  "by": {
+    "warn": 6,
+    "ok": 10,
+    "skip": 5
+  },
+  "results": [
+    {
+      "block": "E2E",
+      "id": ".1-Melde-Confirm",
+      "status": "warn",
+      "note": "url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10 · MN |  | Musterverwaltung Nord |  | Verwaltung |  | Meldung wird gesendet… |  | Einen Moment — Fotos und Angaben werden übermittelt.",
+      "at": "2026-08-26T13:13:33.225Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".1-Lead-DB",
+      "status": "ok",
+      "note": "cc565fe3-7053-4983-a9ae-dd0655b2a02e neu",
+      "at": "2026-08-26T13:13:33.438Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".2-CRM",
+      "status": "ok",
+      "note": "Bärenwald | ARBEIT | Dashboard | Vorgänge | Kunden | Handwerker | ORGANISATION | Kalender | KI Analytics | Einstellungen | ⌘K | KI | 13 | Demo-/Test-Account — Transak",
+      "at": "2026-08-26T13:13:48.411Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".2b-HV-Sheet",
+      "status": "ok",
+      "note": "Warte auf HV / Hausmeister |  | Mieter-Meldungen starten mit hv_meldung_status = neu. Bärenwald darf erst disponieren, wenn ",
+      "at": "2026-08-26T13:13:49.372Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".3-Angebot",
+      "status": "warn",
+      "note": "kein Angebot-Link am Lead 6eba",
+      "at": "2026-08-26T13:13:52.866Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".5-Freigabe-UI",
+      "status": "ok",
+      "note": "Label+Buttons counts {\"anfordern\":0,\"erteilen\":0,\"ablehnen\":0}",
+      "at": "2026-08-26T13:13:55.253Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".4-Partner-Auftrag",
+      "status": "ok",
+      "note": "231716aa in_arbeit · Bärenwald ARBEIT Dashboard Vorgänge Kunden Handwerker ORGANISATION Kalender KI A",
+      "at": "2026-08-26T13:14:00.477Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".9-Abnahme",
+      "status": "skip",
+      "note": "kein Abnahme-Tab am aktuellen Auftrag",
+      "at": "2026-08-26T13:14:00.481Z"
+    },
+    {
+      "block": "A-D",
+      "id": "B1-Mahnung-Modal",
+      "status": "ok",
+      "note": "Modal offen",
+      "at": "2026-08-26T13:14:04.965Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A3-Notfall-Badge",
+      "status": "warn",
+      "note": "kein ist_notfall-Auftrag in DB",
+      "at": "2026-08-26T13:14:05.072Z"
+    },
+    {
+      "block": "ALTDATEN-B",
+      "id": "LEGACY-fremd-AlsBezahlt-Staff2",
+      "status": "ok",
+      "note": "ok",
+      "at": "2026-08-26T13:14:16.264Z"
+    },
+    {
+      "block": "A-D",
+      "id": "A9-Abnahme-Portal",
+      "status": "warn",
+      "note": "Portal wird geladen…  Einen Moment — wir bereiten Ihre Übersicht vor.",
+      "at": "2026-08-26T13:14:21.080Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-10-Partner",
+      "status": "warn",
+      "note": "Bärenwald |  | Ihr Portal für alle Vorgänge. |  | Anfragen melden, Angebote freigeben, Termine bestätigen und den Fortschritt in",
+      "at": "2026-08-26T13:14:30.296Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-04-Notiz",
+      "status": "warn",
+      "note": "Notiz-Textarea",
+      "at": "2026-08-26T13:14:36.567Z"
+    },
+    {
+      "block": "R2-3",
+      "id": "R-06-Mobile",
+      "status": "ok",
+      "note": "sw=375 cw=375",
+      "at": "2026-08-26T13:14:38.985Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".10-email_log",
+      "status": "ok",
+      "note": "9 Einträge · Typen: website,crm_password_reset,update_hinweis",
+      "at": "2026-08-26T13:14:39.109Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".6-Korrektur-Refreeze",
+      "status": "skip",
+      "note": "voller >500€ Freigabe-Durchstich nicht in diesem Lauf — Blocker F-176/Zeit",
+      "at": "2026-08-26T13:14:39.109Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".7-HW-Tausch-BT",
+      "status": "skip",
+      "note": "voller >500€ Freigabe-Durchstich nicht in diesem Lauf — Blocker F-176/Zeit",
+      "at": "2026-08-26T13:14:39.109Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".8-Nachtrag",
+      "status": "skip",
+      "note": "voller >500€ Freigabe-Durchstich nicht in diesem Lauf — Blocker F-176/Zeit",
+      "at": "2026-08-26T13:14:39.109Z"
+    },
+    {
+      "block": "E2E",
+      "id": ".11-Abschlag-Schluss",
+      "status": "skip",
+      "note": "voller >500€ Freigabe-Durchstich nicht in diesem Lauf — Blocker F-176/Zeit",
+      "at": "2026-08-26T13:14:39.109Z"
+    },
+    {
+      "block": "CLEANUP",
+      "id": "Soft-Delete-Lead",
+      "status": "ok",
+      "note": "cc565fe3-7053-4983-a9ae-dd0655b2a02e",
+      "at": "2026-08-26T13:14:39.168Z"
+    }
+  ]
+}

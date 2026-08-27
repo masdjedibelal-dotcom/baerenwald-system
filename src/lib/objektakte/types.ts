@@ -94,10 +94,122 @@ export type ObjektAkteReadOnlyPayload = {
   fremdVorgaenge: FremdVorgang[]
 }
 
+import type { ObjektAnlageWartungsintervall } from '@/lib/objektakte/labels'
+
+export type ObjektAnlageStatus = 'aktiv' | 'ausgetauscht' | 'stillgelegt'
+
+export type ObjektAnlage = {
+  id: string
+  kunde_id: string
+  kunde_objekt_id: string
+  bezeichnung: string
+  gewerk_id: string
+  standort: string | null
+  objekt_einheit_id: string | null
+  einbau_datum: string | null
+  foto_url: string | null
+  notiz: string | null
+  hersteller: string | null
+  modell: string | null
+  seriennummer: string | null
+  anschaffungswert_eur: number | null
+  garantie_bis: string | null
+  gewaehrleistung_bis: string | null
+  wartungsintervall: ObjektAnlageWartungsintervall | null
+  letzte_wartung_am: string | null
+  dokument_urls: string[]
+  status: ObjektAnlageStatus
+  sort_order: number
+  created_at: string
+  updated_at: string
+  gewerke?: { id: string; name: string; slug: string } | null
+  objekt_einheiten?: { bezeichnung: string; etage?: string | null } | null
+  /** Anzahl verknüpfter Vorgänge (Loader-Aggregat). */
+  vorgang_count?: number
+}
+
+export type ObjektAnlageInput = {
+  bezeichnung: string
+  gewerk_id: string
+  standort?: string | null
+  objekt_einheit_id?: string | null
+  einbau_datum?: string | null
+  foto_url?: string | null
+  notiz?: string | null
+  status?: ObjektAnlageStatus
+  hersteller?: string | null
+  modell?: string | null
+  seriennummer?: string | null
+  anschaffungswert_eur?: number | null
+  garantie_bis?: string | null
+  gewaehrleistung_bis?: string | null
+  wartungsintervall?: ObjektAnlageWartungsintervall | null
+  letzte_wartung_am?: string | null
+  dokument_urls?: string[] | null
+}
+
+/** Alle Felder aus bestehender Anlage — z. B. für Status-Update ohne Datenverlust. */
+export function anlageToInput(a: ObjektAnlage): ObjektAnlageInput {
+  return {
+    bezeichnung: a.bezeichnung,
+    gewerk_id: a.gewerk_id,
+    standort: a.standort,
+    objekt_einheit_id: a.objekt_einheit_id,
+    einbau_datum: a.einbau_datum,
+    foto_url: a.foto_url,
+    notiz: a.notiz,
+    status: a.status,
+    hersteller: a.hersteller,
+    modell: a.modell,
+    seriennummer: a.seriennummer,
+    anschaffungswert_eur: a.anschaffungswert_eur,
+    garantie_bis: a.garantie_bis,
+    gewaehrleistung_bis: a.gewaehrleistung_bis,
+    wartungsintervall: a.wartungsintervall,
+    letzte_wartung_am: a.letzte_wartung_am,
+    dokument_urls: a.dokument_urls ?? [],
+  }
+}
+
+export type ObjektAnlageVorgangRow = {
+  id: string
+  titel: string
+  created_at: string
+  status: string | null
+  phase: string | null
+  kosten_label: string
+}
+
+import type { VorgangPhase } from '@/lib/vorgang/types'
+
+/** Chronologie-Zeile für Objekt-Historie-Tab / Bericht. */
+export type ObjektHistorieRow = {
+  leadId: string
+  datum: string
+  titel: string
+  einheitLabel: string | null
+  anlageLabel: string | null
+  anlageId: string | null
+  gewerkLabel: string | null
+  phase: VorgangPhase | 'bestand'
+  unterstatus: string
+  unterstatusLabel: string
+  kostenLabel: string
+  kostenEuro: number | null
+  detailHref: string
+  ist_wiederkehrend?: boolean
+}
+
+export type ObjektHistoriePayload = {
+  rows: ObjektHistorieRow[]
+  leadIds: string[]
+}
+
 export type ObjektAkteDetailPayload = ObjektAkteReadOnlyPayload & {
   kontakte: ObjektKontakt[]
   einheiten: ObjektEinheit[]
   bewohner: EinheitBewohner[]
+  anlagen: ObjektAnlage[]
   orgHausmeisterListe: OrgHausmeister[]
   hausmeisterAmObjekt: HausmeisterAmObjekt | null
 }

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
+
 /** HTML/PDF-Vorschau einer gespeicherten Rechnung. */
 export function RechnungWizardPdfPreview({
   rechnungId,
@@ -18,9 +20,7 @@ export function RechnungWizardPdfPreview({
   const previewSrc = rechnungId
     ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(rechnungId)}&preview=html`
     : null
-  const pdfHref = rechnungId
-    ? `/api/rechnung-pdf?rechnungId=${encodeURIComponent(rechnungId)}`
-    : null
+  const pdfHref = rechnungId ? rechnungPdfHref(rechnungId) : null
 
   useEffect(() => {
     setFailed(false)

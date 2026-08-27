@@ -148,7 +148,7 @@ export function buildAnfrageSchwellenHinweis(input: {
 
   if (freigabeAktiv && unterSchwelle) {
     const status = (freigabeStatus ?? '').trim()
-    if (status === 'ausstehend') {
+    if (status === 'ausstehend' || status === 'beschluss_ausstehend') {
       return {
         freigabeAktiv,
         schwelleEur: schwelle,
@@ -158,9 +158,14 @@ export function buildAnfrageSchwellenHinweis(input: {
         notfallDirektErlaubt,
         istAkut,
         istMieterMeldung,
-        headline: `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — HV-Freigabe ausstehend`,
+        headline:
+          status === 'beschluss_ausstehend'
+            ? `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — wartet auf Eigentümerbeschluss`
+            : `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — HV-Freigabe ausstehend`,
         detail:
-          'Preisindikation liegt unter der Freigabe-Schwelle. Warte auf HV-Freigabe oder markiere als Akut, wenn sofort disponiert werden muss.',
+          status === 'beschluss_ausstehend'
+            ? 'Parkzustand Beschluss — Freigabe im HV-Portal nach Beschluss abschließen.'
+            : 'Preisindikation liegt unter der Freigabe-Schwelle. Warte auf HV-Freigabe oder markiere als Akut, wenn sofort disponiert werden muss.',
       }
     }
     if (status === 'freigegeben' || status === 'nicht_noetig' || !status) {
@@ -208,8 +213,10 @@ export function buildAnfrageSchwellenHinweis(input: {
       istMieterMeldung,
       headline: `Über Schwelle (${formatEur(preis)} > ${formatEur(schwelle)}) — HV-Freigabe nötig`,
       detail:
-        freigabeStatus === 'ausstehend'
-          ? 'Angebot an HV zur Freigabe. Bei echter Havarie: als Akut markieren und direkt beauftragen.'
+        freigabeStatus === 'ausstehend' || freigabeStatus === 'beschluss_ausstehend'
+          ? freigabeStatus === 'beschluss_ausstehend'
+            ? 'Wartet auf Eigentümerbeschluss — danach Freigabe/Ablehnung im HV-Portal.'
+            : 'Angebot an HV zur Freigabe. Bei echter Havarie: als Akut markieren und direkt beauftragen.'
           : 'Normalweg: Angebot → HV-Freigabe. Akut nur bei Notfall.',
     }
   }

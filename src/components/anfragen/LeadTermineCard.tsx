@@ -10,7 +10,6 @@ import {
   ImagePlus,
   Pencil,
   Plus,
-  Trash2,
   X,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
@@ -19,6 +18,8 @@ import { Modal } from '@/components/ui/Modal'
 import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
+import { confirmDelete } from '@/components/ui/confirm-delete'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import {
   addLeadNotizRow,
   deleteLeadNotizRow,
@@ -41,7 +42,9 @@ import {
 } from '@/lib/anfragen/lead-notiz-fotos'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { KalenderTermin, LeadNotizRow } from '@/lib/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn, formatDatum } from '@/lib/utils'
+import { richTextToPlain } from '@/lib/rich-text'
 
 function teamMitgliedName(team: CrmTeamMitglied[], id: string | null | undefined): string {
   if (!id?.trim()) return '—'
@@ -164,6 +167,14 @@ function TerminNotizFormModal({
   function appendFiles(files: FileList | File[]) {
     const list = Array.from(files)
     if (!list.length) return
+    const maxBytes = 8 * 1024 * 1024
+    const tooLarge = list.find((f) => f.size > maxBytes)
+    if (tooLarge) {
+      toast.error('Datei zu groß (max. 8 MB)')
+      if (fileGalleryRef.current) fileGalleryRef.current.value = ''
+      if (fileCameraRef.current) fileCameraRef.current.value = ''
+      return
+    }
     setPendingFotos((prev) => {
       const slots = TERMIN_NOTIZ_MAX_FOTOS - existingUrls.length - prev.length
       if (slots <= 0) {
@@ -359,15 +370,23 @@ function TerminNotizZeile({
   const [pending, startTransition] = useLocalTransition()
 
   async function loeschen() {
-    if (!window.confirm('Notiz löschen?')) return
-    startTransition(async () => {
-      const r = await deleteLeadNotizRow(notiz.id, leadId)
-      if (!r.ok) toast.error(r.message)
-      else {
+    const preview =
+      notiz.titel?.trim() ||
+      richTextToPlain(notiz.inhalt ?? '').trim().split('\n')[0] ||
+      'Notiz'
+    confirmDelete(
+      'Notiz löschen?',
+      async () => {
+        const r = await deleteLeadNotizRow(notiz.id, leadId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
         onReload()
         router.refresh()
-      }
-    })
+      },
+      { body: preview }
+    )
   }
 
   const titel = notiz.titel?.trim() || 'Notiz'
@@ -387,23 +406,26 @@ function TerminNotizZeile({
           <ChevronDown className={cn('lead-notiz-row__chevron', open && 'is-open')} aria-hidden />
         </button>
         <div className="lead-notiz-row__actions">
-          <button
-            type="button"
-            className="lead-notiz-row__icon-btn"
-            onClick={() => setEditOpen(true)}
-            aria-label="Notiz bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className="lead-notiz-row__icon-btn lead-notiz-row__icon-btn--danger"
-            onClick={() => void loeschen()}
-            disabled={pending}
-            aria-label="Notiz löschen"
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          <MockEntityRowMenu
+            title="Notiz"
+            items={
+              [
+                {
+                  icon: 'pencil',
+                  label: 'Bearbeiten',
+                  onClick: () => setEditOpen(true),
+                },
+                'sep',
+                {
+                  icon: 'trash',
+                  label: 'Löschen',
+                  danger: true,
+                  disabled: pending,
+                  onClick: () => void loeschen(),
+                },
+              ] satisfies EntityMenuItem[]
+            }
+          />
         </div>
       </div>
       {open ? (

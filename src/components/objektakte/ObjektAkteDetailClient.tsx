@@ -12,16 +12,21 @@ import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
 import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeisterCard'
+import { ObjektAnlagenSection } from '@/components/objektakte/ObjektAnlagenSection'
+import { ObjektHistorieSection } from '@/components/objektakte/ObjektHistorieSection'
+import { ObjektUebersichtKpiCard } from '@/components/objektakte/ObjektUebersichtKpiCard'
+import { VersammlungsberichtDialog } from '@/components/objektakte/VersammlungsberichtDialog'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
-import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
-import type { Kunde, KundenObjekt } from '@/lib/types'
+import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
+import type { ObjektAkteDetailPayload, ObjektHistorieRow } from '@/lib/objektakte/types'
+import type { Gewerk, Kunde, KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
-type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'vorgaenge' | 'akte'
+type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'akte'
 
 function objektErbtFreigabe(o: KundenObjekt): boolean {
   return o.freigabe_schwelle_eur == null && o.notfall_direkt == null
@@ -31,7 +36,11 @@ export function ObjektAkteDetailClient({
   kunde,
   objekt,
   akte,
+  historieRows = [],
+  objektLeadIds = [],
+  kpis,
   vorgaengeRows = [],
+  gewerke = [],
 }: {
   kunde: Pick<
     Kunde,
@@ -45,10 +54,16 @@ export function ObjektAkteDetailClient({
   >
   objekt: KundenObjekt
   akte: ObjektAkteDetailPayload
+  historieRows?: ObjektHistorieRow[]
+  objektLeadIds?: string[]
+  kpis?: ObjektKpiSnapshot
   vorgaengeRows?: VorgangListeRow[]
+  gewerke?: Gewerk[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
+  const [berichtOpen, setBerichtOpen] = useState(false)
+  const jahr = new Date().getFullYear()
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
   const [objektState, setObjektState] = useState(objekt)
 
@@ -102,14 +117,26 @@ export function ObjektAkteDetailClient({
   )
 
   const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
+  const anlagenAnzahl = akte.anlagen.length
 
   const kundeVorgaenge = useMemo(
-    () => vorgaengeRows.filter((r) => r.kundeId === kunde.id),
-    [vorgaengeRows, kunde.id]
+    () =>
+      objektLeadIds.length
+        ? vorgaengeRows.filter((r) => objektLeadIds.includes(r.leadId))
+        : vorgaengeRows.filter((r) => r.kundeId === kunde.id),
+    [vorgaengeRows, kunde.id, objektLeadIds]
   )
 
   const overview = (
     <div className="space-y-4">
+      {kpis ? (
+        <ObjektUebersichtKpiCard
+          kpis={kpis}
+          jahr={jahr}
+          onHistorieClick={() => setTab('historie')}
+          onBerichtClick={() => setBerichtOpen(true)}
+        />
+      ) : null}
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Objektdaten</div>
@@ -221,6 +248,35 @@ export function ObjektAkteDetailClient({
       ),
     },
     {
+      id: 'anlagen',
+      label: 'Anlagen & Teile',
+      icon: 'tool',
+      count: anlagenAnzahl || undefined,
+      render: () => (
+        <ObjektAnlagenSection
+          kundeId={kunde.id}
+          objektId={objektState.id}
+          anlagen={akte.anlagen}
+          einheiten={einheiten}
+          gewerke={gewerke}
+          onChanged={refresh}
+        />
+      ),
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'history',
+      count: historieRows.length || undefined,
+      render: () => (
+        <ObjektHistorieSection
+          rows={historieRows}
+          einheiten={einheiten.map((e) => ({ id: e.id, bezeichnung: e.bezeichnung }))}
+          anlagen={akte.anlagen.map((a) => ({ id: a.id, bezeichnung: a.bezeichnung }))}
+        />
+      ),
+    },
+    {
       id: 'vorgaenge',
       label: 'Vorgänge',
       icon: 'folders',
@@ -231,6 +287,7 @@ export function ObjektAkteDetailClient({
             rows={vorgaengeRows}
             embedded
             restrictKundeId={kunde.id}
+            restrictLeadIds={objektLeadIds.length ? objektLeadIds : undefined}
           />
         </Suspense>
       ),
@@ -263,6 +320,12 @@ export function ObjektAkteDetailClient({
         groups={detailShellGroups}
         value={tab}
         onChange={(id) => setTab(id as ObjektAkteTab)}
+      />
+      <VersammlungsberichtDialog
+        open={berichtOpen}
+        onClose={() => setBerichtOpen(false)}
+        objektId={objektState.id}
+        kundeId={kunde.id}
       />
     </EntityDetailLayout>
   )

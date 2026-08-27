@@ -14,7 +14,8 @@ type SearchResultType = 'anfrage' | 'angebot' | 'auftrag' | 'handwerker' | 'rech
 
 type LeadHit = { id: string; kontakt_name: string | null; kontakt_email: string | null; status: string | null }
 type HwHit = { id: string; name: string; firma: string | null }
-type KundeHit = KundeListenNamePick & Pick<Kunde, 'id' | 'email'>
+type KundeHit = KundeListenNamePick &
+  Pick<Kunde, 'id' | 'email'> & { org_anzeigename?: string | null }
 
 interface SearchResult {
   id: string
@@ -191,7 +192,7 @@ export function GlobalSearch() {
       for (const k of Array.from(kundeMap.values())) {
         flat.push({
           id: k.id,
-          title: kundeDisplayName(k),
+          title: k.org_anzeigename?.trim() || kundeDisplayName(k),
           subtitle: k.email || '',
           type: 'kunde',
           href: `/kunden/${k.id}`,

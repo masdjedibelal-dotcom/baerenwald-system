@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 import {
   draftFromLeadMelder,
   MelderLeistungsortFields,
@@ -16,7 +17,7 @@ import { toast } from '@/components/ui/app-toast'
 import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsort'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
-import type { KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
+import type { Gewerk, KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
 
@@ -50,6 +51,7 @@ const FREIGABE_BADGE: Record<
   { label: string; tone: 'yel' | 'grn' | 'muted' | 'red' }
 > = {
   ausstehend: { label: 'Ausstehend', tone: 'yel' },
+  beschluss_ausstehend: { label: 'Wartet auf Beschluss', tone: 'yel' },
   freigegeben: { label: 'Freigegeben', tone: 'grn' },
   nicht_noetig: { label: 'Nicht nötig', tone: 'muted' },
   abgelehnt: { label: 'Abgelehnt', tone: 'red' },
@@ -125,6 +127,7 @@ export function HvMeldungKontextCards({
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState<MelderLeistungsortDraft>(() => draftFromLeadMelder(lead))
   const [objekte, setObjekte] = useState<KundenObjekt[]>([])
+  const [gewerke, setGewerke] = useState<Gewerk[]>([])
 
   useEffect(() => {
     if (!editOpen) return
@@ -145,6 +148,13 @@ export function HvMeldungKontextCards({
     }
   }, [editOpen, agKundeId])
 
+  useEffect(() => {
+    if (!editOpen) return
+    void listGewerkeFuerFab()
+      .then((r) => setGewerke(r.ok ? (r.gewerke as Gewerk[]) : []))
+      .catch(() => setGewerke([]))
+  }, [editOpen])
+
   async function saveEdit() {
     if (saving) return
     setSaving(true)
@@ -155,6 +165,7 @@ export function HvMeldungKontextCards({
         melder_telefon: draft.melder_telefon || null,
         melder_einheit: draft.melder_einheit || null,
         kunde_objekt_id: draft.kunde_objekt_id,
+        objekt_anlage_id: draft.objekt_anlage_id,
         angebotId: angebotId ?? null,
       })
       if (!r.ok) {
@@ -257,6 +268,10 @@ export function HvMeldungKontextCards({
               <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
               <PropRow label="PLZ" value={leistungsort.plz || '—'} />
               <PropRow label="Ort" value={leistungsort.ort || '—'} />
+              <PropRow
+                label="Anlage / Teil"
+                value={lead.objekt_anlagen?.bezeichnung?.trim() || '—'}
+              />
             </div>
           </div>
         </div>
@@ -283,6 +298,8 @@ export function HvMeldungKontextCards({
           objekte={objekte}
           onNeuObjekt={agKundeId ? () => setObjektNeuOpen(true) : undefined}
           disabled={saving}
+          kundeId={agKundeId}
+          gewerke={gewerke}
         />
       </EditorSheet>
 

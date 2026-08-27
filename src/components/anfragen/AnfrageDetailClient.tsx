@@ -32,8 +32,11 @@ import {
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
+import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
+import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -53,6 +56,8 @@ import {
 import { AnfrageNeuSheet } from '@/components/anfragen/AnfrageNeuSheet'
 import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCard'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { MeldungsdetailsCard } from '@/components/anfragen/MeldungsdetailsCard'
+import { HvWarteFreigabeSheet } from '@/components/anfragen/HvWarteFreigabeSheet'
 import { LeadBefundCrmCard } from '@/components/anfragen/LeadBefundCrmCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
@@ -101,7 +106,7 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 
@@ -272,6 +277,7 @@ export function AnfrageDetailClient({
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
   const [anfragenOpen, setAnfragenOpen] = useState(false)
+  const [hvWarteSheetOpen, setHvWarteSheetOpen] = useState(false)
   const [einholungRows, setEinholungRows] = useState<AnfragePartnerEinholungRow[]>([])
 
   useEffect(() => {
@@ -581,16 +587,17 @@ export function AnfrageDetailClient({
   const wartetAufHvFreigabe = leadWartetAufHvStartFreigabe(lead)
   const hatAuftrag = Boolean(leadStatusData.auftrag_id)
 
+  const openHvWarteHinweis = useCallback(() => {
+    setHvWarteSheetOpen(true)
+  }, [])
+
   const openAngebotErstellen = useCallback(() => {
     if (wartetAufHvFreigabe) {
-      toast.message('Warte auf HV / Hausmeister', {
-        description:
-          'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du disponierst.',
-      })
+      openHvWarteHinweis()
       return
     }
     openAngebotAuswahl()
-  }, [openAngebotAuswahl, wartetAufHvFreigabe])
+  }, [openAngebotAuswahl, openHvWarteHinweis, wartetAufHvFreigabe])
 
   const openHandwerkerEinholen = useCallback(() => {
     const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
@@ -615,15 +622,12 @@ export function AnfrageDetailClient({
     if (!matrixCta) return
     if (matrixCta.id === 'angebot_erstellen') {
       if (wartetAufHvFreigabe) {
-        toast.message('Warte auf HV / Hausmeister', {
-          description:
-            'HV muss freigeben oder die Hausmeister-Prüfung abschließen, bevor du ein Angebot erstellst.',
-        })
+        openHvWarteHinweis()
         return
       }
       openAngebotErstellen()
     }
-  }, [matrixCta, openAngebotErstellen, wartetAufHvFreigabe])
+  }, [matrixCta, openAngebotErstellen, openHvWarteHinweis, wartetAufHvFreigabe])
 
   const detailPrimary = useMemo(() => {
     if (hatAuftrag) return null
@@ -639,12 +643,7 @@ export function AnfrageDetailClient({
       return {
         label: 'Warte auf HV / Hausmeister',
         icon: 'clock',
-        onClick: () => {
-          toast.message('Warte auf HV / Hausmeister', {
-            description:
-              'Mieter-Meldung: HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach erscheint „Angebot erstellen“.',
-          })
-        },
+        onClick: openHvWarteHinweis,
         disabled: false,
       }
     }
@@ -663,6 +662,7 @@ export function AnfrageDetailClient({
     openDirektBeauftragen,
     pending,
     primaryCtaAction,
+    openHvWarteHinweis,
   ])
 
   const detailSecondary = useMemo(() => {
@@ -708,6 +708,42 @@ export function AnfrageDetailClient({
     )
     const actions: { id: string; label: string; icon?: string; danger?: boolean; onClick: () => void }[] =
       []
+    if (st === 'neu') {
+      actions.push({
+        id: 'kontaktiert',
+        label: 'Als kontaktiert markieren',
+        icon: 'phone',
+        onClick: () => {
+          void (async () => {
+            const res = await updateLeadStatus(lead.id, 'kontaktiert')
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            toast.success('Als kontaktiert markiert')
+            refresh()
+          })()
+        },
+      })
+    }
+    if (st === 'kontaktiert' || st === 'termin') {
+      actions.push({
+        id: 'zurueck_neu',
+        label: 'Zurück zu Neu',
+        icon: 'arrow-back-up',
+        onClick: () => {
+          void (async () => {
+            const res = await updateLeadStatus(lead.id, 'neu')
+            if (!res.ok) {
+              toast.error(res.message)
+              return
+            }
+            toast.success('Status auf Neu gesetzt')
+            refresh()
+          })()
+        },
+      })
+    }
     if (st === 'neu' || st === 'kontaktiert') {
       actions.push({
         id: 'termin',
@@ -732,7 +768,7 @@ export function AnfrageDetailClient({
       })
     }
     return actions
-  }, [lead.status, angeboteListe])
+  }, [lead.status, lead.id, angeboteListe, refresh])
 
   const statusBadge = useMemo(() => {
     const s = anfrageStatusDisplay(lead.status, {
@@ -766,6 +802,8 @@ export function AnfrageDetailClient({
 
   const headMeta = useMemo(() => {
     const parts = [vorhabenTitel]
+    const kanal = kanalLabel(lead.kanal)
+    if (kanal) parts.push(kanal)
     if (lead.created_at) {
       const d = new Date(lead.created_at)
       const time = Number.isNaN(d.getTime())
@@ -777,12 +815,17 @@ export function AnfrageDetailClient({
           : `Eingang ${formatDatum(lead.created_at)}`
       )
     }
+    const freigabeStatus = lead.org_freigabe_status ?? 'nicht_noetig'
+    parts.push(
+      `Freigabe: ${ORG_FREIGABE_LABELS[freigabeStatus] ?? freigabeStatus}`
+    )
     return parts.filter(Boolean).join(' · ')
-  }, [vorhabenTitel, lead.created_at])
+  }, [vorhabenTitel, lead.created_at, lead.kanal, lead.org_freigabe_status])
 
   const stammdatenInhalt = (
     <>
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
+      <MeldungsdetailsCard lead={lead} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
       <LeadBefundCrmCard leadId={lead.id} />
     </>
@@ -923,6 +966,7 @@ export function AnfrageDetailClient({
         title: kundeTitel,
         titleBadges: isMobile ? (
           <>
+            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
                 Direktauftrag
@@ -933,6 +977,7 @@ export function AnfrageDetailClient({
         ) : undefined,
         badges: isMobile ? undefined : (
           <>
+            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
                 Direktauftrag
@@ -1111,6 +1156,14 @@ export function AnfrageDetailClient({
       ) : null}
 
       {quickActionSheets}
+
+      <HvWarteFreigabeSheet
+        open={hvWarteSheetOpen}
+        onClose={() => setHvWarteSheetOpen(false)}
+        leadId={lead.id}
+        hvMeldungStatus={lead.hv_meldung_status}
+        auftraggeberKundeId={lead.auftraggeber_kunde_id}
+      />
       </div>
     </EntityDetailLayout>
   )

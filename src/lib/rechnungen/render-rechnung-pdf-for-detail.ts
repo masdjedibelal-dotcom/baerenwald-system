@@ -17,7 +17,7 @@ export async function renderRechnungPdfForDetail(
   detail: RechnungDetailForPdf,
   firm: FirmenEinstellungen,
   gewerke: Gewerk[] = [],
-  opts?: { supabase?: SupabaseClient }
+  opts?: { supabase?: SupabaseClient; bezugNr?: string | null }
 ): Promise<Buffer> {
   if (!detail.kunden) throw new Error('Kunde fehlt')
   let vorherige = null
@@ -29,8 +29,21 @@ export async function renderRechnungPdfForDetail(
       detail.id
     )
   }
+  let bezugNr = opts?.bezugNr?.trim() || null
+  const bezugId = String(
+    (detail as { bezug_rechnung_id?: string | null }).bezug_rechnung_id ?? ''
+  ).trim()
+  if (!bezugNr && bezugId && opts?.supabase) {
+    const { data: bezug } = await opts.supabase
+      .from('rechnungen')
+      .select('rechnungsnummer')
+      .eq('id', bezugId)
+      .maybeSingle()
+    bezugNr = (bezug as { rechnungsnummer?: string | null } | null)?.rechnungsnummer?.trim() || null
+  }
   const payload = buildRechnungHtmlInput(detail, firm, gewerke, {
     vorherigeAbschlaege: vorherige,
+    bezugNr,
   })
   const html = buildAngebotHtml(payload)
   const footerTemplate = buildAngebotPdfFooterTemplate(payload)

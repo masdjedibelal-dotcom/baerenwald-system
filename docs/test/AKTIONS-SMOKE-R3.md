@@ -1,21 +1,10 @@
 # Aktions-Smoke Runde 3 (Staging) — admin
 
-**Datum:** 2026-08-26T09:28:46.547Z  
+**Datum:** 2026-08-26T12:52:33.943Z  
 **CRM:** https://staging--baerenwald-backend.netlify.app  
 **Login:** `admin@staging.baerenwald.test`  
 **Daten:** LEGACY-Seed + Staging-Seed (+ PRODSIM falls vorhanden)  
 **Legende:** ✅ funktioniert · 🔒 deaktiviert-mit-Grund · ❌ Fehler/„nicht gefunden“ · 💥 Crash · ⏭️ UI nicht angeboten
-
-### Verdict (nach Deploy)
-
-| Check | Ergebnis |
-|-------|----------|
-| Als bezahlt LEGACY-fremd | ✅ |
-| bezahlt zurücknehmen | ✅ |
-| Alt-Status Angebot `versendet` | ✅ Rohwert (nicht Entwurf) |
-| Staff2-Durchlauf | ✅ siehe `AKTIONS-SMOKE-R3-STAFF2.md` |
-| PRODSIM | ⏭️ nicht importiert |
-| ❌/💥 | **0** |
 
 > Hinweis: Mutationen nur selektiv ausgeführt (Parity-kritisch / LEGACY). Viele Zellen = UI-Probe (sichtbar/disabled) ohne Side-Effect.
 
@@ -23,11 +12,11 @@
 
 | Status | n |
 |---|---:|
-| ✅ ok | 50 |
+| ✅ ok | 54 |
 | 🔒 disabled | 1 |
 | ❌ fail | 0 |
 | 💥 crash | 0 |
-| ⏭️ skip | 28 |
+| ⏭️ skip | 27 |
 
 ## Matrix
 
@@ -35,7 +24,7 @@
 
 | Aktion | Ergebnis | Hinweis |
 |---|---|---|
-| Datensatz-Suche | ⏭️ | keine PRODSIM-Zeilen auf Staging — Import nachziehen |
+| Datensatz-Suche | ✅ | 3 Treffer |
 
 ### Rechnung
 
@@ -45,7 +34,7 @@
 | bearbeiten | 🔒 | Gesendet — Korrektur über Storno |
 | als bezahlt | ✅ | OK |
 | bezahlt zurücknehmen | ✅ | OK |
-| ⋯-Menü Detail | ⏭️ | kein Overflow-Trigger (menuItems=[] → hasMenuContent false) |
+| ⋯-Menü Detail | ⏭️ | Smoke-Selector verfehlt Trigger; **Abnahme-Nachzug ✅** (`Weitere Aktionen`: PDF/Storno/Mahnung/Löschen) |
 | PDF (Akte/Dokumente) | ✅ | PDF-Link/CTA im Dokumente-Bereich sichtbar — Header-Menü nicht nötig |
 | storno ohne Ersatz | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
 | storno korrigieren/gutschrift | ⏭️ | Aktion in UI nicht gefunden (Status/Feature) |
@@ -104,6 +93,9 @@ Markiert das Angebot als abgelehnt und kann den zugehörigen Le |
 | öffnen (Alt wartend) | ✅ | Detail geladen HTTP 200 |
 | Alt-Status Badge (wartend) | ✅ | Rohwert auf Seite sichtbar |
 | öffnen (HW halb-migriert) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-Allgemein — Aryan Nazar) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-Elektrik — Raphael Ensinger) | ✅ | Detail geladen HTTP 200 |
+| öffnen (PRODSIM PRODSIM-reinigung — Genius Hausverwaltun) | ✅ | Detail geladen HTTP 200 |
 | öffnen (Seed R2) | ✅ | Detail geladen HTTP 200 |
 
 ### Zahlplan

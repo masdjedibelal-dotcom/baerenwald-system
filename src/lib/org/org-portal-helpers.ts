@@ -17,8 +17,22 @@ export function orgFreigabeBlockiertPartner(
   status: OrgFreigabeStatus | null | undefined,
   hvMeldungStatus?: string | null
 ): boolean {
+  // Dokumentierte Ausnahme (06-PROZESSE.md): Notmaßnahme darf Partner ohne Org-Freigabe
+  // beauftragen — HV hat Sofortmaßnahme gewählt; Gate gilt wieder nach normalem Angebot.
   if ((hvMeldungStatus ?? '').trim() === 'notmassnahme') return false
-  return status === 'ausstehend' || status === 'abgelehnt'
+  return status === 'ausstehend' || status === 'beschluss_ausstehend' || status === 'abgelehnt'
+}
+
+/** Verständliche Hinweis-Message für UI/Actions — kanonisch für alle Partner-Sendepfade. */
+export function orgFreigabePartnerBlockMessage(
+  status: OrgFreigabeStatus | null | undefined,
+  hvMeldungStatus?: string | null
+): string | null {
+  if (!orgFreigabeBlockiertPartner(status, hvMeldungStatus)) return null
+  if (status === 'abgelehnt') {
+    return 'Organisation hat die Freigabe abgelehnt — Partner-Anfrage ist blockiert.'
+  }
+  return 'Wartet auf Org-Freigabe — Partner-Anfrage kann erst nach Freigabe gesendet werden.'
 }
 
 export const ANLASS_LABELS: Record<string, string> = {
@@ -50,10 +64,11 @@ export const KOSTENTRAEGER_LABELS: Record<string, string> = {
 }
 
 export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
-  nicht_noetig: 'Keine Freigabe nötig',
-  ausstehend: 'Gesendet — Entscheidung ausstehend',
-  freigegeben: 'Freigegeben',
-  abgelehnt: 'Abgelehnt',
+  nicht_noetig: 'nicht erforderlich',
+  ausstehend: 'ausstehend',
+  beschluss_ausstehend: 'Wartet auf Beschluss',
+  freigegeben: 'erteilt',
+  abgelehnt: 'abgelehnt',
 }
 
 export const EINLADUNG_STATUS_LABELS: Record<string, string> = {

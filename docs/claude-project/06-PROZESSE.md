@@ -49,6 +49,8 @@ Aushang/QR → /melden/org/objekt → Funnel → Bestätigung + Status-Link
 
 **UI HV-Portal:** `OrganisationEingangPanel` / `OrgMeldungAktionBanner` — Buttons „An Bärenwald übergeben“, „Hausmeister begutachten“.
 
+> **Offene Produktfrage (2026-08-27, nicht live geklärt):** Gilt das HV-Start-Gate für **jede** Meldung oder nur im Freigabe-Modus `freigabe`? Umgeht der Notfall-/Akut-Direktpfad das Gate zuverlässig auch bei Modus `direkt`? Bis zur Klärung: Code-Gate wie dokumentiert; Verhalten bei `freigabe_modus=direkt` auf Staging beobachten (A2-Mittelteil: Gate war trotzdem aktiv).
+
 ---
 
 ## 3) HV legt Vorgang selbst an
@@ -74,9 +76,11 @@ Ohne Freigabe (HV): Partner-Versand ist blockiert (`assertPartnerVersandOrgFreig
 
 ### Org-Freigabe — Gate & Ausnahmen
 
-**Regel:** Solange `org_freigabe_status` ∈ {`ausstehend`, `abgelehnt`}, kein Partner-Versand (Angebot-Anfrage, Auftrag „an HW senden“, Zuweisungs-Mail, Redisposition, Assign+Notify).
+**Regel:** Solange `org_freigabe_status` ∈ {`ausstehend`, `beschluss_ausstehend`, `abgelehnt`}, kein Partner-Versand (Angebot-Anfrage, Auftrag „an HW senden“, Zuweisungs-Mail, Redisposition, Assign+Notify).
 
-**Kunden-/HV-Versand (Ist, bewusst — Zyklus final):** Bei `org_freigabe_status=ausstehend` ist der **Kunden-Versand** des Angebots **nicht** blockiert. Die HV braucht das zugestellte Angebot (PDF/Mail) zur Freigabe-Entscheidung. Nur der Partner-Weg ist gated. UI zeigt z. B. „Gesendet — Entscheidung ausstehend“. Siehe auch `PATTERN-LEITFADEN.md` §19.0.
+**Kunden-/HV-Versand (Ist, bewusst — Zyklus final):** Bei `org_freigabe_status` ∈ {`ausstehend`, `beschluss_ausstehend`} ist der **Kunden-Versand** des Angebots **nicht** blockiert. Die HV braucht das zugestellte Angebot (PDF/Mail) zur Freigabe-Entscheidung. Nur der Partner-Weg ist gated. UI zeigt z. B. „Gesendet — Entscheidung ausstehend“ bzw. „Wartet auf Beschluss“. Siehe auch `PATTERN-LEITFADEN.md` §19.0.
+
+**Beschluss-Parkzustand (HV-Portal):** Aus `ausstehend` kann die HV **Beschluss erforderlich** wählen → `beschluss_ausstehend`. Optional Versammlungsdatum und Protokoll-Link. Erst danach wieder Freigeben/Ablehnen; kein automatisches Zurück auf `ausstehend`.
 
 **Zentrale Prüfung:** `assertPartnerVersandOrgFreigabe` → `orgFreigabeBlockiertPartner` / Message „Wartet auf Org-Freigabe…“.
 

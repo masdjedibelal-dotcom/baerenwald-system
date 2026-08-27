@@ -56,6 +56,7 @@ export type VorgangLeadInput = {
   kanal?: string | null
   org_freigabe_status?: string | null
   hv_meldung_status?: string | null
+  freigabe_bypass_grund?: string | null
   kontakt_name?: string | null
   plz?: string | null
   bereiche?: string[] | null

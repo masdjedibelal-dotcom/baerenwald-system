@@ -55,7 +55,9 @@ Zentrale Pipeline. Alte Einzel-Listen (Anfragen/Angebote/…) existieren als Rou
 **Liste:** Kunde · Titel · Phase · Wert · Datum · Status  
 **Funktionen:** Suche, Sortierung, CSV-Export, Mehrfachauswahl/Löschen, Duplizieren, Partner-Filter, Mobile-Filter, Pull-to-Refresh
 
-Badges u. a.: Notfall, wartet auf Freigabe (HV). Partner-Eingangsrechnungen können in der Liste erscheinen.
+Badges u. a.: Notfall, wartet auf Freigabe (HV), **Wartet auf Beschluss** (`org_freigabe_status=beschluss_ausstehend`). Partner-Eingangsrechnungen können in der Liste erscheinen.
+
+**Filter Anfragen (Org-Kontext):** Spezialfilter „Entscheidung ausstehend“ umfasst `ausstehend` **und** `beschluss_ausstehend`.
 
 ---
 
@@ -158,6 +160,20 @@ Kein direkter FAB-Eintrag „Auftrag“ oder „Partner“ — Auftrag entsteht 
 - Primary: **Angebot erstellen**
 - Org-/HV-Kontext und Freigabe-Hinweise möglich
 
+**Org-Freigabe am Lead (`org_freigabe_status`):**
+
+| Wert | CRM / Portal |
+|------|----------------|
+| `nicht_noetig` | Unter Schwelle, Akut oder kein Freigabe-Modus |
+| `ausstehend` | Angebot zur HV-Entscheidung; Badge „Ausstehend“ |
+| `beschluss_ausstehend` | HV pausiert bis Eigentümerbeschluss; Badge **„Wartet auf Beschluss“** |
+| `freigegeben` | Partner-Versand frei (Gate offen) |
+| `abgelehnt` | Partner-Versand blockiert |
+
+Optionale Felder (Parkzustand): `beschluss_versammlung_am`, `beschluss_protokoll_url` — gesetzt im HV-Portal. Log-Eintrag `org_freigabe_log.aktion=beschluss_ausstehend`.
+
+**Partner-Gate:** `assertPartnerVersandOrgFreigabe` blockiert bei `ausstehend`, `beschluss_ausstehend` und `abgelehnt` (Ausnahme Notmaßnahme). Details: `06-PROZESSE.md` § Org-Freigabe.
+
 ### Angebot
 
 - Wizard (DocumentCanvas): Kunde → Kopf → Positionen → Finalisieren → Vorschau → Senden
@@ -170,6 +186,7 @@ Kein direkter FAB-Eintrag „Auftrag“ oder „Partner“ — Auftrag entsteht 
 
 - Status: Offen · In Arbeit · Abnahme · Abgeschlossen · Storniert
 - **Leistungen / PosBoard:** Positionen, HW zuweisen, an HW senden, Bautagebuch, Abnahme, Abschluss, Nachtrag
+- Am Auftrag-Header: Badge **„Wartet auf Freigabe“** bzw. **„Wartet auf Beschluss“**, solange Lead-Freigabe offen ist
 - Zahlung: Zahlungsplan, Abschläge, Rechnungen
 - Primary je Status: Abschließen · Rechnung · Abschlag senden · Bezahlt · Bewertung
 - Wizards: Abnahmeprotokoll, Abschlussdoku, Nachtrag/Baustopp, Projekt-/Nachunternehmervertrag, AG-Korrektur

@@ -131,8 +131,15 @@ export function primaryCta(
       if (ctx.naechsteRechnungAktion === 'bezahlt') {
         return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
       }
+      // Unversendete Schluss-/Abschlags-RE: Primary = versenden (P3-15 / E1)
       if (ctx.naechsteRechnungAktion === 'versenden') {
-        return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+        return {
+          id: 'rechnung_versenden',
+          label: ctx.naechsterAbschlagSenden
+            ? 'Abschlag versenden'
+            : 'Schlussrechnung versenden',
+          icon: 'send',
+        }
       }
       if (ctx.naechsteRechnungAktion === 'erstellen') {
         return {

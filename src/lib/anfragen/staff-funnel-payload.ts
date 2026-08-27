@@ -171,6 +171,7 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     auftraggeber_kunde_id:
       isHv && state.kundeId && kundentyp === 'verwaltung' ? state.kundeId : undefined,
     kunde_objekt_id: isHv ? state.kundeObjektId?.trim() || null : null,
+    objekt_anlage_id: isHv ? state.objektAnlageId?.trim() || null : null,
     melder_name: melderName,
     melder_email: isHv ? state.mieterEmail.trim() || null : null,
     melder_telefon: isHv ? state.mieterTelefon.trim() || null : null,

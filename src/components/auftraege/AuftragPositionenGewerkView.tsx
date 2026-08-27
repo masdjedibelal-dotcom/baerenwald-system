@@ -152,7 +152,7 @@ export function AuftragPositionenGewerkView({
 
   function openGewerkModal(block: (typeof blocks)[0]) {
     if (!block.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten — bitte Position mit gültigem Gewerk anlegen.')
+      toast.error('Gewerk nicht in Stammdaten')
       return
     }
     const z = zuweisungForBlock(block)

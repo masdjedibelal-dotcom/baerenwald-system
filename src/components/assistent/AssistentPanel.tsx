@@ -468,7 +468,7 @@ export function AssistentPanel() {
       closePanel()
       return
     }
-    toast.success('In Formular übernommen — Fenster schließen oder weiter chatten.')
+    toast.success('In Formular übernommen')
   }
 
   function send(text: string, opts?: { historyOverride?: ChatMsg[] }) {

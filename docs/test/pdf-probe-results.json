@@ -1,0 +1,96 @@
+{
+  "finished_at": "2026-08-26T17:42:03.355Z",
+  "summary": {
+    "ok": 8,
+    "fail": 4
+  },
+  "results": [
+    {
+      "id": "login",
+      "status": "ok",
+      "note": "CRM eingeloggt als admin@staging.baerenwald.test",
+      "at": "2026-08-26T17:41:20.986Z"
+    },
+    {
+      "id": "D1-angebot",
+      "status": "ok",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } PDF 171487 B",
+      "bytes": 171487,
+      "file": "/Users/belalmasdjedi/code/baerenwald-system/docs/test/screenshots/pdf-probe/D1-angebot.pdf",
+      "at": "2026-08-26T17:41:35.201Z"
+    },
+    {
+      "id": "D1b-angebot-query",
+      "status": "ok",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } PDF 171487 B",
+      "bytes": 171487,
+      "file": "/Users/belalmasdjedi/code/baerenwald-system/docs/test/screenshots/pdf-probe/D1b-angebot-query.pdf",
+      "at": "2026-08-26T17:41:45.513Z"
+    },
+    {
+      "id": "D2-rechnung",
+      "status": "fail",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } ct=application/json head=\"{\\\"messag\"",
+      "bytes": 37,
+      "body": "{\"message\":\"Rechnung nicht gefunden\"}",
+      "at": "2026-08-26T17:41:46.067Z"
+    },
+    {
+      "id": "D2b-rechnung-query",
+      "status": "ok",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } PDF 164900 B",
+      "bytes": 164900,
+      "file": "/Users/belalmasdjedi/code/baerenwald-system/docs/test/screenshots/pdf-probe/D2b-rechnung-query.pdf",
+      "at": "2026-08-26T17:41:48.312Z"
+    },
+    {
+      "id": "D2c-rechnung-legacy",
+      "status": "fail",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } ct=application/json head=\"{\\\"messag\"",
+      "bytes": 37,
+      "body": "{\"message\":\"Rechnung nicht gefunden\"}",
+      "at": "2026-08-26T17:41:48.776Z"
+    },
+    {
+      "id": "D3-gutschrift",
+      "status": "fail",
+      "note": "HTTP status() {\n        return this._initializer.status;\n      } ct=application/json head=\"{\\\"messag\"",
+      "bytes": 37,
+      "body": "{\"message\":\"Rechnung nicht gefunden\"}",
+      "at": "2026-08-26T17:41:49.553Z"
+    },
+    {
+      "id": "UI-angebot",
+      "status": "ok",
+      "note": "geladen · Angebote | Bärenwald CRM",
+      "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n13\nDemo-/Test-Account — Transaktionsdaten stammen a",
+      "at": "2026-08-26T17:41:52.889Z"
+    },
+    {
+      "id": "UI-rechnung",
+      "status": "ok",
+      "note": "geladen · Rechnungen | Bärenwald CRM",
+      "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n13\nDemo-/Test-Account — Transaktionsdaten stammen a",
+      "at": "2026-08-26T17:41:56.670Z"
+    },
+    {
+      "id": "UI-gutschrift",
+      "status": "ok",
+      "note": "geladen · Rechnungen | Bärenwald CRM",
+      "snippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n13\nDemo-/Test-Account — Transaktionsdaten stammen a",
+      "at": "2026-08-26T17:41:59.719Z"
+    },
+    {
+      "id": "A2-melde-route",
+      "status": "fail",
+      "note": "HTTP 404 — Pfad prüfen (org/objekt-Slug nötig?)",
+      "at": "2026-08-26T17:42:01.844Z"
+    },
+    {
+      "id": "portal-route",
+      "status": "ok",
+      "note": "HTTP 200 url=https://staging--baerenwald.netlify.app/portal/login",
+      "at": "2026-08-26T17:42:03.323Z"
+    }
+  ]
+}

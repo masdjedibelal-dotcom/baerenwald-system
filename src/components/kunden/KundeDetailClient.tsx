@@ -153,15 +153,10 @@ export function KundeDetailClient({
         label: 'Kunde löschen',
         danger: true,
         onClick: () => {
-          void (async () => {
-            try {
-              await runDeleteKunde(kunde.id, router, kundeDisplayName(kunde))
-              showRouteBusy('Kundenliste…')
-              router.push('/kunden')
-            } catch {
-              /* Toast kommt aus runDeleteKunde */
-            }
-          })()
+          runDeleteKunde(kunde.id, router, kundeDisplayName(kunde), async () => {
+            showRouteBusy('Kundenliste…')
+            router.push('/kunden')
+          })
         },
       },
     ]

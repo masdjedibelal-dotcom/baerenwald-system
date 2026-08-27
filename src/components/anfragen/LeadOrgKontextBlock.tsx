@@ -38,7 +38,7 @@ function orgFreigabeBadgeStatus(
   status: LeadDetail['org_freigabe_status']
 ): 'done' | 'offer' | 'cancel' | 'order' {
   if (status === 'freigegeben' || status === 'nicht_noetig') return 'done'
-  if (status === 'ausstehend') return 'offer'
+  if (status === 'ausstehend' || status === 'beschluss_ausstehend') return 'offer'
   if (status === 'abgelehnt') return 'cancel'
   return 'order'
 }
@@ -125,6 +125,7 @@ export function LeadOrgKontextBlock({
     objekt ||
     fotos.length > 0 ||
     lead.org_freigabe_status === 'ausstehend' ||
+    lead.org_freigabe_status === 'beschluss_ausstehend' ||
     (lead.org_freigabe_log?.length ?? 0) > 0 ||
     zeigtHavarieAktionen
 

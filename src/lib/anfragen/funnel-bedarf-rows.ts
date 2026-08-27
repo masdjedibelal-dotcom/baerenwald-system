@@ -246,6 +246,7 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
 
 const ORG_FREIGABE_KURZ: Record<string, string> = {
   ausstehend: 'Ausstehend',
+  beschluss_ausstehend: 'Wartet auf Beschluss',
   freigegeben: 'Freigegeben',
   abgelehnt: 'Abgelehnt',
   nicht_noetig: 'Nicht nötig',

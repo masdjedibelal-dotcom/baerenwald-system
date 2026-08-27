@@ -1,5 +1,6 @@
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type {
   ResolveVorgangInput,
   ResolvedVorgang,
@@ -124,24 +125,11 @@ function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): st
   return 'neu'
 }
 
-function funnelKategorie(funnelDaten: unknown): string | null {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return null
-  const kat = (funnelDaten as { melde_kategorie?: unknown }).melde_kategorie
-  return typeof kat === 'string' ? kat : null
-}
-
-function funnelIstAkut(funnelDaten: unknown): boolean {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return false
-  const fd = funnelDaten as { notfall?: unknown; havarie?: unknown }
-  return fd.notfall === true || fd.havarie === true
-}
 
 function isNotfall(input: ResolveVorgangInput): boolean {
   const lead = input.lead
   if ((lead.hv_meldung_status ?? '').trim() === 'notmassnahme') return true
-  if (lead.situation === 'notfall') return true
-  if (funnelIstAkut(lead.funnel_daten)) return true
-  return funnelKategorie(lead.funnel_daten) === 'notfall'
+  return leadIstHavarie(lead)
 }
 
 function isUeberfaellig(faellig: string | null | undefined, now = new Date()): boolean {

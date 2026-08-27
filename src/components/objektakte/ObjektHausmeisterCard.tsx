@@ -5,7 +5,6 @@ import { useTransition } from '@/components/ui/action-busy'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -315,12 +314,7 @@ export function ObjektHausmeisterCard({
           <MockEmpty
             icon="key"
             title="Kein Hausmeister"
-            hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen."
-            action={
-              <MockBtn kind="primary" icon="plus" onClick={openSheet} disabled={pending}>
-                Anlegen
-              </MockBtn>
-            }
+            hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen. Über „+“ oben hinzufügen."
           />
         ) : (
           <div className="space-y-2" style={{ fontSize: 'var(--fs-body)' }}>
@@ -351,9 +345,10 @@ export function ObjektHausmeisterCard({
                 <span className="t">{statusLabel}</span>
                 {showInvite ? (
                   <span className="a">
-                    <button
-                      type="button"
-                      className="vgid-portal__invite"
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="send"
                       onClick={einladenOderAktivieren}
                       disabled={pending}
                       aria-label={primaryStaff ? 'Portal aktivieren' : 'Portal-Einladung senden'}
@@ -363,24 +358,23 @@ export function ObjektHausmeisterCard({
                           : 'Portal-Einladung erneut senden'
                       }
                     >
-                      <MockIcon ctx="default" n="send" size={15} />
-                      <span>{primaryStaff ? 'Aktivieren' : 'Einladen'}</span>
-                    </button>
+                      {primaryStaff ? 'Aktivieren' : 'Einladen'}
+                    </MockBtn>
                   </span>
                 ) : null}
                 {showLogin ? (
                   <span className="a">
-                    <button
-                      type="button"
-                      className="vgid-portal__login"
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="log-in"
                       onClick={() => void openLogin()}
                       disabled={loginBusy || pending}
                       aria-label="Hausmeister-Portal Login"
                       title="Als Hausmeister im Portal anmelden"
                     >
-                      <MockIcon ctx="btn" n="log-in" size={15} />
-                      <span>Login</span>
-                    </button>
+                      Login
+                    </MockBtn>
                   </span>
                 ) : null}
               </div>

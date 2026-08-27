@@ -1,0 +1,225 @@
+{
+  "finished_at": "2026-08-26T18:07:07.538Z",
+  "summary": {
+    "ok": 21,
+    "warn": 6,
+    "fail": 2
+  },
+  "ids": {
+    "leadId": "fe37acab-e6ef-43ad-8bfc-2f72ecf5f5af",
+    "angebotId": "40f62e2e-6f1f-4dc7-ad3c-8b3c076f77c7",
+    "auftragId": "231716aa-0215-4560-9253-1492632981de",
+    "rechnungId": "c770d2da-ce85-462a-859d-585c072906f8",
+    "stamp": "373963"
+  },
+  "rows": [
+    {
+      "phase": "A2",
+      "id": "branding-melde",
+      "status": "ok",
+      "note": "MN |  | Musterverwaltung Nord |  | Verwaltung |  | BEREICH |  | Was ist betroffen? |  | Wasser / Rohr / WC |  | tropft, läuft aus, ver",
+      "at": "2026-08-26T18:03:00.978Z"
+    },
+    {
+      "phase": "A2",
+      "id": "melde-submit",
+      "status": "warn",
+      "note": "url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10 · MN |  | Musterverwaltung Nord |  | Verwaltung |  | Meldung wird gesendet… |  | Einen Moment — Fotos und Angaben werden übermittelt.",
+      "at": "2026-08-26T18:03:49.231Z"
+    },
+    {
+      "phase": "A2",
+      "id": "status-branding",
+      "status": "warn",
+      "note": "kein Status-Link",
+      "at": "2026-08-26T18:03:49.234Z"
+    },
+    {
+      "phase": "A2",
+      "id": "lead-db",
+      "status": "ok",
+      "note": "fe37acab-e6ef-43ad-8bfc-2f72ecf5f5af status=neu freigabe=nicht_noetig",
+      "at": "2026-08-26T18:03:49.528Z"
+    },
+    {
+      "phase": "A2",
+      "id": "crm-kontext",
+      "status": "ok",
+      "note": "Bärenwald | ARBEIT | Dashboard | Vorgänge | Kunden | Handwerker | ORGANISATION | Kalender | KI Analytics | Einstellungen | ⌘K | KI | 13 | Demo-/Test-Account — Transaktionsdaten stammen a",
+      "at": "2026-08-26T18:04:06.141Z"
+    },
+    {
+      "phase": "A2",
+      "id": "angebot-db",
+      "status": "warn",
+      "note": "kein Angebot am Lead",
+      "at": "2026-08-26T18:04:06.249Z"
+    },
+    {
+      "phase": "A2",
+      "id": "hv-login",
+      "status": "ok",
+      "note": "url=https://staging--baerenwald.netlify.app/portal · Portal wird geladen… |  | Einen Moment — wir bereiten Ihre Übersicht vor.",
+      "at": "2026-08-26T18:04:12.187Z"
+    },
+    {
+      "phase": "A2",
+      "id": "hv-freigabe-buttons",
+      "status": "warn",
+      "note": "M | MeinBärenwald | VERWALTUNG | 1 | Abmelden |  | MUSTERVERWALTUNG NORD |  | + Neuer Vorgang | Dashboard | Vorgänge | 2 | Objekte | Serviceabos | IN KÜRZE | Marktplatz | I",
+      "at": "2026-08-26T18:04:20.445Z"
+    },
+    {
+      "phase": "A2",
+      "id": "partner-gate-state",
+      "status": "ok",
+      "note": "freigabe=nicht_noetig hv=neu",
+      "at": "2026-08-26T18:04:20.578Z"
+    },
+    {
+      "phase": "A2",
+      "id": "partner-login",
+      "status": "ok",
+      "note": "url=https://staging--baerenwald.netlify.app/partner · Bärenwald |  | Ihr Portal für alle Vorgänge. |  | Anfragen melden, Angebote freigeben, Termine bestätigen und den Fortschritt in",
+      "at": "2026-08-26T18:04:21.758Z"
+    },
+    {
+      "phase": "A1",
+      "id": "rechner",
+      "status": "warn",
+      "note": "Abbrechen | Bärenwald | 08980955726 | UNSERE VISION | Handwerk neu gedacht. |  | Ein Ansprechpartner der alles k",
+      "at": "2026-08-26T18:04:23.831Z"
+    },
+    {
+      "phase": "A1",
+      "id": "rechner-submit",
+      "status": "ok",
+      "note": "https://staging--baerenwald.netlify.app/rechner · Abbrechen | Bärenwald | 08980955726 |  | IHR VORHABEN |  | Wie möchten Sie starten? |  | Nur den Preisrahmen — oder Beratung, Visualisie",
+      "at": "2026-08-26T18:05:59.323Z"
+    },
+    {
+      "phase": "A1",
+      "id": "lead-db",
+      "status": "warn",
+      "note": "kein Privat-Lead",
+      "at": "2026-08-26T18:05:59.811Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "a1-angebot",
+      "status": "ok",
+      "note": "HTTP 200 · 171487 B",
+      "bytes": 171487,
+      "at": "2026-08-26T18:06:14.212Z"
+    },
+    {
+      "phase": "A1",
+      "id": "angebot-detail",
+      "status": "ok",
+      "note": "40f62e2e gesendet_kunde",
+      "at": "2026-08-26T18:06:16.972Z"
+    },
+    {
+      "phase": "A1",
+      "id": "auftrag",
+      "status": "ok",
+      "note": "231716aa in_arbeit",
+      "at": "2026-08-26T18:06:21.489Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "a1-abschluss",
+      "status": "ok",
+      "note": "HTTP 200 · 160464 B",
+      "bytes": 160464,
+      "at": "2026-08-26T18:06:29.906Z"
+    },
+    {
+      "phase": "A1",
+      "id": "privat-portal",
+      "status": "ok",
+      "note": "url=https://staging--baerenwald.netlify.app/portal · B | MeinBärenwald | FAMILIE BERGER | Abmelden |  | FAMILIE BERGER |  | + Schaden melden | Übersicht | Vorgänge | Einstel",
+      "at": "2026-08-26T18:06:36.064Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "c-re-query",
+      "status": "ok",
+      "note": "HTTP 200 · 164900 B",
+      "bytes": 164900,
+      "at": "2026-08-26T18:06:40.585Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "c-re-id",
+      "status": "fail",
+      "note": "HTTP 400 · {\"message\":\"Rechnung nicht gefunden\"}",
+      "at": "2026-08-26T18:06:41.082Z"
+    },
+    {
+      "phase": "C",
+      "id": "re-detail",
+      "status": "ok",
+      "note": "STG-R2-0001 1059.1",
+      "at": "2026-08-26T18:06:44.521Z"
+    },
+    {
+      "phase": "C",
+      "id": "storno-menu",
+      "status": "ok",
+      "note": "⋯ Storno/Gutschrift",
+      "at": "2026-08-26T18:06:44.973Z"
+    },
+    {
+      "phase": "C",
+      "id": "als-bezahlt",
+      "status": "ok",
+      "note": "status=bezahlt",
+      "at": "2026-08-26T18:06:46.616Z"
+    },
+    {
+      "phase": "C",
+      "id": "als-bezahlt-revert",
+      "status": "ok",
+      "note": "zurück gesendet",
+      "at": "2026-08-26T18:06:46.708Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "c-gs-query",
+      "status": "ok",
+      "note": "HTTP 200 · 175081 B",
+      "bytes": 175081,
+      "at": "2026-08-26T18:06:54.456Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "c-gs-id",
+      "status": "fail",
+      "note": "HTTP 400 · {\"message\":\"Rechnung nicht gefunden\"}",
+      "at": "2026-08-26T18:06:54.976Z"
+    },
+    {
+      "phase": "C",
+      "id": "re-entwurf",
+      "status": "ok",
+      "note": "537d9dbf",
+      "at": "2026-08-26T18:06:57.008Z"
+    },
+    {
+      "phase": "C",
+      "id": "zahlplan",
+      "status": "ok",
+      "note": "Bärenwald ARBEIT Dashboard Vorgänge Kunden Handwerker ORGANISATION Kalender KI Analytics E",
+      "at": "2026-08-26T18:07:00.147Z"
+    },
+    {
+      "phase": "PDF",
+      "id": "c-aushang",
+      "status": "ok",
+      "note": "HTTP 200 · 79992 B",
+      "bytes": 79992,
+      "at": "2026-08-26T18:07:07.428Z"
+    }
+  ]
+}

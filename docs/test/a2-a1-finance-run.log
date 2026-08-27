@@ -1,0 +1,51 @@
+
+=== A2 ===
+
+✅ [A2] branding-melde — MN |  | Musterverwaltung Nord |  | Verwaltung |  | BEREICH |  | Was ist betroffen? |  | Wasser / Rohr / WC |  | tropft, läuft aus, ver
+  funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+  funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+  funnel picked: Küche
+  funnel picked: Ja
+  funnel picked: Ja
+  funnel picked: Rutschgefahr
+⚠️ [A2] melde-submit — url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10 · MN |  | Musterverwaltung Nord |  | Verwaltung |  | Meldung wird gesendet… |  | Einen Moment — Fotos und Angaben werden übermittelt.
+⚠️ [A2] status-branding — kein Status-Link
+✅ [A2] lead-db — fe37acab-e6ef-43ad-8bfc-2f72ecf5f5af status=neu freigabe=nicht_noetig
+✅ [A2] crm-kontext — Bärenwald | ARBEIT | Dashboard | Vorgänge | Kunden | Handwerker | ORGANISATION | Kalender | KI Analytics | Einstellungen | ⌘K | KI | 13 | Demo-/Test-Account — Transaktionsdaten stammen a
+⚠️ [A2] angebot-db — kein Angebot am Lead
+✅ [A2] hv-login — url=https://staging--baerenwald.netlify.app/portal · Portal wird geladen… |  | Einen Moment — wir bereiten Ihre Übersicht vor.
+⚠️ [A2] hv-freigabe-buttons — M | MeinBärenwald | VERWALTUNG | 1 | Abmelden |  | MUSTERVERWALTUNG NORD |  | + Neuer Vorgang | Dashboard | Vorgänge | 2 | Objekte | Serviceabos | IN KÜRZE | Marktplatz | I
+✅ [A2] partner-gate-state — freigabe=nicht_noetig hv=neu
+✅ [A2] partner-login — url=https://staging--baerenwald.netlify.app/partner · Bärenwald |  | Ihr Portal für alle Vorgänge. |  | Anfragen melden, Angebote freigeben, Termine bestätigen und den Fortschritt in
+
+=== A1 ===
+
+⚠️ [A1] rechner — Abbrechen | Bärenwald | 08980955726 | UNSERE VISION | Handwerk neu gedacht. |  | Ein Ansprechpartner der alles k
+✅ [A1] rechner-submit — https://staging--baerenwald.netlify.app/rechner · Abbrechen | Bärenwald | 08980955726 |  | IHR VORHABEN |  | Wie möchten Sie starten? |  | Nur den Preisrahmen — oder Beratung, Visualisie
+⚠️ [A1] lead-db — kein Privat-Lead
+✅ [PDF] a1-angebot — HTTP 200 · 171487 B
+✅ [A1] angebot-detail — 40f62e2e gesendet_kunde
+✅ [A1] auftrag — 231716aa in_arbeit
+✅ [PDF] a1-abschluss — HTTP 200 · 160464 B
+✅ [A1] privat-portal — url=https://staging--baerenwald.netlify.app/portal · B | MeinBärenwald | FAMILIE BERGER | Abmelden |  | FAMILIE BERGER |  | + Schaden melden | Übersicht | Vorgänge | Einstel
+
+=== C Finanz ===
+
+✅ [PDF] c-re-query — HTTP 200 · 164900 B
+❌ [PDF] c-re-id — HTTP 400 · {"message":"Rechnung nicht gefunden"}
+✅ [C] re-detail — STG-R2-0001 1059.1
+✅ [C] storno-menu — ⋯ Storno/Gutschrift
+✅ [C] als-bezahlt — status=bezahlt
+✅ [C] als-bezahlt-revert — zurück gesendet
+✅ [PDF] c-gs-query — HTTP 200 · 175081 B
+❌ [PDF] c-gs-id — HTTP 400 · {"message":"Rechnung nicht gefunden"}
+✅ [C] re-entwurf — 537d9dbf
+✅ [C] zahlplan — Bärenwald ARBEIT Dashboard Vorgänge Kunden Handwerker ORGANISATION Kalender KI Analytics E
+✅ [PDF] c-aushang — HTTP 200 · 79992 B
+
+=== SUMMARY === { ok: 21, warn: 6, fail: 2 }
+wrote /Users/belalmasdjedi/code/baerenwald-system/docs/test/TESTREPORT-A2-A1-FINANZ-LIVE.json

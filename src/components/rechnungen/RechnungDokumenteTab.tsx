@@ -1,6 +1,4 @@
-'use client'
-
-import { useEffect, useMemo, useState } from 'react'
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import {
   AnfrageDokumenteTab,
   type AkteProtokollDokument,
@@ -117,7 +115,7 @@ export function RechnungDokumenteTab({
   auftragDetail?: AuftragDetail | null
   onReload: () => void
 }) {
-  const pdfHref = detail.pdf_url?.trim() || `/api/rechnungen/${detail.id}/pdf`
+  const pdfHref = rechnungPdfHref(detail.id, detail.pdf_url)
   const name = pdfName(detail)
   const datum = detail.rechnungsdatum
     ? formatDatum(detail.rechnungsdatum)

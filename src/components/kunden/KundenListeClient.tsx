@@ -28,12 +28,15 @@ import { KundenMergeAssistentSheet } from '@/components/kunden/KundenMergeAssist
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 
 const EXPORT_FIELDS: ExportField[] = [
   { key: 'name', label: 'Name' },
@@ -51,6 +54,7 @@ const KUNDEN_COLS: ResizableColDef[] = [
   { id: 'typ', defaultWidth: 130, minWidth: 90, maxWidth: 200 },
   { id: 'telefon', defaultWidth: 150, minWidth: 110, maxWidth: 220 },
   { id: 'email', defaultWidth: 220, minWidth: 140, maxWidth: 360 },
+  { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
 type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
@@ -138,7 +142,14 @@ export function KundenListeClient({
       if (typFilter !== 'alle' && kundeTypFilterBucket(k.typ) !== typFilter) return false
       if (nameNeedle && !kundeListenName(k).toLowerCase().includes(nameNeedle)) return false
       if (!needle) return true
-      const pool = [kundeListenName(k), k.name, k.email ?? '', k.telefon ?? '', k.kundennummer ?? '']
+      const pool = [
+        kundeListenName(k),
+        k.name,
+        (k as { org_anzeigename?: string | null }).org_anzeigename ?? '',
+        k.email ?? '',
+        k.telefon ?? '',
+        k.kundennummer ?? '',
+      ]
         .join(' ')
         .toLowerCase()
       return pool.includes(needle)
@@ -239,7 +250,7 @@ export function KundenListeClient({
   }, [router, selectedRows])
 
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    'crm.cols.kunden.select.v1',
+    'crm.cols.kunden.select.v2',
     KUNDEN_COLS
   )
   const resizeOffset = 1
@@ -285,7 +296,7 @@ export function KundenListeClient({
 
   const filterFooter = (
     <div className="sheet-footer-actions">
-      <MockBtn kind="secondary" onClick={resetFilters}>
+      <MockBtn kind="ghost" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
@@ -540,20 +551,12 @@ export function KundenListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectAll()
-            }}
+          <ListRowCheck
+            checked={allFilteredSelected}
+            partial={allPageSelected && !allFilteredSelected}
+            onToggle={toggleSelectAll}
             title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          />
           <MockSortHead
             col="name"
             sortCol={sortCol}
@@ -594,6 +597,7 @@ export function KundenListeClient({
           >
             Email
           </MockSortHead>
+          <div />
         </div>
 
         {displayItems.length === 0 ? (
@@ -626,6 +630,22 @@ export function KundenListeClient({
             const del = () => {
               void runDeleteKunde(k.id, router, kundeListenName(k))
             }
+            const rowMenu: EntityMenuItem[] = [
+              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(k.id) },
+              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
+              { icon: 'copy', label: 'Duplizieren', onClick: copy },
+              'sep',
+              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+            ]
+            const menuCell = (
+              <div
+                className="vg-row-menu"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+              </div>
+            )
             const row = isMobile ? (
               <div
                 role="button"
@@ -639,17 +659,10 @@ export function KundenListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(k.id)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[k.id] && 'on')}>
-                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[k.id])}
+                  onToggle={() => toggleSel(k.id)}
+                />
                 <div className="vg-vorgang">
                   <div className="t" title={kundeListenName(k)}>
                     {kundeListenName(k)}
@@ -662,6 +675,7 @@ export function KundenListeClient({
                   <span title={tel || undefined}>{tel || '—'}</span>
                   <span title={mail || undefined}>{mail || '—'}</span>
                 </div>
+                {menuCell}
               </div>
             ) : (
               <div
@@ -676,17 +690,10 @@ export function KundenListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(k.id)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[k.id] && 'on')}>
-                    {selected[k.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[k.id])}
+                  onToggle={() => toggleSel(k.id)}
+                />
                 <div className="lc-title" style={{ fontWeight: 600 }}>
                   {kundeListenName(k)}
                 </div>
@@ -707,6 +714,7 @@ export function KundenListeClient({
                 >
                   {mail || '—'}
                 </div>
+                {menuCell}
               </div>
             )
             return (

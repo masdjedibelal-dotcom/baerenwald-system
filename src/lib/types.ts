@@ -36,9 +36,18 @@ export type FreigabeModus = 'direkt' | 'freigabe'
 export type LeadAnlass = 'meldung' | 'projekt' | 'servicepaket' | 'sonstiges'
 export type LeadErfassungVon = 'melder' | 'organisation' | 'crm'
 export type EinladungStatus = 'offen' | 'ergaenzt' | 'entfallen'
-export type OrgFreigabeStatus = 'nicht_noetig' | 'ausstehend' | 'freigegeben' | 'abgelehnt'
+export type OrgFreigabeStatus =
+  | 'nicht_noetig'
+  | 'ausstehend'
+  | 'beschluss_ausstehend'
+  | 'freigegeben'
+  | 'abgelehnt'
 export type ServiceModus = 'paket' | 'einzeln'
-export type OrgFreigabeAktion = 'angefordert' | 'freigegeben' | 'abgelehnt'
+export type OrgFreigabeAktion =
+  | 'angefordert'
+  | 'freigegeben'
+  | 'abgelehnt'
+  | 'beschluss_ausstehend'
 
 export type LeadStatusHistory = {
   id: string
@@ -207,6 +216,8 @@ export type Lead = {
   kunde_id: string | null
   /** Ausgewähltes Verwaltungsobjekt (Gewerbe/Hausverwaltung) */
   kunde_objekt_id?: string | null
+  /** Optionale Zuordnung zu Anlage/Teil am Objekt */
+  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Empfänger) */
   ansprechpartner_id?: string | null
   kanal: LeadKanal
@@ -337,6 +348,7 @@ export type LeadDetail = Lead & {
   kunden?: Kunde | null
   auftraggeber?: LeadAuftraggeberEmbed | null
   kunden_objekte?: KundenObjekt | null
+  objekt_anlagen?: { id: string; bezeichnung: string; gewerke?: { name: string } | null } | null
   org_freigabe_log?: OrgFreigabeLogRow[] | null
   leads_status_history?: LeadStatusHistory[] | null
   vorab_formulare?: VorabFormular[] | null
@@ -453,6 +465,8 @@ export type Angebot = {
   kunde_id: string | null
   /** Ausführungsort (Verwaltungsobjekt) */
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort */
+  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Versand-Empfänger) */
   ansprechpartner_id?: string | null
   status: AngebotStatus
@@ -1296,6 +1310,8 @@ export type Rechnung = {
   ansprechpartner_id?: string | null
   /** Ausführungsort / Verwaltungsobjekt (PDF „Durchführung in“). */
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort */
+  objekt_anlage_id?: string | null
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
   /** Spec Ketten */

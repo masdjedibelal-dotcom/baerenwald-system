@@ -110,6 +110,7 @@ export async function notifyInterneNeueMeldung(
     html: tpl.html,
   })
 
+  // Best-effort Push (kein Mail): Fire-and-forget bewusst — Glocke/Mail sind die Quelle der Wahrheit.
   void sendCrmPushToStaff({
     typ: 'neue_anfrage',
     title: pushTitle,
@@ -194,7 +195,7 @@ export async function notifyOrgFreigabeErgebnis(input: {
       ? `${orgName} hat „${objektTitel}“ freigegeben.`
       : `${orgName} hat die Freigabe für „${objektTitel}“ abgelehnt.`)
 
-  // Push an CRM-Staff (Glocke liest zusätzlich lead_timeline vom Portal).
+  // Best-effort Push (kein Mail): Fire-and-forget bewusst — Timeline/Mail tragen.
   void sendCrmPushToStaff({
     typ: 'angebot_entscheidung',
     title: freigabeTitle,
@@ -355,6 +356,7 @@ export async function notifyAngebotEntscheidung(input: {
       ? `${entscheidenderName} hat das Angebot für „${objektTitel}“ angenommen.`
       : `${entscheidenderName} hat das Angebot für „${objektTitel}“ abgelehnt.`)
 
+  // Best-effort Push (kein Mail): Fire-and-forget bewusst.
   void sendCrmPushToStaff({
     typ: 'angebot_entscheidung',
     title,

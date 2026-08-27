@@ -6,12 +6,15 @@ import { useRouter } from "next/navigation";
 import { addLeadNotizRow, deleteLeadNotizRow } from "@/app/(dashboard)/anfragen/actions";
 import { leadNotizFotoUrls } from "@/lib/anfragen/lead-notiz-fotos";
 import { toast } from "@/components/ui/app-toast";
+import { confirmDelete } from "@/components/ui/confirm-delete";
 import type { LeadNotizRow } from "@/lib/types";
+import type { EntityMenuItem } from "@/lib/entity-menu";
 import { richTextToPlain } from "@/lib/rich-text";
 import { formatTimelineStamp } from "@/lib/utils";
 import { MockCard } from "@/components/mock-ui/MockCard";
 import { MockNotizComposer } from "@/components/mock-ui/MockDetailCards";
 import { MockBtn } from "@/components/mock-ui/MockPrimitives";
+import { MockEntityRowMenu } from "@/components/mock-ui/MockEntityRowMenu";
 import { MockModal } from "@/components/mock-ui/MockModal";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -57,23 +60,28 @@ export function AnfrageNotizenTab({
         toast.error(r.message);
         return;
       }
+      toast.success("Notiz hinzugefügt");
       setVal("");
       onReload();
       router.refresh();
     });
   }
 
-  function loeschen(id: string) {
-    if (!window.confirm("Notiz löschen?")) return;
-    startTransition(async () => {
-      const r = await deleteLeadNotizRow(id, leadId);
-      if (!r.ok) {
-        toast.error(r.message);
-        return;
-      }
-      onReload();
-      router.refresh();
-    });
+  function loeschen(id: string, preview?: string) {
+    confirmDelete(
+      "Notiz löschen?",
+      async () => {
+        const r = await deleteLeadNotizRow(id, leadId);
+        if (!r.ok) {
+          toast.error(r.message);
+          throw new Error(r.message);
+        }
+        toast.success("Notiz gelöscht");
+        onReload();
+        router.refresh();
+      },
+      { body: preview?.trim() || undefined }
+    );
   }
 
   return (
@@ -111,13 +119,20 @@ export function AnfrageNotizenTab({
                   </div>
                   {!isMobile ? (
                     <div style={{ position: "absolute", top: 4, right: 4 }}>
-                      <MockBtn
-                        sm
-                        kind="ghost"
-                        icon="trash"
-                        title="Löschen"
-                        disabled={pending}
-                        onClick={() => loeschen(n.id)}
+                      <MockEntityRowMenu
+                        title="Notiz"
+                        items={
+                          [
+                            {
+                              icon: "trash",
+                              label: "Löschen",
+                              danger: true,
+                              disabled: pending,
+                              onClick: () =>
+                                loeschen(n.id, text.split("\n")[0] || "Notiz"),
+                            },
+                          ] satisfies EntityMenuItem[]
+                        }
                       />
                     </div>
                   ) : null}

@@ -5,9 +5,14 @@ import {
   type AngebotStatusEinfachRow,
 } from '@/lib/angebot-einfach'
 import type { AuftragStatus, LeadStatus, OrgFreigabeStatus } from '@/lib/types'
-import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
+import { type RechnungStatus } from '@/lib/rechnung-config'
 import { resolveRechnungKorrekturUi } from '@/lib/rechnungen/rechnung-korrektur'
-import { AUFTRAG_STATUS_LABELS, STATUS_LABELS, formatDatum } from '@/lib/utils'
+import {
+  statusLabel,
+  statusMapEntry,
+  unknownStatusEntry,
+} from '@/lib/status/status-map'
+import { formatDatum } from '@/lib/utils'
 import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
 
 export type StatusDisplay = {
@@ -58,8 +63,11 @@ export function anfrageStatusDisplay(
   _opts?: { orgFreigabeStatus?: OrgFreigabeStatus | string | null }
 ): StatusDisplay {
   void _opts
-  const key = status as LeadStatus
-  const label = key in STATUS_LABELS ? STATUS_LABELS[key] : String(status)
+  const key = String(status ?? '')
+    .trim()
+    .toLowerCase() as LeadStatus
+  const known = statusMapEntry('anfrage', key)
+  const label = known?.label ?? unknownStatusEntry(status).label
   const variant = key in ANFRAGE_VARIANT ? ANFRAGE_VARIANT[key] : 'neutral'
   return { label, variant }
 }
@@ -69,12 +77,29 @@ export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDispla
   const db = String(row.status ?? '')
     .trim()
     .toLowerCase()
+  const einfachCol = String(row.status_einfach ?? '')
+    .trim()
+    .toLowerCase()
   /* Fein-Status vor Einfach-Collapse: sonst bleibt Badge bei „Gesendet“/blau */
   if (db === 'handwerker_akzeptiert') {
-    return { label: 'Partner akzeptiert', variant: 'success' }
+    return { label: statusLabel('angebot', 'handwerker_akzeptiert'), variant: 'success' }
   }
   if (db === 'gesendet_handwerker') {
-    return { label: 'An Partner gesendet', variant: 'active' }
+    return { label: statusLabel('angebot', 'gesendet_handwerker'), variant: 'active' }
+  }
+  /* Alt-Status (z. B. versendet): nicht zu „Entwurf“ kollabieren — Rohwert, neutral */
+  const einfachKnown =
+    einfachCol === 'entwurf' ||
+    einfachCol === 'gesendet' ||
+    einfachCol === 'angenommen' ||
+    einfachCol === 'abgelehnt' ||
+    einfachCol === 'abgelaufen' ||
+    einfachCol === 'ersetzt'
+  if (einfachCol && !einfachKnown && !statusMapEntry('angebot', einfachCol)) {
+    return { label: unknownStatusEntry(einfachCol).label, variant: 'neutral' }
+  }
+  if (!einfachCol && db && !statusMapEntry('angebot', db)) {
+    return { label: unknownStatusEntry(db).label, variant: 'neutral' }
   }
   const einfach = resolveStatusEinfach(row)
   return {
@@ -85,11 +110,12 @@ export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDispla
 
 /** Nutzer-sichtbares Label + semantische Farbe für Auftrag. */
 export function auftragStatusDisplay(status: AuftragStatus | string): StatusDisplay {
-  const key = status as AuftragStatus
-  const label =
-    key in AUFTRAG_STATUS_LABELS ? AUFTRAG_STATUS_LABELS[key] : String(status)
-  const variant =
-    key in AUFTRAG_VARIANT ? AUFTRAG_VARIANT[key] : 'neutral'
+  const key = String(status ?? '')
+    .trim()
+    .toLowerCase() as AuftragStatus
+  const known = statusMapEntry('auftrag', key)
+  const label = known?.label ?? unknownStatusEntry(status).label
+  const variant = key in AUFTRAG_VARIANT ? AUFTRAG_VARIANT[key] : 'neutral'
   return { label, variant }
 }
 
@@ -104,7 +130,7 @@ export function rechnungStatusDisplay(
   }
 ): StatusDisplay {
   if (opts?.ueberfaellig) {
-    return { label: 'Überfällig', variant: 'warning' }
+    return { label: statusLabel('rechnung', 'ueberfaellig'), variant: 'warning' }
   }
   if (opts?.korrektur_von) {
     const ui = resolveRechnungKorrekturUi({
@@ -116,12 +142,14 @@ export function rechnungStatusDisplay(
       return { label: ui.dualBadges.secondary, variant: 'neutral' }
     }
   }
-  const key = status as RechnungStatus
+  const key = String(status ?? '')
+    .trim()
+    .toLowerCase() as RechnungStatus
   if (opts?.eingehend && key === 'bezahlt') {
-    return { label: 'Überwiesen', variant: 'success' }
+    return { label: statusLabel('rechnung', 'ueberwiesen'), variant: 'success' }
   }
-  const label =
-    key in RECHNUNG_STATUS_LABELS ? RECHNUNG_STATUS_LABELS[key] : String(status)
+  const known = statusMapEntry('rechnung', key)
+  const label = known?.label ?? unknownStatusEntry(status).label
   const variant = key in RECHNUNG_VARIANT ? RECHNUNG_VARIANT[key] : 'neutral'
   return { label, variant }
 }

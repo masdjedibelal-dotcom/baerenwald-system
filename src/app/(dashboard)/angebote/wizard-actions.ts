@@ -226,12 +226,14 @@ export async function saveAngebotWizardDraft(
         }
 
   const kundeObjektId = input.meta.kunde_objekt_id?.trim() || null
+  const objektAnlageId = input.meta.objekt_anlage_id?.trim() || null
 
   if (input.angebotId) {
     const upd = await updateAngebot(input.angebotId, {
       lead_id: input.lead_id,
       kunde_id: input.kunde_id,
       kunde_objekt_id: kundeObjektId,
+      objekt_anlage_id: objektAnlageId,
       positionen,
       notizen,
       preis_typ: 'range',
@@ -290,6 +292,7 @@ export async function saveAngebotWizardDraft(
     lead_id: input.lead_id,
     kunde_id: input.kunde_id,
     kunde_objekt_id: kundeObjektId,
+    objekt_anlage_id: objektAnlageId,
     positionen,
     notizen,
     preis_typ: 'range',
@@ -635,6 +638,10 @@ export async function loadAngebotWizardBootstrapKopie(
     titel: angebotTitelFuerKopie(metaParsed.titel),
     kunde_objekt_id:
       ang.kunde_objekt_id?.trim() || metaParsed.kunde_objekt_id || null,
+    objekt_anlage_id:
+      (ang as { objekt_anlage_id?: string | null }).objekt_anlage_id?.trim() ||
+      metaParsed.objekt_anlage_id ||
+      null,
   }
 
   const zahlungsplanParsed = parseZahlungsplan(ang.zahlungsplan)

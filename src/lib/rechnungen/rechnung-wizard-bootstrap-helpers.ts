@@ -18,6 +18,7 @@ export function buildStandaloneRechnungWizardBootstrap(
     kundeId: '',
     ansprechpartnerId: null,
     kundeObjektId: null,
+    objektAnlageId: null,
     kunde: null,
     positionen: [],
     meta: defaultRechnungWizardMeta(zt, { firm }),

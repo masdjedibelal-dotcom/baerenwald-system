@@ -8,7 +8,7 @@ import { mailProjektStatusUpdate } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import {
-  aktuellePhaseIndex,
+  aktuellePhaseIndexFromEntities,
   auftragStatusLabelDe,
   mailPhasenStepsHtml,
 } from '@/lib/auftraege/projekt-phasen'
@@ -122,7 +122,12 @@ export async function createKundenUpdateAndSend(input: {
     const leadRaw = auf.leads as { status?: LeadStatus } | { status?: LeadStatus }[] | null
     const leadStatus = (Array.isArray(leadRaw) ? leadRaw[0]?.status : leadRaw?.status) ?? null
     const aufStatus = auf.status as AuftragStatus
-    const phaseIdx = aktuellePhaseIndex(leadStatus, aufStatus)
+    const phaseIdx = aktuellePhaseIndexFromEntities({
+      aufStatus,
+      hasAuftrag: true,
+      hasAngebot: true,
+      leadStatus,
+    })
     const link = projektUrlFromToken(token)
     const branding = await getMailBranding(supabaseAdmin)
     const minimal = input.mailModus === 'schlicht'

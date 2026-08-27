@@ -48,6 +48,8 @@ export type DocumentCanvasProps = {
    * Auf eigenen Routes (`/angebote/neu`) aus — sonst kämpft die History mit PickerSheets.
    */
   manageHistory?: boolean
+  /** Ungespeicherte Änderungen — beforeunload + Confirm bei Browser-Zurück */
+  draftDirty?: boolean
   /** Vollflächiger Lade-Overlay (z. B. Versand) */
   busy?: boolean
   busyLabel?: string
@@ -78,6 +80,7 @@ export function DocumentCanvas({
   className,
   portal = true,
   manageHistory = true,
+  draftDirty = false,
   busy,
   busyLabel,
 }: DocumentCanvasProps) {
@@ -90,10 +93,23 @@ export function DocumentCanvas({
   const bodyRef = useRef<HTMLDivElement>(null)
   const historyPushed = useRef(false)
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftDirtyRef = useRef(draftDirty)
+  draftDirtyRef.current = draftDirty
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  /* Tab schließen / Reload bei ungespeicherten Änderungen */
+  useEffect(() => {
+    if (!open || !draftDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [open, draftDirty])
 
   /* Speichern/Laden: Soft-Keyboard zu — sonst bleibt Fokus im Feld unter dem Overlay */
   useEffect(() => {
@@ -127,7 +143,9 @@ export function DocumentCanvas({
   }, [])
 
   useEffect(() => {
-    if (!open || !mounted || !portal || !manageHistory) return
+    if (!open || !mounted || !portal) return
+    const trackHistory = manageHistory || draftDirty
+    if (!trackHistory) return
     window.history.pushState({ documentCanvas: true }, '')
     historyPushed.current = true
     const onPop = (e: PopStateEvent) => {
@@ -138,6 +156,16 @@ export function DocumentCanvas({
         return
       }
       if (editorSheetStackDepth() > 0) return
+      if (draftDirtyRef.current) {
+        const ok = window.confirm(
+          'Änderungen verwerfen? Ungespeicherte Eingaben gehen verloren.'
+        )
+        if (!ok) {
+          window.history.pushState({ documentCanvas: true }, '')
+          historyPushed.current = true
+          return
+        }
+      }
       historyPushed.current = false
       handleCloseRef.current()
     }
@@ -149,7 +177,7 @@ export function DocumentCanvas({
         window.history.back()
       }
     }
-  }, [open, mounted, portal, manageHistory])
+  }, [open, mounted, portal, manageHistory, draftDirty])
 
   useOverlayChromeLock(Boolean(open && mounted))
 

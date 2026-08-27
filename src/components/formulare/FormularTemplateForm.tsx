@@ -447,7 +447,7 @@ export function FormularTemplateForm({
                               />
                             ) : null}
                             <Button type="button" variant="primary" size="sm" onClick={() => saveInline(f.id)}>
-                              Fertig
+                              Speichern
                             </Button>
                           </div>
                         }

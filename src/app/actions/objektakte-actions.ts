@@ -2,11 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { OBJEKT_KONTAKT_ROLLEN } from '@/lib/objektakte/labels'
+import { OBJEKT_ANLAGE_STATUS, OBJEKT_KONTAKT_ROLLEN, OBJEKT_ANLAGE_WARTUNGSINTERVALL } from '@/lib/objektakte/labels'
+import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
 import type {
   EinheitBewohner,
   EinheitBewohnerInput,
   EinheitBewohnerRolle,
+  ObjektAnlage,
+  ObjektAnlageInput,
+  ObjektAnlageStatus,
+  ObjektAnlageVorgangRow,
   ObjektEinheit,
   ObjektEinheitInput,
   ObjektKontakt,
@@ -802,4 +807,431 @@ export async function loadBewohnerLinksForPrivatkunde(
     })
   }
   return out
+}
+
+async function assertAnlageGehoertObjekt(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<boolean> {
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) return false
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('objekt_anlagen')
+    .select('id')
+    .eq('id', anlageId)
+    .eq('kunde_objekt_id', objektId)
+    .eq('kunde_id', kundeId)
+    .maybeSingle()
+  return Boolean(data)
+}
+
+function normalizeAnlageStatus(status?: ObjektAnlageStatus | null): ObjektAnlageStatus {
+  if (status === 'ausgetauscht' || status === 'stillgelegt') return status
+  return 'aktiv'
+}
+
+function validateAnlageInput(input: ObjektAnlageInput): string | null {
+  if (!input.bezeichnung?.trim()) return 'Bezeichnung ist erforderlich.'
+  if (!input.gewerk_id?.trim()) return 'Gewerk ist erforderlich.'
+  if (input.status && !OBJEKT_ANLAGE_STATUS.includes(input.status)) {
+    return 'Ungültiger Status.'
+  }
+  return null
+}
+
+function parseEinbauDatum(value: string | null | undefined): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  if (/^\d{4}$/.test(v)) return `${v}-01-01`
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  return null
+}
+
+function parseIsoDate(value: string | null | undefined): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  return null
+}
+
+function parseAnschaffungswert(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const n =
+    typeof value === 'number'
+      ? value
+      : Number(String(value).replace(/\./g, '').replace(',', '.').trim())
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n * 100) / 100
+}
+
+function normalizeWartungsintervall(
+  value: string | null | undefined
+): (typeof OBJEKT_ANLAGE_WARTUNGSINTERVALL)[number] | null {
+  const v = value?.trim()
+  if (!v || v === 'keins') return v === 'keins' ? 'keins' : null
+  return (OBJEKT_ANLAGE_WARTUNGSINTERVALL as readonly string[]).includes(v)
+    ? (v as (typeof OBJEKT_ANLAGE_WARTUNGSINTERVALL)[number])
+    : null
+}
+
+function normalizeDokumentUrls(urls: string[] | null | undefined): string[] {
+  if (!urls?.length) return []
+  return urls.map((u) => u.trim()).filter(Boolean).slice(0, 20)
+}
+
+const ANLAGE_DETAIL_COLUMNS = [
+  'hersteller',
+  'modell',
+  'seriennummer',
+  'anschaffungswert_eur',
+  'garantie_bis',
+  'gewaehrleistung_bis',
+  'wartungsintervall',
+  'letzte_wartung_am',
+  'dokument_urls',
+] as const
+
+function stripAnlageDetailFields(row: Record<string, unknown>): Record<string, unknown> {
+  const copy = { ...row }
+  for (const key of ANLAGE_DETAIL_COLUMNS) delete copy[key]
+  return copy
+}
+
+function isAnlageDetailSchemaError(message: string): boolean {
+  return /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|wartungsintervall|does not exist|Could not find|schema cache/i.test(
+    message
+  )
+}
+
+function anlageRowFromInput(
+  kundeId: string,
+  objektId: string,
+  input: ObjektAnlageInput,
+  sortOrder: number
+): Record<string, unknown> {
+  const now = new Date().toISOString()
+  return {
+    kunde_id: kundeId,
+    kunde_objekt_id: objektId,
+    bezeichnung: input.bezeichnung.trim(),
+    gewerk_id: input.gewerk_id.trim(),
+    standort: input.standort?.trim() || null,
+    objekt_einheit_id: input.objekt_einheit_id?.trim() || null,
+    einbau_datum: parseEinbauDatum(input.einbau_datum),
+    foto_url: input.foto_url?.trim() || null,
+    notiz: input.notiz?.trim() || null,
+    hersteller: input.hersteller?.trim() || null,
+    modell: input.modell?.trim() || null,
+    seriennummer: input.seriennummer?.trim() || null,
+    anschaffungswert_eur: parseAnschaffungswert(input.anschaffungswert_eur),
+    garantie_bis: parseIsoDate(input.garantie_bis),
+    gewaehrleistung_bis: parseIsoDate(input.gewaehrleistung_bis),
+    wartungsintervall: normalizeWartungsintervall(input.wartungsintervall ?? null),
+    letzte_wartung_am: parseIsoDate(input.letzte_wartung_am),
+    dokument_urls: normalizeDokumentUrls(input.dokument_urls),
+    status: normalizeAnlageStatus(input.status),
+    sort_order: sortOrder,
+    updated_at: now,
+  }
+}
+
+export async function createObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  input: ObjektAnlageInput
+): Promise<{ ok: true; anlage: ObjektAnlage } | { ok: false; message: string }> {
+  const err = validateAnlageInput(input)
+  if (err) return { ok: false, message: err }
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
+    return { ok: false, message: 'Objekt nicht gefunden.' }
+  }
+
+  const einheitId = input.objekt_einheit_id?.trim() || null
+  if (
+    einheitId &&
+    !(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))
+  ) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: maxRow } = await supabase
+    .from('objekt_anlagen')
+    .select('sort_order')
+    .eq('kunde_objekt_id', objektId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const now = new Date().toISOString()
+  const row = {
+    ...anlageRowFromInput(kundeId, objektId, input, (maxRow?.sort_order ?? -1) + 1),
+    updated_at: now,
+  }
+
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .insert(row)
+    .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+    .single()
+
+  if ((error || !data) && isAnlageDetailSchemaError(error?.message ?? '')) {
+    const retry = await supabase
+      .from('objekt_anlagen')
+      .insert(stripAnlageDetailFields(row))
+      .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+      .single()
+    if (!retry.error && retry.data) {
+      revalidateObjektAkte(kundeId, objektId)
+      return {
+        ok: true,
+        anlage: {
+          ...(retry.data as ObjektAnlage),
+          dokument_urls: [],
+          vorgang_count: 0,
+        },
+      }
+    }
+  }
+
+  if (error || !data) {
+    return { ok: false, message: error?.message ?? 'Anlage konnte nicht angelegt werden.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  const anlage = {
+    ...(data as ObjektAnlage),
+    dokument_urls: (data as ObjektAnlage).dokument_urls ?? [],
+    vorgang_count: 0,
+  }
+  return { ok: true, anlage }
+}
+
+export async function updateObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  anlageId: string,
+  input: ObjektAnlageInput
+): Promise<{ ok: true; anlage: ObjektAnlage } | { ok: false; message: string }> {
+  const err = validateAnlageInput(input)
+  if (err) return { ok: false, message: err }
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const einheitId = input.objekt_einheit_id?.trim() || null
+  if (
+    einheitId &&
+    !(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))
+  ) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const patch = {
+    ...anlageRowFromInput(kundeId, objektId, input, 0),
+  }
+  delete (patch as { sort_order?: number }).sort_order
+
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .update(patch)
+    .eq('id', anlageId)
+    .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+    .single()
+
+  if ((error || !data) && isAnlageDetailSchemaError(error?.message ?? '')) {
+    const retry = await supabase
+      .from('objekt_anlagen')
+      .update(stripAnlageDetailFields(patch))
+      .eq('id', anlageId)
+      .select('*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)')
+      .single()
+    if (!retry.error && retry.data) {
+      revalidateObjektAkte(kundeId, objektId)
+      return { ok: true, anlage: retry.data as ObjektAnlage }
+    }
+  }
+
+  if (error || !data) {
+    return { ok: false, message: error?.message ?? 'Anlage konnte nicht gespeichert werden.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, anlage: data as ObjektAnlage }
+}
+
+export async function deleteObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const [{ count: leadCount }, { count: angebotCount }, { count: rechnungCount }] =
+    await Promise.all([
+      supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+      supabase
+        .from('angebote')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+      supabase
+        .from('rechnungen')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+    ])
+
+  const linked = (leadCount ?? 0) + (angebotCount ?? 0) + (rechnungCount ?? 0)
+  if (linked > 0) {
+    return {
+      ok: false,
+      message:
+        'Anlage ist mit Vorgängen verknüpft — bitte Status auf „Stillgelegt“ setzen statt löschen.',
+    }
+  }
+
+  const { error } = await supabase.from('objekt_anlagen').delete().eq('id', anlageId)
+  if (error) return { ok: false, message: error.message }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true }
+}
+
+export async function loadObjektAnlageVorgaenge(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<{ ok: true; rows: ObjektAnlageVorgangRow[] } | { ok: false; message: string }> {
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: leads, error } = await supabase
+    .from('leads')
+    .select('id, titel, created_at, status, anlass')
+    .eq('objekt_anlage_id', anlageId)
+    .order('created_at', { ascending: false })
+
+  if (error) return { ok: false, message: error.message }
+
+  const leadIds = (leads ?? []).map((l) => String(l.id)).filter(Boolean)
+  if (!leadIds.length) return { ok: true, rows: [] }
+
+  const [{ data: angebote }, { data: auftraege }] = await Promise.all([
+    supabase
+      .from('angebote')
+      .select('id, lead_id, status, gesamt_fix, gesamt_min, gesamt_max')
+      .in('lead_id', leadIds),
+    supabase.from('auftraege').select('id, lead_id, angebot_id, status').in('lead_id', leadIds),
+  ])
+
+  const auftragIds = (auftraege ?? []).map((a) => String(a.id)).filter(Boolean)
+  const angebotIds = (angebote ?? []).map((a) => String(a.id)).filter(Boolean)
+  let rechnungen: Array<{
+    auftrag_id?: string | null
+    angebot_id?: string | null
+    status: string
+    brutto?: number | null
+    rechnung_art?: string | null
+    created_at: string
+    updated_at?: string | null
+  }> = []
+  if (auftragIds.length || angebotIds.length) {
+    let q = supabase
+      .from('rechnungen')
+      .select('auftrag_id, angebot_id, status, brutto, rechnung_art, created_at, updated_at')
+    if (auftragIds.length && angebotIds.length) {
+      q = q.or(`auftrag_id.in.(${auftragIds.join(',')}),angebot_id.in.(${angebotIds.join(',')})`)
+    } else if (auftragIds.length) {
+      q = q.in('auftrag_id', auftragIds)
+    } else {
+      q = q.in('angebot_id', angebotIds)
+    }
+    const { data } = await q
+    rechnungen = (data ?? []) as typeof rechnungen
+  }
+
+  const angeboteByLead = new Map<string, NonNullable<typeof angebote>>()
+  for (const a of angebote ?? []) {
+    const lid = String(a.lead_id ?? '')
+    if (!lid) continue
+    const list = angeboteByLead.get(lid) ?? []
+    list.push(a)
+    angeboteByLead.set(lid, list)
+  }
+  const auftraegeByLead = new Map<string, NonNullable<typeof auftraege>>()
+  for (const a of auftraege ?? []) {
+    const lid = String(a.lead_id ?? '')
+    if (!lid) continue
+    const list = auftraegeByLead.get(lid) ?? []
+    list.push(a)
+    auftraegeByLead.set(lid, list)
+  }
+
+  const rows: ObjektAnlageVorgangRow[] = (leads ?? []).map((l) => {
+    const lid = String(l.id)
+    const leadAuf = auftraegeByLead.get(lid) ?? []
+    const leadAng = angeboteByLead.get(lid) ?? []
+    const aufIds = new Set(leadAuf.map((a) => String(a.id)))
+    const angIds = new Set(leadAng.map((a) => String(a.id)))
+    const recs = rechnungen.filter(
+      (r) =>
+        (r.auftrag_id && aufIds.has(String(r.auftrag_id))) ||
+        (r.angebot_id && angIds.has(String(r.angebot_id)))
+    )
+    const kosten = resolveObjektVorgangKosten({
+      rechnungen: recs,
+      auftraege: leadAuf as Array<{ status: string; angebot_id?: string | null }>,
+      angebote: leadAng as Array<{
+        id?: string
+        status?: string
+        gesamt_fix?: number | null
+        gesamt_min?: number | null
+        gesamt_max?: number | null
+      }>,
+    })
+    return {
+      id: lid,
+      titel: (l.titel as string)?.trim() || 'Vorgang',
+      created_at: l.created_at as string,
+      status: (l.status as string | null) ?? null,
+      phase: (l.anlass as string | null) ?? null,
+      kosten_label: kosten.label,
+    }
+  })
+
+  return { ok: true, rows }
+}
+
+export async function fetchObjektAnlagenForPicker(
+  kundeId: string,
+  objektId: string
+): Promise<ObjektAnlage[]> {
+  const kid = kundeId.trim()
+  const oid = objektId.trim()
+  if (!kid || !oid) return []
+  if (!(await assertObjektGehoertKunde(kid, oid))) return []
+
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .select('*, gewerke(id, name, slug)')
+    .eq('kunde_id', kid)
+    .eq('kunde_objekt_id', oid)
+    .neq('status', 'stillgelegt')
+    .order('bezeichnung', { ascending: true })
+
+  if (error) {
+    console.warn('fetchObjektAnlagenForPicker:', error.message)
+    return []
+  }
+  return (data ?? []) as ObjektAnlage[]
 }

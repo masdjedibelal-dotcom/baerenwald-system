@@ -176,6 +176,9 @@ export async function notfallDirektBeauftragen(
     await supabaseAdmin
       .from('leads')
       .update({
+        // Dokumentierte Ausnahme: Notmaßnahme umgeht Org-Freigabe-Gate
+        // (`orgFreigabeBlockiertPartner` / assertPartnerVersandOrgFreigabe).
+        // Siehe docs/claude-project/06-PROZESSE.md § Org-Freigabe.
         hv_meldung_status: 'notmassnahme',
         vorgang_phase: 'in_bearbeitung',
         org_freigabe_status: 'nicht_noetig',
@@ -360,7 +363,7 @@ export async function notfallDirektBeauftragen(
           },
           branding
         )
-        void sendMail({
+        const mail = await sendMail({
           typ: 'org_notfall_info',
           an: hvEmail,
           anName: orgName,
@@ -370,6 +373,13 @@ export async function notfallDirektBeauftragen(
           kundeId,
           auftragId,
         })
+        if (!mail.success) {
+          console.error('[notfall-direkt] HV-Info-Mail fehlgeschlagen', mail.error, {
+            auftragId,
+            leadId,
+            hvEmail,
+          })
+        }
       }
     }
   }

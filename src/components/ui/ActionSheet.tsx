@@ -42,6 +42,7 @@ export function ActionSheet({
   const danger = flat.filter((it) => it.danger)
 
   function run(item: Exclude<ActionsMenuItem, 'sep'>) {
+    if (item.disabled) return
     onClose()
     item.onClick()
   }
@@ -101,7 +102,12 @@ export function ActionSheet({
             <button
               key={it.label}
               type="button"
-              className="action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium text-bw-text transition-colors active:bg-bw-hover"
+              disabled={it.disabled}
+              title={it.disabled && it.hint ? it.hint : undefined}
+              className={cn(
+                'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium text-bw-text transition-colors active:bg-bw-hover',
+                it.disabled && 'opacity-50'
+              )}
               onClick={() => run(it)}
             >
               {it.icon ? (
@@ -125,9 +131,12 @@ export function ActionSheet({
                 <button
                   key={it.label}
                   type="button"
+                  disabled={it.disabled}
+                  title={it.disabled && it.hint ? it.hint : undefined}
                   className={cn(
                     'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium transition-colors active:bg-status-cancel-bg/30',
-                    'text-status-cancel-text'
+                    'text-status-cancel-text',
+                    it.disabled && 'opacity-50'
                   )}
                   onClick={() => run(it)}
                 >
@@ -135,6 +144,11 @@ export function ActionSheet({
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center">{it.icon}</span>
                   ) : null}
                   <span className="min-w-0 flex-1">{it.label}</span>
+                  {it.hint ? (
+                    <span className="shrink-0 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
+                      {it.hint}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </>

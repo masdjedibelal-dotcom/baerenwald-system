@@ -3,6 +3,7 @@
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
@@ -329,6 +330,8 @@ export type CreateAngebotInput = {
   varianten?: AngebotVariantenPersistJson | null
   wichtige_hinweise?: string | null
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort — mit Lead durch Pipeline mitgeführt. */
+  objekt_anlage_id?: string | null
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
@@ -468,6 +471,7 @@ export async function createAngebot(
       varianten: input.varianten ?? null,
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+      objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
       ist_wiederkehrend: input.ist_wiederkehrend === true,
       wiederkehr_turnus:
         input.ist_wiederkehrend === true
@@ -696,6 +700,9 @@ export async function updateAngebot(
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
         : {}),
+      ...(input.objekt_anlage_id !== undefined
+        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
+        : {}),
       ...(input.ist_wiederkehrend !== undefined
         ? {
             ist_wiederkehrend: input.ist_wiederkehrend === true,
@@ -866,7 +873,14 @@ export async function setAngebotStatus(
   status: AngebotStatus,
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
+  let supabase
+  if (opts?.asSystem) {
+    supabase = supabaseAdmin
+  } else {
+    const gate = await requireStaffAndServiceRole()
+    if (!gate.ok) return { ok: false, message: gate.message }
+    supabase = gate.db
+  }
   const now = new Date().toISOString()
   const extra: Record<string, string> = {}
   if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
@@ -1685,11 +1699,8 @@ export async function ablehneHandwerkerEinreichung(input: {
   | { ok: true; mailGesendet: boolean; mailHinweis?: string }
   | { ok: false; message: string }
 > {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
 
   const crmNotiz = input.crmNotiz.trim()
   if (!crmNotiz) return { ok: false, message: 'Bitte einen Grund für den Handwerker eingeben.' }
@@ -1698,7 +1709,7 @@ export async function ablehneHandwerkerEinreichung(input: {
   if (!loaded.ok) return loaded
 
   const now = new Date().toISOString()
-  const { error: upErr } = await supabaseAdmin
+  const { error: upErr } = await gate.db
     .from('angebot_handwerker')
     .update({
       hw_status: 'abgelehnt',
@@ -1744,7 +1755,14 @@ export async function sendAngebotToKunde(
     skipHandwerkerGate?: boolean
   }
 ) {
-  const supabase = options?.asSystem ? supabaseAdmin : createClient()
+  let supabase
+  if (options?.asSystem) {
+    supabase = supabaseAdmin
+  } else {
+    const gate = await requireStaffAndServiceRole()
+    if (!gate.ok) return { ok: false as const, message: gate.message }
+    supabase = gate.db
+  }
   const detail = await loadAngebotDetailAdmin(angebotId)
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
@@ -2090,7 +2108,9 @@ export async function recordKundeAbgelehntMitDetails(
     notiz: string | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: row } = await supabase
     .from('angebote')
     .select('id, status, status_einfach')
@@ -2275,7 +2295,9 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
   alteZuweisungId: string
   neuerHandwerkerId: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: zuAlt, error: zErr } = await supabase
     .from('angebot_handwerker')
     .select('id, gewerk_id, handwerker_id, status, hw_status, hw_eingereicht_at')
@@ -3238,7 +3260,9 @@ export async function updateAngebotVorlage(
 export async function deleteAngebot(
   angebotId: string
 ): Promise<{ success: true } | { error: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { error: gate.message }
+  const supabase = gate.db
   const { data: auf } = await supabase.from('auftraege').select('id').eq('angebot_id', angebotId).maybeSingle()
   if (auf) {
     return {

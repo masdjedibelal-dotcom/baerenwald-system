@@ -143,6 +143,7 @@ export function PosBoard({
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
   const [gewerkAddPick, setGewerkAddPick] = useState('')
   const [gewerkAddCustom, setGewerkAddCustom] = useState('')
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
   const _line = lineOf ?? posBoardLineNetto
 
@@ -160,6 +161,12 @@ export function PosBoard({
       delete n[id]
       return n
     })
+    setPendingRemoveId(null)
+  }
+
+  const requestRemove = (id: string) => {
+    if (!onChange) return
+    setPendingRemoveId(id)
   }
 
   const dup = (id: string) => {
@@ -555,7 +562,7 @@ export function PosBoard({
             label: 'Löschen',
             icon: 'trash',
             danger: true,
-            onClick: () => remove(it.id),
+            onClick: () => requestRemove(it.id),
           },
         ]
         return items
@@ -614,7 +621,7 @@ export function PosBoard({
           guardSheetPointerFallthrough()
           setEditId(null)
         },
-        onRemove: () => remove(editP.id),
+        onRemove: () => requestRemove(editP.id),
       }
     : null
 
@@ -988,6 +995,37 @@ export function PosBoard({
                 </option>
               ))}
             </select>
+          </div>
+        </MockModal>
+      ) : null}
+      {pendingRemoveId ? (
+        <MockModal
+          open
+          icon="trash"
+          title="Position löschen?"
+          sub="Aus dem Leistungsblatt entfernen."
+          size="sm"
+          onClose={() => setPendingRemoveId(null)}
+          footer={
+            <>
+              <MockBtn kind="ghost" onClick={() => setPendingRemoveId(null)}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                kind="danger"
+                icon="trash"
+                onClick={() => {
+                  if (pendingRemoveId) remove(pendingRemoveId)
+                }}
+              >
+                Position löschen
+              </MockBtn>
+            </>
+          }
+        >
+          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+            Die Position wird aus der Liste entfernt. Speichern im Wizard übernimmt die Änderung.
           </div>
         </MockModal>
       ) : null}

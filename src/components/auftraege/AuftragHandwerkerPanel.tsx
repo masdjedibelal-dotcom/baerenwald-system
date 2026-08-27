@@ -135,7 +135,7 @@ export function AuftragHandwerkerPanel({
 
   function openGewerkModal(gruppe: GewerkGruppe, replaceZuweisungId?: string) {
     if (!gruppe.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten — bitte Position mit gültigem Gewerk anlegen.')
+      toast.error('Gewerk nicht in Stammdaten')
       return
     }
     const alterHwId = replaceZuweisungId

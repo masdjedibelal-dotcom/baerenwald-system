@@ -21,7 +21,7 @@ Kurze Definitionen, wie sie im Produkt gemeint sind. Bei Unklarheit gilt diese D
 | **org_kennung** | Kurzname in der Melde-URL, z. B. `/melden/meine-hv/...`. |
 | **melde_slug** | Kurzname des Objekts in der Melde-URL. |
 | **Meldung** | Schaden-/Anliegen-Meldung eines Mieters/Bewohners; wird intern als Anfrage geführt. |
-| **Freigabe** | HV/Eigentümer muss Kosten oder Angebot freigeben, bevor es weitergeht. |
+| **Freigabe** | HV/Eigentümer muss Kosten oder Angebot freigeben, bevor es weitergeht. Status am Lead: `org_freigabe_status` — u. a. `ausstehend`, **`beschluss_ausstehend`** (Parkzustand bis Eigentümerbeschluss), `freigegeben`, `abgelehnt`. |
 | **Whitelabel** | Logo/Farben/Name der Organisation auf Melde- und manchen Portal-Seiten. |
 | **MeinBärenwald** | Login-Portal für Kunden, HV, Mieter, Eigentümer, Hausmeister. |
 | **Partner** | Handwerksbetrieb im Netzwerk. Im CRM oft unter „Handwerker“ geführt. |
@@ -50,6 +50,9 @@ Kurze Definitionen, wie sie im Produkt gemeint sind. Bei Unklarheit gilt diese D
 | **Notfall / Akutfall** | Beschleunigter Pfad (z. B. Wasser, Strom), oft mit Sofortmaßnahmen. |
 | **Aushang** | PDF/QR am Objekt, damit Mieter den Melde-Link finden. |
 | **Tracking-Token** | Persönlicher Status-Link nach einer Meldung. |
+| **hv_meldung_status** | HV-interner Meldungs-Workflow auf dem Lead: `neu` → ggf. `hm_pruefung` → `angebot_eingefordert` (BW darf Angebot) oder `notmassnahme` (Akut). Steuert CRM Primary-CTA und HV-Start-Gate. |
+| **HV-Start-Gate** | Solange `hv_meldung_status` ∈ {`neu`, `hm_pruefung`}, blockiert das CRM Angebot/Partner-Versand — Primary = „Warte auf HV / Hausmeister“. Erst nach Freigabe für Bärenwald erscheint „Angebot erstellen“. |
+| **An Bärenwald übergeben** | HV-Aktion im Portal (`angebot_einfordern`): setzt `hv_meldung_status=angebot_eingefordert` und gibt den Vorgang an Bärenwald-Staff frei. |
 | **Eingangsrechnung** | Rechnung vom Handwerker an Bärenwald. |
 | **Direkt Auftrag** | Auftrag ohne klassische Kunden-Mail — z. B. unter Freigabe-Schwelle. |
 | **Surface** | Art der Oberfläche (Liste, Detail, Wizard, Sheet, Canvas). |

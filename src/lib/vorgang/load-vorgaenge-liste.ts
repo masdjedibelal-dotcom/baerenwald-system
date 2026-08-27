@@ -42,6 +42,7 @@ const VORGAENGE_LEAD_SELECT = `
   auftraggeber_kunde_id,
   org_freigabe_status,
   hv_meldung_status,
+  freigabe_bypass_grund,
   funnel_daten,
   preis_min,
   preis_max,
@@ -62,6 +63,8 @@ export type LoadVorgaengeListeOpts = {
   kundeId?: string
   /** Nur Vorgänge mit diesem Handwerker (über Auftragspositionen / Zuweisungen). */
   handwerkerId?: string
+  /** Nur Vorgänge an diesem Verwaltungsobjekt (leads.kunde_objekt_id). */
+  objektId?: string
 }
 
 async function resolveLeadIdsForHandwerker(
@@ -131,7 +134,8 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
 
   const kundeId = opts?.kundeId?.trim() || null
   const handwerkerId = opts?.handwerkerId?.trim() || null
-  const scoped = Boolean(kundeId || handwerkerId)
+  const objektId = opts?.objektId?.trim() || null
+  const scoped = Boolean(kundeId || handwerkerId || objektId)
   const leadLimit = scoped ? 80 : 200
 
   const RECHNUNG_SELECT =
@@ -154,6 +158,9 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
       .limit(leadLimit)
     if (kundeId) {
       q = q.or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
+    }
+    if (objektId) {
+      q = q.eq('kunde_objekt_id', objektId)
     }
     if (handwerkerLeadIds?.length) {
       q = q.in('id', handwerkerLeadIds)
@@ -311,6 +318,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
     auftraggeber_kunde_id: string | null
     org_freigabe_status: string | null
     hv_meldung_status: string | null
+    freigabe_bypass_grund: string | null
     funnel_daten: unknown
     preis_min: number | null
     preis_max: number | null
@@ -553,6 +561,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
         kanal: lead.kanal,
         org_freigabe_status: lead.org_freigabe_status,
         hv_meldung_status: lead.hv_meldung_status,
+        freigabe_bypass_grund: lead.freigabe_bypass_grund,
         kontakt_name: lead.kontakt_name,
         plz: lead.plz,
         bereiche: lead.bereiche,

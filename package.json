@@ -35,6 +35,9 @@
     "staging:buckets": "./scripts/staging/apply-storage-buckets-staging.sh",
     "staging:seed": "node --env-file=.env.staging scripts/staging/seed-staging.mjs",
     "staging:register-portals": "node --env-file=.env.staging scripts/staging/register-portal-users.mjs",
+    "staging:import-prodsim": "node --env-file=.env.staging scripts/staging/import-prod-snapshot.mjs",
+    "staging:seed-legacy": "node --env-file=.env.staging scripts/staging/seed-legacy-edgecases.mjs",
+    "staging:smoke-aktionen": "node --env-file=.env.staging scripts/staging/smoke-aktions-matrix.mjs",
     "db:hw-rechnung-einreichung": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260603120500_portal_handwerker_rechnung_einreichung.sql",
     "db:angebot-handwerker-gaps": "node --env-file=.env.local scripts/apply-gap-repair.mjs",
     "docs:screenshots": "node --env-file=.env.local scripts/docs-screenshots/capture.mjs",
@@ -65,7 +68,8 @@
     "ki:analyse:produkte": "node --env-file=.env.local scripts/ki-analyse/produkte.mjs",
     "ki:analyse:all": "node --env-file=.env.local scripts/ki-analyse/funnel.mjs && node --env-file=.env.local scripts/ki-analyse/nachfrage.mjs && node --env-file=.env.local scripts/ki-analyse/kommunikation.mjs && node --env-file=.env.local scripts/ki-analyse/angebot-abgleich.mjs && node --env-file=.env.local scripts/ki-analyse/preise-margen.mjs && node --env-file=.env.local scripts/ki-analyse/produkte.mjs && node --env-file=.env.local scripts/ki-analyse/gewerke.mjs && node --env-file=.env.local scripts/ki-analyse/ausfuehrung.mjs && node --env-file=.env.local scripts/ki-analyse/handwerker.mjs && node --env-file=.env.local scripts/ki-analyse/dauer.mjs && node --env-file=.env.local scripts/ki-analyse/bewertungen.mjs",
     "ki:analyse:claude": "node --env-file=.env.local scripts/ki-analyse/claude-auswertung.mjs",
-    "ki:analyse:full": "npm run ki:analyse:all && npm run ki:analyse:claude"
+    "ki:analyse:full": "npm run ki:analyse:all && npm run ki:analyse:claude",
+    "prod:smoke-readonly": "node --env-file=.env.staging scripts/staging/smoke-prod-readonly.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

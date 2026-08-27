@@ -28,6 +28,7 @@ import {
 } from '@/lib/templates/angebot-mail'
 import { mapAngebotPositionenToTemplateRows } from '@/lib/angebote/angebot-projekt-pdf-blocks'
 import { buildProjektPdfBloecke } from '@/lib/angebote/angebot-projekt-pdf-blocks'
+import { formatDatum } from '@/lib/utils'
 import { istFreitextPosition } from '@/lib/dokument-zeilen'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import { formatKundeEmpfaengerFuerDokument, kundeAnredeKontextFromEmpfaenger, kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
@@ -87,9 +88,9 @@ function angebotPdfDatumDe(detail: {
 }): string {
   if (detail.gesendet_kunde_at) {
     const src = detail.updated_at?.trim() || new Date().toISOString()
-    return new Date(src).toLocaleDateString('de-DE')
+    return formatDatum(src)
   }
-  return new Date(detail.created_at).toLocaleDateString('de-DE')
+  return formatDatum(detail.created_at)
 }
 
 function resolveLeistungsumfang(detail: AngebotDetail): string {
@@ -101,16 +102,12 @@ function resolveLeistungsumfang(detail: AngebotDetail): string {
 
 function parseGueltigDe(detail: AngebotDetail, firm: FirmenEinstellungen): string {
   if (detail.gueltig_bis) {
-    try {
-      return new Date(detail.gueltig_bis as string).toLocaleDateString('de-DE')
-    } catch {
-      /* noop */
-    }
+    return formatDatum(detail.gueltig_bis as string)
   }
   const tage = Math.max(1, parseInt(String(firm.angebot_gueltig_tage ?? '30'), 10) || 30)
   const d = new Date()
   d.setDate(d.getDate() + tage)
-  return d.toLocaleDateString('de-DE')
+  return formatDatum(d.toISOString())
 }
 
 function mapZuTemplateZeilen(anPos: AngebotPosition[], gewerke: Gewerk[]): AngebotTemplatePosition[] {

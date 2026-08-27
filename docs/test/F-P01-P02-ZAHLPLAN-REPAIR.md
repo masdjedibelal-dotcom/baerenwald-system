@@ -1,6 +1,6 @@
 # F-P01 / F-P02 — Zahlplan-Abschlag Orphans (Prod)
 
-**Status:** Skript vorbereitet — **keine Prod-Ausführung** in diesem Auftrag.  
+**Status:** ✅ **ausgeführt 2026-08-26** (AUFTRAG F) — beide REs `zahlungsplan_abschlag_id → NULL`.  
 **Skript:** `scripts/prod/repair-zahlplan-abschlag-orphans.mjs`  
 **Symptom:** `rechnungen.zahlungsplan_abschlag_id` gesetzt, Auftrag ohne `zahlungsplan` (tote Bindung).
 

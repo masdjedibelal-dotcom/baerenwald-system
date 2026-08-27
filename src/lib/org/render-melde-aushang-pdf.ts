@@ -18,9 +18,13 @@ type OrgKundePick = {
   org_anzeigename?: string | null
   org_kennung?: string | null
   org_logo_url?: string | null
+  org_primary_color?: string | null
   telefon?: string | null
   email?: string | null
 }
+
+/** Neutraler Whitelabel-Fallback (kein BW-Grün / kein Steiner-Blau). */
+const AUSHANG_PRIMARY_NEUTRAL = '#363B41'
 
 async function requireAuthUser() {
   const supabase = createClient()
@@ -55,7 +59,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
   const { data: objekt, error } = await supabaseAdmin
     .from('kunden_objekte')
     .select(
-      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, org_logo_url, telefon, email, typ)'
+      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, org_logo_url, org_primary_color, telefon, email, typ)'
     )
     .eq('id', objektId)
     .maybeSingle()
@@ -82,7 +86,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
     {
       orgName: kunde?.org_anzeigename?.trim() || kunde?.name?.trim() || 'Hausverwaltung',
       orgSub: 'Verwaltung',
-      primaryColor: '#22508C',
+      primaryColor: kunde?.org_primary_color?.trim() || AUSHANG_PRIMARY_NEUTRAL,
       objektTitel: objekt.titel?.trim() || 'Objekt',
       objektAdresse: adresse,
       meldeUrl,
@@ -101,7 +105,7 @@ export async function renderHvMeldeAushangPdf(kundeId: string): Promise<RenderAu
 
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, org_anzeigename, org_kennung, org_logo_url, telefon, email, portal_modus')
+    .select('id, name, org_anzeigename, org_kennung, org_logo_url, org_primary_color, telefon, email, portal_modus')
     .eq('id', kundeId)
     .maybeSingle()
 
@@ -125,7 +129,7 @@ export async function renderHvMeldeAushangPdf(kundeId: string): Promise<RenderAu
     {
       orgName,
       orgSub: 'Verwaltung',
-      primaryColor: '#22508C',
+      primaryColor: (kunde as OrgKundePick).org_primary_color?.trim() || AUSHANG_PRIMARY_NEUTRAL,
       objektTitel: 'alle Objekte',
       objektAdresse: null,
       meldeUrl,

@@ -9,6 +9,7 @@ import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
@@ -566,28 +567,11 @@ export function ObjektEinheitenSection({
           isChecked && 'is-checked'
         )}
       >
-        <div
-          className="vg-check"
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleSel(u.id)
-          }}
-          role="checkbox"
-          aria-checked={isChecked}
-          aria-label={`${u.bezeichnung} auswählen`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              e.stopPropagation()
-              toggleSel(u.id)
-            }
-          }}
-        >
-          <span className={cn('vg-box', isChecked && 'on')}>
-            {isChecked ? <MockIcon ctx="default" n="check" size={12} /> : null}
-          </span>
-        </div>
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(u.id)}
+          title={`${u.bezeichnung} auswählen`}
+        />
         <button
           type="button"
           className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
@@ -686,12 +670,7 @@ export function ObjektEinheitenSection({
           <MockEmpty
             icon="building"
             title="Noch keine Einheiten"
-            hint="Einheit anlegen — danach Eigentümer und Mieter zuordnen"
-            action={
-              <MockBtn kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
-                Hinzufügen
-              </MockBtn>
-            }
+            hint="Einheit anlegen — danach Eigentümer und Mieter zuordnen. Über „+“ oben hinzufügen."
           />
         ) : isMobile ? (
           <div className="ap-cards vg-selectmode">{einheiten.map(einheitRow)}</div>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-const MAX_BYTES = 5 * 1024 * 1024
+const MAX_BYTES = 8 * 1024 * 1024
 const ALLOWED = new Set([
   'image/jpeg',
   'image/png',
@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { leadId: string 
     return NextResponse.json({ error: 'Keine Datei' }, { status: 400 })
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'Datei zu groß (max. 5 MB)' }, { status: 400 })
+    return NextResponse.json({ error: 'Datei zu groß (max. 8 MB)' }, { status: 400 })
   }
 
   const type = (file as File).type || 'image/jpeg'

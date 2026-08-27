@@ -21,6 +21,30 @@ import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type { Kunde, Lead, LeadAnlass, LeadErfassungVon, OrgFreigabeStatus } from '@/lib/types'
 
+/** Await + ehrliches Ergebnis — kein void/Fire-and-forget (F-179). */
+async function awaitOrgFreigabeMail(opts: {
+  typ: 'org_freigabe_angefordert' | 'org_angebot_info'
+  an: string
+  anName: string
+  betreff: string
+  html: string
+  leadId: string
+  kundeId: string
+}): Promise<{ mailOk: true } | { mailOk: false; mailError: string }> {
+  const mail = await sendMail(opts)
+  if (!mail.success) {
+    const mailError = mail.error ?? 'Versand fehlgeschlagen'
+    console.error('[org-freigabe] sendMail fehlgeschlagen', {
+      typ: opts.typ,
+      leadId: opts.leadId,
+      an: opts.an,
+      mailError,
+    })
+    return { mailOk: false, mailError }
+  }
+  return { mailOk: true }
+}
+
 type OrgKundePick = Pick<
   Kunde,
   'id' | 'name' | 'email' | 'org_anzeigename' | 'portal_modus' | 'freigabe_modus' | 'freigabe_schwelle_eur' | 'notfall_direkt'
@@ -178,6 +202,28 @@ function angebotBetragEur(gesamtFix: number | null | undefined, gesamtMax: numbe
   return 0
 }
 
+/** Zuletzt freigegebene / angeforderte Summe — Basis für Refreeze nach AG-Korrektur. */
+async function loadLetzterFreigegebenerBetrag(leadId: string): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from('org_freigabe_log')
+    .select('aktion, betrag_eur, created_at')
+    .eq('lead_id', leadId)
+    .in('aktion', ['freigegeben', 'angefordert'])
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  const rows = data ?? []
+  const freig = rows.find(
+    (r) => r.aktion === 'freigegeben' && r.betrag_eur != null && Number(r.betrag_eur) > 0
+  )
+  if (freig?.betrag_eur != null) return Number(freig.betrag_eur)
+  const anf = rows.find(
+    (r) => r.aktion === 'angefordert' && r.betrag_eur != null && Number(r.betrag_eur) > 0
+  )
+  if (anf?.betrag_eur != null) return Number(anf.betrag_eur)
+  return 0
+}
+
 async function persistAngebotFreigabeFlag(
   angebotId: string,
   erforderlich: boolean
@@ -201,7 +247,15 @@ export async function syncOrgFreigabeNachAngebot(input: {
   gesamtFix?: number | null
   gesamtMax?: number | null
 }): Promise<
-  | { ok: true; status: OrgFreigabeStatus; erforderlich: boolean; autoAuftragId?: string }
+  | {
+      ok: true
+      status: OrgFreigabeStatus
+      erforderlich: boolean
+      autoAuftragId?: string
+      /** false = Freigabe-Status ok, Mail aber fehlgeschlagen/fehlend (ehrlich, F-179) */
+      mailOk?: boolean
+      mailError?: string
+    }
   | { ok: false; message: string }
 > {
   const leadId = input.leadId?.trim()
@@ -246,8 +300,79 @@ export async function syncOrgFreigabeNachAngebot(input: {
   await persistAngebotFreigabeFlag(angebotId, erforderlich)
 
   const aktuell = (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus
-  // Q6: nach HV-Entscheidung Status eingefroren
-  if (aktuell === 'freigegeben' || aktuell === 'abgelehnt') {
+
+  // Abgelehnt bleibt eingefroren (wie Nachtrag) — Korrektur öffnet keine neue Freigabe.
+  if (aktuell === 'abgelehnt') {
+    return { ok: true, status: aktuell, erforderlich }
+  }
+
+  // Bereits freigegeben: nur neu öffnen, wenn Betrag über Schwelle UND höher als freigegebene Summe.
+  if (aktuell === 'freigegeben') {
+    if (erforderlich) {
+      const freigegebenBetrag = await loadLetzterFreigegebenerBetrag(leadId)
+      if (betrag > freigegebenBetrag) {
+        const now = new Date().toISOString()
+        const { error: reopenErr } = await supabaseAdmin
+          .from('leads')
+          .update({
+            org_freigabe_status: 'ausstehend',
+            freigabe_bypass_grund: null,
+            updated_at: now,
+          })
+          .eq('id', leadId)
+        if (reopenErr) return { ok: false, message: reopenErr.message }
+
+        await supabaseAdmin.from('org_freigabe_log').insert({
+          lead_id: leadId,
+          angebot_id: angebotId,
+          auftraggeber_kunde_id: orgKundeId,
+          aktion: 'angefordert',
+          betrag_eur: betrag > 0 ? betrag : null,
+          notiz: 'AG-Korrektur: Betrag über freigegebener Summe — erneute Freigabe',
+          erstellt_von: 'crm',
+        })
+
+        const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
+        const orgEmail = org?.email?.trim()
+        const orgName = org?.org_anzeigename?.trim() || org?.name?.trim() || 'Auftraggeber'
+        if (orgEmail) {
+          const branding = await getMailBranding(supabaseAdmin)
+          const tpl = mailOrgFreigabeAngefordert(
+            {
+              orgName,
+              objektTitel,
+              betragEur: betrag,
+              portalLink: buildPortalLoginLink(),
+            },
+            branding
+          )
+          const sent = await awaitOrgFreigabeMail({
+            typ: 'org_freigabe_angefordert',
+            an: orgEmail,
+            anName: orgName,
+            betreff: tpl.betreff,
+            html: tpl.html,
+            leadId,
+            kundeId: orgKundeId,
+          })
+          return {
+            ok: true,
+            status: 'ausstehend',
+            erforderlich: true,
+            mailOk: sent.mailOk,
+            ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+          }
+        }
+
+        return {
+          ok: true,
+          status: 'ausstehend',
+          erforderlich: true,
+          mailOk: false,
+          mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+        }
+      }
+    }
     return { ok: true, status: aktuell, erforderlich }
   }
 
@@ -276,7 +401,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
 
     // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe, nur Info.
     // Auftrag legt der Nutzer per Primary „Direkt Auftrag“ an (kein stiller Auto-Accept).
-    await sendOrgAngebotInfoOnce({
+    const info = await sendOrgAngebotInfoOnce({
       leadId,
       angebotId,
       orgKundeId,
@@ -290,11 +415,13 @@ export async function syncOrgFreigabeNachAngebot(input: {
       ok: true,
       status: 'nicht_noetig',
       erforderlich: false,
+      mailOk: info.mailOk,
+      ...(info.mailError ? { mailError: info.mailError } : {}),
     }
   }
 
-  if (aktuell === 'ausstehend') {
-    return { ok: true, status: 'ausstehend', erforderlich: true }
+  if (aktuell === 'ausstehend' || aktuell === 'beschluss_ausstehend') {
+    return { ok: true, status: aktuell, erforderlich: true }
   }
 
   const now = new Date().toISOString()
@@ -329,7 +456,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
       },
       branding
     )
-    void sendMail({
+    const sent = await awaitOrgFreigabeMail({
       typ: 'org_freigabe_angefordert',
       an: orgEmail,
       anName: orgName,
@@ -338,9 +465,22 @@ export async function syncOrgFreigabeNachAngebot(input: {
       leadId,
       kundeId: orgKundeId,
     })
+    return {
+      ok: true,
+      status: 'ausstehend',
+      erforderlich: true,
+      mailOk: sent.mailOk,
+      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+    }
   }
 
-  return { ok: true, status: 'ausstehend', erforderlich: true }
+  return {
+    ok: true,
+    status: 'ausstehend',
+    erforderlich: true,
+    mailOk: false,
+    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+  }
 }
 
 async function sendOrgAngebotInfoOnce(input: {
@@ -351,7 +491,7 @@ async function sendOrgAngebotInfoOnce(input: {
   orgName: string
   objektTitel: string
   betrag: number
-}): Promise<void> {
+}): Promise<{ mailOk: boolean; mailError?: string }> {
   const { data: existing } = await supabaseAdmin
     .from('org_freigabe_log')
     .select('id')
@@ -359,7 +499,7 @@ async function sendOrgAngebotInfoOnce(input: {
     .eq('aktion', 'info_gesendet')
     .limit(1)
     .maybeSingle()
-  if (existing?.id) return
+  if (existing?.id) return { mailOk: true }
 
   await supabaseAdmin.from('org_freigabe_log').insert({
     lead_id: input.leadId,
@@ -370,7 +510,9 @@ async function sendOrgAngebotInfoOnce(input: {
     erstellt_von: 'crm',
   })
 
-  if (!input.orgEmail) return
+  if (!input.orgEmail) {
+    return { mailOk: false, mailError: 'Keine Org-E-Mail für Angebots-Info' }
+  }
   const branding = await getMailBranding(supabaseAdmin)
   const tpl = mailOrgAngebotZurInfo(
     {
@@ -381,7 +523,7 @@ async function sendOrgAngebotInfoOnce(input: {
     },
     branding
   )
-  void sendMail({
+  const sent = await awaitOrgFreigabeMail({
     typ: 'org_angebot_info',
     an: input.orgEmail,
     anName: input.orgName,
@@ -390,6 +532,7 @@ async function sendOrgAngebotInfoOnce(input: {
     leadId: input.leadId,
     kundeId: input.orgKundeId,
   })
+  return sent.mailOk ? { mailOk: true } : { mailOk: false, mailError: sent.mailError }
 }
 
 /** Org-Freigabe nach Partner-Nachtrag wenn Summe Schwelle überschreitet. */
@@ -442,4 +585,130 @@ export async function syncOrgFreigabeNachNachtrag(input: {
   })
 
   return { ok: true, status: 'ausstehend' }
+}
+
+/**
+ * CRM: Nach HV-Ablehnung Freigabe erneut anfordern (Pflicht-Kommentar → Log + Mail).
+ * Einfacher als Diff „Angebot seit Ablehnung geändert“ — kein Snapshot nötig.
+ */
+export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
+  leadId: string
+  angebotId: string
+  anpassungNotiz: string
+  betragEur?: number
+  gesamtFix?: number | null
+  gesamtMax?: number | null
+}): Promise<
+  | { ok: true; status: 'ausstehend'; mailOk?: boolean; mailError?: string }
+  | { ok: false; message: string }
+> {
+  const leadId = input.leadId?.trim()
+  const angebotId = input.angebotId?.trim()
+  const anpassung = input.anpassungNotiz?.trim() ?? ''
+  if (!leadId || !angebotId) return { ok: false, message: 'Lead oder Angebot fehlt.' }
+  if (!anpassung) return { ok: false, message: 'Bitte kurz beschreiben, was angepasst wurde.' }
+
+  const { data: leadRaw, error: leadErr } = await supabaseAdmin
+    .from('leads')
+    .select(
+      'id, auftraggeber_kunde_id, kunde_id, situation, funnel_daten, org_freigabe_status, kunde_objekt_id, erfassung_von, anlass'
+    )
+    .eq('id', leadId)
+    .maybeSingle()
+
+  if (leadErr || !leadRaw) return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
+  const lead = leadRaw as LeadPick
+
+  const aktuell = (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus
+  if (aktuell !== 'abgelehnt') {
+    return { ok: false, message: 'Freigabe ist nicht abgelehnt — erneutes Anfordern nicht möglich.' }
+  }
+
+  let orgKundeId = resolveOrgKundeIdFuerLead(lead)
+  if (!orgKundeId && lead.kunde_id) {
+    const { data: k } = await supabaseAdmin
+      .from('kunden')
+      .select('id, portal_modus')
+      .eq('id', lead.kunde_id)
+      .maybeSingle()
+    if ((k as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
+      orgKundeId = lead.kunde_id
+    }
+  }
+  if (!orgKundeId) return { ok: false, message: 'Kein Auftraggeber (Organisation) am Vorgang.' }
+
+  const org = await loadOrgKunde(supabaseAdmin, orgKundeId)
+  let betrag =
+    input.betragEur ??
+    angebotBetragEur(input.gesamtFix ?? null, input.gesamtMax ?? null)
+  if (!(betrag > 0)) {
+    const { data: ang } = await supabaseAdmin
+      .from('angebote')
+      .select('gesamt_fix, gesamt_max')
+      .eq('id', angebotId)
+      .maybeSingle()
+    const a = ang as { gesamt_fix?: number | null; gesamt_max?: number | null } | null
+    betrag = angebotBetragEur(a?.gesamt_fix, a?.gesamt_max)
+  }
+
+  const now = new Date().toISOString()
+  const { error: updErr } = await supabaseAdmin
+    .from('leads')
+    .update({
+      org_freigabe_status: 'ausstehend',
+      freigabe_bypass_grund: null,
+      updated_at: now,
+    })
+    .eq('id', leadId)
+  if (updErr) return { ok: false, message: updErr.message }
+
+  const notiz = `erneut angefordert nach Ablehnung: ${anpassung}`
+  await supabaseAdmin.from('org_freigabe_log').insert({
+    lead_id: leadId,
+    angebot_id: angebotId,
+    auftraggeber_kunde_id: orgKundeId,
+    aktion: 'angefordert',
+    betrag_eur: betrag > 0 ? betrag : null,
+    notiz,
+    erstellt_von: 'crm',
+  })
+
+  const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
+  const orgEmail = org?.email?.trim()
+  const orgName = org?.org_anzeigename?.trim() || org?.name?.trim() || 'Auftraggeber'
+  if (orgEmail) {
+    const branding = await getMailBranding(supabaseAdmin)
+    const tpl = mailOrgFreigabeAngefordert(
+      {
+        orgName,
+        objektTitel,
+        betragEur: betrag,
+        portalLink: buildPortalLoginLink(),
+        anpassungNotiz: anpassung,
+      },
+      branding
+    )
+    const sent = await awaitOrgFreigabeMail({
+      typ: 'org_freigabe_angefordert',
+      an: orgEmail,
+      anName: orgName,
+      betreff: tpl.betreff,
+      html: tpl.html,
+      leadId,
+      kundeId: orgKundeId,
+    })
+    return {
+      ok: true,
+      status: 'ausstehend',
+      mailOk: sent.mailOk,
+      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
+    }
+  }
+
+  return {
+    ok: true,
+    status: 'ausstehend',
+    mailOk: false,
+    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+  }
 }

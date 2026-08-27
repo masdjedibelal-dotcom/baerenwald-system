@@ -33,7 +33,7 @@ function hexOr(primary: string | null | undefined, fallback: string): string {
 }
 
 export function buildAushangHtml(p: AushangHtmlInput): string {
-  const primary = hexOr(p.primaryColor, '#22508C')
+  const primary = hexOr(p.primaryColor, '#363B41')
   const org = (p.orgName || 'Hausverwaltung').trim()
   const sub = (p.orgSub || 'Mieter-Service').trim()
   const objekt = (p.objektTitel || 'Objekt').trim()

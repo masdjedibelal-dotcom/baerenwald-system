@@ -1,0 +1,59 @@
+[
+  {
+    "check": "lead-body-snippet",
+    "text": "Bärenwald | ARBEIT | Dashboard | Vorgänge | Kunden | Handwerker | ORGANISATION | Kalender | KI Analytics | Einstellungen | ⌘K | KI | 13 | Demo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze). | Transaktionsdaten leeren | Zurück zu den Suchergebnissen | Musterverwaltung Nord | HV-Meldung | Neu | Warte auf HV / Hausmeister | Übersicht | Leistungen | Zahlung | Akte | STAMMDATEN | Musterverwaltung Nord | Hausverwaltung | Typ | Hausverwaltung | Adresse | Leopoldstraße 10, 80802 München | Telefon | 089 1111 0001 | E-Mail | hv-nord@example.test | Kundenakte | Login | Portal aktiv | MELDUNGSDETAILS | Situation | Reparatur & Notfall | Bereich(e) | sanitaer | Zeitraum | Diese Woche | Freitext Melder | ZZTEST A2 E2E — Wasseraustritt Küche, Schaden klar über 500 Euro, Freigabe-Pfad prüfen. | MELDER | Name | ZZTEST A2373963 | Telefon | 08955559876 | E-Mail | zztes"
+  },
+  {
+    "check": "primary-candidate",
+    "text": "Warte auf HV / Hausmeister",
+    "disabled": false
+  },
+  {
+    "check": "btn-angebot-erstellen",
+    "count": 0,
+    "visible": false,
+    "disabled": null
+  },
+  {
+    "check": "link-angebot-erstellen",
+    "count": 0
+  },
+  {
+    "check": "plus-angebot",
+    "count": 0,
+    "disabled": null
+  },
+  {
+    "check": "vgp-head-angebot-phase",
+    "disabled": false,
+    "label": "Anfrage: eingegangen 26.08.2026"
+  },
+  {
+    "check": "warte-hv",
+    "visible": true,
+    "disabled": false
+  },
+  {
+    "check": "rechner-end",
+    "url": "https://staging--baerenwald.netlify.app/rechner",
+    "body": "Abbrechen | Bärenwald | 08980955726 | UNSERE VISION | Handwerk neu gedacht. |  | Ein Ansprechpartner der alles koordiniert. Volle Preistransparenz von Anfang an. Statusupdates während des Projekts und digitales Abnahmeprotokoll am Ende — so wie es sein sollte. |  | Los geht's → | Impressum | · | Datenschutz | · | Technischer"
+  },
+  {
+    "check": "re-bezahlt-btn",
+    "visible": true
+  },
+  {
+    "check": "re-revert-btn",
+    "visible": false,
+    "text": ""
+  },
+  {
+    "check": "after-bezahlt",
+    "dialogs": []
+  },
+  {
+    "check": "re-revert-after",
+    "visible": false,
+    "text": ""
+  }
+]

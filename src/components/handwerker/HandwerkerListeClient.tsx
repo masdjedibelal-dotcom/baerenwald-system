@@ -22,12 +22,15 @@ import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { gewerkPillClass } from '@/lib/gewerk-pill-tone'
 
@@ -67,6 +70,7 @@ const HW_COLS: ResizableColDef[] = [
   { id: 'telefon', defaultWidth: 130, minWidth: 100, maxWidth: 200 },
   { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
   { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
+  { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
 type SortCol = 'name' | 'gewerk' | 'telefon' | 'email' | 'bewertung'
@@ -269,7 +273,7 @@ export function HandwerkerListeClient({
   }, [router, selectedRows])
 
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    'crm.cols.handwerker.select.v2',
+    'crm.cols.handwerker.select.v3',
     HW_COLS
   )
   const resizeOffset = 1
@@ -315,7 +319,7 @@ export function HandwerkerListeClient({
 
   const filterFooter = (
     <div className="sheet-footer-actions">
-      <MockBtn kind="secondary" onClick={resetFilters}>
+      <MockBtn kind="ghost" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
@@ -544,20 +548,12 @@ export function HandwerkerListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="list-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectAll()
-            }}
+          <ListRowCheck
+            checked={allFilteredSelected}
+            partial={allPageSelected && !allFilteredSelected}
+            onToggle={toggleSelectAll}
             title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          />
           <MockSortHead
             col="name"
             sortCol={sortCol}
@@ -609,6 +605,7 @@ export function HandwerkerListeClient({
           >
             Bewertung
           </MockSortHead>
+          <div />
         </div>
 
         {displayItems.length === 0 ? (
@@ -650,6 +647,22 @@ export function HandwerkerListeClient({
             const del = () => {
               void runDeleteHandwerker(h.id, router, handwerkerDisplayName(h))
             }
+            const rowMenu: EntityMenuItem[] = [
+              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(h.id) },
+              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
+              { icon: 'copy', label: 'Duplizieren', onClick: copy },
+              'sep',
+              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+            ]
+            const menuCell = (
+              <div
+                className="vg-row-menu"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+              </div>
+            )
             const row = isMobile ? (
               <div
                 role="button"
@@ -663,17 +676,10 @@ export function HandwerkerListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(h.id)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[h.id] && 'on')}>
-                    {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[h.id])}
+                  onToggle={() => toggleSel(h.id)}
+                />
                 <div className="vg-vorgang">
                   <div className="t" title={handwerkerDisplayName(h)}>
                     {handwerkerDisplayName(h)}
@@ -693,6 +699,7 @@ export function HandwerkerListeClient({
                   <span title={tel || undefined}>{tel || '—'}</span>
                   <span title={mail || undefined}>{mail || '—'}</span>
                 </div>
+                {menuCell}
               </div>
             ) : (
               <div
@@ -707,17 +714,10 @@ export function HandwerkerListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(h.id)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[h.id] && 'on')}>
-                    {selected[h.id] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[h.id])}
+                  onToggle={() => toggleSel(h.id)}
+                />
                 <div className="lc-title" style={{ fontWeight: 600 }}>
                   {handwerkerDisplayName(h)}
                 </div>
@@ -748,6 +748,7 @@ export function HandwerkerListeClient({
                     —
                   </span>
                 </div>
+                {menuCell}
               </div>
             )
             return (

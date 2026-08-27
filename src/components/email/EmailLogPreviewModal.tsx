@@ -7,7 +7,7 @@ import { loadEmailLogDetail, type EmailLogDetail } from '@/app/(dashboard)/email
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { freitextMailTypLabel } from '@/lib/kommunikation/types'
-import { formatDatumZeit } from '@/lib/utils'
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 
 export function EmailLogPreviewModal({
   emailLogId,
@@ -43,7 +43,7 @@ export function EmailLogPreviewModal({
   const pdfHref = row?.angebot_id
     ? `/api/angebote/${row.angebot_id}/pdf`
     : row?.rechnung_id
-      ? `/api/rechnungen/${row.rechnung_id}/pdf`
+      ? rechnungPdfHref(row.rechnung_id)
       : null
 
   const title =

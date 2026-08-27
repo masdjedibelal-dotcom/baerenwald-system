@@ -20,6 +20,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { Check, FileText } from 'lucide-react'
@@ -340,11 +341,21 @@ export function AngebotWizard({
   const [mitAnfahrt, setMitAnfahrt] = useState(() => findAnfahrtZeilen(initialZeilen).length > 0)
   const [meta, setMeta] = useState<AngebotWizardMeta>(() => {
     const base = bootstrap?.meta ?? defaultMeta
-    if (bootstrap?.meta?.kunde_objekt_id) return base
-    if (leadState.kunde_objekt_id) {
-      return { ...base, kunde_objekt_id: leadState.kunde_objekt_id }
+    const withObjekt = bootstrap?.meta?.kunde_objekt_id
+      ? base
+      : leadState.kunde_objekt_id
+        ? { ...base, kunde_objekt_id: leadState.kunde_objekt_id }
+        : base
+    if (bootstrap?.meta?.objekt_anlage_id || leadState.objekt_anlage_id) {
+      return {
+        ...withObjekt,
+        objekt_anlage_id:
+          bootstrap?.meta?.objekt_anlage_id?.trim() ||
+          leadState.objekt_anlage_id?.trim() ||
+          null,
+      }
     }
-    return base
+    return withObjekt
   })
   const [dokumentTyp, setDokumentTyp] = useState<AngebotDokumentTyp>(
     () => bootstrap?.dokumentTyp ?? initialDokumentTypFromLead(leadState.bereiche, leadState.situation)
@@ -426,9 +437,23 @@ export function AngebotWizard({
   function patchMelderDraft(patch: Partial<MelderLeistungsortDraft>) {
     setMelderDraft((prev) => {
       const next = { ...prev, ...patch }
-      if (patch.kunde_objekt_id !== undefined) {
-        setMeta((m) => ({ ...m, kunde_objekt_id: next.kunde_objekt_id }))
+      if (
+        patch.kunde_objekt_id !== undefined &&
+        patch.kunde_objekt_id !== prev.kunde_objekt_id &&
+        patch.objekt_anlage_id === undefined
+      ) {
+        next.objekt_anlage_id = null
       }
+      setMeta((m) => ({
+        ...m,
+        ...(patch.kunde_objekt_id !== undefined
+          ? { kunde_objekt_id: next.kunde_objekt_id }
+          : {}),
+        ...(patch.objekt_anlage_id !== undefined ||
+        (patch.kunde_objekt_id !== undefined && next.objekt_anlage_id === null)
+          ? { objekt_anlage_id: next.objekt_anlage_id }
+          : {}),
+      }))
       return next
     })
     setDraftDirty(true)
@@ -664,6 +689,7 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
+      objekt_anlage_id: melderDraft.objekt_anlage_id,
     })
     if (!r.ok) {
       toast.error(r.message)
@@ -679,6 +705,7 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
+      objekt_anlage_id: melderDraft.objekt_anlage_id,
     }))
     return r.leadId
   }, [deferredLeadCreate, leadState, melderDraft])
@@ -774,6 +801,7 @@ export function AngebotWizard({
             melder_telefon: melderDraft.melder_telefon || null,
             melder_einheit: melderDraft.melder_einheit || null,
             kunde_objekt_id: melderDraft.kunde_objekt_id,
+            objekt_anlage_id: melderDraft.objekt_anlage_id,
             angebotId: res.angebotId,
           })
           if (!sync.ok) {
@@ -786,6 +814,7 @@ export function AngebotWizard({
               melder_telefon: melderDraft.melder_telefon || null,
               melder_einheit: melderDraft.melder_einheit || null,
               kunde_objekt_id: melderDraft.kunde_objekt_id,
+              objekt_anlage_id: melderDraft.objekt_anlage_id,
             }))
           }
         }
@@ -798,10 +827,10 @@ export function AngebotWizard({
         if (opts?.notify) {
           toast.success(
             istNachtrag
-              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
+              ? 'Nachtrag gespeichert'
               : istAuftragKorrektur
                 ? hatGestellteAbschlaege
-                  ? 'Korrektur gespeichert. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
+                  ? 'Korrektur gespeichert — Abschläge unverändert'
                   : 'Korrektur gespeichert'
                 : res.angebotsnr?.trim()
                   ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
@@ -866,9 +895,7 @@ export function AngebotWizard({
   async function openVorschauSheet() {
     const id = await ensureDraftForPreview()
     if (!id) {
-      toast.error(
-        'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
-      )
+      toast.error('Entwurf prüfen')
     }
     setSheet('vorschau')
   }
@@ -976,12 +1003,12 @@ export function AngebotWizard({
       }
       toast.success(
         istNachtrag
-          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
+          ? 'Nachtrag versendet'
           : istAuftragKorrektur
             ? hatGestellteAbschlaege
-              ? 'Korrektur gespeichert und versendet. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
-              : 'Korrektur gespeichert und an den Kunden versendet'
-            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+              ? 'Korrektur versendet — Abschläge unverändert'
+              : 'Korrektur versendet'
+            : `Angebot versendet · ${formatEurBetrag(mailSummen.bruttoMin)}`
       )
       setSheet(null)
       setKundeEditOpen(false)
@@ -1103,12 +1130,10 @@ export function AngebotWizard({
     <div className="dc-doc flex flex-col gap-4">
       {istAuftragKorrektur && hatGestellteAbschlaege ? (
         <div className="zahlung-tab-hint">
-          <MockIcon ctx="btn" n="info" size={15} />
-          <span>
-            Bereits gestellte Abschläge bleiben nach der Korrektur unverändert. Die
-            Schlussrechnung gleicht die Differenz aus. Soll ein Abschlag zur neuen Summe
-            passen: Rechnung stornieren und die Rate neu stellen.
-          </span>
+          <MockInfoTip
+            label="Hinweis gestellte Abschläge"
+            tip="Gestellte Abschläge bleiben unverändert. Die Schlussrechnung gleicht die Differenz aus — oder Abschlag stornieren und Rate neu stellen."
+          />
         </div>
       ) : null}
       <PosBoard
@@ -1185,6 +1210,7 @@ export function AngebotWizard({
         meta={metaColumn}
         className="wizard-flow"
         manageHistory={false}
+        draftDirty={draftDirty}
       />
 
       <EditorSheet
@@ -1251,6 +1277,8 @@ export function AngebotWizard({
               onChange={patchMelderDraft}
               objekte={hvObjekte}
               onNeuObjekt={hvKundeId ? () => setObjektNeuOpen(true) : undefined}
+              kundeId={hvKundeId}
+              gewerke={gewerke}
             />
           </div>
         ) : null}
@@ -1410,11 +1438,10 @@ export function AngebotWizard({
         <div className="form-grid form-grid--sheet">
           {istAuftragKorrektur && hatGestellteAbschlaege ? (
             <div className="full zahlung-tab-hint" style={{ marginBottom: 0 }}>
-              <MockIcon ctx="btn" n="info" size={15} />
-              <span>
-                Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag
-                stornieren und die Rate neu stellen.
-              </span>
+              <MockInfoTip
+                label="Hinweis gestellte Abschläge"
+                tip="Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag stornieren und Rate neu stellen."
+              />
             </div>
           ) : null}
           <MockField label="Gültig bis" full>

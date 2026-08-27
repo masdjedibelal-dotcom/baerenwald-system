@@ -36,9 +36,9 @@ import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 
 function nachtragPublicUrl(token: string) {
+  /** Strikt CRM-Domain (NEXT_PUBLIC_APP_URL), nie Website-Origin. */
   const b = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
   if (b) return `${b}/nachtrag/${token}`
-  if (typeof window !== 'undefined') return `${window.location.origin}/nachtrag/${token}`
   return `/nachtrag/${token}`
 }
 
@@ -216,7 +216,14 @@ export function AuftragNachtragBaustoppSection({
                           startTransition(async () => {
                             const r = await updateNachtragHandwercherBestaetigt(n.id, detail.id, e.target.checked)
                             if (!r.ok) toast.error(r.message)
-                            else onChanged()
+                            else {
+                              toast.success(
+                                e.target.checked
+                                  ? 'Handwerker-Bestätigung gesetzt'
+                                  : 'Handwerker-Bestätigung entfernt'
+                              )
+                              onChanged()
+                            }
                           })
                         }}
                       />
@@ -291,7 +298,7 @@ export function AuftragNachtragBaustoppSection({
                         <div className="mt-2 space-y-2 rounded border border-border bg-surface p-2 text-ink">
                           <p className="font-semibold">Kunden-Link</p>
                           <div className="flex flex-wrap gap-2">
-                            <Button type="button" variant="secondary" onClick={() => void copyText(link)}>
+                            <Button type="button" variant="ghost" onClick={() => void copyText(link)}>
                               Link kopieren
                             </Button>
                             <Button

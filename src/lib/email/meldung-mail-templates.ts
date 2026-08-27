@@ -194,15 +194,22 @@ export function mailOrgFreigabeAngefordert(
     objektTitel: string
     betragEur: number
     portalLink: string
+    /** Optional: erneut nach Ablehnung — was angepasst wurde. */
+    anpassungNotiz?: string
   },
   b: MailBranding
 ): { betreff: string; html: string } {
   const betreff = `Freigabe erforderlich — ${data.objektTitel.trim() || 'Objekt'}`
+  const anpassung = data.anpassungNotiz?.trim()
+  const anpassungBlock = anpassung
+    ? `<p><strong>Was angepasst wurde:</strong> ${esc(anpassung)}</p>`
+    : ''
   const body = `
     <p>Guten Tag,</p>
     <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
       data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
     )}</strong> vor und benötigt Ihre Freigabe.</p>
+    ${anpassungBlock}
     <p>Dies betrifft eine <strong>Mieter-Schadenmeldung</strong>. Bitte im Auftraggeber-Portal freigeben oder ablehnen, bevor Bärenwald den Handwerker informiert.</p>
   `
   return {
