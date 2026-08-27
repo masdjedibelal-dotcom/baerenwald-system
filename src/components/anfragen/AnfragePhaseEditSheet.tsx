@@ -2,7 +2,7 @@
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { updateLeadBeschreibung, updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
@@ -204,17 +204,8 @@ function AnfragePhaseEditFooter({
   pending: boolean
   onSave: () => void
 }) {
-  const requestClose = useEditorSheetRequestClose()
   return (
     <div className="phase-sheet-footer">
-      <button
-        type="button"
-        className="btn secondary"
-        onClick={() => (requestClose ? requestClose() : undefined)}
-        disabled={pending}
-      >
-        Abbrechen
-      </button>
       <button type="button" className="btn primary" onClick={onSave} disabled={pending}>
         <MockIcon ctx="default" n="check" size={14} />
         Speichern

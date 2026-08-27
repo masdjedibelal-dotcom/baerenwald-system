@@ -107,7 +107,7 @@ export function PositionModal({
         : p.name || 'Position'
 
   return (
-    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose}>
+    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose} confirmLabel="Übernehmen">
       {kind === 'nachlass' ? (
         <div className="form-grid">
           <Field label="Bezeichnung" full required>

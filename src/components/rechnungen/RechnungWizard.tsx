@@ -1416,6 +1416,8 @@ export function RechnungWizard({
             </button>
           ) : null
         }
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1538,6 +1540,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <SheetEditableField
@@ -1571,6 +1575,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Zahlung"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full">
@@ -1769,6 +1775,8 @@ export function RechnungWizard({
         title="Vorschau"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <RechnungWizardPdfPreview
           rechnungId={vorschauRechnungId}
@@ -1782,6 +1790,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Abschlussbericht"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full" style={{ display: 'grid', gap: 12 }}>
@@ -1898,6 +1908,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title={istKorrekturVersand ? 'Korrektur versenden' : 'Versand'}
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField

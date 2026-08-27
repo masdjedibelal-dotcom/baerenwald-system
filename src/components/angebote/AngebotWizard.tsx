@@ -1237,6 +1237,8 @@ export function AngebotWizard({
             </button>
           ) : null
         }
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1325,6 +1327,8 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <SheetEditableField
@@ -1442,6 +1446,8 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Zahlung"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           {istAuftragKorrektur && hatGestellteAbschlaege ? (
@@ -1502,6 +1508,8 @@ export function AngebotWizard({
         title="Vorschau"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <AngebotWizardPdfPreview
           angebotId={angebotId}
@@ -1516,6 +1524,8 @@ export function AngebotWizard({
         title="Versand"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet form-grid--sheet-versand">
           <EmailPillsField
