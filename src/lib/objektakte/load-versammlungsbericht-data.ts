@@ -146,6 +146,28 @@ type AnlageDbRow = {
   objekt_einheiten: unknown
 }
 
+type AnlagenBerichtQuery = {
+  data: AnlageDbRow[] | null
+  error: { message: string } | null
+}
+
+async function fetchAnlagenBerichtRows(
+  supabase: ReturnType<typeof createClient>,
+  oid: string,
+  select: string
+): Promise<AnlagenBerichtQuery> {
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .select(select)
+    .eq('kunde_objekt_id', oid)
+    .neq('status', 'stillgelegt')
+    .order('bezeichnung', { ascending: true })
+  return {
+    data: (data ?? null) as AnlageDbRow[] | null,
+    error: error ? { message: error.message } : null,
+  }
+}
+
 async function loadAnlagenRowsForBericht(oid: string): Promise<AnlageDbRow[]> {
   const supabase = createClient()
   const fullSelect =
@@ -157,43 +179,23 @@ async function loadAnlagenRowsForBericht(oid: string): Promise<AnlageDbRow[]> {
   const basicSelectNoEtage =
     'id, bezeichnung, standort, status, einbau_datum, gewerke(name), objekt_einheiten(bezeichnung)'
 
-  let res = await supabase
-    .from('objekt_anlagen')
-    .select(fullSelect)
-    .eq('kunde_objekt_id', oid)
-    .neq('status', 'stillgelegt')
-    .order('bezeichnung', { ascending: true })
+  let res = await fetchAnlagenBerichtRows(supabase, oid, fullSelect)
 
   if (res.error && /etage/i.test(res.error.message)) {
-    res = await supabase
-      .from('objekt_anlagen')
-      .select(fullSelectNoEtage)
-      .eq('kunde_objekt_id', oid)
-      .neq('status', 'stillgelegt')
-      .order('bezeichnung', { ascending: true })
+    res = await fetchAnlagenBerichtRows(supabase, oid, fullSelectNoEtage)
   }
 
   if (
     res.error &&
     /garantie|gewaehrleistung|anschaffungswert|dokument/i.test(res.error.message)
   ) {
-    res = await supabase
-      .from('objekt_anlagen')
-      .select(basicSelect)
-      .eq('kunde_objekt_id', oid)
-      .neq('status', 'stillgelegt')
-      .order('bezeichnung', { ascending: true })
+    res = await fetchAnlagenBerichtRows(supabase, oid, basicSelect)
     if (res.error && /etage/i.test(res.error.message)) {
-      res = await supabase
-        .from('objekt_anlagen')
-        .select(basicSelectNoEtage)
-        .eq('kunde_objekt_id', oid)
-        .neq('status', 'stillgelegt')
-        .order('bezeichnung', { ascending: true })
+      res = await fetchAnlagenBerichtRows(supabase, oid, basicSelectNoEtage)
     }
   }
 
-  return (res.data ?? []) as AnlageDbRow[]
+  return res.data ?? []
 }
 
 export async function loadVersammlungsberichtPayload(input: {

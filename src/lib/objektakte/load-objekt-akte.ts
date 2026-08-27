@@ -29,6 +29,25 @@ export async function loadKundenObjektForAkte(
   return data as KundenObjekt
 }
 
+async function fetchObjektAnlagenRows(
+  supabase: ReturnType<typeof createClient>,
+  kundeId: string,
+  objektId: string,
+  select: string
+): Promise<{ data: ObjektAnlage[] | null; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .select(select)
+    .eq('kunde_id', kundeId)
+    .eq('kunde_objekt_id', objektId)
+    .order('sort_order', { ascending: true })
+    .order('bezeichnung', { ascending: true })
+  return {
+    data: (data ?? null) as ObjektAnlage[] | null,
+    error: error ? { message: error.message } : null,
+  }
+}
+
 async function loadObjektAnlagen(
   supabase: ReturnType<typeof createClient>,
   kundeId: string,
@@ -43,40 +62,16 @@ async function loadObjektAnlagen(
   const basicSelectNoEtage =
     'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
 
-  let res = await supabase
-    .from('objekt_anlagen')
-    .select(fullSelect)
-    .eq('kunde_id', kundeId)
-    .eq('kunde_objekt_id', objektId)
-    .order('sort_order', { ascending: true })
-    .order('bezeichnung', { ascending: true })
+  let res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, fullSelect)
 
   if (res.error && /etage/i.test(res.error.message)) {
-    res = await supabase
-      .from('objekt_anlagen')
-      .select(fullSelectNoEtage)
-      .eq('kunde_id', kundeId)
-      .eq('kunde_objekt_id', objektId)
-      .order('sort_order', { ascending: true })
-      .order('bezeichnung', { ascending: true })
+    res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, fullSelectNoEtage)
   }
 
   if (res.error && /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|does not exist|Could not find/i.test(res.error.message)) {
-    res = await supabase
-      .from('objekt_anlagen')
-      .select(basicSelect)
-      .eq('kunde_id', kundeId)
-      .eq('kunde_objekt_id', objektId)
-      .order('sort_order', { ascending: true })
-      .order('bezeichnung', { ascending: true })
+    res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, basicSelect)
     if (res.error && /etage/i.test(res.error.message)) {
-      res = await supabase
-        .from('objekt_anlagen')
-        .select(basicSelectNoEtage)
-        .eq('kunde_id', kundeId)
-        .eq('kunde_objekt_id', objektId)
-        .order('sort_order', { ascending: true })
-        .order('bezeichnung', { ascending: true })
+      res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, basicSelectNoEtage)
     }
   }
 
@@ -88,7 +83,7 @@ async function loadObjektAnlagen(
     return []
   }
 
-  const anlagen = (res.data ?? []) as ObjektAnlage[]
+  const anlagen = res.data ?? []
   if (!anlagen.length) return []
 
   const ids = anlagen.map((a) => a.id)
