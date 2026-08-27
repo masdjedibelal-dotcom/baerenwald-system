@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { freitextMailTypLabel } from '@/lib/kommunikation/types'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
+import { formatDatumZeit } from '@/lib/utils'
 
 export function EmailLogPreviewModal({
   emailLogId,

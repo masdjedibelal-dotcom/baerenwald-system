@@ -9,6 +9,7 @@ import {
 import { toast } from '@/components/ui/app-toast'
 import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { KundenDokumentRow } from '@/lib/types'
+import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
