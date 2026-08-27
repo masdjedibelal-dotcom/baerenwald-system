@@ -28,6 +28,10 @@ import {
   type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
+import {
+  Ustg13bHilfeSheet,
+  Ustg13bHilfeTrigger,
+} from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { toast } from '@/components/ui/app-toast'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
@@ -356,6 +360,7 @@ export function RechnungWizard({
   )
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
   const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
@@ -1194,42 +1199,47 @@ export function RechnungWizard({
         Steuerliche Hinweise
       </div>
       <div className="rw-tax__list">
-        {(
-          [
-            {
-              on: meta.hinweis_35a,
-              set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
-              label: '§35a EStG-Hinweis ausweisen',
-              sub:
-                anteil35a.lohn_netto > 0
-                  ? anteil35a.hat_materialausweis
-                    ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
-                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
-                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
-            },
-            {
-              on: meta.reverse_charge_13b,
-              set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
-              label: 'Reverse-Charge (§13b UStG)',
-              sub: 'Steuerschuldnerschaft des Leistungsempfängers',
-            },
-          ] as const
-        ).map((c) => (
-          <button
-            key={c.label}
-            type="button"
-            className={cn('rw-tax__opt', c.on && 'on')}
-            onClick={() => c.set(!c.on)}
-          >
-            <span className="rw-tax__check" aria-hidden>
-              {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+        <button
+          type="button"
+          className={cn('rw-tax__opt', meta.hinweis_35a && 'on')}
+          onClick={() => setMeta((m) => ({ ...m, hinweis_35a: !m.hinweis_35a }))}
+        >
+          <span className="rw-tax__check" aria-hidden>
+            {meta.hinweis_35a ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+          </span>
+          <span className="rw-tax__txt">
+            <span className="rw-tax__lab">§35a EStG-Hinweis ausweisen</span>
+            <span className="rw-tax__sub">
+              {anteil35a.lohn_netto > 0
+                ? anteil35a.hat_materialausweis
+                  ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
+                  : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
+                : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen'}
             </span>
-            <span className="rw-tax__txt">
-              <span className="rw-tax__lab">{c.label}</span>
-              <span className="rw-tax__sub">{c.sub}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={cn('rw-tax__opt', meta.reverse_charge_13b && 'on')}
+          onClick={() =>
+            setMeta((m) => ({ ...m, reverse_charge_13b: !m.reverse_charge_13b }))
+          }
+        >
+          <span className="rw-tax__check" aria-hidden>
+            {meta.reverse_charge_13b ? (
+              <MockIcon ctx="btn" n="check" size={12} />
+            ) : null}
+          </span>
+          <span className="rw-tax__txt">
+            <span className="rw-tax__lab" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              Reverse-Charge (§13b UStG)
+              <Ustg13bHilfeTrigger onOpen={() => setUstg13bHilfeOpen(true)} />
             </span>
-          </button>
-        ))}
+            <span className="rw-tax__sub">
+              Steuerschuldnerschaft des Leistungsempfängers
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   )
@@ -1958,6 +1968,12 @@ export function RechnungWizard({
       >
         Ungespeicherte Eingaben gehen sonst verloren.
       </ConfirmPopup>
+
+      <Ustg13bHilfeSheet
+        open={ustg13bHilfeOpen}
+        onClose={() => setUstg13bHilfeOpen(false)}
+        variant="ausgang"
+      />
     </>
   )
 

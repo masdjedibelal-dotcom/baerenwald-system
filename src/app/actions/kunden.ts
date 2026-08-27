@@ -846,7 +846,7 @@ export async function deleteKunde(
   }
 
   const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id, auth_user_id').eq('id', id).maybeSingle()
+    db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle()
   )
   if (loadErr || !row) {
     return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
@@ -949,9 +949,67 @@ export async function deleteKunde(
   const authUserId = String(
     (row as { auth_user_id?: string | null }).auth_user_id ?? ''
   ).trim()
-  if (authUserId) {
+  const kundeEmail = String((row as { email?: string | null }).email ?? '')
+    .trim()
+    .toLowerCase()
+
+  const authIdsToDelete = new Set<string>()
+  if (authUserId) authIdsToDelete.add(authUserId)
+
+  // Fallback: Auth-User per E-Mail, falls auth_user_id fehlt/verwaist —
+  // sonst blockiert „bereits registriert“ die erneute Portal-Anmeldung.
+  if (kundeEmail.includes('@')) {
     try {
-      await supabaseAdmin.auth.admin.deleteUser(authUserId)
+      let page = 1
+      while (page <= 10) {
+        const { data: list } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage: 200,
+        })
+        const users = list?.users ?? []
+        const found = users.find(
+          (u) => (u.email ?? '').toLowerCase() === kundeEmail && !u.deleted_at
+        )
+        if (found?.id) {
+          authIdsToDelete.add(found.id)
+          break
+        }
+        if (users.length < 200) break
+        page += 1
+      }
+    } catch (e) {
+      console.warn('[deleteKunde] auth lookup by email:', e)
+    }
+  }
+
+  for (const uid of authIdsToDelete) {
+    // Nicht löschen, wenn derselbe Auth noch an anderem Stamm hängt
+    const [{ data: otherKunde }, { data: otherHw }, { data: otherMitglied }] =
+      await Promise.all([
+        supabaseAdmin
+          .from('kunden')
+          .select('id')
+          .eq('auth_user_id', uid)
+          .neq('id', id)
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('handwerker')
+          .select('id')
+          .eq('auth_user_id', uid)
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('kunden_mitglieder')
+          .select('id')
+          .eq('auth_user_id', uid)
+          .eq('aktiv', true)
+          .limit(1)
+          .maybeSingle(),
+      ])
+    if (otherKunde?.id || otherHw?.id || otherMitglied?.id) continue
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(uid)
     } catch (e) {
       console.warn('[deleteKunde] auth delete:', e)
     }

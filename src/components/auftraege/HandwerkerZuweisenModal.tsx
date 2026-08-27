@@ -4,6 +4,10 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import {
+  Ustg13bHilfeSheet,
+  Ustg13bHilfeTrigger,
+} from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { Accordion } from '@/components/ui/Accordion'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
@@ -156,6 +160,7 @@ export function HandwerkerZuweisenModal({
   const [splitZiel, setSplitZiel] = useState<Record<string, SplitZiel>>({})
   const [betragAlt, setBetragAlt] = useState<Record<string, string>>({})
   const [hwRechnungReverseCharge13b, setHwRechnungReverseCharge13b] = useState(false)
+  const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
 
   const gewerkId = scope?.gewerkId ?? ''
   const gewerkSlug = scope?.gewerkSlug ?? null
@@ -465,9 +470,13 @@ export function HandwerkerZuweisenModal({
             onChange={(e) => setHwRechnungReverseCharge13b(e.target.checked)}
           />
           <span>
-            <span className="font-medium">EK: § 13b UStG für Partner-Rechnung</span>
+            <span className="inline-flex items-center font-medium">
+              EK: § 13b UStG für Partner-Rechnung
+              <Ustg13bHilfeTrigger onOpen={() => setUstg13bHilfeOpen(true)} />
+            </span>
             <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-              Steuert den Reverse-Charge-Hinweis auf der automatischen Eingangsrechnung.
+              Steuert den Reverse-Charge-Hinweis auf der automatischen
+              Eingangsrechnung.
             </span>
           </span>
         </label>
@@ -548,17 +557,24 @@ export function HandwerkerZuweisenModal({
   )
 
   return (
-    <EditorSheet
-      open={open}
-      onClose={onClose}
-      title={title}
-      context="detail"
-      size="lg"
-      onConfirm={canConfirmReplace ? zuweisen : undefined}
-      confirmBusy={pending}
-      confirmDisabled={!canConfirmReplace}
-    >
-      {body}
-    </EditorSheet>
+    <>
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title={title}
+        context="detail"
+        size="lg"
+        onConfirm={canConfirmReplace ? zuweisen : undefined}
+        confirmBusy={pending}
+        confirmDisabled={!canConfirmReplace}
+      >
+        {body}
+      </EditorSheet>
+      <Ustg13bHilfeSheet
+        open={ustg13bHilfeOpen}
+        onClose={() => setUstg13bHilfeOpen(false)}
+        variant="eingang"
+      />
+    </>
   )
 }
