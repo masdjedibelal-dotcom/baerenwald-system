@@ -4,9 +4,16 @@
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type { Lead, OrgFreigabeStatus } from '@/lib/types'
 
-export function leadIstAkut(
-  lead: Pick<Lead, 'situation' | 'funnel_daten' | 'freigabe_bypass_grund'>
-): boolean {
+type AkutSchwelleLeadSlice = {
+  situation?: string | null
+  funnel_daten?: unknown
+  freigabe_bypass_grund?: string | null
+  erfassung_von?: string | null
+  anlass?: string | null
+  hv_meldung_status?: string | null
+}
+
+export function leadIstAkut(lead: AkutSchwelleLeadSlice): boolean {
   return leadIstHavarie(lead)
 }
 
@@ -23,13 +30,7 @@ export function leadIstMieterMeldung(lead: {
  * Mieter-Meldung wartet noch auf HV-Start-Freigabe („Vorgang freigeben“).
  * Akut-Direktauftrag: kein Gate — BW kann sofort disponieren.
  */
-export function leadWartetAufHvStartFreigabe(
-  lead: Pick<Lead, 'situation' | 'funnel_daten' | 'freigabe_bypass_grund'> & {
-    erfassung_von?: string | null
-    anlass?: string | null
-    hv_meldung_status?: string | null
-  }
-): boolean {
+export function leadWartetAufHvStartFreigabe(lead: AkutSchwelleLeadSlice): boolean {
   if (!leadIstMieterMeldung(lead)) return false
   if (leadIstAkut(lead)) return false
   const st = (lead.hv_meldung_status ?? 'neu').trim().toLowerCase()

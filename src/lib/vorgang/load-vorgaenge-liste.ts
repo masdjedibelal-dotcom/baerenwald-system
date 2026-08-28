@@ -334,6 +334,8 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     org_freigabe_status: string | null
     hv_meldung_status: string | null
     freigabe_bypass_grund: string | null
+    erfassung_von: string | null
+    anlass: string | null
     funnel_daten: unknown
     preis_min: number | null
     preis_max: number | null
