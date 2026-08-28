@@ -80,5 +80,7 @@ export function MockCard({
 }
 
 export function MockCardArrowAction({ onClick }: { onClick: () => void }) {
-  return <MockBtn sm kind="ghost" icon="arrow-right" onClick={onClick} />
+  return (
+    <MockBtn sm kind="secondary" icon="arrow-right" title="Öffnen" onClick={onClick} />
+  )
 }

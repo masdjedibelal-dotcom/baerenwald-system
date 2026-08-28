@@ -200,27 +200,34 @@ export function EntityKundenStammdatenCard({
       </div>
 
       {kundeId?.trim() ? (
-        <div className="vgid-chips">
+        <div className="stammdaten-footer">
+          <div className="stammdaten-footer__row">
+            <div className="stammdaten-footer__status">
+              <StammdatenPortalZeile
+                kundeId={kundeId}
+                fallbackEmail={draft.email}
+                variant="vgid"
+                hideLogin
+              />
+            </div>
+            <div className="stammdaten-footer__login">
+              <PortalLoginIconButton
+                kundeId={kundeId}
+                label="Kundenportal öffnen"
+                withLabel
+              />
+            </div>
+          </div>
           {showKundeLink ? (
-            <Link className="vgid-chip ghost" href={`/kunden/${kundeId.trim()}`}>
-              <MockIcon ctx="default" n="user" size={14} />
-              Kundenakte
-            </Link>
+            <div className="stammdaten-footer__secondary">
+              <Link className="vgid-chip ghost vgid-chip--secondary" href={`/kunden/${kundeId.trim()}`}>
+                <MockIcon ctx="default" n="user" size={14} />
+                Kundenakte
+              </Link>
+            </div>
           ) : null}
-          <PortalLoginIconButton
-            kundeId={kundeId}
-            label="Kundenportal öffnen"
-            withLabel
-          />
         </div>
       ) : null}
-
-      <StammdatenPortalZeile
-        kundeId={kundeId}
-        fallbackEmail={draft.email}
-        variant="vgid"
-        hideLogin
-      />
     </>
   )
 
@@ -230,7 +237,7 @@ export function EntityKundenStammdatenCard({
         <div className="card-h">
           <div className="card-title title">Stammdaten</div>
           {showPencil ? (
-            <MockBtn sm kind="ghost" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
+            <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
           ) : null}
         </div>
         <div className="card-b">{viewBody}</div>

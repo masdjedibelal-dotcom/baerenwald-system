@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import {
   buildKundeWirtschaft,
@@ -96,64 +99,40 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
         />
       </div>
 
-      <div className="kw-kpi-row">
-        <div className="card kw-kpi dshell-framed">
-          <div className="kw-kpi-label">
-            Umsatz{zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}
-          </div>
-          <div className="kw-kpi-val">{formatEurGanz(snap.umsatz)}</div>
-          {delta ? (
-            <div
-              className={cn(
-                'kw-kpi-meta',
-                snap.umsatzDeltaPct != null && snap.umsatzDeltaPct > 0 && 'is-up',
-                snap.umsatzDeltaPct != null && snap.umsatzDeltaPct < 0 && 'is-down'
-              )}
-            >
-              {snap.umsatzDeltaPct != null && snap.umsatzDeltaPct > 0 ? (
-                <MockIcon ctx="default" n="trending-up" size={13} />
-              ) : snap.umsatzDeltaPct != null && snap.umsatzDeltaPct < 0 ? (
-                <MockIcon ctx="default" n="trending-up" size={13} className="kw-flip" />
-              ) : null}
-              <span>{delta}</span>
-            </div>
-          ) : (
-            <div className="kw-kpi-meta">Gesamtumsatz</div>
-          )}
-        </div>
+      <MockUebersichtCard
+        stats={[
+          {
+            icon: 'euro',
+            label: `Umsatz${zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}${delta ? ` (${delta})` : ''}`,
+            value: formatEurGanz(snap.umsatz),
+          },
+          {
+            icon: 'receipt',
+            label:
+              snap.offenerBetrag > 0
+                ? 'Offener Betrag · offene Posten'
+                : 'Offener Betrag · keine offenen Posten',
+            value: formatEurGanz(snap.offenerBetrag),
+          },
+          {
+            icon: 'folders',
+            label: `Aktive Vorgänge · ${snap.auftraegeGesamt} Auftrag${snap.auftraegeGesamt === 1 ? '' : 'e'} gesamt`,
+            value: snap.aktiveVorgaenge,
+          },
+        ]}
+      />
 
-        <div className="card kw-kpi dshell-framed">
-          <div className="kw-kpi-label">Offener Betrag</div>
-          <div className="kw-kpi-val">{formatEurGanz(snap.offenerBetrag)}</div>
-          <div className="kw-kpi-meta">
-            {snap.offenerBetrag > 0 ? 'offene Posten' : 'keine offenen Posten'}
-          </div>
-        </div>
-
-        <div className="card kw-kpi dshell-framed">
-          <div className="kw-kpi-label">Aktive Vorgänge</div>
-          <div className="kw-kpi-val">{snap.aktiveVorgaenge}</div>
-          <div className="kw-kpi-meta">
-            {snap.auftraegeGesamt} Auftrag{snap.auftraegeGesamt === 1 ? '' : 'e'} gesamt
-          </div>
-        </div>
-      </div>
-
-      <div className="card kw-chart dshell-framed">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="activity" size={16} />
-            Umsatzverlauf
-          </div>
-        </div>
-        <div className="card-b">
-          {snap.monate.every((m) => m.betrag <= 0) ? (
-            <p className="kw-chart-empty">Noch kein Umsatz in diesem Zeitraum.</p>
-          ) : (
-            <UmsatzverlaufBars monate={snap.monate} />
-          )}
-        </div>
-      </div>
+      <MockCard title="Umsatzverlauf" icon="activity">
+        {snap.monate.every((m) => m.betrag <= 0) ? (
+          <MockEmpty
+            icon="activity"
+            title="Noch kein Umsatz"
+            hint="In diesem Zeitraum liegen noch keine Umsatzdaten vor."
+          />
+        ) : (
+          <UmsatzverlaufBars monate={snap.monate} />
+        )}
+      </MockCard>
     </div>
   )
 }

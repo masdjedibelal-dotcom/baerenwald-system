@@ -22,6 +22,8 @@ import { MockBtn } from "@/components/mock-ui/MockPrimitives";
 import { DokMobileCard } from "@/components/ui/DokMobileCard";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { cn } from "@/lib/utils";
+import { MockEmpty } from "@/components/mock-ui/MockEmpty";
+import { DOC } from "@/lib/crm-labels";
 
 type AngebotKurz = {
   id: string;
@@ -341,17 +343,15 @@ export function AnfrageDokumenteTab({
               }}
             >
               <MockIcon ctx="btn" n="cloud-upload" size={18} />
-              {uploading ? "Wird hochgeladen…" : "Dateien hier ablegen oder klicken"}
+              {uploading ? "Wird hochgeladen…" : DOC.uploadHint}
             </div>
           </>
         ) : null}
 
         {docs.length === 0 ? (
-          <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-            {isMobile
-              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
-              : 'Noch keine Dokumente.'}
-          </p>
+          isMobile ? (
+            <MockEmpty icon="files" title={DOC.emptyTitle} hint={DOC.emptyHint} />
+          ) : null
         ) : isMobile ? (
           <div className="dok-cards">
             {docs.map((d) => {

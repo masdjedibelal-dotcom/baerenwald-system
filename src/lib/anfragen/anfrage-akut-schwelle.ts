@@ -111,6 +111,10 @@ export function buildAnfrageSchwellenHinweis(input: {
   portalModus?: string | null
   schwelleEur?: number | null
   notfallDirekt?: boolean | null
+  /** Angebot existiert — Schwelle darf verglichen werden (nicht nur Preisindikation). */
+  hatAngebot?: boolean
+  /** Angebotsbetrag; hat Vorrang vor Preisindikation. */
+  angebotBetragEur?: number | null
 }): AnfrageSchwellenHinweis {
   const istAkut = leadIstAkut(input.lead)
   const istMieterMeldung = leadIstMieterMeldung(input.lead)
@@ -122,8 +126,21 @@ export function buildAnfrageSchwellenHinweis(input: {
     input.schwelleEur != null && Number.isFinite(Number(input.schwelleEur)) && Number(input.schwelleEur) > 0
       ? Number(input.schwelleEur)
       : null
-  const preis = leadPreisindikationEur(input.lead)
-  const unterSchwelle = schwelle != null && preis != null && preis <= schwelle
+  const bypass = (input.lead.freigabe_bypass_grund ?? '').trim().toLowerCase()
+  const schwelleHinweisErlaubt =
+    input.hatAngebot === true ||
+    bypass === 'schwelle' ||
+    bypass === 'akut'
+  const preisIndikation = leadPreisindikationEur(input.lead)
+  const angebotBetrag =
+    input.angebotBetragEur != null &&
+    Number.isFinite(Number(input.angebotBetragEur)) &&
+    Number(input.angebotBetragEur) > 0
+      ? Number(input.angebotBetragEur)
+      : null
+  const preis = schwelleHinweisErlaubt ? (angebotBetrag ?? preisIndikation) : null
+  const unterSchwelle =
+    schwelleHinweisErlaubt && schwelle != null && preis != null && preis <= schwelle
   const notfallDirektErlaubt = input.notfallDirekt !== false
   const freigabeStatus = input.lead.org_freigabe_status
 
@@ -218,6 +235,22 @@ export function buildAnfrageSchwellenHinweis(input: {
             ? 'Wartet auf Eigentümerbeschluss — danach Freigabe/Ablehnung im HV-Portal.'
             : 'Angebot an HV zur Freigabe. Bei echter Havarie: als Akut markieren und direkt beauftragen.'
           : 'Normalweg: Angebot → HV-Freigabe. Akut nur bei Notfall.',
+    }
+  }
+
+  if (freigabeAktiv && schwelle != null && preis == null && !schwelleHinweisErlaubt) {
+    return {
+      freigabeAktiv,
+      schwelleEur: schwelle,
+      preisEur: null,
+      unterSchwelle: false,
+      freigabeStatus,
+      notfallDirektErlaubt,
+      istAkut,
+      istMieterMeldung,
+      headline: `Freigabe-Schwelle ${formatEur(schwelle)} — Schwelle gilt erst nach Angebot`,
+      detail:
+        'Angebot erstellen, dann wird der Betrag mit der Schwelle abgeglichen. Bei Akut trotzdem direkt beauftragen möglich.',
     }
   }
 

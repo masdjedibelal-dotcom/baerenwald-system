@@ -10,6 +10,7 @@ import {
   MockModal,
   MockPager,
   MockSortHead,
+  ListBulkBar,
 } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
@@ -477,37 +478,25 @@ export function KundenListeClient({
       )}
 
       {selectedCount > 0 ? (
-        <div className="bulkbar">
-          <span className="bulkbar-count">
-            <b>{selectedCount}</b> ausgewählt
-          </span>
-          <div style={{ flex: 1 }} />
-          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
-            Export
-          </MockBtn>
-          {selectedCount === 2 ? (
-            <MockBtn kind="ghost" sm icon="link" onClick={() => setMergeListOpen(true)}>
-              Zusammenführen
-            </MockBtn>
-          ) : null}
-          <MockBtn
-            kind="danger"
-            sm
-            icon="trash"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={bulkDeletePending}
-          >
-            Löschen
-          </MockBtn>
-          <MockBtn
-            kind="ghost"
-            sm
-            className="qa-btn bulkbar-clear"
-            icon="x"
-            onClick={() => setSelected({})}
-            title="Auswahl aufheben"
-          />
-        </div>
+        <ListBulkBar
+          selectedCount={selectedCount}
+          onClear={() => setSelected({})}
+          onExport={bulkExport}
+          onDelete={() => setBulkDeleteOpen(true)}
+          onEdit={
+            selectedCount === 1 && selectedRows[0]
+              ? () => openDetail(selectedRows[0]!.id)
+              : undefined
+          }
+          deletePending={bulkDeletePending}
+          extraActions={
+            selectedCount === 2 ? (
+              <MockBtn kind="ghost" sm icon="link" onClick={() => setMergeListOpen(true)}>
+                Zusammenführen
+              </MockBtn>
+            ) : null
+          }
+        />
       ) : null}
 
       <MockModal

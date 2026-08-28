@@ -1,3 +1,4 @@
+import { leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
@@ -328,6 +329,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const badges: ResolvedVorgangBadges = {}
   if (isNotfall(input)) badges.notfall = true
+  if (leadWartetAufHvStartFreigabe(input.lead)) badges.wartet_freigabe = true
   // org_freigabe_status bleibt Datenfeld; kein eigener Vorgangs-Status / Badge mehr
 
   const { actor, needsAction } = resolveActor(

@@ -22,10 +22,15 @@ import {
   auftragNetto,
   type DashboardZeitraumFilter,
 } from '@/lib/dashboard/dashboard-analytics'
-import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
+import {
+  emptyDashboardMarketingSnapshot,
+  loadDashboardMarketingSafe,
+} from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
+/** Netlify Serverless: Dashboard darf Marketing-APIs nicht unbegrenzt warten lassen. */
+export const maxDuration = 26
 
 type SupabaseErr = { message: string } | null
 
@@ -63,6 +68,52 @@ async function safeMaybeSingle<T>(
 }
 
 async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
+  try {
+    return await DashboardDataInner({ zeitraumFilter })
+  } catch (e) {
+    console.error('[DashboardData]', e)
+    return (
+      <DashboardClient
+        vorname="Team"
+        zeitraumFilter={zeitraumFilter}
+        kpis={[
+          {
+            icon: 'inbox',
+            label: 'Offene Anfragen',
+            value: 0,
+            href: '/vorgaenge?tab=anfrage&lifecycle=offen',
+          },
+          {
+            icon: 'file-invoice',
+            label: 'Offene Angebote',
+            value: 0,
+            href: '/vorgaenge?tab=angebot&lifecycle=offen',
+          },
+          {
+            icon: 'tool',
+            label: 'Aktive Aufträge',
+            value: 0,
+            href: '/vorgaenge?tab=auftrag&lifecycle=offen',
+          },
+          {
+            icon: 'receipt',
+            label: 'Offene Rechnungen',
+            value: 0,
+            href: '/vorgaenge?tab=rechnung&lifecycle=offen',
+          },
+        ]}
+        marketing={emptyDashboardMarketingSnapshot('Dashboard konnte nicht vollständig geladen werden')}
+        umsatzMonate={[]}
+        funnel={{ stufen: [], conversionGesamt: 0 }}
+        gewerk={{ zeilen: [], gesamt: 0 }}
+        rankingHandwerker={[]}
+        rankingKunden={[]}
+      />
+    )
+  }
+}
+
+async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
   const supabase = createClient()
   const zeitraumRange = getDashboardZeitraumRange(zeitraumFilter)
 
@@ -108,7 +159,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .select(
             `
             id, status, status_einfach, kunde_id, lead_id, created_at,
-            gesamt_fix, gesamt_min, gesamt_max, positionen,
+            gesamt_fix, gesamt_min, gesamt_max,
             leads(id, status),
             auftraege(id, status)
           `
@@ -125,7 +176,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
             `
             id, status, kunde_id, lead_id, angebot_id, created_at, titel, ist_wiederkehrend,
             letzte_aktivitaet, fortschritt,
-            angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
+            angebote(id, gesamt_fix, gesamt_min, gesamt_max),
             kunden(id, name, vorname, nachname)
           `
           )
@@ -168,13 +219,13 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
             handwerker(id, name, firma),
             gewerke(name),
             auftraege(id, status, lead_id, angebot_id, kunde_id, created_at,
-              angebote(gesamt_fix, gesamt_min, gesamt_max, positionen))
+              angebote(gesamt_fix, gesamt_min, gesamt_max))
           `
           )
           .limit(3000)
       )
     ),
-    loadDashboardMarketing(zeitraumFilter),
+    loadDashboardMarketingSafe(zeitraumFilter),
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db.from('gewerke').select('id, name, slug').order('name')

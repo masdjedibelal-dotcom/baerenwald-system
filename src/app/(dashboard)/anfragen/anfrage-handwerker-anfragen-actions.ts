@@ -19,7 +19,7 @@ const AH_SELECT = `
   hw_angebot_pdf_url, hw_angebot_anhang_urls, hw_konditionen, gesendet_at,
   handwerker(id, name, firma, email, telefon, gewerke),
   gewerke(id, name, slug),
-  angebote!inner(id, lead_id, leistungsumfang, projektbeschreibung, ist_partner_einholung, status, gesendet_kunde_at)
+  angebote!inner(id, lead_id, leistungsumfang, projektbeschreibung, ist_partner_einholung, status, gesendet_kunde_at, positionen)
 `
 
 function one<T>(x: T | T[] | null | undefined): T | null {
@@ -256,6 +256,7 @@ export type AnfragePartnerEinholungRow = AngebotHandwerkerRow & {
   leistungsumfang?: string | null
   projektbeschreibung?: string | null
   angebot_gesendet_kunde_at?: string | null
+  angebot_positionen?: unknown
   /** Noch am internen Gehäuse — nach Kundenangebot-Speichern false (Karte wandert). */
   ist_intern_gehaeuse?: boolean
 }
@@ -290,6 +291,7 @@ export async function listAnfragePartnerEinholungen(
       projektbeschreibung?: string | null
       gesendet_kunde_at?: string | null
       ist_partner_einholung?: boolean | null
+      positionen?: unknown
     } | null
     const { angebote: _drop, ...rest } = rec
     rows.push({
@@ -299,6 +301,7 @@ export async function listAnfragePartnerEinholungen(
       leistungsumfang: ang?.leistungsumfang ?? null,
       projektbeschreibung: ang?.projektbeschreibung ?? null,
       angebot_gesendet_kunde_at: ang?.gesendet_kunde_at ?? null,
+      angebot_positionen: ang?.positionen ?? null,
       ist_intern_gehaeuse: ang?.ist_partner_einholung === true,
     })
   }

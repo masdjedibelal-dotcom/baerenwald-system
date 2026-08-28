@@ -11,6 +11,7 @@ import {
   MockModal,
   MockPager,
   MockSortHead,
+  ListBulkBar,
 } from '@/components/mock-ui'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -1156,37 +1157,18 @@ export function VorgaengeListeClient({
       )}
 
       {selectedCount > 0 ? (
-        <div className="bulkbar">
-          <span className="bulkbar-count">
-            <b>{selectedCount}</b> ausgewählt
-          </span>
-          {showSelectAllFilteredLink ? (
-            <MockBtn kind="ghost" sm onClick={selectAllFiltered}>
-              Alle {filtered.length} Treffer auswählen
-            </MockBtn>
-          ) : null}
-          <div style={{ flex: 1 }} />
-          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
-            Export
-          </MockBtn>
-          <MockBtn
-            kind="danger"
-            sm
-            icon="trash"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={bulkDeletePending}
-          >
-            Löschen
-          </MockBtn>
-          <MockBtn
-            kind="ghost"
-            sm
-            className="qa-btn bulkbar-clear"
-            icon="x"
-            onClick={() => setSelected({})}
-            title="Auswahl aufheben"
-          />
-        </div>
+        <ListBulkBar
+          selectedCount={selectedCount}
+          onClear={() => setSelected({})}
+          onExport={bulkExport}
+          onDelete={() => setBulkDeleteOpen(true)}
+          deleteDisabled={bulkDeletePending}
+          deletePending={bulkDeletePending}
+          selectAllFilteredLabel={
+            showSelectAllFilteredLink ? `Alle ${filtered.length} Treffer auswählen` : undefined
+          }
+          onSelectAllFiltered={showSelectAllFilteredLink ? selectAllFiltered : undefined}
+        />
       ) : null}
 
       <MockModal
@@ -1489,6 +1471,11 @@ export function VorgaengeListeClient({
                     <>
                       <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
                       <MockBadge kind="neu">{korrekturUi.dualBadges.secondary}</MockBadge>
+                    </>
+                  ) : v.badges?.wartet_freigabe ? (
+                    <>
+                      <MockBadge kind="warten">Warte auf HV</MockBadge>
+                      <MockBadge kind={kind}>{label}</MockBadge>
                     </>
                   ) : (
                     <MockBadge kind={kind}>{label}</MockBadge>

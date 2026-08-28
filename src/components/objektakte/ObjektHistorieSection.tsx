@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { MockBadge, MockChip, MockEmpty } from '@/components/mock-ui'
+import { MockBadge, MockChip, MockEmpty, MockCard } from '@/components/mock-ui'
 import { DateInput } from '@/components/ui/DateInput'
 import type { ObjektHistorieRow } from '@/lib/objektakte/types'
 import { phaseChipLabelHistorie } from '@/lib/objektakte/compute-objekt-kpis'
@@ -98,14 +98,11 @@ export function ObjektHistorieSection({
 
   return (
     <div className="space-y-4">
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Historie</div>
+      <MockCard title="Historie" icon="history">
+        <div className="space-y-3">
           <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-            Chronologische Maßnahmen am Objekt — fehlende Zuordnungen als „—".
+            Chronologische Maßnahmen — fehlende Zuordnungen als „—“
           </p>
-        </div>
-        <div className="card-b space-y-3">
           <div className="flex flex-wrap gap-2">
             {PHASE_FILTERS.map((p) => (
               <MockChip key={p} active={phase === p} onClick={() => setPhase(p)}>
@@ -114,7 +111,7 @@ export function ObjektHistorieSection({
             ))}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="historie-filter-row">
             {einheiten.length ? (
               <label className="block">
                 <span className="lbl">Einheit</span>
@@ -176,7 +173,7 @@ export function ObjektHistorieSection({
             </label>
           </div>
         </div>
-      </div>
+      </MockCard>
 
       {filtered.length === 0 ? (
         <MockEmpty

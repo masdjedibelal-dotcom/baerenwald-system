@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { LIST } from '@/lib/crm-labels'
+import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
@@ -532,6 +535,20 @@ export function ObjektEinheitenSection({
     ]
   }
 
+  function bulkExport() {
+    exportSimpleCsv(
+      'einheiten-auswahl',
+      selectedRows.map((u) => {
+        const leer = peopleFor(u.id).length === 0
+        return {
+          Einheit: u.bezeichnung,
+          Details: metaFor(u) || 'Keine Personen',
+          Status: leer ? 'leer' : 'belegt',
+        }
+      })
+    )
+  }
+
   async function runBulkDelete() {
     if (!selectedRows.length || bulkDeletePending) return
     setBulkDeletePending(true)
@@ -836,53 +853,23 @@ export function ObjektEinheitenSection({
         icon="building"
         actions={
           <MockBtn sm kind="primary" icon="plus" onClick={openEinheitNeu} disabled={pending}>
-            Hinzufügen
+            {LIST.hinzufuegen}
           </MockBtn>
         }
       >
         {selectedCount > 0 ? (
-          <div className="bulkbar" style={{ marginBottom: 12 }}>
-            <span className="bulkbar-count">
-              <b>{selectedCount}</b> ausgewählt
-            </span>
-            <MockBtn
-              kind="ghost"
-              sm
-              onClick={toggleAll}
-              title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-            >
-              {allSelected ? 'Keine' : 'Alle'}
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            {selectedCount === 1 ? (
-              <MockBtn
-                kind="ghost"
-                sm
-                icon="pencil"
-                onClick={openBearbeitenBulk}
-                disabled={pending}
-              >
-                Bearbeiten
-              </MockBtn>
-            ) : null}
-            <MockBtn
-              kind="danger"
-              sm
-              icon="trash"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={bulkDeletePending || pending}
-            >
-              Löschen
-            </MockBtn>
-            <MockBtn
-              kind="ghost"
-              sm
-              className="qa-btn bulkbar-clear"
-              icon="x"
-              onClick={() => setSelected({})}
-              title="Auswahl aufheben"
-            />
-          </div>
+          <ListBulkBar
+            selectedCount={selectedCount}
+            onClear={() => setSelected({})}
+            onExport={bulkExport}
+            onDelete={() => setBulkDeleteOpen(true)}
+            onToggleAll={toggleAll}
+            allSelected={allSelected}
+            onEdit={openBearbeitenBulk}
+            deleteDisabled={bulkDeletePending || pending}
+            deletePending={bulkDeletePending}
+            className="mb-3"
+          />
         ) : null}
 
         {einheiten.length === 0 ? (

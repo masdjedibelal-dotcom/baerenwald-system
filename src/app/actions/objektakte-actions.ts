@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { OBJEKT_ANLAGE_STATUS, OBJEKT_KONTAKT_ROLLEN, OBJEKT_ANLAGE_WARTUNGSINTERVALL } from '@/lib/objektakte/labels'
 import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
   EinheitBewohner,
   EinheitBewohnerInput,
@@ -1421,7 +1422,7 @@ export async function loadObjektAnlageVorgaenge(
   const supabase = createClient()
   const { data: leads, error } = await supabase
     .from('leads')
-    .select('id, titel, created_at, status, anlass')
+    .select('id, created_at, status, anlass, situation, bereiche')
     .eq('objekt_anlage_id', anlageId)
     .order('created_at', { ascending: false })
 
@@ -1433,7 +1434,7 @@ export async function loadObjektAnlageVorgaenge(
   const [{ data: angebote }, { data: auftraege }] = await Promise.all([
     supabase
       .from('angebote')
-      .select('id, lead_id, status, gesamt_fix, gesamt_min, gesamt_max')
+      .select('id, lead_id, status, gesamt_fix, gesamt_min, gesamt_max, leistungsumfang, notizen')
       .in('lead_id', leadIds),
     supabase.from('auftraege').select('id, lead_id, angebot_id, status').in('lead_id', leadIds),
   ])
@@ -1505,7 +1506,16 @@ export async function loadObjektAnlageVorgaenge(
     })
     return {
       id: lid,
-      titel: (l.titel as string)?.trim() || 'Vorgang',
+      titel: angebotTitelOderSituationBereich({
+        angebot: leadAng[0]
+          ? {
+              leistungsumfang: (leadAng[0] as { leistungsumfang?: string | null }).leistungsumfang,
+              notizen: (leadAng[0] as { notizen?: string | null }).notizen,
+            }
+          : null,
+        situation: (l.situation as string | null) ?? null,
+        bereiche: (l.bereiche as string[] | null) ?? null,
+      }),
       created_at: l.created_at as string,
       status: (l.status as string | null) ?? null,
       phase: (l.anlass as string | null) ?? null,

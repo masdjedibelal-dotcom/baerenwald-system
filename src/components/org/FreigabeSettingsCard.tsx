@@ -6,6 +6,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
+import { LIST } from '@/lib/crm-labels'
 
 const SCHWELLE_MIN = 0
 const SCHWELLE_MAX = 5000
@@ -144,7 +145,23 @@ export function FreigabeSettingsCard({
   }
 
   return (
-    <MockCard title={title} icon="shield-check" className={cn('freigabe-settings-card', className)}>
+    <MockCard
+      title={title}
+      icon="shield-check"
+      className={cn('freigabe-settings-card', className)}
+      actions={
+        !erben ? (
+          <MockBtn
+            sm
+            kind="primary"
+            disabled={pending || !dirty}
+            onClick={() => speichern(buildPayload())}
+          >
+            {pending ? `${LIST.speichern}…` : LIST.speichern}
+          </MockBtn>
+        ) : null
+      }
+    >
       {onErbenChange ? (
         <div className="freigabe-settings-card__row">
           <div className="freigabe-settings-card__row-text">
@@ -255,14 +272,6 @@ export function FreigabeSettingsCard({
           </div>
         ) : null}
       </div>
-
-      {!erben ? (
-        <div className="freigabe-settings-card__actions">
-          <MockBtn sm kind="primary" disabled={pending || !dirty} onClick={() => speichern(buildPayload())}>
-            Speichern
-          </MockBtn>
-        </div>
-      ) : null}
     </MockCard>
   )
 }

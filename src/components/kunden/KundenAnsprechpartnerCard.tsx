@@ -5,7 +5,10 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { LIST } from '@/lib/crm-labels'
+import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -195,6 +198,19 @@ export function KundenAnsprechpartnerCard({
     })
   }
 
+  function bulkExport() {
+    exportSimpleCsv(
+      'ansprechpartner-auswahl',
+      selectedRows.map((r) => ({
+        Name: r.name,
+        Rolle: r.rolle ?? '',
+        Email: r.email ?? '',
+        Telefon: r.telefon ?? '',
+        Primaer: r.ist_primaer ? 'ja' : 'nein',
+      }))
+    )
+  }
+
   async function runBulkDelete() {
     if (!selectedRows.length || bulkDeletePending) return
     setBulkDeletePending(true)
@@ -277,47 +293,22 @@ export function KundenAnsprechpartnerCard({
       className={cn(className)}
       actions={
         <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-          Hinzufügen
+          {LIST.hinzufuegen}
         </MockBtn>
       }
     >
       {selectedCount > 0 ? (
-        <div className="bulkbar">
-          <span className="bulkbar-count">
-            <b>{selectedCount}</b> ausgewählt
-          </span>
-          <MockBtn
-            kind="ghost"
-            sm
-            onClick={toggleAll}
-            title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            {allSelected ? 'Keine' : 'Alle'}
-          </MockBtn>
-          <div style={{ flex: 1 }} />
-          {selectedCount === 1 ? (
-            <MockBtn kind="ghost" sm icon="pencil" onClick={openBearbeitenBulk} disabled={pending}>
-              Bearbeiten
-            </MockBtn>
-          ) : null}
-          <MockBtn
-            kind="danger"
-            sm
-            icon="trash"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={bulkDeletePending || pending}
-          >
-            Löschen
-          </MockBtn>
-          <MockBtn
-            kind="ghost"
-            sm
-            className="qa-btn bulkbar-clear"
-            icon="x"
-            onClick={() => setSelected({})}
-            title="Auswahl aufheben"
-          />
-        </div>
+        <ListBulkBar
+          selectedCount={selectedCount}
+          onClear={() => setSelected({})}
+          onExport={bulkExport}
+          onDelete={() => setBulkDeleteOpen(true)}
+          onToggleAll={toggleAll}
+          allSelected={allSelected}
+          onEdit={openBearbeitenBulk}
+          deleteDisabled={bulkDeletePending || pending}
+          deletePending={bulkDeletePending}
+        />
       ) : null}
 
       <MockModal

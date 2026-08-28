@@ -28,7 +28,6 @@ import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
@@ -406,23 +405,21 @@ export function AngebotDetailPageClient({
       ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
       : undefined
 
-  const statusMenuItems = useMemo((): ActionsMenuItem[] => {
+  const dangerAction = useMemo((): DetailActionDef | null => {
     if (!((statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId)) {
-      return []
+      return null
     }
-    return [
-      {
-        label: 'Ablehnen',
-        danger: true,
-        icon: <MockIcon ctx="btn" n="x" size={16} />,
-        onClick: () => {
-          setAblehnenGrund('')
-          setAblehnenNotiz('')
-          setAblehnenKonkurrenz('')
-          setAblehnenOpen(true)
-        },
+    return {
+      label: 'Ablehnen',
+      icon: 'x',
+      danger: true,
+      onClick: () => {
+        setAblehnenGrund('')
+        setAblehnenNotiz('')
+        setAblehnenKonkurrenz('')
+        setAblehnenOpen(true)
       },
-    ]
+    }
   }, [statusEinfach, auftragId])
 
   const kundeEmail =
@@ -734,7 +731,7 @@ export function AngebotDetailPageClient({
             sheetTitle="Angebot"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={statusMenuItems}
+            danger={dangerAction}
           />
         ),
       }}

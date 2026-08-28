@@ -218,7 +218,7 @@ export function AuftragAbnahmeprotokollCard({
           {offeneMaengel > 0 ? (
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="tool"
               onClick={() => router.push(`/auftraege/${auftragId}/abnahme/maengel`)}
             >

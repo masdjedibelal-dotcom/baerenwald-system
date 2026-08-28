@@ -34,6 +34,7 @@ import { anlageToInput } from '@/lib/objektakte/types'
 import type { Gewerk } from '@/lib/types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
+import { LIST } from '@/lib/crm-labels'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
@@ -237,7 +238,7 @@ export function ObjektAnlagenSection({
                 <MockBadge kind={badgeKind}>{statusLabel}</MockBadge>
               </div>
               <div className="ap-mobile-card__meta">
-                <span className="chip">{gewerkName}</span>
+                <span className="meta-tag">{gewerkName}</span>
               </div>
               <div className="ap-mobile-card__meta">
                 {[a.standort?.trim(), count ? `${count} Vorgänge` : 'Keine Vorgänge']
@@ -249,7 +250,7 @@ export function ObjektAnlagenSection({
             <>
               <span className="ap-list__name-cell">{a.bezeichnung}</span>
               <span>
-                <span className="chip">{gewerkName}</span>
+                <span className="meta-tag">{gewerkName}</span>
               </span>
               <span className="ap-list__dim">{a.standort?.trim() || '—'}</span>
               <span className="ap-list__dim">{count}</span>
@@ -281,7 +282,7 @@ export function ObjektAnlagenSection({
         icon="tool"
         actions={
           <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
-            Hinzufügen
+            {LIST.hinzufuegen}
           </MockBtn>
         }
       >
@@ -314,7 +315,7 @@ export function ObjektAnlagenSection({
                   {a.bezeichnung}
                 </button>
                 <div>
-                  <span className="chip">{a.gewerke?.name ?? '—'}</span>
+                  <span className="meta-tag">{a.gewerke?.name ?? '—'}</span>
                 </div>
                 <div className="lc-sub" style={{ color: 'var(--text-2)' }}>
                   {a.standort?.trim() || '—'}
@@ -374,7 +375,7 @@ export function ObjektAnlagenSection({
             <div className="card">
               <div className="card-b space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="chip">{detail.gewerke?.name ?? '—'}</span>
+                  <span className="meta-tag">{detail.gewerke?.name ?? '—'}</span>
                   <MockBadge kind={OBJEKT_ANLAGE_STATUS_BADGE[detail.status]}>
                     {OBJEKT_ANLAGE_STATUS_LABELS[detail.status]}
                   </MockBadge>

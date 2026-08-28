@@ -62,7 +62,7 @@ export function PortalLoginIconButton({
     <button
       type="button"
       className={cn(
-        withLabel ? 'vgid-chip ghost portal-login-chip' : 'qa-btn portal-login-icon',
+        withLabel ? 'vgid-portal__login' : 'qa-btn portal-login-icon',
         className
       )}
       aria-label={label}
@@ -71,9 +71,9 @@ export function PortalLoginIconButton({
       onClick={() => void open()}
     >
       <MockIcon
-        ctx={withLabel ? 'default' : 'row'}
-        n={hid ? 'users' : 'user'}
-        size={withLabel ? 22 : 18}
+        ctx={withLabel ? 'btn' : 'row'}
+        n="log-in"
+        size={withLabel ? 15 : 18}
       />
       {withLabel ? <span>Login</span> : null}
     </button>

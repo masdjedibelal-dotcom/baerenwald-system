@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { befundVorlageLabelDe } from '@/lib/anfragen/befund-vorlage-label'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { CHECKLISTE } from '@/lib/crm-labels'
 import { createClient } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { toneToMockBadgeKind } from '@/lib/status/status-tone'
+import type { StatusTone } from '@/lib/status/status-tone'
 
 type Punkt = {
   id: string
@@ -30,12 +34,12 @@ function statusLabel(s: string | null): string | null {
   return null
 }
 
-function ergebnisMeta(s: string | null): { label: string; tone: 'yel' | 'grn' | 'red' | 'muted' } {
-  if (s === 'selbst_erledigt') return { label: 'Selbst erledigt', tone: 'grn' }
-  if (s === 'fachfirma_angebot') return { label: 'Fachfirma — Angebot', tone: 'yel' }
-  if (s === 'fachfirma_akut') return { label: 'Fachfirma — Akut', tone: 'red' }
-  if (s?.trim()) return { label: s.trim(), tone: 'muted' }
-  return { label: 'Prüfung läuft', tone: 'muted' }
+function ergebnisMeta(s: string | null): { label: string; tone: StatusTone } {
+  if (s === 'selbst_erledigt') return { label: 'Selbst erledigt', tone: 'gruen' }
+  if (s === 'fachfirma_angebot') return { label: 'Fachfirma — Angebot', tone: 'blau' }
+  if (s === 'fachfirma_akut') return { label: 'Fachfirma — Akut', tone: 'rot' }
+  if (s?.trim()) return { label: s.trim(), tone: 'grau' }
+  return { label: 'Prüfung läuft', tone: 'grau' }
 }
 
 function punktIstAusgefuellt(p: Punkt): boolean {
@@ -48,10 +52,18 @@ function formatDatum(iso: string): string {
   return d.toLocaleDateString('de-DE')
 }
 
-/** Read-only HM-Vorbefund am CRM-Anfrage-Detail — nur wenn Inhalt (Ergebnis oder Punkte). */
-export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
+/** Read-only HM-Checkliste am CRM-Anfrage-Detail. */
+export function LeadBefundCrmCard({
+  leadId,
+  hvMeldungStatus,
+}: {
+  leadId: string
+  hvMeldungStatus?: string | null
+}) {
   const [befund, setBefund] = useState<Befund | null>(null)
   const [loaded, setLoaded] = useState(false)
+
+  const hv = String(hvMeldungStatus ?? '').trim().toLowerCase()
 
   useEffect(() => {
     let cancelled = false
@@ -109,7 +121,25 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
     befund && ((befund.ergebnis ?? '').trim() || ausgefuellt.length > 0)
   )
 
-  if (!loaded || !befund || !hatInhalt) return null
+  if (!loaded) return null
+
+  if (hv === 'hm_pruefung' && !befund?.ergebnis) {
+    return (
+      <MockCard
+        title={CHECKLISTE.tab}
+        icon="clipboard-check"
+        actions={
+          <MockBadge kind="plain">{CHECKLISTE.laeuft}</MockBadge>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+          {CHECKLISTE.warteHvHint}
+        </p>
+      </MockCard>
+    )
+  }
+
+  if (!befund || !hatInhalt) return null
 
   const ergebnis = ergebnisMeta(befund.ergebnis)
   const vorlageLabel = befundVorlageLabelDe(befund.vorlage_key)
@@ -120,82 +150,46 @@ export function LeadBefundCrmCard({ leadId }: { leadId: string }) {
   ].filter(Boolean)
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">Hausmeister-Vorbefund</div>
-        <span className={cn('hvk-badge', `hvk-badge--${ergebnis.tone}`)}>{ergebnis.label}</span>
-      </div>
-      <div className="card-b">
-        {metaParts.length > 0 ? (
-          <p
-            style={{
-              margin: '0 0 12px',
-              fontSize: 'var(--fs-meta)',
-              color: 'var(--text-3)',
-            }}
-          >
-            {metaParts.join(' · ')}
-          </p>
-        ) : null}
+    <MockCard
+      title={CHECKLISTE.ergebnis}
+      icon="clipboard-check"
+      actions={
+        <MockBadge kind={toneToMockBadgeKind(ergebnis.tone)}>{ergebnis.label}</MockBadge>
+      }
+    >
+      {metaParts.length > 0 ? (
+        <p
+          style={{
+            margin: '0 0 12px',
+            fontSize: 'var(--fs-meta)',
+            color: 'var(--text-3)',
+          }}
+        >
+          {metaParts.join(' · ')}
+        </p>
+      ) : null}
 
-        {ausgefuellt.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-            Noch keine Prüfpunkte ausgefüllt.
-          </p>
-        ) : (
-          <div className="detail-soft-block">
-            <div className="props">
-              {ausgefuellt.map((p) => {
-                const st = statusLabel(p.status)
-                const notiz = p.notiz.trim()
-                const valueParts = [st, notiz].filter(Boolean)
-                return (
-                  <div key={p.id} className="prop">
-                    <div className="prop-l">{p.titel}</div>
-                    <div className="prop-v">
-                      {valueParts.length > 0 ? valueParts.join(' — ') : null}
-                      {p.foto_refs.length > 0 ? (
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 6,
-                            marginTop: valueParts.length ? 6 : 0,
-                          }}
-                        >
-                          {p.foto_refs.map((url) => (
-                            <a
-                              key={url}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'block',
-                                width: 48,
-                                height: 48,
-                                overflow: 'hidden',
-                                borderRadius: 'var(--r-md)',
-                                border: '1px solid var(--border)',
-                              }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt=""
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            </a>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+      {ausgefuellt.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+          Noch keine Prüfpunkte ausgefüllt.
+        </p>
+      ) : (
+        <div className="detail-soft-block">
+          <div className="props">
+            {ausgefuellt.map((p) => {
+              const st = statusLabel(p.status)
+              const notiz = p.notiz.trim()
+              const valueParts = [st, notiz].filter(Boolean)
+              return (
+                <div key={p.id} className="prop">
+                  <div className="prop-k">{p.titel}</div>
+                  <div className="prop-v">{valueParts.join(' · ') || '—'}</div>
+                </div>
+              )
+            })}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </MockCard>
   )
 }

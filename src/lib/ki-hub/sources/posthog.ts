@@ -56,6 +56,7 @@ async function posthogQuery(
       },
       body: JSON.stringify(body),
       next: { revalidate: 0 },
+      signal: AbortSignal.timeout(4000),
     })
     const text = await res.text()
     if (!res.ok) {

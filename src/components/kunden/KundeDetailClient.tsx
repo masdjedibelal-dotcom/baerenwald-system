@@ -44,10 +44,9 @@ import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
+import { saveKundeCustomFieldValue, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
-import { runDeleteKunde } from '@/lib/list-actions'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   buildPortalLoginLink,
@@ -139,7 +138,6 @@ export function KundeDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('sie')
 
-  const [spamPending, setSpamPending] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
   const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
     null
@@ -147,29 +145,13 @@ export function KundeDetailClient({
   const istSpam = Boolean(kunde.ist_spam)
 
   const detailMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: istSpam ? 'Spam aufheben' : 'Als Spam markieren',
-        onClick: () => toggleSpam(),
-      },
+    return [
       {
         label: 'Mit anderem Kunden zusammenführen',
         onClick: () => setMergePickerOpen(true),
       },
-      'sep',
-      {
-        label: 'Kunde löschen',
-        danger: true,
-        onClick: () => {
-          runDeleteKunde(kunde.id, router, kundeDisplayName(kunde), async () => {
-            showRouteBusy('Kundenliste…')
-            router.push('/kunden')
-          })
-        },
-      },
     ]
-    return items
-  }, [istSpam, kunde, router])
+  }, [])
 
   useEffect(() => {
     void (async () => {
@@ -185,29 +167,6 @@ export function KundeDetailClient({
   useEffect(() => {
     setKunde(initialKunde)
   }, [initialKunde])
-
-  function toggleSpam() {
-    const next = !istSpam
-    const label = next
-      ? 'Als Spam markieren? Der Kunde kann dann keine Anfragen mehr über den Rechner stellen und sich nicht mehr mit dieser E-Mail anmelden oder registrieren.'
-      : 'Spam-Markierung aufheben? Rechner und Portal-Zugang sind danach wieder möglich.'
-    if (!confirm(label)) return
-    setSpamPending(true)
-    void setKundeSpam(kunde.id, next).then((r) => {
-      setSpamPending(false)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setKunde((k) => ({
-        ...k,
-        ist_spam: next,
-        spam_markiert_am: next ? new Date().toISOString() : null,
-      }))
-      toast.success(next ? 'Als Spam markiert' : 'Spam-Markierung aufgehoben')
-      refresh()
-    })
-  }
 
   function confirmMergeIntoCurrent(other: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>) {
     if (other.id === kunde.id) {

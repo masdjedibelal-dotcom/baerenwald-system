@@ -28,14 +28,11 @@ import {
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
-  deleteRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
-  rechnungDarfGeloeschtWerden,
   rechnungDarfImWizardBearbeitetWerden,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
@@ -577,11 +574,6 @@ export function RechnungDetailClient({
             : `${statusLabel} — Erinnerung nicht verfügbar`
       : undefined
 
-    const loeschbar = rechnungDarfGeloeschtWerden(detail.status)
-    const loeschHint = loeschbar
-      ? undefined
-      : `${statusLabel} — nur Entwürfe löschen`
-
     const items: ActionsMenuItem[] = [
       {
         label: 'PDF öffnen',
@@ -620,34 +612,6 @@ export function RechnungDetailClient({
             },
           ] as ActionsMenuItem[])
         : []),
-      'sep',
-      {
-        label: 'Löschen',
-        icon: <MockIcon ctx="btn" n="trash" size={16} />,
-        danger: true,
-        disabled: !loeschbar,
-        hint: loeschHint,
-        onClick: () => {
-          const nr = detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)
-          confirmDelete(
-            'Rechnung löschen?',
-            async () => {
-              const r = await deleteRechnungEntwurf(detail.id)
-              if (!r.ok) {
-                toast.error(r.message)
-                return
-              }
-              toast.success('Rechnung gelöscht')
-              router.push('/vorgaenge?tab=rechnung')
-              refresh()
-            },
-            {
-              sub: nr,
-              body: 'Entwurf wird endgültig entfernt.',
-            }
-          )
-        },
-      },
     ]
     return items
   }, [

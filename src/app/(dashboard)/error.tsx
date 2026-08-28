@@ -8,6 +8,16 @@ function isChunkLoadError(error: Error): boolean {
   return msg.includes('ChunkLoadError') || msg.includes('Loading chunk')
 }
 
+function isRscFetchError(error: Error): boolean {
+  const msg = error.message.toLowerCase()
+  return (
+    msg === 'load failed' ||
+    msg.includes('failed to fetch') ||
+    msg.includes('connection closed') ||
+    msg.includes('networkerror')
+  )
+}
+
 function isLocalDevHost(): boolean {
   if (typeof window === 'undefined') return false
   const h = window.location.hostname
@@ -22,6 +32,7 @@ export default function DashboardError({
   reset: () => void
 }) {
   const chunk = isChunkLoadError(error)
+  const rscFetch = isRscFetchError(error)
   const local = isLocalDevHost()
 
   useEffect(() => {
@@ -38,6 +49,11 @@ export default function DashboardError({
       {chunk ? (
         <p className="mt-2 text-sm text-muted">
           Die App wurde gerade aktualisiert. Seite neu laden, dann den Assistenten noch einmal öffnen.
+        </p>
+      ) : rscFetch ? (
+        <p className="mt-2 text-sm text-muted">
+          Die Seite konnte nicht vom Server geladen werden (Timeout oder Verbindung abgebrochen). Bitte
+          Seite neu laden — KPIs und Charts laden dann erneut.
         </p>
       ) : (
         <p className="mt-2 text-sm text-muted">
@@ -78,14 +94,14 @@ export default function DashboardError({
           type="button"
           variant="primary"
           onClick={() => {
-            if (chunk) {
+            if (chunk || rscFetch) {
               window.location.reload()
               return
             }
             reset()
           }}
         >
-          {chunk ? 'Seite neu laden' : 'Erneut versuchen'}
+          {chunk || rscFetch ? 'Seite neu laden' : 'Erneut versuchen'}
         </Button>
         <Button type="button" variant="secondary" onClick={() => (window.location.href = '/')}>
           Zurück zum Dashboard

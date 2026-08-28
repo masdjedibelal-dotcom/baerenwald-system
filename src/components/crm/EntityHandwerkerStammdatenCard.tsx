@@ -96,7 +96,7 @@ export function EntityHandwerkerStammdatenCard({
         <div className="card-h">
           <div className="card-title title">Stammdaten</div>
           {showPencil ? (
-            <MockBtn sm kind="ghost" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
+            <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
           ) : null}
         </div>
         <div className="card-b">
@@ -140,13 +140,15 @@ export function EntityHandwerkerStammdatenCard({
             </div>
           </div>
 
-          <StammdatenPortalZeile
-            handwerkerId={handwerkerId}
-            fallbackEmail={draft.email}
-            gesperrt={portalGesperrt}
-            onInvite={onInvite}
-            variant="vgid"
-          />
+          <div className="stammdaten-footer">
+            <StammdatenPortalZeile
+              handwerkerId={handwerkerId}
+              fallbackEmail={draft.email}
+              gesperrt={portalGesperrt}
+              onInvite={onInvite}
+              variant="vgid"
+            />
+          </div>
         </div>
       </div>
 

@@ -291,13 +291,13 @@ export function ObjektHausmeisterCard({
   const headerActions = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {amObjekt && !amObjekt.isLegacy ? (
-        <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>
+        <MockBtn sm className="danger-outline" disabled={pending} onClick={entfernen}>
           Entfernen
         </MockBtn>
       ) : null}
       <MockBtn
         sm
-        kind={amObjekt && !amObjekt.isLegacy ? 'ghost' : 'primary'}
+        kind={amObjekt && !amObjekt.isLegacy ? 'secondary' : 'primary'}
         icon={amObjekt && !amObjekt.isLegacy ? undefined : 'plus'}
         onClick={openSheet}
         disabled={pending}

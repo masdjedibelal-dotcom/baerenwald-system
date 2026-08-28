@@ -725,6 +725,12 @@ export function AngebotWizard({
     }
   }, [deferredLeadCreate, angebotId])
 
+  useEffect(() => {
+    return () => {
+      void discardSessionLeadIfOrphan()
+    }
+  }, [discardSessionLeadIfOrphan])
+
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!kundeId) {
@@ -1609,7 +1615,7 @@ export function AngebotWizard({
     !typConfirmed ? (
       <EditorSheet
         open
-        onClose={onClose}
+        onClose={handleRequestClose}
         title={typGateStep === 'layout' ? 'Angebotslayout' : 'Art der Leistung'}
         context="canvas"
         manageHistory={false}

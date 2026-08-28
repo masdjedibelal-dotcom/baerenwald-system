@@ -22,3 +22,33 @@ export const CTA = {
 
 /** Lead-Status `abgebrochen` → Vertriebs-Sprache. */
 export const LEAD_ABGEBROCHEN_LABEL = 'Verloren'
+
+export const LIST = {
+  hinzufuegen: 'Hinzufügen',
+  hochladen: 'Hochladen',
+  export: 'Export',
+  loeschen: 'Löschen',
+  bearbeiten: 'Bearbeiten',
+  oeffnen: 'Öffnen',
+  duplizieren: 'Duplizieren',
+  speichern: 'Speichern',
+  alle: 'Alle',
+  keine: 'Keine',
+} as const
+
+export const DOC = {
+  dokumente: 'Dokumente',
+  berichtErstellen: 'Bericht erstellen',
+  uploadHint: 'Dateien hier ablegen oder klicken',
+  emptyTitle: 'Keine Dokumente',
+  emptyHint: 'Dateien über „Hochladen“ oder per Drag & Drop ablegen.',
+} as const
+
+export const CHECKLISTE = {
+  tab: 'Checkliste',
+  laeuft: 'Läuft',
+  warteHv: 'Warte auf Hausmeister-Prüfung',
+  warteHvHint:
+    'Der Hausmeister prüft vor Ort. Ergebnis und dokumentierte Punkte erscheinen hier nach Abschluss.',
+  ergebnis: 'Checkliste — Ergebnis',
+} as const

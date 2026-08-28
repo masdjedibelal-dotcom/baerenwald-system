@@ -6,6 +6,7 @@ import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerk
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
+  orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail, AngebotPosition, AngebotStatus } from '@/lib/types'
@@ -76,13 +77,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   if (body.typ === 'kunde') {
-    if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)) {
+    const orgFreigabe = orgFreigabeKundenversandOptsFromLead(
+      detail.leads as {
+        org_freigabe_status?: string | null
+        hv_meldung_status?: string | null
+        freigabe_bypass_grund?: string | null
+        funnel_daten?: unknown
+      } | null
+    )
+    if (!darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status, orgFreigabe)) {
       return NextResponse.json(
-        { error: handwerkerSendenBlockierHinweis(
-          detail.angebot_handwerker,
-          (detail.leads as { org_freigabe_status?: string } | null | undefined)
-            ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
-        ) },
+        {
+          error: handwerkerSendenBlockierHinweis(
+            detail.angebot_handwerker,
+            orgFreigabe?.orgStatus,
+            orgFreigabe?.hvMeldungStatus,
+            orgFreigabe
+          ),
+        },
         { status: 400 }
       )
     }

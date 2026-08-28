@@ -1,7 +1,54 @@
 import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
-import { orgFreigabeBlockiertPartner, orgFreigabePartnerBlockMessage } from '@/lib/org/org-portal-helpers'
+import {
+  orgFreigabeBlockiertPartner,
+  orgFreigabeKundenversandBlockMessage,
+  orgFreigabePartnerBlockMessage,
+} from '@/lib/org/org-portal-helpers'
 import { ohnePartnerLvZuweisungen } from '@/lib/angebote/partner-einholung'
+
+export type OrgFreigabeKundenversandOpts = {
+  orgStatus?: OrgFreigabeStatus | null
+  hvMeldungStatus?: string | null
+  freigabeBypassGrund?: string | null
+  funnelDirektauftrag?: boolean
+}
+
+export function orgFreigabeKundenversandOptsFromLead(
+  lead:
+    | {
+        org_freigabe_status?: string | null
+        hv_meldung_status?: string | null
+        freigabe_bypass_grund?: string | null
+        funnel_daten?: unknown
+      }
+    | null
+    | undefined
+): OrgFreigabeKundenversandOpts | undefined {
+  if (!lead) return undefined
+  const funnel =
+    lead.funnel_daten &&
+    typeof lead.funnel_daten === 'object' &&
+    !Array.isArray(lead.funnel_daten)
+      ? (lead.funnel_daten as { direktauftrag?: unknown })
+      : null
+  return {
+    orgStatus: lead.org_freigabe_status as OrgFreigabeStatus | undefined,
+    hvMeldungStatus: lead.hv_meldung_status,
+    freigabeBypassGrund: lead.freigabe_bypass_grund,
+    funnelDirektauftrag: funnel?.direktauftrag === true,
+  }
+}
+
+/** HV-Freigabe fehlt — außer Akut / Notmaßnahme. */
+export function orgFreigabeBlockiertKundenversand(
+  opts: OrgFreigabeKundenversandOpts | null | undefined
+): boolean {
+  if (!opts) return false
+  const bypass = (opts.freigabeBypassGrund ?? '').trim().toLowerCase()
+  if (bypass === 'akut' || opts.funnelDirektauftrag === true) return false
+  return orgFreigabeBlockiertPartner(opts.orgStatus, opts.hvMeldungStatus)
+}
 
 export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undefined): boolean {
   return ohnePartnerLvZuweisungen(rows).length > 0
@@ -50,8 +97,10 @@ function zuweisungenMitLv(rows: AngebotHandwerkerRow[] | null | undefined): Ange
 
 export function darfAngebotAnKundeSenden(
   rows: AngebotHandwerkerRow[] | null | undefined,
-  angebotStatus?: string | null
+  angebotStatus?: string | null,
+  orgFreigabe?: OrgFreigabeKundenversandOpts
 ): boolean {
+  if (orgFreigabeBlockiertKundenversand(orgFreigabe)) return false
   const list = zuweisungenMitLv(rows)
   if (!list.length) return true
   if (angebotStatus === 'handwerker_akzeptiert') return true
@@ -75,11 +124,32 @@ export function orgFreigabeBlockierHinweis(
 export function handwerkerSendenBlockierHinweis(
   rows: AngebotHandwerkerRow[] | null | undefined,
   orgStatus?: OrgFreigabeStatus | null,
-  hvMeldungStatus?: string | null
+  hvMeldungStatus?: string | null,
+  orgFreigabe?: OrgFreigabeKundenversandOpts
 ): string {
-  const orgHinweis = orgFreigabeBlockierHinweis(orgStatus, hvMeldungStatus)
-  if (orgHinweis) return orgHinweis
+  const orgOpts =
+    orgFreigabe ??
+    (orgStatus != null || hvMeldungStatus != null
+      ? { orgStatus, hvMeldungStatus }
+      : undefined)
   const list = zuweisungenMitLv(rows)
+  if (orgFreigabeBlockiertPartner(orgOpts?.orgStatus, orgOpts?.hvMeldungStatus)) {
+    if (
+      !list.length &&
+      orgFreigabeBlockiertKundenversand(orgOpts)
+    ) {
+      const kundenMsg = orgFreigabeKundenversandBlockMessage(
+        orgOpts?.orgStatus,
+        orgOpts?.hvMeldungStatus
+      )
+      if (kundenMsg) return kundenMsg
+    }
+    const partnerMsg = orgFreigabePartnerBlockMessage(
+      orgOpts?.orgStatus,
+      orgOpts?.hvMeldungStatus
+    )
+    if (partnerMsg) return partnerMsg
+  }
   if (!list.length) {
     return 'Bitte zuerst Handwerker zuweisen und Partner-Angebot einholen.'
   }

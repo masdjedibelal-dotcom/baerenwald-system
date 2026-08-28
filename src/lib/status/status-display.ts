@@ -60,9 +60,18 @@ export const ANFRAGE_WARTE_AUF_HV_LABEL = 'Gesendet'
 /** Nutzer-sichtbares Label + semantische Farbe für Anfrage (Lead). */
 export function anfrageStatusDisplay(
   status: LeadStatus | string,
-  _opts?: { orgFreigabeStatus?: OrgFreigabeStatus | string | null }
+  opts?: {
+    orgFreigabeStatus?: OrgFreigabeStatus | string | null
+    hvMeldungStatus?: string | null
+  }
 ): StatusDisplay {
-  void _opts
+  const hv = String(opts?.hvMeldungStatus ?? '')
+    .trim()
+    .toLowerCase()
+  if (hv === 'hm_erledigt') {
+    return { label: 'Vom Hausmeister erledigt', variant: 'success' }
+  }
+  void opts?.orgFreigabeStatus
   const key = String(status ?? '')
     .trim()
     .toLowerCase() as LeadStatus

@@ -23,7 +23,9 @@ import {
 } from '@/components/ui/DokumenteVorgangAccordions'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { DOC } from '@/lib/crm-labels'
 import { cn } from '@/lib/utils'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 
 type DocRow = {
   id: string
@@ -597,17 +599,15 @@ export function KundenDokumenteTab({
               }}
             >
               <MockIcon ctx="btn" n="cloud-upload" size={18} />
-              {uploading ? 'Wird hochgeladen…' : 'Dateien hier ablegen oder klicken'}
+              {uploading ? 'Wird hochgeladen…' : DOC.uploadHint}
             </div>
           </>
         ) : null}
 
         {docs.length === 0 ? (
-          <p className="py-4 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
-            {isMobile
-              ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.'
-              : 'Noch keine Dokumente.'}
-          </p>
+          isMobile ? (
+            <MockEmpty icon="files" title={DOC.emptyTitle} hint={DOC.emptyHint} />
+          ) : null
         ) : (
           <DokumenteVorgangAccordions groups={groups} renderItems={renderDocList} />
         )}

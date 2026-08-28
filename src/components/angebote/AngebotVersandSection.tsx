@@ -18,6 +18,7 @@ import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
   handwerkerZuweisungAktiv,
+  orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { betragAnzeige } from '@/lib/angebot-einfach'
@@ -138,6 +139,18 @@ export function AngebotVersandSection({
   )
   const orgFreigabeStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
     ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
+  const orgFreigabe = useMemo(
+    () =>
+      orgFreigabeKundenversandOptsFromLead(
+        detail.leads as {
+          org_freigabe_status?: string | null
+          hv_meldung_status?: string | null
+          freigabe_bypass_grund?: string | null
+          funnel_daten?: unknown
+        } | null
+      ),
+    [detail.leads]
+  )
   const titel =
     angebotTitel?.trim() ||
     detail.notizen?.trim()?.slice(0, 80) ||
@@ -182,7 +195,7 @@ export function AngebotVersandSection({
     detail.status === 'gesendet_kunde' ||
     String(detail.status_einfach ?? '').trim().toLowerCase() === 'gesendet'
   const kannAnKunde =
-    darfAngebotAnKundeSenden(rows, detail.status) &&
+    darfAngebotAnKundeSenden(rows, detail.status, orgFreigabe) &&
     statusOk &&
     Boolean(kundeEmail)
 
@@ -352,8 +365,13 @@ export function AngebotVersandSection({
           <p className="text-[length:var(--fs-text)] text-muted">
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
-              : !darfAngebotAnKundeSenden(rows, detail.status)
-                ? handwerkerSendenBlockierHinweis(rows, orgFreigabeStatus)
+              : !darfAngebotAnKundeSenden(rows, detail.status, orgFreigabe)
+                ? handwerkerSendenBlockierHinweis(
+                    rows,
+                    orgFreigabeStatus,
+                    orgFreigabe?.hvMeldungStatus,
+                    orgFreigabe
+                  )
                 : 'E-Mail-Versand möglich, sobald das Angebot gespeichert ist.'}
           </p>
         )}

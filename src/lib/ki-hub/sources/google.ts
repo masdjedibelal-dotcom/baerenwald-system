@@ -47,6 +47,7 @@ export async function fetchGscSummary(range?: {
           rowLimit: 10,
         }),
         next: { revalidate: 0 },
+        signal: AbortSignal.timeout(4000),
       }
     )
 

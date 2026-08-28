@@ -12,6 +12,7 @@ import {
   ORG_MELDE_LEGAL_REQUIRED_HINT,
 } from '@/lib/org/melde-legal-urls'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
+import { DOC, LIST } from '@/lib/crm-labels'
 import { toast } from '@/components/ui/app-toast'
 
 /**
@@ -148,7 +149,16 @@ export function MeldeLinksCard({
   }
 
   return (
-    <MockCard title="Links" icon="link" className="objekte-links-card">
+    <MockCard
+      title="Links"
+      icon="link"
+      className="objekte-links-card"
+      actions={
+        <MockBtn sm kind="primary" disabled={saving || !dirty} onClick={() => void speichern()}>
+          {saving ? `${LIST.speichern}…` : LIST.speichern}
+        </MockBtn>
+      }
+    >
       <div className="space-y-3" style={{ marginBottom: 12 }}>
         <MockField label="Impressum-URL (Mieter)" required full>
           <input
@@ -187,16 +197,6 @@ export function MeldeLinksCard({
             Beide Links speichern — danach sind Melde-Link, QR und Aushang verfügbar.
           </p>
         ) : null}
-        <div className="flex justify-end">
-          <MockBtn
-            sm
-            kind="primary"
-            disabled={saving || !dirty}
-            onClick={() => void speichern()}
-          >
-            {saving ? 'Speichern…' : 'Speichern'}
-          </MockBtn>
-        </div>
       </div>
 
       {legalReady ? (

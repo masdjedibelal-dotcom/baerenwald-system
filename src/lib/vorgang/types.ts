@@ -54,6 +54,8 @@ export type VorgangLeadInput = {
   situation?: string | null
   funnel_daten?: unknown
   kanal?: string | null
+  erfassung_von?: string | null
+  anlass?: string | null
   org_freigabe_status?: string | null
   hv_meldung_status?: string | null
   freigabe_bypass_grund?: string | null

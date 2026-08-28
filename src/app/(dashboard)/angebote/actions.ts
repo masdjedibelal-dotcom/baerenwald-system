@@ -64,6 +64,7 @@ import { parseHwAnhangStoragePaths } from '@/lib/partner/partner-hw-dokument-typ
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
+  orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
@@ -1768,15 +1769,26 @@ export async function sendAngebotToKunde(
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
   }
+  const orgFreigabe = orgFreigabeKundenversandOptsFromLead(
+    detail.leads as {
+      org_freigabe_status?: string | null
+      hv_meldung_status?: string | null
+      freigabe_bypass_grund?: string | null
+      funnel_daten?: unknown
+    } | null
+  )
   if (
     !options?.skipHandwerkerGate &&
-    !darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)
+    !darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status, orgFreigabe)
   ) {
-    const orgStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
-      ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
     return {
       ok: false as const,
-      message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker, orgStatus),
+      message: handwerkerSendenBlockierHinweis(
+        detail.angebot_handwerker,
+        orgFreigabe?.orgStatus,
+        orgFreigabe?.hvMeldungStatus,
+        orgFreigabe
+      ),
     }
   }
   const istKorrektur = Boolean(options?.statusBeibehalten || detail.gesendet_kunde_at)

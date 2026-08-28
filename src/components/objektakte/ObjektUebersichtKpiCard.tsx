@@ -1,6 +1,7 @@
 'use client'
 
 import { MockBtn, MockUebersichtCard } from '@/components/mock-ui'
+import { DOC } from '@/lib/crm-labels'
 import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
 
 export function ObjektUebersichtKpiCard({
@@ -23,7 +24,7 @@ export function ObjektUebersichtKpiCard({
         <div className="flex flex-wrap gap-2">
           {onBerichtClick ? (
             <MockBtn sm kind="secondary" icon="file-text" onClick={onBerichtClick}>
-              Bericht erstellen
+              {DOC.berichtErstellen}
             </MockBtn>
           ) : null}
         </div>

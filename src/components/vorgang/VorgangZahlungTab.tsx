@@ -735,11 +735,12 @@ export function VorgangZahlungTab({
             canEditPlan ? (
               <MockBtn
                 sm
-                kind="ghost"
+                kind="secondary"
                 icon="plus"
-                title="Abschlagsplan anlegen"
                 onClick={() => setEditorOpen(true)}
-              />
+              >
+                Abschlagsplan
+              </MockBtn>
             ) : null
           }
         >
@@ -761,11 +762,6 @@ export function VorgangZahlungTab({
                 </>
               )}
             </div>
-            {canEditPlan ? (
-              <MockBtn kind="primary" icon="plus" onClick={() => setEditorOpen(true)}>
-                Abschlagsplan anlegen
-              </MockBtn>
-            ) : null}
           </div>
           {afterTable}
         </MockCard>
@@ -796,11 +792,13 @@ export function VorgangZahlungTab({
           canEditPlan ? (
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="pencil"
               title="Abschlagsplan bearbeiten"
               onClick={() => setEditorOpen(true)}
-            />
+            >
+              Bearbeiten
+            </MockBtn>
           ) : variant === 'angebot' ? (
             <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>Vorschlag</span>
           ) : null

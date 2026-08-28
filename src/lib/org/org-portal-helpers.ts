@@ -35,6 +35,21 @@ export function orgFreigabePartnerBlockMessage(
   return 'Wartet auf Org-Freigabe — Partner-Anfrage kann erst nach Freigabe gesendet werden.'
 }
 
+/** Hinweis wenn Kundenversand wegen fehlender HV-Freigabe blockiert ist. */
+export function orgFreigabeKundenversandBlockMessage(
+  status: OrgFreigabeStatus | null | undefined,
+  hvMeldungStatus?: string | null
+): string | null {
+  if (!orgFreigabeBlockiertPartner(status, hvMeldungStatus)) return null
+  if (status === 'abgelehnt') {
+    return 'Organisation hat die Freigabe abgelehnt — Versand an den Kunden ist blockiert.'
+  }
+  if (status === 'beschluss_ausstehend') {
+    return 'Wartet auf Eigentümerbeschluss — Versand an den Kunden erst nach Freigabe.'
+  }
+  return 'Wartet auf HV-Freigabe — Versand an den Kunden erst nach Freigabe erteilen.'
+}
+
 export const ANLASS_LABELS: Record<string, string> = {
   meldung: 'Meldung',
   projekt: 'Projekt',

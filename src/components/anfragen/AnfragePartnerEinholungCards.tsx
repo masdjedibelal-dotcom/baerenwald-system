@@ -1,20 +1,17 @@
 'use client'
+import { useState } from 'react'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
 import { getHandwerkerEinreichungPdfUrl, loescheHandwerkerAnfrage } from '@/app/(dashboard)/angebote/actions'
-import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import type { AnfragePartnerEinholungRow } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
+import { LvAnfrageDetailSheet } from '@/components/anfragen/LvAnfrageDetailSheet'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { darfPartnerLvAnfrageLoeschen } from '@/lib/angebote/partner-einholung'
-import {
-  hasHwEinreichung,
-  hwStatusBadgeClass,
-  hwStatusLabel,
-} from '@/lib/partner/handwerker-einreichung'
-import { parseHwKonditionen } from '@/lib/partner/hw-konditionen'
-import { parseHwAnhangStoragePaths } from '@/lib/partner/partner-hw-dokument-typen'
+import { hasHwEinreichung, hwStatusLabel } from '@/lib/partner/handwerker-einreichung'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import type { StatusTone } from '@/lib/status/status-tone'
 import { cn } from '@/lib/utils'
 
 function statusLabel(z: AnfragePartnerEinholungRow): string {
@@ -27,118 +24,100 @@ function statusLabel(z: AnfragePartnerEinholungRow): string {
   return 'Ausstehend'
 }
 
-function statusClass(z: AnfragePartnerEinholungRow): string {
-  if (hasHwEinreichung(z)) return hwStatusBadgeClass(z.hw_status)
-  const st = (z.status ?? '').toLowerCase()
-  if (st === 'angefragt') return 'bg-blue-100 text-blue-900'
-  if (st === 'abgelehnt') return 'bg-red-100 text-red-900'
-  return 'bg-bw-bg-soft text-bw-text-muted'
+function statusForBadge(z: AnfragePartnerEinholungRow): {
+  status: string
+  label: string
+  tone?: StatusTone
+} {
+  if (hasHwEinreichung(z)) {
+    const hw = (z.hw_status ?? 'eingereicht').toLowerCase()
+    const toneByHw: Record<string, StatusTone> = {
+      eingereicht: 'blau',
+      bestaetigt: 'blau',
+      uebernommen: 'gruen',
+      abgelehnt: 'rot',
+      rueckfrage: 'blau',
+      offen: 'grau',
+    }
+    return {
+      status: hw,
+      label: statusLabel(z),
+      tone: toneByHw[hw] ?? 'grau',
+    }
+  }
+  const st = (z.status ?? 'ausstehend').toLowerCase()
+  if (st === 'ausstehend') return { status: 'offen', label: 'Ausstehend' }
+  return { status: st, label: statusLabel(z) }
 }
 
-function EinholungCard({
+function EinholungRow({
   z,
+  onOpen,
   onDeleted,
 }: {
   z: AnfragePartnerEinholungRow
+  onOpen: () => void
   onDeleted?: () => void
 }) {
   const [pending, startTransition] = useLocalTransition()
-  const eingereicht = hasHwEinreichung(z)
   const kannLoeschen = darfPartnerLvAnfrageLoeschen(z)
-  const konditionen = parseHwKonditionen(z.hw_konditionen)
-  const unterlagePaths = parseHwAnhangStoragePaths(
-    z.hw_angebot_anhang_urls,
-    z.hw_angebot_pdf_url
-  )
   const name =
     (z.handwerker as { firma?: string | null } | null)?.firma?.trim() ||
     z.handwerker?.name?.trim() ||
     'Handwerker'
+  const badge = statusForBadge(z)
+  const eingereicht = hasHwEinreichung(z)
 
-  function openPdf(index: number) {
+  function loeschen(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (
+      !window.confirm(
+        `LV-Anfrage an ${name} löschen? Der Vorgang verschwindet auch im Partner-Portal.`
+      )
+    ) {
+      return
+    }
     startTransition(async () => {
-      const res = await getHandwerkerEinreichungPdfUrl(z.id, 'angebot', index)
+      const res = await loescheHandwerkerAnfrage({
+        angebotId: z.angebot_id,
+        zuweisungId: z.id,
+      })
       if (!res.ok) {
         toast.error(res.message)
         return
       }
-      window.open(res.url, '_blank', 'noopener,noreferrer')
+      toast.success('LV-Anfrage gelöscht')
+      onDeleted?.()
     })
   }
 
   return (
-    <Card className="space-y-2 p-4 text-[length:var(--fs-text)]">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-medium text-bw-text">{name}</p>
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+    <li className="lv-anfrage-item">
+      <button
+        type="button"
+        className={cn(
+          'lv-anfrage-row-btn einst-list-item w-full text-left',
+          eingereicht && 'lv-anfrage-row-btn--eingereicht'
+        )}
+        onClick={onOpen}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[length:var(--fs-text)] font-semibold text-[var(--text)]">{name}</div>
+          <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
             {z.gewerke?.name ?? '—'}
-          </p>
+            {eingereicht ? ' · Antwort eingegangen' : ' · Warte auf Partner'}
+          </div>
         </div>
-        <span
-          className={cn(
-            'inline-block rounded-md px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
-            statusClass(z)
-          )}
-        >
-          {statusLabel(z)}
-        </span>
-      </div>
-
-      {eingereicht && konditionen ? (
-        <HwKonditionenPruefungTable z={z} />
-      ) : null}
-
-      {unterlagePaths.length ? (
-        <div className="flex flex-wrap gap-2">
-          {unterlagePaths.map((_, i) => (
-            <Button
-              key={i}
-              type="button"
-              variant="secondary"
-              size="sm"
-              loading={pending}
-              onClick={() => openPdf(i)}
-            >
-              PDF {unterlagePaths.length > 1 ? i + 1 : ''}
-            </Button>
-          ))}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <StatusBadge status={badge.status} label={badge.label} tone={badge.tone} />
+          {kannLoeschen ? (
+            <MockBtn sm className="danger-outline" disabled={pending} onClick={loeschen}>
+              {pending ? '…' : 'Löschen'}
+            </MockBtn>
+          ) : null}
         </div>
-      ) : null}
-
-      {kannLoeschen ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          loading={pending}
-          className="text-danger"
-          onClick={() => {
-            if (
-              !window.confirm(
-                `LV-Anfrage an ${name} löschen? Der Vorgang verschwindet auch im Partner-Portal.`
-              )
-            ) {
-              return
-            }
-            startTransition(async () => {
-              const res = await loescheHandwerkerAnfrage({
-                angebotId: z.angebot_id,
-                zuweisungId: z.id,
-              })
-              if (!res.ok) {
-                toast.error(res.message)
-                return
-              }
-              toast.success('LV-Anfrage gelöscht')
-              onDeleted?.()
-            })
-          }}
-        >
-          LV-Anfrage löschen
-        </Button>
-      ) : null}
-    </Card>
+      </button>
+    </li>
   )
 }
 
@@ -154,29 +133,49 @@ export function AnfragePartnerEinholungCards({
   showCta?: boolean
   onDeleted?: () => void
 }) {
+  const [sheetRow, setSheetRow] = useState<AnfragePartnerEinholungRow | null>(null)
+
   if (!rows.length && !showCta) return null
 
-  const cta = onAnfragen ? (
-    <Button type="button" variant="secondary" size="sm" onClick={onAnfragen}>
-      LV anfragen
-    </Button>
-  ) : null
+  const headerCta =
+    showCta && onAnfragen ? (
+      <MockBtn sm kind="secondary" onClick={onAnfragen}>
+        LV anfragen
+      </MockBtn>
+    ) : null
+
+  const title = rows.length ? `LV-Anfrage · ${rows.length}` : 'LV-Anfrage'
 
   if (!rows.length) {
-    return showCta && cta ? <div>{cta}</div> : null
+    return (
+      <MockCard title={title} icon="send" className="dshell-framed" actions={headerCta}>
+        <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+          Noch keine Partner angefragt — LV per Button oben anstoßen.
+        </p>
+      </MockCard>
+    )
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
-          LV-Anfrage
-        </p>
-        {showCta ? cta : null}
-      </div>
-      {rows.map((z) => (
-        <EinholungCard key={z.id} z={z} onDeleted={onDeleted} />
-      ))}
-    </div>
+    <>
+      <MockCard title={title} icon="send" className="dshell-framed" actions={headerCta}>
+        <ul className="einst-list lv-anfrage-list">
+          {rows.map((z) => (
+            <EinholungRow
+              key={z.id}
+              z={z}
+              onOpen={() => setSheetRow(z)}
+              onDeleted={onDeleted}
+            />
+          ))}
+        </ul>
+      </MockCard>
+
+      <LvAnfrageDetailSheet
+        row={sheetRow}
+        open={Boolean(sheetRow)}
+        onClose={() => setSheetRow(null)}
+      />
+    </>
   )
 }
