@@ -11267,25 +11267,26 @@ body.is-pwa-standalone .topbar {
   }
 }
 
-/* Sticky CTAs: Hybrid — oben ausgeblendet, nach Scroll floating ohne Nav */
+/* Sticky CTAs: Hybrid — nach Scroll volle Leiste mit Blur (wie Bulkbar), nicht schwebende Pills */
 .detail-mobile-action-bar {
   position: fixed;
   left: 0;
   right: 0;
   /* Default (vor Scroll / Fallback): über Bottom-Nav */
   bottom: calc(
-    var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 10px
+    var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px)))
   );
   z-index: 95;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0 20px;
-  background: transparent;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--bg, #f1f2f1) 88%, transparent);
   border: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-top: 0.5px solid color-mix(in srgb, var(--border, #d8ddd9) 85%, transparent);
+  box-shadow: 0 -8px 24px -12px rgba(20, 24, 31, 0.18);
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
   pointer-events: none;
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -11294,9 +11295,10 @@ body.is-pwa-standalone .topbar {
   transform: translateY(0);
   opacity: 1;
 }
-/* Nav ersetzt → CTA sitzt unten am Safe-Area-Rand */
+/* Nav ersetzt → CTA-Leiste am unteren Rand inkl. Safe-Area */
 .detail-mobile-action-bar--nav-replaced {
-  bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 10px);
+  bottom: 0;
+  padding-bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 8px);
 }
 .detail-mobile-action-bar--hidden {
   transform: translateY(110%);
@@ -11358,10 +11360,10 @@ body.is-pwa-standalone .topbar {
   border-radius: 999px !important;
   font-size: var(--fs-text) !important;
   font-weight: 600 !important;
-  background: color-mix(in srgb, var(--card, #fff) 88%, transparent) !important;
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: 0 8px 22px -10px rgba(22, 32, 27, 0.28) !important;
+  background: var(--card, #fff) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(22, 32, 27, 0.06) !important;
 }
 .detail-mobile-action-bar__secondary {
   border: 0.5px solid var(--border-strong, var(--border)) !important;
@@ -11402,15 +11404,14 @@ body.is-pwa-standalone .topbar {
   padding: 0 22px !important;
   gap: 8px !important;
   border-radius: 999px !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.28) !important;
-  /* Apple-ähnliches Glass auf Grün */
-  background: color-mix(in srgb, var(--green, #2e7d52) 82%, transparent) !important;
-  backdrop-filter: blur(22px) saturate(1.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  /* Solide Primary auf Blur-Leiste — kein zweites Floating-Glass */
+  background: var(--green, #2e7d52) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow:
-    0 10px 28px -8px rgba(22, 32, 27, 0.38),
-    0 2px 8px -2px rgba(46, 125, 82, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+    0 2px 8px -2px rgba(46, 125, 82, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
   font-size: var(--fs-title) !important;
   font-weight: 600 !important;
   letter-spacing: -0.01em;
@@ -11426,11 +11427,10 @@ body.is-pwa-standalone .topbar {
     background 180ms ease;
 }
 .detail-mobile-action-bar__primary--solo:hover {
-  background: color-mix(in srgb, var(--green, #2e7d52) 90%, transparent) !important;
+  background: color-mix(in srgb, var(--green, #2e7d52) 92%, #000) !important;
   box-shadow:
-    0 12px 32px -8px rgba(22, 32, 27, 0.42),
-    0 3px 10px -2px rgba(46, 125, 82, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
+    0 3px 10px -2px rgba(46, 125, 82, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
 }
 .detail-mobile-action-bar__primary--solo:active:not(:disabled) {
   transform: scale(0.97);
@@ -11443,11 +11443,13 @@ body.is-pwa-standalone .topbar {
   gap: 6px !important;
   font-size: var(--fs-text) !important;
   box-shadow:
-    0 6px 18px -6px rgba(22, 32, 27, 0.32),
-    0 1px 4px rgba(46, 125, 82, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    0 1px 4px rgba(46, 125, 82, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .detail-mobile-action-bar {
+    background: var(--bg, #f1f2f1);
+  }
   .detail-mobile-action-bar__primary--solo {
     background: var(--green, #2e7d52) !important;
   }
@@ -11474,11 +11476,11 @@ body.is-pwa-standalone .topbar {
   min-height: 52px;
   border-radius: 999px;
   border: 0.5px solid var(--border-strong, var(--border));
-  background: color-mix(in srgb, var(--card, #fff) 88%, transparent);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  background: var(--card, #fff);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   color: var(--text);
-  box-shadow: 0 8px 22px -10px rgba(22, 32, 27, 0.28);
+  box-shadow: 0 1px 2px rgba(22, 32, 27, 0.06);
 }
 
 @media (max-width: 767px) {
@@ -22996,7 +22998,7 @@ button.crow.crow--tap:hover {
 }
 .ap-list__head--select,
 .ap-list__row--select {
-  grid-template-columns: 28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  grid-template-columns: 28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px;
 }
 .ap-list__hit {
   display: contents;

@@ -47,6 +47,7 @@ import { RechnungLeistungenMitBautagebuch } from '@/components/rechnungen/Rechnu
 import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
@@ -207,7 +208,9 @@ export function RechnungDetailClient({
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
-  const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | null>(null)
+  const [rechnungConfirm, setRechnungConfirm] = useState<
+    'gutschrift' | 'bezahlt' | 'unbezahlt' | null
+  >(null)
   const [korrekturWahlOpen, setKorrekturWahlOpen] = useState(false)
 
   useEffect(() => {
@@ -442,32 +445,7 @@ export function RechnungDetailClient({
       return {
         label: cta.label,
         icon: cta.icon,
-        onClick: () => {
-          const nr = detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)
-          const betrag =
-            detail.brutto != null ? formatEurBetrag(detail.brutto) : '—'
-          const titel = isEingehend
-            ? 'Als überwiesen markieren?'
-            : 'Als bezahlt markieren?'
-          const ok = window.confirm(
-            `${titel}\n\n${nr} · ${betrag}\n\n${
-              isEingehend
-                ? 'Die Eingangsrechnung wird als überwiesen verbucht.'
-                : 'Die Rechnung wird als bezahlt verbucht und fließt in Umsatz/KPIs ein.'
-            }`
-          )
-          if (!ok) return
-          void actionBusy.run(
-            isEingehend ? 'Wird als überwiesen markiert…' : 'Wird als bezahlt markiert…',
-            async () => {
-              if (isEingehend) {
-                await setStatus('bezahlt', { notifyPartner: true })
-              } else {
-                await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
-              }
-            }
-          )
-        },
+        onClick: () => setRechnungConfirm('bezahlt'),
         disabled: pending,
       }
     }
@@ -599,16 +577,7 @@ export function RechnungDetailClient({
             {
               label: 'Als unbezahlt markieren',
               icon: <MockIcon ctx="btn" n="arrow-left" size={16} />,
-              onClick: () => {
-                const nr = detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)
-                const ok = window.confirm(
-                  `Bezahlung zurücknehmen?\n\n${nr}\n\nStatus wird auf „Gesendet“ gesetzt, bezahlt_at geleert und der offene Betrag im Zahlplan neu berechnet.`
-                )
-                if (!ok) return
-                void actionBusy.run('Wird zurückgesetzt…', async () => {
-                  await setStatus('gesendet')
-                })
-              },
+              onClick: () => setRechnungConfirm('unbezahlt'),
             },
           ] as ActionsMenuItem[])
         : []),
@@ -995,6 +964,58 @@ export function RechnungDetailClient({
           storniert markiert.
         </p>
       </Modal>
+
+      <ConfirmPopup
+        open={rechnungConfirm === 'bezahlt'}
+        onClose={() => setRechnungConfirm(null)}
+        title={isEingehend ? 'Als überwiesen markieren?' : 'Als bezahlt markieren?'}
+        confirmLabel={isEingehend ? 'Als überwiesen markieren' : 'Als bezahlt markieren'}
+        cancelLabel="Abbrechen"
+        onConfirm={() => {
+          setRechnungConfirm(null)
+          void actionBusy.run(
+            isEingehend ? 'Wird als überwiesen markiert…' : 'Wird als bezahlt markiert…',
+            async () => {
+              if (isEingehend) {
+                await setStatus('bezahlt', { notifyPartner: true })
+              } else {
+                await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
+              }
+            }
+          )
+        }}
+      >
+        <p>
+          {(detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)) +
+            (detail.brutto != null ? ` · ${formatEurBetrag(detail.brutto)}` : '')}
+        </p>
+        <p className="mt-2">
+          {isEingehend
+            ? 'Die Eingangsrechnung wird als überwiesen verbucht.'
+            : 'Die Rechnung wird als bezahlt verbucht und fließt in Umsatz/KPIs ein.'}
+        </p>
+      </ConfirmPopup>
+
+      <ConfirmPopup
+        open={rechnungConfirm === 'unbezahlt'}
+        onClose={() => setRechnungConfirm(null)}
+        title="Bezahlung zurücknehmen?"
+        confirmLabel="Als unbezahlt markieren"
+        cancelLabel="Abbrechen"
+        danger
+        onConfirm={() => {
+          setRechnungConfirm(null)
+          void actionBusy.run('Wird zurückgesetzt…', async () => {
+            await setStatus('gesendet')
+          })
+        }}
+      >
+        <p>{detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)}</p>
+        <p className="mt-2">
+          Status wird auf „Gesendet“ gesetzt, bezahlt_at geleert und der offene Betrag im Zahlplan neu
+          berechnet.
+        </p>
+      </ConfirmPopup>
     </EntityDetailLayout>
   )
 }

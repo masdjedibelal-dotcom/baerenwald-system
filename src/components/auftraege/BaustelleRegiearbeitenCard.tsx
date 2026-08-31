@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createAuftragRegiearbeit,
   deleteAuftragRegiearbeit,
@@ -88,14 +89,14 @@ export function BaustelleRegiearbeitenCard({
   }
 
   function remove(id: string) {
-    if (!confirm('Regiearbeit löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Regiearbeit löschen?', async () => {
       const r = await deleteAuftragRegiearbeit(id, auftragId)
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Regiearbeit gelöscht')
-        onChanged()
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
       }
+      toast.success('Regiearbeit gelöscht')
+      onChanged()
     })
   }
 

@@ -114,11 +114,16 @@ export function normalizeAngebotPosition(
 
   const slugLower = (gewerk_slug ?? '').toLowerCase()
   const leistungLower = leistung.toLowerCase()
-  /** Negativzeilen: Nachlass / Abschlag in Schlussrechnung */
+  /** Negativzeilen: Nachlass / Abschlag / Storno-Gutschrift (bereits negierte Beträge). */
   const erlaubtNegativ =
     slugLower === ZEILE_SLUG_GESAMTRABATT ||
     slugLower === 'abschlag_abzug' ||
-    leistungLower.startsWith('abzüglich')
+    leistungLower.startsWith('abzüglich') ||
+    num(r.lohn_netto) < 0 ||
+    num(r.material_netto) < 0 ||
+    num(r.vk_netto) < 0 ||
+    num(r.gesamt_min) < 0 ||
+    num(r.gesamt_max) < 0
 
   if (slugLower === ZEILE_SLUG_GESAMTRABATT) {
     const beschRaw = r.beschreibung != null ? String(r.beschreibung).trim() : ''

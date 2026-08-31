@@ -1,8 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { getHandwerkerEinreichungPdfUrl, loescheHandwerkerAnfrage } from '@/app/(dashboard)/angebote/actions'
 import type { AnfragePartnerEinholungRow } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { LvAnfrageDetailSheet } from '@/components/anfragen/LvAnfrageDetailSheet'
@@ -59,7 +59,6 @@ function EinholungRow({
   onOpen: () => void
   onDeleted?: () => void
 }) {
-  const [pending, startTransition] = useLocalTransition()
   const kannLoeschen = darfPartnerLvAnfrageLoeschen(z)
   const name =
     (z.handwerker as { firma?: string | null } | null)?.firma?.trim() ||
@@ -70,25 +69,24 @@ function EinholungRow({
 
   function loeschen(e: React.MouseEvent) {
     e.stopPropagation()
-    if (
-      !window.confirm(
-        `LV-Anfrage an ${name} löschen? Der Vorgang verschwindet auch im Partner-Portal.`
-      )
-    ) {
-      return
-    }
-    startTransition(async () => {
-      const res = await loescheHandwerkerAnfrage({
-        angebotId: z.angebot_id,
-        zuweisungId: z.id,
-      })
-      if (!res.ok) {
-        toast.error(res.message)
-        return
+    confirmDelete(
+      'LV-Anfrage löschen?',
+      async () => {
+        const res = await loescheHandwerkerAnfrage({
+          angebotId: z.angebot_id,
+          zuweisungId: z.id,
+        })
+        if (!res.ok) {
+          toast.error(res.message)
+          throw new Error(res.message)
+        }
+        toast.success('LV-Anfrage gelöscht')
+        onDeleted?.()
+      },
+      {
+        body: `LV-Anfrage an ${name} löschen? Der Vorgang verschwindet auch im Partner-Portal.`,
       }
-      toast.success('LV-Anfrage gelöscht')
-      onDeleted?.()
-    })
+    )
   }
 
   return (
@@ -111,8 +109,8 @@ function EinholungRow({
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <StatusBadge status={badge.status} label={badge.label} tone={badge.tone} />
           {kannLoeschen ? (
-            <MockBtn sm className="danger-outline" disabled={pending} onClick={loeschen}>
-              {pending ? '…' : 'Löschen'}
+            <MockBtn sm className="danger-outline" onClick={loeschen}>
+              Löschen
             </MockBtn>
           ) : null}
         </div>

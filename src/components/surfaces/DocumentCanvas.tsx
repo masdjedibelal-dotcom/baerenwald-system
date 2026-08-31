@@ -8,7 +8,7 @@ import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
-import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
+import { editorSheetStackDepth, shouldIgnoreSuppressedEditorSheetPop } from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
 
 export type DocumentCanvasProps = {
@@ -144,39 +144,55 @@ export function DocumentCanvas({
 
   useEffect(() => {
     if (!open || !mounted || !portal) return
-    const trackHistory = manageHistory || draftDirty
-    if (!trackHistory) return
-    window.history.pushState({ documentCanvas: true }, '')
-    historyPushed.current = true
+
     const onPop = (e: PopStateEvent) => {
+      if (shouldIgnoreSuppressedEditorSheetPop()) return
       // Sheet geschlossen → wir landen wieder auf Canvas-State → offen lassen
-      const st = e.state as { documentCanvas?: boolean } | null
+      const st = e.state as { documentCanvas?: boolean; editorSheet?: string } | null
       if (st?.documentCanvas) {
         historyPushed.current = true
         return
       }
+      // Offenes EditorSheet (Kunde/Kontakt/…) besitzt den Back — Canvas nicht stehlen
       if (editorSheetStackDepth() > 0) return
-      if (draftDirtyRef.current) {
-        const ok = window.confirm(
-          'Änderungen verwerfen? Ungespeicherte Eingaben gehen verloren.'
-        )
-        if (!ok) {
-          window.history.pushState({ documentCanvas: true }, '')
-          historyPushed.current = true
-          return
-        }
-      }
-      historyPushed.current = false
+
+      /*
+       * History-Eintrag ist weg (Back). Parent (Wizard) zeigt bei Dirty das
+       * Speichern-Confirm — History wiederherstellen, sonst wirkt „Übernehmen“
+       * im Kind-Sheet wie Wizard-Schließen.
+       */
+      window.history.pushState({ documentCanvas: true }, '')
+      historyPushed.current = true
       handleCloseRef.current()
     }
+
     window.addEventListener('popstate', onPop)
+
+    if (manageHistory || draftDirtyRef.current) {
+      window.history.pushState({ documentCanvas: true }, '')
+      historyPushed.current = true
+    }
+
     return () => {
       window.removeEventListener('popstate', onPop)
       if (historyPushed.current) {
         historyPushed.current = false
-        window.history.back()
+        // Nicht backen solange Sheets offen — sonst schließt deren History den Canvas
+        if (editorSheetStackDepth() === 0) {
+          window.history.back()
+        }
       }
     }
+    // draftDirty absichtlich nicht in deps: sonst Cleanup+back bei Kontakt-Übernehmen
+  }, [open, mounted, portal, manageHistory])
+
+  /* Spät dirty geworden (z. B. Feld geändert) — History nachziehen, ohne Re-Init */
+  useEffect(() => {
+    if (!open || !mounted || !portal || manageHistory) return
+    if (!draftDirty || historyPushed.current) return
+    if (editorSheetStackDepth() > 0) return
+    window.history.pushState({ documentCanvas: true }, '')
+    historyPushed.current = true
   }, [open, mounted, portal, manageHistory, draftDirty])
 
   useOverlayChromeLock(Boolean(open && mounted))

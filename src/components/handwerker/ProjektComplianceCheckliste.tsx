@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import {
   ablehnenPartnerDokument,
@@ -254,15 +255,18 @@ export function ProjektComplianceCheckliste({
   }
 
   function removeDoc(docId: string, titel: string) {
-    if (!confirm(`„${titel}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deletePartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
-      else {
+    confirmDelete(
+      `„${titel}“ löschen?`,
+      async () => {
+        const r = await deletePartnerDokument(docId, handwerkerId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
         toast.success('Gelöscht')
         router.refresh()
       }
-    })
+    )
   }
 
   const busy = pending || uploadingTyp != null

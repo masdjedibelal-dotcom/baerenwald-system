@@ -42,6 +42,7 @@ import { Input } from '@/components/ui/Input'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import { FORMULAR_SUBTYP_OPTIONS } from '@/lib/formular-constants'
@@ -307,15 +308,18 @@ export function FormularTemplateForm({
 
   function onDelete() {
     if (!initial?.id) return
-    if (!confirm('Template deaktivieren? Es wird in der Liste ausgeblendet.')) return
-    startTransition(async () => {
-      const res = await deleteFormularTemplate(initial.id)
-      if (!res.ok) {
-        setErr(res.message)
-        return
-      }
-      router.replace('/formulare')
-    })
+    confirmDelete(
+      'Template deaktivieren?',
+      async () => {
+        const res = await deleteFormularTemplate(initial.id)
+        if (!res.ok) {
+          setErr(res.message)
+          throw new Error(res.message)
+        }
+        router.replace('/formulare')
+      },
+      { body: 'Es wird in der Liste ausgeblendet.' }
+    )
   }
 
   const grundinfoCard = (

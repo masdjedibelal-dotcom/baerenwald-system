@@ -31,12 +31,58 @@ import { buildProjektPdfBloecke } from '@/lib/angebote/angebot-projekt-pdf-block
 import { formatDatum } from '@/lib/utils'
 import { istFreitextPosition } from '@/lib/dokument-zeilen'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
-import { formatKundeEmpfaengerFuerDokument, kundeAnredeKontextFromEmpfaenger, kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
+import {
+  formatRechnungEmpfaengerFuerDokument,
+  kundeAnredeKontextFromEmpfaenger,
+  kundeRechnungsempfaengerAusStammdaten,
+} from '@/lib/kunde-rechnungsempfaenger'
 import { resolveAngebotDurchfuehrungIn } from '@/lib/kunden-objekte'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveAngebotLeistungsumfang } from '@/lib/angebote/resolve-angebot-leistungsumfang'
-import type { AngebotDetail, AngebotPosition, Gewerk } from '@/lib/types'
+import type { AngebotDetail, AngebotPosition, Gewerk, KundenObjekt } from '@/lib/types'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
+
+function firstJoin<T>(raw: T | T[] | null | undefined): T | null {
+  if (raw == null) return null
+  return Array.isArray(raw) ? (raw[0] ?? null) : raw
+}
+
+/** Empfängerblock + Anrede-Kontext — gleiche Logik wie Rechnung (WEG + c/o HV + z. Hd. AP). */
+export function resolveAngebotDokumentEmpfaenger(detail: {
+  kunden?: AngebotDetail['kunden']
+  kunden_objekte?: KundenObjekt | KundenObjekt[] | null
+  ansprechpartner_id?: string | null
+  leads?: { plz?: string | null; kontakt_name?: string | null } | null
+}): {
+  empfaenger: { name: string; adresse: string }
+  anredeKontext: ReturnType<typeof kundeAnredeKontextFromEmpfaenger>
+} {
+  const kunde = detail.kunden
+  if (!kunde) {
+    return {
+      empfaenger: { name: '—', adresse: '—' },
+      anredeKontext: { name: '—', typ: null },
+    }
+  }
+  const apId = detail.ansprechpartner_id?.trim() || null
+  const objekt = firstJoin(detail.kunden_objekte)
+  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(
+    kunde,
+    {
+      plz: detail.leads?.plz ?? null,
+      kontakt_name: detail.leads?.kontakt_name ?? null,
+    },
+    { selectedAnsprechpartnerId: apId }
+  )
+  const empfaenger = formatRechnungEmpfaengerFuerDokument(kunde, {
+    selectedAnsprechpartnerId: apId,
+    objekt,
+  })
+  return {
+    empfaenger,
+    anredeKontext: kundeAnredeKontextFromEmpfaenger(empfaengerStamm),
+  }
+}
 
 function parseVariantenPersist(raw: unknown): AngebotVariantenPersistJson | null {
   if (!raw || typeof raw !== 'object') return null
@@ -193,13 +239,9 @@ export function buildAngebotHtmlInputAusDetail(
     resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
   )
   const wmParsed = parseWizardMetaFromNotizen(detail.notizen)
-  const empfaenger = formatKundeEmpfaengerFuerDokument(kunde, detail.leads?.plz ?? null)
-  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(kunde, {
-    plz: detail.leads?.plz ?? null,
-    kontakt_name: detail.leads?.kontakt_name ?? null,
-  })
+  const { empfaenger, anredeKontext } = resolveAngebotDokumentEmpfaenger(detail)
   const leistungsumfang = resolveLeistungsumfang(detail)
-  const begruessung = angebotPdfBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaengerStamm))
+  const begruessung = angebotPdfBegruessung(anrede, anredeKontext)
   const einleitung = resolveAngebotPdfEinleitung(
     detail.einleitung?.trim() || wmParsed?.einleitung,
     anrede
@@ -231,7 +273,7 @@ export function buildAngebotHtmlInputAusDetail(
     ? buildProjektPdfBloecke(pos, varianten, gewerke, mwstSatz)
     : null
 
-  const verwaltersObjekt = detail.kunden_objekte ?? null
+  const verwaltersObjekt = firstJoin(detail.kunden_objekte)
   const durchfuehrungIn = resolveAngebotDurchfuehrungIn(verwaltersObjekt)
 
   const payload: AngebotHtmlInput = {

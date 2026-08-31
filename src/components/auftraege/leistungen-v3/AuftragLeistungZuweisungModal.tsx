@@ -217,6 +217,25 @@ export function AuftragLeistungZuweisungModal({
           ? displayToYmd(bis)
           : vonYmd
 
+    if (!isAngebotOnly) {
+      if (!vonYmd) {
+        toast.error(
+          zeitModus === 'tag'
+            ? 'Bitte ein Ausführungsdatum angeben.'
+            : 'Bitte den Leistungszeitraum (von) angeben.'
+        )
+        return
+      }
+      if (zeitModus === 'zeitraum' && !bisYmd) {
+        toast.error('Bitte den Leistungszeitraum (bis) angeben.')
+        return
+      }
+      if (vonYmd && bisYmd && bisYmd < vonYmd) {
+        toast.error('„Bis“ darf nicht vor „Von“ liegen.')
+        return
+      }
+    }
+
     dismissKiOverSheet()
     setPickerOpen(false)
 
@@ -285,6 +304,8 @@ export function AuftragLeistungZuweisungModal({
         handwerkerId: primaryHw,
         ekNetto: isSingle ? ekNum : null,
         ekNettoByPositionId: ekByPositionId,
+        startDatum: vonYmd,
+        endDatum: bisYmd,
       })
       if (!assign.ok) {
         toast.error(assign.message)
@@ -490,134 +511,6 @@ export function AuftragLeistungZuweisungModal({
                 </span>
               ) : null}
             </label>
-
-            {!isAngebotOnly ? (
-            <div className="hw-anfrage-section">
-              <div className="hw-anfrage-section-head">
-                <span>Zeitraum</span>
-              </div>
-              <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setDirty(true)
-                    setZeitModus('zeitraum')
-                    if (document.activeElement instanceof HTMLElement) {
-                      document.activeElement.blur()
-                    }
-                  }}
-                  disabled={pending}
-                >
-                  Zeitraum
-                </button>
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setDirty(true)
-                    setZeitModus('tag')
-                    if (von) setBis(von)
-                    /* iOS: Modus-Wechsel darf Date-Picker nicht auto-öffnen */
-                    if (document.activeElement instanceof HTMLElement) {
-                      document.activeElement.blur()
-                    }
-                  }}
-                  disabled={pending}
-                >
-                  Einzelner Tag
-                </button>
-              </div>
-              {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
-              <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
-                <label className="hw-anfrage-field">
-                  <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
-                  <div className="hw-anfrage-date-field">
-                    <input
-                      type="date"
-                      className="input"
-                      value={von.trim() ? displayToYmd(von) : ''}
-                      onChange={(e) => {
-                        setDirty(true)
-                        const v = e.target.value
-                        setVon(v ? ymdToDisplay(v) : '')
-                        if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending}
-                    />
-                    <button
-                      type="button"
-                      className="hw-anfrage-date-icon"
-                      tabIndex={-1}
-                      disabled={pending}
-                      aria-label="Kalender öffnen"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const input = (e.currentTarget.parentElement?.querySelector(
-                          'input[type="date"]'
-                        ) ?? null) as HTMLInputElement | null
-                        try {
-                          input?.showPicker?.()
-                        } catch {
-                          input?.focus()
-                        }
-                      }}
-                    >
-                      <MockIcon ctx="btn" n="calendar" size={15} />
-                    </button>
-                  </div>
-                </label>
-                <label
-                  className={cn(
-                    'hw-anfrage-field',
-                    zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
-                  )}
-                >
-                  <span className="hw-anfrage-label">Bis</span>
-                  <div className="hw-anfrage-date-field">
-                    <input
-                      type="date"
-                      className="input"
-                      value={bis.trim() ? displayToYmd(bis) : ''}
-                      onChange={(e) => {
-                        setDirty(true)
-                        const v = e.target.value
-                        setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending || zeitModus === 'tag'}
-                      tabIndex={zeitModus === 'tag' ? -1 : undefined}
-                    />
-                    <button
-                      type="button"
-                      className="hw-anfrage-date-icon"
-                      tabIndex={-1}
-                      disabled={pending || zeitModus === 'tag'}
-                      aria-label="Kalender öffnen"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const input = (e.currentTarget.parentElement?.querySelector(
-                          'input[type="date"]'
-                        ) ?? null) as HTMLInputElement | null
-                        try {
-                          input?.showPicker?.()
-                        } catch {
-                          input?.focus()
-                        }
-                      }}
-                    >
-                      <MockIcon ctx="btn" n="calendar" size={15} />
-                    </button>
-                  </div>
-                </label>
-              </div>
-            </div>
-            ) : null}
           </>
         ) : (
           <div className="hw-anfrage-section">
@@ -673,6 +566,141 @@ export function AuftragLeistungZuweisungModal({
             ) : null}
           </div>
         )}
+
+        {!isAngebotOnly ? (
+            <div className="hw-anfrage-section">
+              <div className="hw-anfrage-section-head">
+                <span>Leistungszeitraum *</span>
+              </div>
+              <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
+                <button
+                  type="button"
+                  className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setDirty(true)
+                    setZeitModus('zeitraum')
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
+                  }}
+                  disabled={pending}
+                >
+                  Zeitraum
+                </button>
+                <button
+                  type="button"
+                  className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setDirty(true)
+                    setZeitModus('tag')
+                    if (von) setBis(von)
+                    /* iOS: Modus-Wechsel darf Date-Picker nicht auto-öffnen */
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur()
+                    }
+                  }}
+                  disabled={pending}
+                >
+                  Einzelner Tag
+                </button>
+              </div>
+              {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
+              <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
+                <label className="hw-anfrage-field">
+                  <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum *' : 'Von *'}</span>
+                  <div className="hw-anfrage-date-field">
+                    <input
+                      type="date"
+                      className="input"
+                      required
+                      value={von.trim() ? displayToYmd(von) : ''}
+                      onChange={(e) => {
+                        setDirty(true)
+                        const v = e.target.value
+                        setVon(v ? ymdToDisplay(v) : '')
+                        if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
+                      }}
+                      disabled={pending}
+                    />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending}
+                      aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
+                  </div>
+                </label>
+                <label
+                  className={cn(
+                    'hw-anfrage-field',
+                    zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
+                  )}
+                >
+                  <span className="hw-anfrage-label">Bis *</span>
+                  <div className="hw-anfrage-date-field">
+                    <input
+                      type="date"
+                      className="input"
+                      required={zeitModus === 'zeitraum'}
+                      value={bis.trim() ? displayToYmd(bis) : ''}
+                      onChange={(e) => {
+                        setDirty(true)
+                        const v = e.target.value
+                        setBis(v ? ymdToDisplay(v) : '')
+                      }}
+                      disabled={pending || zeitModus === 'tag'}
+                      tabIndex={zeitModus === 'tag' ? -1 : undefined}
+                    />
+                    <button
+                      type="button"
+                      className="hw-anfrage-date-icon"
+                      tabIndex={-1}
+                      disabled={pending || zeitModus === 'tag'}
+                      aria-label="Kalender öffnen"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const input = (e.currentTarget.parentElement?.querySelector(
+                          'input[type="date"]'
+                        ) ?? null) as HTMLInputElement | null
+                        try {
+                          input?.showPicker?.()
+                        } catch {
+                          input?.focus()
+                        }
+                      }}
+                    >
+                      <MockIcon ctx="btn" n="calendar" size={15} />
+                    </button>
+                  </div>
+                </label>
+              </div>
+              {!von.trim() || (zeitModus === 'zeitraum' && !bis.trim()) ? (
+                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                  Pflicht — für Partner-Leistungen und spätere Belege
+                </span>
+              ) : null}
+            </div>
+        ) : null}
       </EditorSheet>
 
       <HandwerkerSuchenSheet

@@ -104,6 +104,9 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   ekNetto?: number | null
   /** Pro Position eigener Partner-EK (Mehrfachzuweisung). */
   ekNettoByPositionId?: Record<string, number | null | undefined>
+  /** Ausführungszeitraum (Pflicht für PDF/Leistungszeitraum später). */
+  startDatum?: string | null
+  endDatum?: string | null
 }): Promise<{ ok: true; updated: number } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
@@ -160,6 +163,12 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     if (ekPos == null && current.preis_partner != null) {
       // EK unverändert — nicht überschreiben
       delete patch.preis_partner
+    }
+    const startYmd = input.startDatum?.trim().slice(0, 10) || null
+    const endYmd = input.endDatum?.trim().slice(0, 10) || startYmd
+    if (startYmd) {
+      patch.start_datum = startYmd
+      patch.end_datum = endYmd
     }
 
     const { error } = await gate.supabase!

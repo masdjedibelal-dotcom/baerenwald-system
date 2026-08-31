@@ -10,6 +10,7 @@ import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
@@ -488,16 +489,18 @@ export function ObjektEinheitenSection({
   }
 
   function entfernenPerson(b: EinheitBewohner) {
-    if (!confirm(`„${b.name}“ wirklich entfernen?`)) return
-    startTransition(async () => {
-      const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+    confirmDelete(
+      `„${b.name}“ entfernen?`,
+      async () => {
+        const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Gelöscht')
+        onChanged()
       }
-      toast.success('Gelöscht')
-      onChanged()
-    })
+    )
   }
 
   async function confirmDeleteEinzel() {

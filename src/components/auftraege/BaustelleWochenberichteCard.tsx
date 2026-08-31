@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createAuftragWochenbericht,
   deleteAuftragWochenbericht,
@@ -89,11 +90,13 @@ export function BaustelleWochenberichteCard({
   }
 
   function remove(id: string) {
-    if (!confirm('Wochenbericht löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Wochenbericht löschen?', async () => {
       const r = await deleteAuftragWochenbericht(id, auftragId)
-      if (!r.ok) toast.error(r.message)
-      else onChanged()
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
+      }
+      onChanged()
     })
   }
 

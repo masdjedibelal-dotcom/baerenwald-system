@@ -6,6 +6,7 @@ import { Download, FileUp, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { deleteBaustellenDokument } from '@/app/(dashboard)/auftraege/baustelle-actions'
 import {
   BAUSTELLEN_DOKUMENT_TYP_LABELS,
@@ -60,14 +61,14 @@ export function BaustelleBerichteDokumenteCard({
   }
 
   function remove(id: string) {
-    if (!confirm('Dokument löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Dokument löschen?', async () => {
       const r = await deleteBaustellenDokument(id, auftragId)
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Dokument gelöscht')
-        onChanged()
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
       }
+      toast.success('Dokument gelöscht')
+      onChanged()
     })
   }
 

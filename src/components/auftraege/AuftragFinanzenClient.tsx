@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { DetailHead } from '@/components/layout/DetailHead'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
 import {
   createBuergschaft,
   createEinbehalt,
@@ -431,11 +432,19 @@ export function AuftragFinanzenClient({
                       type="button"
                       variant="primary"
                       onClick={() => {
-                        if (!confirm(`Einbehalt von ${fmtEuro(e.einbehalt_betrag)} € an ${e.handwerker?.name ?? 'Handwerker'} freigeben?`)) return
-                        startTransition(async () => {
-                          const r = await freigebenEinbehalt(e.id, auftragId)
-                          if (!r.ok) toast.error(r.message)
-                          else toast.success('Freigegeben')
+                        confirmAction({
+                          title: 'Einbehalt freigeben?',
+                          body: `Einbehalt von ${fmtEuro(e.einbehalt_betrag)} € an ${e.handwerker?.name ?? 'Handwerker'} freigeben?`,
+                          confirmLabel: 'Freigeben',
+                          cancelLabel: 'Abbrechen',
+                          busyLabel: null,
+                          onConfirm: () => {
+                            startTransition(async () => {
+                              const r = await freigebenEinbehalt(e.id, auftragId)
+                              if (!r.ok) toast.error(r.message)
+                              else toast.success('Freigegeben')
+                            })
+                          },
                         })
                       }}
                     >

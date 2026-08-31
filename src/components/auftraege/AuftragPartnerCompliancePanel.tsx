@@ -4,6 +4,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useMemo, useRef, useState } from 'react'
 import { CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { Button } from '@/components/ui/Button'
 import type { AuftragCompliancePartner } from '@/lib/auftraege/auftrag-compliance-partners'
 import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
@@ -269,15 +270,18 @@ export function AuftragPartnerCompliancePanel({
   }
 
   function removeDoc(docId: string, titel: string) {
-    if (!confirm(`„${titel}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deletePartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
-      else {
+    confirmDelete(
+      `„${titel}“ löschen?`,
+      async () => {
+        const r = await deletePartnerDokument(docId, handwerkerId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
         toast.success('Gelöscht')
         onChanged()
       }
-    })
+    )
   }
 
   const pflichtOk = fortschritt.pflicht === 0 || fortschritt.erfuellt >= fortschritt.pflicht

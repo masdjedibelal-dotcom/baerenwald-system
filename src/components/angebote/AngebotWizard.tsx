@@ -38,6 +38,9 @@ import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -90,7 +93,6 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
-import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import {
   kundentypLabel,
   leadKontaktAnzeigeName,
@@ -98,7 +100,6 @@ import {
   resolveLeadKunde,
   resolveLeadPreisAnzeige,
 } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
   istKundeHausverwaltungTyp,
@@ -122,7 +123,16 @@ import {
 } from '@/lib/templates/angebot-mail'
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
-import type { AngebotPosition, Gewerk, Handwerker, Kunde, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
+import type {
+  AngebotPosition,
+  Gewerk,
+  Handwerker,
+  Kunde,
+  KundeAnsprechpartner,
+  KundenObjekt,
+  LeadDetail,
+  Preisliste,
+} from '@/lib/types'
 import { BEREICH_LABELS, cn, formatDatum } from '@/lib/utils'
 import type { ZahlfristSeg } from '@/lib/zahlfrist'
 
@@ -264,17 +274,7 @@ export function AngebotWizard({
   const sheetStadt = [sheetKunde?.plz?.trim(), sheetKunde?.ort?.trim()]
     .filter(Boolean)
     .join(' ')
-  const sheetEmail = (
-    sheetKunde?.email ?? leadState.kontakt_email ?? ''
-  ).trim()
-  const sheetTelefon = (
-    sheetKunde?.telefon ?? leadState.kontakt_telefon ?? ''
-  ).trim()
   const sheetKundentypLabel = kundentypLabel(sheetKunde?.typ ?? kundeTyp)
-  const crowKundeValue =
-    sheetFirma ||
-    [sheetNamen.vorname, sheetNamen.nachname].filter(Boolean).join(' ') ||
-    name
 
   const leadZeilen = useMemo(
     () =>
@@ -321,6 +321,7 @@ export function AngebotWizard({
   const [kundeEditOpen, setKundeEditOpen] = useState(false)
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
   const [melderDraft, setMelderDraft] = useState<MelderLeistungsortDraft>(() =>
     draftFromLeadMelder(lead)
   )
@@ -400,12 +401,49 @@ export function AngebotWizard({
   /** Lead, der in dieser Direkt-Angebot-Session angelegt wurde (für Abbruch-Cleanup). */
   const sessionCreatedLeadRef = useRef<string | null>(null)
 
-  const [mailTo, setMailTo] = useState<string[]>(() =>
-    sheetEmail && isValidEmail(sheetEmail) ? [sheetEmail] : []
-  )
+  const [mailTo, setMailTo] = useState<string[]>(() => {
+    const fallback = (
+      sheetKunde?.email ?? lead.kontakt_email ?? ''
+    ).trim()
+    return fallback && isValidEmail(fallback) ? [fallback] : []
+  })
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailBetreff, setMailBetreff] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+
+  const ansprechpartnerId = meta.ansprechpartner_id?.trim() || null
+  /** Gewählter AP, sonst Primär — steuert Anzeige, Anrede & Mail. */
+  const effektivAp =
+    (ansprechpartnerId
+      ? apRows.find((a) => a.id === ansprechpartnerId)
+      : null) ??
+    apRows.find((a) => a.ist_primaer) ??
+    null
+  const apNamen = effektivAp
+    ? splitDeutscherVollname(String(effektivAp.name ?? '').trim())
+    : null
+  const displayVorname = apNamen?.vorname || sheetNamen.vorname
+  const displayNachname = apNamen?.nachname || sheetNamen.nachname
+  const sheetEmail = (
+    effektivAp?.email?.trim() ||
+    sheetKunde?.email ||
+    leadState.kontakt_email ||
+    ''
+  ).trim()
+  const sheetTelefon = (
+    effektivAp?.telefon?.trim() ||
+    sheetKunde?.telefon ||
+    leadState.kontakt_telefon ||
+    ''
+  ).trim()
+  const crowKundeValue = (() => {
+    const base =
+      sheetFirma ||
+      [sheetNamen.vorname, sheetNamen.nachname].filter(Boolean).join(' ') ||
+      name
+    const ap = effektivAp?.name?.trim()
+    return ap ? `${base} · ${ap}` : base
+  })()
 
   const zahlfristInit = zahlfristSegFromAngebotMeta(meta)
   const [zahlfristSeg, setZahlfristSeg] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -434,6 +472,42 @@ export function AngebotWizard({
       cancelled = true
     }
   }, [isHv, hvKundeId])
+
+  /** Ansprechpartner der Vertragspartei (HV / Firma / Privat). */
+  useEffect(() => {
+    const kid = (hvKundeId || kundeId || '').trim()
+    if (!kid) {
+      setApRows([])
+      return
+    }
+    let cancelled = false
+    void listKundenAnsprechpartner(kid).then((rows) => {
+      if (!cancelled) setApRows(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hvKundeId, kundeId])
+
+  /** Bootstrap: Mail an gewählten AP, sobald die Liste da ist. */
+  useEffect(() => {
+    const sid = meta.ansprechpartner_id?.trim()
+    if (!sid || !apRows.length) return
+    const ap = apRows.find((a) => a.id === sid)
+    const mail = ap?.email?.trim() || ''
+    if (mail && isValidEmail(mail)) {
+      setMailTo((prev) =>
+        prev.length === 1 &&
+        prev[0] === (sheetKunde?.email || lead.kontakt_email || '').trim()
+          ? [mail]
+          : prev.length
+            ? prev
+            : [mail]
+      )
+    }
+    // nur einmal nach Laden der AP-Liste für den Bootstrap-Wert
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apRows])
 
   function patchMelderDraft(patch: Partial<MelderLeistungsortDraft>) {
     setMelderDraft((prev) => {
@@ -468,17 +542,26 @@ export function AngebotWizard({
   const mailAnrede = mailAnredeFromKundeTyp(kundeTyp)
   const mailKundeKontext = useMemo((): KundeAnredeKontext => {
     const k = sheetKunde
+    const apName = effektivAp?.name?.trim() || null
     return {
       name: k?.name?.trim() || name,
-      vorname: k?.vorname ?? sheetNamen.vorname,
-      nachname: k?.nachname ?? sheetNamen.nachname,
+      vorname: displayVorname || null,
+      nachname: displayNachname || null,
       typ: k?.typ ?? kundeTyp,
       ansprechpartner:
-        k && 'ansprechpartner' in k
+        apName ||
+        (k && 'ansprechpartner' in k
           ? (k as { ansprechpartner?: string | null }).ansprechpartner
-          : null,
+          : null),
     }
-  }, [sheetKunde, name, sheetNamen.vorname, sheetNamen.nachname, kundeTyp])
+  }, [
+    sheetKunde,
+    name,
+    displayVorname,
+    displayNachname,
+    kundeTyp,
+    effektivAp,
+  ])
 
   useEffect(() => {
     if (sheet !== 'versand') return
@@ -692,8 +775,12 @@ export function AngebotWizard({
       kunde_objekt_id: melderDraft.kunde_objekt_id,
       objekt_anlage_id: melderDraft.objekt_anlage_id,
     })
-    if (!r.ok) {
-      toast.error(r.message)
+    if (!r?.ok) {
+      toast.error(
+        r && 'message' in r && r.message
+          ? r.message
+          : 'Anfrage konnte nicht angelegt werden — bitte neu laden.'
+      )
       return null
     }
     sessionCreatedLeadRef.current = r.leadId
@@ -792,8 +879,12 @@ export function AngebotWizard({
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
-        if (!res.ok) {
-          toast.error(res.message)
+        if (!res?.ok) {
+          toast.error(
+            res && 'message' in res && res.message
+              ? res.message
+              : 'Speichern fehlgeschlagen — bitte Seite neu laden und erneut versuchen.'
+          )
           // Speichern fehlgeschlagen → frisch angelegten Träger wieder entfernen
           if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
             await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
@@ -812,8 +903,12 @@ export function AngebotWizard({
             objekt_anlage_id: melderDraft.objekt_anlage_id,
             angebotId: res.angebotId,
           })
-          if (!sync.ok) {
-            toast.error(sync.message)
+          if (!sync?.ok) {
+            toast.error(
+              sync && 'message' in sync && sync.message
+                ? sync.message
+                : 'Melder/Leistungsort konnte nicht gespeichert werden.'
+            )
           } else {
             setLeadState((prev) => ({
               ...prev,
@@ -1016,8 +1111,12 @@ export function AngebotWizard({
         betreff: mailBetreff.trim() || undefined,
         auftragKorrektur: istAuftragKorrektur,
       })
-      if (!res.ok) {
-        toast.error(res.message)
+      if (!res?.ok) {
+        toast.error(
+          res && 'message' in res && res.message
+            ? res.message
+            : 'Versand fehlgeschlagen — bitte Seite neu laden und erneut versuchen.'
+        )
         return
       }
       toast.success(
@@ -1194,10 +1293,7 @@ export function AngebotWizard({
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
-        onClick={() => {
-          setSheet('versand')
-          void ensureDraftForPreview()
-        }}
+        onClick={() => setSheet('versand')}
       />
     </div>
   )
@@ -1254,13 +1350,40 @@ export function AngebotWizard({
               <span className="gfc-v">{sheetFirma}</span>
             </div>
           ) : null}
+          <MockField label="Ansprechpartner" full>
+            <select
+              className="sel sel--choice"
+              value={ansprechpartnerId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value.trim() || null
+                setMeta((m) => ({ ...m, ansprechpartner_id: next }))
+                const ap = next
+                  ? apRows.find((a) => a.id === next)
+                  : apRows.find((a) => a.ist_primaer)
+                const mail = (ap?.email?.trim() || sheetKunde?.email || '').trim()
+                if (mail && isValidEmail(mail)) setMailTo([mail])
+                else if (!mail) setMailTo([])
+                setDraftDirty(true)
+              }}
+              disabled={!(hvKundeId || kundeId)}
+            >
+              <option value="">Hauptansprechpartner</option>
+              {apRows.map((ap) => (
+                <option key={ap.id} value={ap.id}>
+                  {ap.name.trim() || 'Ohne Name'}
+                  {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                </option>
+              ))}
+            </select>
+          </MockField>
           <div className="gfc-row">
             <span className="gfc-l">{sheetFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
-            <span className="gfc-v">{sheetNamen.vorname || '—'}</span>
+            <span className="gfc-v">{displayVorname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">{sheetFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
-            <span className="gfc-v">{sheetNamen.nachname || '—'}</span>
+            <span className="gfc-v">{displayNachname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Anschrift</span>
@@ -1577,7 +1700,8 @@ export function AngebotWizard({
           />
           <div className="full">
             <AngebotWizardMailPreview
-              angebotId={angebotId}
+              liveOnly
+              angebotId={null}
               betreff={mailBetreff.trim() || defaultMailBetreff}
               einleitung={meta.einleitung}
               schluss={meta.schluss}
@@ -1586,6 +1710,13 @@ export function AngebotWizard({
               gesamtNetto={mailSummen.nettoMin}
               gueltigBis={meta.gueltig_bis}
               empfaengerHint={mailTo[0] || sheetEmail || undefined}
+              anrede={mailAnrede}
+              kundeName={mailKundeKontext.name}
+              kundeVorname={mailKundeKontext.vorname}
+              kundeNachname={mailKundeKontext.nachname}
+              kundeTyp={mailKundeKontext.typ ?? kundeTyp}
+              reverseCharge={reverseChargeAktiv}
+              portalAudience={isHv ? 'organisation' : 'privat'}
             />
           </div>
         </div>

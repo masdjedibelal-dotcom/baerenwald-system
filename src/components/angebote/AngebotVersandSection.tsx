@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -452,23 +454,25 @@ export function AngebotVersandSection({
                           size="sm"
                           disabled={pending}
                           onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Anfrage von ${name} im CRM als akzeptiert markieren?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await crmBestaetigeHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
-                                toast.success('Anfrage bestätigt')
-                                router.refresh()
-                              }
+                            confirmAction({
+                              title: 'Anfrage bestätigen?',
+                              body: `Anfrage von ${name} im CRM als akzeptiert markieren?`,
+                              confirmLabel: 'Bestätigen',
+                              cancelLabel: 'Abbrechen',
+                              busyLabel: null,
+                              onConfirm: () => {
+                                startTransition(async () => {
+                                  const r = await crmBestaetigeHandwerkerAnfrage({
+                                    angebotId: detail.id,
+                                    zuweisungId: z.id,
+                                  })
+                                  if (!r.ok) toast.error(r.message)
+                                  else {
+                                    toast.success('Anfrage bestätigt')
+                                    router.refresh()
+                                  }
+                                })
+                              },
                             })
                           }}
                         >
@@ -484,24 +488,22 @@ export function AngebotVersandSection({
                           disabled={pending}
                           className="text-danger"
                           onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Partner-Anfrage an ${name} wirklich löschen?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await loescheHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
+                            confirmDelete(
+                              'Partner-Anfrage löschen?',
+                              async () => {
+                                const r = await loescheHandwerkerAnfrage({
+                                  angebotId: detail.id,
+                                  zuweisungId: z.id,
+                                })
+                                if (!r.ok) {
+                                  toast.error(r.message)
+                                  throw new Error(r.message)
+                                }
                                 toast.success('Anfrage gelöscht')
                                 router.refresh()
-                              }
-                            })
+                              },
+                              { body: `Partner-Anfrage an ${name} wirklich löschen?` }
+                            )
                           }}
                         >
                           <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />

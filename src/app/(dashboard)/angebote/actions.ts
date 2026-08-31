@@ -79,6 +79,7 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
+import { resolveAngebotDokumentEmpfaenger } from '@/lib/angebote/angebot-html-payload'
 import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { supersedeLeadAngebote } from '@/lib/angebote/supersede-lead-angebote'
@@ -151,7 +152,10 @@ function parseVariantenRow(raw: unknown): AngebotVariantenPersistJson | null {
 
 const ANGEBOT_DETAIL_SELECT = `
       *,
-      kunden(*),
+      kunden(
+        *,
+        kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)
+      ),
       leads(*),
       kunden_objekte(*),
       angebot_handwerker(
@@ -180,7 +184,10 @@ export async function loadAngebotDetailAdmin(id: string): Promise<AngebotDetail 
     .select(
       `
       *,
-      kunden(*),
+      kunden(
+        *,
+        kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)
+      ),
       leads(*),
       kunden_objekte(*),
       angebot_handwerker(
@@ -334,6 +341,8 @@ export type CreateAngebotInput = {
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort — mit Lead durch Pipeline mitgeführt. */
   objekt_anlage_id?: string | null
+  /** Optionaler Ansprechpartner (Versand / Anrede / PDF z. Hd.) */
+  ansprechpartner_id?: string | null
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
@@ -474,6 +483,7 @@ export async function createAngebot(
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
       objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
+      ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
       ist_wiederkehrend: input.ist_wiederkehrend === true,
       wiederkehr_turnus:
         input.ist_wiederkehrend === true
@@ -704,6 +714,9 @@ export async function updateAngebot(
         : {}),
       ...(input.objekt_anlage_id !== undefined
         ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
+        : {}),
+      ...(input.ansprechpartner_id !== undefined
+        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
         : {}),
       ...(input.ist_wiederkehrend !== undefined
         ? {
@@ -1792,7 +1805,14 @@ export async function sendAngebotToKunde(
     }
   }
   const istKorrektur = Boolean(options?.statusBeibehalten || detail.gesendet_kunde_at)
-  const kundenMail = detail.kunden?.email?.trim() ?? ''
+  const apIdSend =
+    (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id?.trim() || null
+  const kundenMail =
+    kundeRechnungsempfaengerAusStammdaten(detail.kunden, null, {
+      selectedAnsprechpartnerId: apIdSend,
+    }).email?.trim() ||
+    detail.kunden?.email?.trim() ||
+    ''
   const toList =
     options?.to?.map((e) => e.trim()).filter(Boolean) ??
     (kundenMail ? [kundenMail] : [])
@@ -1867,13 +1887,23 @@ export async function sendAngebotToKunde(
       })()
     : gueltigFallback
 
-  const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
-    plz: detail.leads?.plz ?? null,
-    kontakt_name: detail.leads?.kontakt_name ?? null,
+  const { anredeKontext: kundenAnrede } = resolveAngebotDokumentEmpfaenger({
+    kunden: detail.kunden,
+    kunden_objekte: detail.kunden_objekte,
+    ansprechpartner_id:
+      (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null,
+    leads: detail.leads,
   })
   const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
   const portalAudience = portalAudienceFromKunde(detail.kunden)
-  const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
+  const unterSchwelleDirekt =
+    portalAudience === 'organisation' &&
+    String(
+      (detail.leads as { freigabe_bypass_grund?: string | null } | null)
+        ?.freigabe_bypass_grund ?? ''
+    )
+      .trim()
+      .toLowerCase() === 'schwelle'
   const angebotNr = detail.angebotsnr?.trim()
   const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
   const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
@@ -1905,6 +1935,7 @@ export async function sendAngebotToKunde(
             portalAudience,
             visualisierung_vorschau_url: vizPreviewUrl,
             reverseCharge: mailReverseCharge,
+            ctaMode: unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen',
           },
           branding
         ),
@@ -1995,6 +2026,27 @@ export async function previewAngebotKundeMail(input: {
   /** Live Gültig-bis (YYYY-MM-DD oder ISO), sonst DB/Fallback. */
   gueltigBis?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  try {
+    return await previewAngebotKundeMailInner(input)
+  } catch (e) {
+    console.error('[previewAngebotKundeMail]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'E-Mail-Vorschau fehlgeschlagen',
+    }
+  }
+}
+
+async function previewAngebotKundeMailInner(input: {
+  angebotId: string
+  betreff?: string
+  einleitung?: string | null
+  schluss?: string | null
+  leistungsumfang?: string | null
+  gesamtBrutto?: number | null
+  gesamtNetto?: number | null
+  gueltigBis?: string | null
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const angebotId = input.angebotId.trim()
   if (!angebotId) return { ok: false, message: 'Angebot fehlt' }
 
@@ -2040,13 +2092,23 @@ export async function previewAngebotKundeMail(input: {
       })()
     : gueltigFallback
 
-  const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
-    plz: detail.leads?.plz ?? null,
-    kontakt_name: detail.leads?.kontakt_name ?? null,
+  const { anredeKontext: kundenAnrede } = resolveAngebotDokumentEmpfaenger({
+    kunden: detail.kunden,
+    kunden_objekte: detail.kunden_objekte,
+    ansprechpartner_id:
+      (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null,
+    leads: detail.leads,
   })
   const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
   const portalAudience = portalAudienceFromKunde(detail.kunden)
-  const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
+  const leadRow = Array.isArray(detail.leads)
+    ? (detail.leads[0] as { freigabe_bypass_grund?: string | null } | undefined)
+    : (detail.leads as { freigabe_bypass_grund?: string | null } | null)
+  const unterSchwelleDirekt =
+    portalAudience === 'organisation' &&
+    String(leadRow?.freigabe_bypass_grund ?? '')
+      .trim()
+      .toLowerCase() === 'schwelle'
   const angebotNr = detail.angebotsnr?.trim()
   const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
   const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
@@ -2081,6 +2143,7 @@ export async function previewAngebotKundeMail(input: {
         portalAudience,
         visualisierung_vorschau_url: vizPreviewUrl,
         reverseCharge: mailReverseCharge,
+        ctaMode: unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen',
       },
       branding
     )
@@ -2106,6 +2169,85 @@ export async function previewAngebotKundeMail(input: {
     ok: true,
     html: tpl.html,
     betreff: betreffOverride || tpl.betreff,
+  }
+}
+
+/**
+ * Mail-Vorschau aus Wizard-Stand — ohne Angebot zu speichern / ohne Entwurf anzulegen.
+ * Platzhalter-Nr. „ENTWURF“; echte Nummer erst beim Versand.
+ */
+export async function previewAngebotWizardMailLive(input: {
+  betreff?: string
+  einleitung?: string | null
+  schluss?: string | null
+  leistungsumfang?: string | null
+  gesamtBrutto?: number | null
+  gueltigBis?: string | null
+  anrede?: 'du' | 'sie'
+  kundeName?: string | null
+  kundeVorname?: string | null
+  kundeNachname?: string | null
+  kundeTyp?: string | null
+  reverseCharge?: boolean
+  unterSchwelleDirekt?: boolean
+  /** organisation = Auftraggeber-Portal-Wording */
+  portalAudience?: 'privat' | 'organisation'
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  try {
+    const branding = await getMailBranding(supabaseAdmin)
+    const firmMail = await fetchFirmenEinstellungen(supabaseAdmin)
+    const anrede = input.anrede === 'du' ? 'du' : 'sie'
+    const lu = input.leistungsumfang?.trim() || 'Ihr Projekt'
+    const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
+    const gueltigFallback = new Date(
+      Date.now() + gueltigTage * 24 * 60 * 60 * 1000
+    ).toLocaleDateString('de-DE')
+    const gueltigSource = input.gueltigBis?.trim()
+    const gueltig = gueltigSource
+      ? (() => {
+          try {
+            return new Date(gueltigSource).toLocaleDateString('de-DE')
+          } catch {
+            return gueltigFallback
+          }
+        })()
+      : gueltigFallback
+    const brutto =
+      input.gesamtBrutto != null && Number.isFinite(Number(input.gesamtBrutto))
+        ? Number(input.gesamtBrutto)
+        : 0
+    const audience = input.portalAudience === 'organisation' ? 'organisation' : 'privat'
+    const ctaMode = input.unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen'
+    const betreff =
+      input.betreff?.trim() ||
+      angebotMailBetreff(anrede, 'ENTWURF', branding.firmenname)
+    const html = buildAngebotMail(
+      {
+        name: input.kundeName?.trim() || 'Kunde',
+        vorname: input.kundeVorname?.trim() || null,
+        nachname: input.kundeNachname?.trim() || null,
+        typ: input.kundeTyp ?? null,
+        angebotsnr: 'ENTWURF',
+        leistungsumfang: lu,
+        gesamt_brutto: brutto,
+        gueltig_bis: gueltig,
+        anrede,
+        einleitung: input.einleitung ?? undefined,
+        schluss: input.schluss ?? undefined,
+        portalLink: buildPortalLoginLink() ?? undefined,
+        portalAudience: audience,
+        reverseCharge: Boolean(input.reverseCharge),
+        ctaMode,
+      },
+      branding
+    )
+    return { ok: true, html, betreff }
+  } catch (e) {
+    console.error('[previewAngebotWizardMailLive]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'E-Mail-Vorschau fehlgeschlagen',
+    }
   }
 }
 

@@ -192,7 +192,15 @@ export async function createAnfrageFuerKunde(
     },
   })
 
-  if (!r.ok) return r
+  if (!r?.ok) {
+    return {
+      ok: false,
+      message:
+        r && 'message' in r && r.message
+          ? r.message
+          : 'Anfrage konnte nicht angelegt werden.',
+    }
+  }
 
   // Sofort aus Anfragen-Pipeline nehmen (Status vor Angebot = neu/kontaktiert/termin).
   const now = new Date().toISOString()

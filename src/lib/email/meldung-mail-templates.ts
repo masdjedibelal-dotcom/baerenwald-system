@@ -229,16 +229,27 @@ export function mailOrgAngebotZurInfo(
     objektTitel: string
     betragEur: number
     portalLink: string
+    schwelleLabel?: string
+    /** schwelle | akut — steuert den Info-Text */
+    bypassGrund?: 'schwelle' | 'akut' | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
   const betreff = `Angebot zur Information — ${data.objektTitel.trim() || 'Objekt'}`
+  const schwelle =
+    data.schwelleLabel?.trim() != null && data.schwelleLabel.trim() !== ''
+      ? ` (${esc(data.schwelleLabel.trim())})`
+      : ''
+  const grundAbsatz =
+    data.bypassGrund === 'akut'
+      ? `<p>Wegen der Einstufung als <strong>Akut / Sofortmaßnahme</strong> ist eine Freigabe bzw. Annahme oder Ablehnung <strong>nicht erforderlich</strong>. Wir kümmern uns direkt um den Auftrag. Diese Mail dient nur der Information; den Stand sehen Sie jederzeit im Auftraggeber-Portal.</p>`
+      : `<p>Aufgrund Ihrer erteilten Freigabeschwelle${schwelle} liegt der Betrag darunter — eine Freigabe bzw. Annahme oder Ablehnung ist <strong>nicht erforderlich</strong>. Wir kümmern uns direkt um den Auftrag. Diese Mail dient nur der Information; den Stand sehen Sie jederzeit im Auftraggeber-Portal.</p>`
   const body = `
     <p>Guten Tag,</p>
     <p>für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
       data.betragEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
     )}</strong> vor.</p>
-    <p>Eine Freigabe ist <strong>nicht erforderlich</strong> (unter Schwelle bzw. Akut). Bärenwald kann den Auftrag direkt anlegen — diese Mail dient nur der Information.</p>
+    ${grundAbsatz}
   `
   return {
     betreff,

@@ -104,13 +104,16 @@ export async function linkRechnungKorrekturKette(
       updated_at: now,
     })
     .eq('id', input.neuId)) as { error: { message: string } | null }
-  if (neuRes?.error && /korrektur_von|korrektur_art|schema cache|column/i.test(neuRes.error.message)) {
-    return
+  if (neuRes?.error) {
+    console.warn('[linkRechnungKorrekturKette] korrektur_von:', neuRes.error.message)
   }
-  await supabase
+  const origRes = (await supabase
     .from('rechnungen')
     .update({ ersetzt_durch: input.neuId, updated_at: now })
-    .eq('id', input.originalId)
+    .eq('id', input.originalId)) as { error: { message: string } | null }
+  if (origRes?.error) {
+    console.warn('[linkRechnungKorrekturKette] ersetzt_durch:', origRes.error.message)
+  }
 }
 
 export function rechnungKorrekturModus(status: RechnungStatus | string | null | undefined): RechnungKorrekturModus {

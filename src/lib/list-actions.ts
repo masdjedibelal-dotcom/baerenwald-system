@@ -146,18 +146,22 @@ export async function runDeleteHandwerker(
   router: AppRouterInstance,
   label = 'Handwerker'
 ): Promise<void> {
-  const ok = window.confirm(
-    `„${label}“ wirklich löschen? Das kann nicht rückgängig gemacht werden.`
-  )
-  if (!ok) return
-
-  await actionBusy.run(`${label} wird gelöscht…`, async () => {
-    const r = await deleteHandwerker(handwerkerId)
-    if (!r.ok) {
-      toast.error(r.message)
-      throw new Error(r.message)
+  confirmDelete(
+    `„${label}“ löschen?`,
+    async () => {
+      await actionBusy.run(`${label} wird gelöscht…`, async () => {
+        const r = await deleteHandwerker(handwerkerId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success(`${label} gelöscht`)
+        router.refresh()
+      })
+    },
+    {
+      sub: 'Dauerhaft entfernen.',
+      body: `„${label}“ wird unwiderruflich gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.`,
     }
-    toast.success(`${label} gelöscht`)
-    router.refresh()
-  })
+  )
 }

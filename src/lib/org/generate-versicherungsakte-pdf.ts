@@ -13,7 +13,6 @@ export type VersicherungsaktePdfInput = {
   befundZeilen: Array<{ datum: string; titel: string; text: string; fotoCount: number }>;
   abnahmeHinweis?: string | null;
   rechnungHinweis?: string | null;
-  selbstbehaltEur?: number | null;
 };
 
 const green = rgb(0.1, 0.24, 0.17);
@@ -120,14 +119,6 @@ export async function generateVersicherungsaktePdf(
   drawLine(`Schadendatum: ${fmtDatum(input.schadendatum)}`);
   if (input.kostentraegerLabel) {
     drawLine(`Kostenträger: ${input.kostentraegerLabel}`);
-  }
-  if (input.selbstbehaltEur != null && Number.isFinite(input.selbstbehaltEur)) {
-    drawLine(
-      `Selbstbehalt: ${new Intl.NumberFormat("de-DE", {
-        style: "currency",
-        currency: "EUR",
-      }).format(input.selbstbehaltEur)}`
-    );
   }
   y -= 6;
 

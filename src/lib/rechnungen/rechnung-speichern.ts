@@ -34,8 +34,8 @@ export async function berechneRechnungMitFirmeneinstellungen(
 
 /**
  * Negiert Positionen für Storno-Gutschrift.
- * Wichtig: Festpreis-Zeilen oft nur über `vk_netto` (lohn/material = 0) —
- * vorher repair, sonst entsteht Brutto 0.
+ * Zuerst positive Repair (Festpreis oft nur in vk_netto), dann negieren —
+ * normalize darf Negativbeträge nicht auf 0 setzen (siehe erlaubtNegativ).
  */
 export function positionenFuerGutschrift(positionen: AngebotPosition[]): AngebotPosition[] {
   return repairAngebotPositionen(normalizeAngebotPositionen(positionen)).map((p) => {

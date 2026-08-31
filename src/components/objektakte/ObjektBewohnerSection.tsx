@@ -7,6 +7,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
@@ -19,9 +20,12 @@ import {
   updateEinheitBewohner,
 } from '@/app/actions/objektakte-actions'
 import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+
+const BEWOHNER_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px'
 
 export function ObjektBewohnerSection({
   kundeId,
@@ -51,6 +55,8 @@ export function ObjektBewohnerSection({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<EinheitBewohner | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   const einheitOptions = useMemo(
     () => [
@@ -225,6 +231,46 @@ export function ObjektBewohnerSection({
     }
   }
 
+  async function runSingleDelete() {
+    if (!deleteTarget || deletePending) return
+    setDeletePending(true)
+    try {
+      const r = await deleteEinheitBewohner(kundeId, objektId, deleteTarget.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setListe((prev) => prev.filter((x) => x.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      setSelected((prev) => {
+        const next = { ...prev }
+        delete next[deleteTarget.id]
+        return next
+      })
+      toast.success('Bewohner gelöscht')
+      onChanged()
+    } finally {
+      setDeletePending(false)
+    }
+  }
+
+  function bewohnerRowMenu(b: EinheitBewohner): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openBearbeiten(b),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => setDeleteTarget(b),
+      },
+    ]
+  }
+
   function rowBody(b: EinheitBewohner) {
     const kontaktZeile = [b.telefon?.trim(), b.email?.trim()].filter(Boolean).join(' · ') || '—'
     const einheitLabel = b.objekt_einheiten?.bezeichnung ?? 'Einheit'
@@ -236,6 +282,7 @@ export function ObjektBewohnerSection({
           isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
           isChecked && 'is-checked'
         )}
+        style={isMobile ? undefined : { gridTemplateColumns: BEWOHNER_LIST_COLS }}
       >
         <ListRowCheck
           checked={isChecked}
@@ -263,6 +310,13 @@ export function ObjektBewohnerSection({
             </>
           )}
         </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={bewohnerRowMenu(b)} title={b.name} />
+        </div>
       </div>
     )
   }
@@ -319,11 +373,15 @@ export function ObjektBewohnerSection({
           <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>
         ) : (
           <div className="ap-list vg-selectmode">
-            <div className="ap-list__head ap-list__head--select">
+            <div
+              className="ap-list__head ap-list__head--select"
+              style={{ gridTemplateColumns: BEWOHNER_LIST_COLS }}
+            >
               <span aria-hidden />
               <span>Name</span>
               <span>Einheit</span>
               <span>Kontakt</span>
+              <span aria-hidden />
             </div>
             {liste.map(rowBody)}
           </div>
@@ -362,6 +420,39 @@ export function ObjektBewohnerSection({
             : selectedCount === 1
               ? `„${selectedRows[0]?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Bewohner werden unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
+
+      <MockModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        icon="trash"
+        title="Bewohner löschen?"
+        sub="Dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={deletePending ? undefined : 'trash'}
+              disabled={deletePending}
+              onClick={() => void runSingleDelete()}
+            >
+              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {deletePending
+            ? 'Bitte warten…'
+            : `„${deleteTarget?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`}
         </div>
       </MockModal>
 

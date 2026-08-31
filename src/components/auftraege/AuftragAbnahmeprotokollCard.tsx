@@ -8,6 +8,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   ablehnenAbnahmeprotokoll,
   deleteAbnahmeprotokoll,
@@ -109,16 +110,16 @@ export function AuftragAbnahmeprotokollCard({
   }
 
   function loeschen(id: string) {
-    if (!window.confirm('Abnahmeprotokoll wirklich löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Abnahmeprotokoll löschen?', async () => {
       const r = await deleteAbnahmeprotokoll(id, auftragId)
-      if (!r.ok) toast.error(r.message)
-      else {
-        toast.success('Protokoll gelöscht')
-        reload()
-        onChanged?.()
-        router.refresh()
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
       }
+      toast.success('Protokoll gelöscht')
+      reload()
+      onChanged?.()
+      router.refresh()
     })
   }
 

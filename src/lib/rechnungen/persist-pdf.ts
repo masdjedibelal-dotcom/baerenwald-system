@@ -62,11 +62,15 @@ export async function buildRechnungPdfBuffer(
     ust_id: kunde.ust_id ?? null,
   }
 
+  const isEingehend = String((row as { richtung?: string | null }).richtung ?? '') === 'eingehend'
+  const datumFallback = String(row.rechnungsdatum ?? '').trim().slice(0, 10) || null
+
   const validMsg = validateRechnungPflichtangaben(firm, kundePflicht, {
-    leistungszeitraum_von: row.leistungszeitraum_von,
-    leistungszeitraum_bis: row.leistungszeitraum_bis,
+    // Eingangsrechnung: Partner-PDF — Zeitraum aus Auftrag/Einreichung ableiten
+    leistungszeitraum_von: row.leistungszeitraum_von || (isEingehend ? datumFallback : null),
+    leistungszeitraum_bis: row.leistungszeitraum_bis || (isEingehend ? datumFallback : null),
     rechnungsdatum: String(row.rechnungsdatum),
-    positionenCount: artikelCount,
+    positionenCount: isEingehend ? Math.max(artikelCount, 1) : artikelCount,
   })
   if (validMsg) return { ok: false, message: validMsg }
 

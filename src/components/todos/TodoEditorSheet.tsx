@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { loadCrmTeamFuerTermin } from '@/app/(dashboard)/anfragen/actions'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
 import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
@@ -225,12 +226,11 @@ export function TodoEditorSheet({
 
   function remove() {
     if (!todo) return
-    if (!confirm('To-do wirklich löschen?')) return
-    startTransition(async () => {
+    confirmDelete('To-do löschen?', async () => {
       const res = await deleteTodo(todo.id)
       if (!res.ok) {
         toast.error(res.message)
-        return
+        throw new Error(res.message)
       }
       toast.success('To-do gelöscht')
       onClose()

@@ -11,6 +11,9 @@ type SheetEntry = {
 
 const stack: SheetEntry[] = []
 let suppressPop = 0
+/** Pop-Generation: alle Listener derselben history.back()-Aktion ignorieren. */
+let suppressGeneration = 0
+let suppressHandledGeneration = -1
 let listening = false
 let fallthroughTimer: ReturnType<typeof setTimeout> | null = null
 let fallthroughEl: HTMLDivElement | null = null
@@ -57,13 +60,26 @@ export function guardSheetPointerFallthrough(ms = 320) {
 }
 
 function onWindowPopState() {
-  if (suppressPop > 0) {
-    suppressPop -= 1
-    return
-  }
+  if (shouldIgnoreSuppressedEditorSheetPop()) return
   const top = stack[stack.length - 1]
   if (!top) return
   top.onPop()
+}
+
+/**
+ * Programmatisches history.back() nach Sheet-Close — Canvas und Sheet-Stack
+ * müssen denselben Pop ignorieren (sonst öffnet der Wizard das Speichern-Confirm).
+ */
+export function shouldIgnoreSuppressedEditorSheetPop(): boolean {
+  if (suppressPop > 0) {
+    suppressPop -= 1
+    suppressHandledGeneration = suppressGeneration
+    return true
+  }
+  if (suppressHandledGeneration === suppressGeneration && suppressGeneration > 0) {
+    return true
+  }
+  return false
 }
 
 function ensureListener() {
@@ -95,6 +111,7 @@ export function releaseEditorSheetHistory(id: string, opts?: { historyStillPushe
   const wasTop = idx === stack.length - 1
   stack.splice(idx, 1)
   if (wasTop && opts?.historyStillPushed) {
+    suppressGeneration += 1
     suppressPop += 1
     window.history.back()
   }
@@ -108,6 +125,7 @@ export function updateEditorSheetHistoryPop(id: string, onPop: () => void) {
 
 /** Dirty + Back: History wieder herstellen, ohne Stack zu ändern. */
 export function restoreEditorSheetHistoryAfterDirtyPop(id: string) {
+  suppressGeneration += 1
   suppressPop += 1
   window.history.pushState({ editorSheet: id }, '')
 }

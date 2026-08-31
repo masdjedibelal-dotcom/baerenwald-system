@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createGewerk,
   setGewerkAktiv,
@@ -228,16 +229,20 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
     )
   }
 
-  async function remove(g: GewerkMitCount) {
-    if (!confirm(`Gewerk „${g.name}“ löschen?`)) return
-    const r = await deleteGewerkIfEmpty(g.id)
-    if (!r.ok) {
-      toast.error(r.message)
-      return
-    }
-    toast.success('Gelöscht')
-    setRows((prev) => prev.filter((x) => x.id !== g.id))
-    router.refresh()
+  function remove(g: GewerkMitCount) {
+    confirmDelete(
+      `Gewerk „${g.name}“ löschen?`,
+      async () => {
+        const r = await deleteGewerkIfEmpty(g.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Gelöscht')
+        setRows((prev) => prev.filter((x) => x.id !== g.id))
+        router.refresh()
+      }
+    )
   }
 
   function saveNeu() {

@@ -8,6 +8,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createClient } from '@/lib/supabase'
 import { MEHR_TILE_NAV } from '@/lib/nav-config'
+import { confirmAction } from '@/components/ui/confirm-action'
 
 const ICON_MAP: Record<string, string> = {
   Kunden: 'users',
@@ -29,14 +30,26 @@ export function MehrScreenClient({
   const router = useRouter()
   const [logoutLoading, setLogoutLoading] = useState(false)
 
-  async function handleLogout() {
-    if (!window.confirm('Wirklich abmelden?')) return
-    setLogoutLoading(true)
-    const supabase = createClient()
-    await supabase.auth.signOut({ scope: "local" })
-    router.replace('/login')
-    router.refresh()
-    setLogoutLoading(false)
+  function handleLogout() {
+    confirmAction({
+      title: 'Wirklich abmelden?',
+      body: 'Du wirst aus dem CRM ausgeloggt.',
+      confirmLabel: 'Abmelden',
+      cancelLabel: 'Abbrechen',
+      danger: true,
+      busyLabel: null,
+      onConfirm: async () => {
+        setLogoutLoading(true)
+        try {
+          const supabase = createClient()
+          await supabase.auth.signOut({ scope: 'local' })
+          router.replace('/login')
+          router.refresh()
+        } finally {
+          setLogoutLoading(false)
+        }
+      },
+    })
   }
 
   return (

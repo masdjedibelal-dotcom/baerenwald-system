@@ -59,10 +59,17 @@ export function rechnungMailBetreff(
 /** Betreff bei Korrektur (Storno-Gutschrift + neue RE). */
 export function rechnungKorrekturMailBetreff(
   rechnungsnummer: string,
-  firmenname: string
+  firmenname: string,
+  opts?: { originalNr?: string | null }
 ): string {
-  const nr = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
-  return `Korrektur ${nr} · ${firmenname}`
+  const neu = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
+  const orig = opts?.originalNr?.trim()
+    ? sanitizeRechnungNrFuerBetreff(opts.originalNr)
+    : null
+  if (orig && orig !== neu) {
+    return `Korrektur ${orig} → ${neu} · ${firmenname}`
+  }
+  return `Korrektur ${neu} · ${firmenname}`
 }
 
 /** Kein „Entwurf“ im Kunden-Betreff (auch bei Platzhalter ohne echte Nummer). */
@@ -210,7 +217,9 @@ export function buildRechnungMail(
   const betreff = sanitizeRechnungMailBetreff(
     data.mailBetreff?.trim() ||
       (istKorrektur
-        ? rechnungKorrekturMailBetreff(data.rechnungsnummer, b.firmenname)
+        ? rechnungKorrekturMailBetreff(data.rechnungsnummer, b.firmenname, {
+            originalNr: data.stornoBezugRechnungsnummer,
+          })
         : rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname))
   )
 

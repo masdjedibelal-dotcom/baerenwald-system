@@ -7,6 +7,7 @@ import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
@@ -24,9 +25,12 @@ import {
   OBJEKT_KONTAKT_ROLLEN,
 } from '@/lib/objektakte/labels'
 import type { ObjektKontakt, ObjektKontaktInput, ObjektKontaktRolle } from '@/lib/objektakte/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+
+const KONTAKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px'
 
 const ROLLE_OPTIONS = OBJEKT_KONTAKT_ROLLEN.filter((r) => r !== 'hausmeister').map((r) => ({
   value: r,
@@ -60,6 +64,8 @@ export function ObjektKontakteSection({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ObjektKontakt | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   useEffect(() => {
     setListe(initial)
@@ -227,6 +233,46 @@ export function ObjektKontakteSection({
     }
   }
 
+  async function runSingleDelete() {
+    if (!deleteTarget || deletePending) return
+    setDeletePending(true)
+    try {
+      const r = await deleteObjektKontakt(kundeId, objektId, deleteTarget.id)
+      if (!r.ok) {
+        toast.error(r.message)
+        return
+      }
+      setListe((prev) => prev.filter((x) => x.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      setSelected((prev) => {
+        const next = { ...prev }
+        delete next[deleteTarget.id]
+        return next
+      })
+      toast.success('Kontakt gelöscht')
+      onChanged()
+    } finally {
+      setDeletePending(false)
+    }
+  }
+
+  function kontaktRowMenu(k: ObjektKontakt): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openBearbeiten(k),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => setDeleteTarget(k),
+      },
+    ]
+  }
+
   function rowBody(k: ObjektKontakt) {
     const kontaktZeile =
       [k.telefon?.trim(), k.email?.trim()].filter(Boolean).join(' · ') || '—'
@@ -239,6 +285,7 @@ export function ObjektKontakteSection({
           isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
           isChecked && 'is-checked'
         )}
+        style={isMobile ? undefined : { gridTemplateColumns: KONTAKT_LIST_COLS }}
       >
         <ListRowCheck
           checked={isChecked}
@@ -274,6 +321,13 @@ export function ObjektKontakteSection({
             </>
           )}
         </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={kontaktRowMenu(k)} title={k.name} />
+        </div>
       </div>
     )
   }
@@ -310,11 +364,15 @@ export function ObjektKontakteSection({
           <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>
         ) : (
           <div className="ap-list vg-selectmode">
-            <div className="ap-list__head ap-list__head--select">
+            <div
+              className="ap-list__head ap-list__head--select"
+              style={{ gridTemplateColumns: KONTAKT_LIST_COLS }}
+            >
               <span aria-hidden />
               <span>Name</span>
               <span>Rolle</span>
               <span>Kontakt</span>
+              <span aria-hidden />
             </div>
             {liste.map(rowBody)}
           </div>
@@ -353,6 +411,39 @@ export function ObjektKontakteSection({
             : selectedCount === 1
               ? `„${selectedRows[0]?.name ?? 'Kontakt'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Kontakte werden unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
+
+      <MockModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        icon="trash"
+        title="Kontakt löschen?"
+        sub="Dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={deletePending ? undefined : 'trash'}
+              disabled={deletePending}
+              onClick={() => void runSingleDelete()}
+            >
+              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {deletePending
+            ? 'Bitte warten…'
+            : `„${deleteTarget?.name ?? 'Kontakt'}“ wird unwiderruflich gelöscht.`}
         </div>
       </MockModal>
 

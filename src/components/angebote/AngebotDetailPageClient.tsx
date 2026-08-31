@@ -492,8 +492,12 @@ export function AngebotDetailPageClient({
         send_kunden_email: false,
         direktOhneHvFreigabe: true,
       })
-      if (!res.ok) {
-        toast.error(res.message)
+      if (!res?.ok) {
+        toast.error(
+          res && 'message' in res && res.message
+            ? res.message
+            : 'Direkt Auftrag fehlgeschlagen — bitte neu laden.'
+        )
         return
       }
       toast.success('Auftrag erstellt — ohne Kundenmail / ohne HV-Freigabe')

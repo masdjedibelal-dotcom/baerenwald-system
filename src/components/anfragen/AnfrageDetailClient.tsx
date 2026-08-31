@@ -793,20 +793,13 @@ export function AnfrageDetailClient({
     )
   }, [lead.status, lead.org_freigabe_status, lead.hv_meldung_status])
 
-  const detailDanger = useMemo(() => {
-    if (hatAuftrag || istAkut || wartetAufHvFreigabe) return null
-    const verloren = statusActions.find((a) => a.id === 'verloren')
-    if (!verloren) return null
-    return {
-      label: verloren.label,
-      icon: verloren.icon,
-      danger: true,
-      onClick: verloren.onClick,
-    }
-  }, [hatAuftrag, istAkut, statusActions, wartetAufHvFreigabe])
-
   const statusMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items = statusActions.filter((a) => a.id !== 'verloren')
+    const items = statusActions.filter((a) => {
+      if (a.id !== 'verloren') return true
+      // Kein eigener Danger-Button mehr — nur ⋯; bei Auftrag/Akut ausblenden
+      if (hatAuftrag || istAkut) return false
+      return true
+    })
     if (!items.length) return []
     return items.map((a) => ({
       label: a.label,
@@ -814,7 +807,7 @@ export function AnfrageDetailClient({
       icon: a.icon ? <MockIcon ctx="btn" n={a.icon} size={16} /> : undefined,
       onClick: a.onClick,
     }))
-  }, [statusActions])
+  }, [statusActions, hatAuftrag, istAkut])
 
   const noShowTerminHinweis = useMemo(
     () =>
@@ -1022,7 +1015,6 @@ export function AnfrageDetailClient({
             sheetTitle="Anfrage"
             primary={detailPrimary}
             secondary={detailSecondary}
-            danger={detailDanger}
             menuItems={statusMenuItems}
           />
         ),

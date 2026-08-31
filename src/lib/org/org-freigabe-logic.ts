@@ -409,6 +409,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
       orgName,
       objektTitel,
       betrag,
+      bypassGrund,
     })
 
     return {
@@ -491,6 +492,7 @@ async function sendOrgAngebotInfoOnce(input: {
   orgName: string
   objektTitel: string
   betrag: number
+  bypassGrund?: 'schwelle' | 'akut' | null
 }): Promise<{ mailOk: boolean; mailError?: string }> {
   const { data: existing } = await supabaseAdmin
     .from('org_freigabe_log')
@@ -520,6 +522,7 @@ async function sendOrgAngebotInfoOnce(input: {
       objektTitel: input.objektTitel,
       betragEur: input.betrag,
       portalLink: buildPortalLoginLink(),
+      bypassGrund: input.bypassGrund ?? 'schwelle',
     },
     branding
   )

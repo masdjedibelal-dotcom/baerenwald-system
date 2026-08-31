@@ -206,10 +206,12 @@ export type AngebotWizardMeta = {
   hinweis_35a?: boolean
   hinweis_19?: boolean
   hinweis_13b?: boolean
-  /** Verwaltungsobjekt (Gewerbe/Hausverwaltung) — PDF „Durchführung in“ */
+  /** Verwaltungsobjekt (Gewerbe/Hausverwaltung) — PDF „Durchführung in“ / WEG-Kopf */
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort */
   objekt_anlage_id?: string | null
+  /** Optionaler Ansprechpartner (Anrede / z. Hd. / Mail) */
+  ansprechpartner_id?: string | null
 }
 
 export function plusDaysYmd(days: number): string {

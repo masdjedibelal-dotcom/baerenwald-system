@@ -30,7 +30,7 @@ type Props = {
   primary?: DetailActionDef | null
   /** Zweite Action (Bearbeiten, Rechnung erstellen, …) */
   secondary?: DetailActionDef | null
-  /** Gegen-Entscheidung (Ablehnen, Als verloren) — danger-outline */
+  /** Gegen-Entscheidung (z. B. Ablehnen) — danger-outline; optional, oft besser im ⋯ */
   danger?: DetailActionDef | null
   menuItems?: ActionsMenuItem[]
   sheetTitle?: string
