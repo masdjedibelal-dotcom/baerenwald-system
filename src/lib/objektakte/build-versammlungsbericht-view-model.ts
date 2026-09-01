@@ -363,4 +363,4 @@ export function buildVersammlungsberichtViewModel(
   }
 }
 
-export { esc, TEXT, TEXT_MUTED, LINE, ZEBRA, VERSAMMLUNG_ACCENT, VERSAMMLUNG_TINT }
+export { esc, TEXT, TEXT_MUTED, LINE, ZEBRA }
