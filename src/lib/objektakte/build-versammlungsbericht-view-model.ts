@@ -1,11 +1,14 @@
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
+import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { formatDatum } from '@/lib/utils'
 
-const PRIMARY_FALLBACK = '#333333'
-const TEXT = '#1e1c1a'
-const TEXT_MUTED = '#6b6660'
-const LINE = '#e2e0dc'
-const ZEBRA = '#f7f6f3'
+/** Identisch zu Angebot/Abnahme — Bericht ist Bärenwald-Service-Dokument */
+export const VERSAMMLUNG_ACCENT = '#1A3D2B'
+export const VERSAMMLUNG_TINT = '#F3F7F4'
+const TEXT = '#111111'
+const TEXT_MUTED = '#6B7280'
+const LINE = '#D1D5DB'
+const ZEBRA = '#F3F7F4'
 
 export type VersammlungsberichtViewModel = {
   primary: string
@@ -87,12 +90,6 @@ export type VersammlungsberichtViewModel = {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function hexOr(primary: string | null | undefined): string {
-  const h = (primary || '').trim()
-  if (/^#[0-9A-Fa-f]{6}$/.test(h)) return h
-  return PRIMARY_FALLBACK
 }
 
 function fmtEuro(n: number | null | undefined, decimals = 2): string {
@@ -187,13 +184,12 @@ export function buildVersammlungsberichtFilename(p: VersammlungsberichtPayload):
 export function buildVersammlungsberichtViewModel(
   p: VersammlungsberichtPayload
 ): VersammlungsberichtViewModel {
-  const primary = hexOr(p.orgPrimaryColor)
-  const org = esc(p.orgName)
-  const logo = p.orgLogoDataUrl?.trim()
+  const primary = VERSAMMLUNG_ACCENT
+  const bwLogo = resolveAngebotPdfLogoSrc(null)
   const logoHtml =
-    logo && (logo.startsWith('data:') || /^https?:\/\//i.test(logo))
-      ? `<img src="${logo.replace(/"/g, '&quot;')}" alt="" class="cover-logo" />`
-      : `<div class="cover-logo-fallback">${org}</div>`
+    bwLogo && (bwLogo.startsWith('data:') || /^https?:\/\//i.test(bwLogo))
+      ? `<img src="${bwLogo.replace(/"/g, '&quot;')}" alt="Bärenwald" class="cover-logo" />`
+      : `<div class="cover-logo-fallback">Bärenwald</div>`
 
   const zeitraumLabel = fmtRange(p.zeitraumVon, p.zeitraumBis)
   const erstelltAmLabel = formatDatum(p.erstelltAm)
@@ -367,4 +363,4 @@ export function buildVersammlungsberichtViewModel(
   }
 }
 
-export { esc, TEXT, TEXT_MUTED, LINE, ZEBRA }
+export { esc, TEXT, TEXT_MUTED, LINE, ZEBRA, VERSAMMLUNG_ACCENT, VERSAMMLUNG_TINT }

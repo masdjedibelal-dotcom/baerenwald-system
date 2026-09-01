@@ -15,10 +15,10 @@ export type RenderVersammlungsberichtResult =
   | { ok: false; message: string }
 
 const PDF_MARGIN = {
-  top: '18mm',
-  right: '20mm',
-  bottom: '22mm',
-  left: '20mm',
+  top: '14mm',
+  right: '16mm',
+  bottom: '28mm',
+  left: '16mm',
 }
 
 export async function renderVersammlungsberichtPdf(input: {

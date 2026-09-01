@@ -45,7 +45,10 @@ export function buildDashboardKpiSnapshot(input: {
       (Number(m?.rechnungen) || 0),
     0
   )
-  lines.push('', '## Umsatzverlauf (letzte 6 Monate)')
+  lines.push('', '## Umsatzverlauf')
+  lines.push(
+    '- Basis: nicht stornierte Aufträge (ab Annahme/Direkt) + gestellte Direktrechnungen; Korrektur = aktuelle Summe'
+  )
   lines.push(`- Summe gesamt: ${formatEurBetrag(umsatzTotal)}`)
   for (const m of months) {
     const offen = Number(m?.offen) || 0

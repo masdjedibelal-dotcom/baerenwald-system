@@ -1,13 +1,23 @@
+/**
+ * Objektbericht / Versammlungsbericht — HTML für PDF.
+ * Design 1:1 an Angebot/Abnahme: Accent #1A3D2B, Soft-Tint, Bärenwald-Logo, nummerierte Sektionen.
+ */
+
 import {
   buildVersammlungsberichtViewModel,
   esc,
   LINE,
   TEXT,
   TEXT_MUTED,
+  VERSAMMLUNG_ACCENT,
+  VERSAMMLUNG_TINT,
   ZEBRA,
   type VersammlungsberichtViewModel,
 } from '@/lib/objektakte/build-versammlungsbericht-view-model'
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
+
+const ACCENT = VERSAMMLUNG_ACCENT
+const TINT = VERSAMMLUNG_TINT
 
 function leerBox(text: string): string {
   return `<div class="leer-box">${esc(text)}</div>`
@@ -18,21 +28,21 @@ function statusDot(done: boolean): string {
   return `<span class="${cls}" aria-hidden="true"></span>`
 }
 
-function sectionHead(title: string, vm: VersammlungsberichtViewModel): string {
+function sectionHead(n: number, title: string, vm: VersammlungsberichtViewModel): string {
   return `<div class="running-head"><span>${esc(vm.objektTitel)}</span><span>${esc(vm.zeitraumLabel)}</span></div>
-    <h2 class="section-title">${esc(title)}</h2>`
+    <h2 class="section-title"><span class="section-num">${n}.</span> ${esc(title)}</h2>`
 }
 
 function buildCover(vm: VersammlungsberichtViewModel): string {
   const toc = [
-    'Zusammenfassung',
-    'Kosten nach Gewerk',
-    'Maßnahmen im Berichtszeitraum',
-    'Anlagen & Teile',
-    'Offene und laufende Maßnahmen',
+    '1. Zusammenfassung',
+    '2. Kosten nach Gewerk',
+    '3. Maßnahmen im Berichtszeitraum',
+    '4. Anlagen & Teile',
+    '5. Offene und laufende Maßnahmen',
   ]
   return `<section class="cover page-break-after">
-    <div class="cover-top">${vm.orgLogoHtml}</div>
+    <div class="logo-band">${vm.orgLogoHtml}</div>
     <div class="cover-body">
       <p class="cover-kicker">Objektbericht</p>
       <p class="cover-sub">Instandhaltung &amp; Reparaturen</p>
@@ -42,6 +52,7 @@ function buildCover(vm: VersammlungsberichtViewModel): string {
       <p class="cover-meta">Erstellt für die Eigentümerversammlung</p>
       <p class="cover-meta cover-meta--strong">${esc(vm.orgName)}</p>
       <p class="cover-meta">Erstellt am: ${esc(vm.erstelltAmLabel)}</p>
+      <p class="cover-meta">Erstellt mit Bärenwald</p>
     </div>
     <div class="cover-toc">
       <p class="cover-toc-title">Inhalt</p>
@@ -70,7 +81,7 @@ function buildZusammenfassung(vm: VersammlungsberichtViewModel): string {
       : ''
 
   return `<section class="content-section page-break-before">
-    ${sectionHead('Zusammenfassung', vm)}
+    ${sectionHead(1, 'Zusammenfassung', vm)}
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-val">${k.massnahmenGesamt}</div><div class="kpi-lbl">Maßnahmen gesamt</div></div>
       <div class="kpi-card"><div class="kpi-val tabular">${esc(k.gesamtKostenLabel)}</div><div class="kpi-lbl">Gesamtkosten</div>${ohneHinweis}</div>
@@ -101,15 +112,13 @@ function buildGewerk(vm: VersammlungsberichtViewModel): string {
        <div class="bar-sum tabular">Summe: ${esc(vm.gewerkSummeLabel)}</div>`
 
   return `<section class="content-section page-break-before">
-    ${sectionHead('Kosten nach Gewerk', vm)}
+    ${sectionHead(2, 'Kosten nach Gewerk', vm)}
     ${body}
   </section>`
 }
 
 function buildMassnahmen(vm: VersammlungsberichtViewModel): string {
-  const kostenCol = vm.zeigeEinzelpreise
-    ? `<th class="num">Kosten</th>`
-    : ''
+  const kostenCol = vm.zeigeEinzelpreise ? `<th class="num">Kosten</th>` : ''
   const body = vm.massnahmenLeer
     ? leerBox('Im gewählten Zeitraum wurden keine Maßnahmen durchgeführt.')
     : `<table class="data-table massnahmen-table">
@@ -143,7 +152,7 @@ function buildMassnahmen(vm: VersammlungsberichtViewModel): string {
       </table>`
 
   return `<section class="content-section page-break-before">
-    ${sectionHead('Maßnahmen im Berichtszeitraum', vm)}
+    ${sectionHead(3, 'Maßnahmen im Berichtszeitraum', vm)}
     ${body}
   </section>`
 }
@@ -195,7 +204,7 @@ function buildAnlagen(vm: VersammlungsberichtViewModel): string {
   }
 
   return `<section class="content-section page-break-before">
-    ${sectionHead('Anlagen & Teile', vm)}
+    ${sectionHead(4, 'Anlagen & Teile', vm)}
     ${body}
   </section>`
 }
@@ -226,20 +235,20 @@ function buildOffen(vm: VersammlungsberichtViewModel): string {
       </table>`
 
   return `<section class="content-section page-break-before">
-    ${sectionHead('Offene und laufende Maßnahmen', vm)}
+    ${sectionHead(5, 'Offene und laufende Maßnahmen', vm)}
     ${body}
     <div class="abbinder avoid-break">
       <hr class="abbinder-rule" />
       <p>Dieser Bericht wurde automatisch aus der Objektdokumentation erstellt.<br/>
       Alle Maßnahmen sind mit Fotos, Protokollen und Rechnungen hinterlegt und können bei der Verwaltung eingesehen werden.</p>
       <p class="abbinder-org">${esc(vm.orgName)}${vm.orgKontakt ? ` · ${esc(vm.orgKontakt)}` : ''}</p>
+      <p class="abbinder-brand">Erstellt mit Bärenwald</p>
     </div>
   </section>`
 }
 
 export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload): string {
   const vm = buildVersammlungsberichtViewModel(payload)
-  const p = vm.primary
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -248,7 +257,8 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
 <title>Objektbericht · ${esc(vm.objektTitel)}</title>
 <style>
   :root {
-    --primary: ${p};
+    --primary: ${ACCENT};
+    --tint: ${TINT};
     --text: ${TEXT};
     --muted: ${TEXT_MUTED};
     --line: ${LINE};
@@ -256,10 +266,7 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
   }
   @page {
     size: A4 portrait;
-    margin: 18mm 20mm 22mm 20mm;
-  }
-  @page :first {
-    margin-top: 18mm;
+    margin: 16mm 16mm 28mm 16mm;
   }
   * { box-sizing: border-box; }
   body {
@@ -277,28 +284,74 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
   .page-break-before { page-break-before: always; }
   .avoid-break { break-inside: avoid; page-break-inside: avoid; }
 
-  .cover { min-height: 250mm; position: relative; padding-top: 4mm; }
-  .cover-top { min-height: 18mm; margin-bottom: 28mm; }
-  .cover-logo { max-width: 40mm; max-height: 16mm; object-fit: contain; }
-  .cover-logo-fallback { font-size: 14pt; font-weight: 700; color: var(--text); }
-  .cover-body { text-align: center; padding: 0 8mm; }
+  /* Logo-Band wie Angebot */
+  .logo-band {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+  }
+  .cover-logo {
+    height: 56px;
+    width: auto;
+    max-width: 240px;
+    object-fit: contain;
+    display: block;
+  }
+  .cover-logo-fallback {
+    font-size: 16pt;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .cover { min-height: 240mm; position: relative; padding-top: 2mm; }
+  .cover-body { text-align: center; padding: 24mm 8mm 0; }
   .cover-kicker {
     margin: 0 0 6px;
     font-size: 9pt;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--primary);
+    color: var(--muted);
     font-weight: 700;
   }
-  .cover-sub { margin: 0 0 20px; color: var(--muted); font-size: 11pt; }
-  .cover-objekt { margin: 0 0 16px; font-size: 22pt; line-height: 1.25; font-weight: 700; }
-  .cover-range { margin: 0 0 20px; font-size: 12pt; color: var(--text); }
-  .cover-rule { border: none; border-top: 0.5pt solid var(--line); margin: 0 auto 18px; width: 55%; }
+  .cover-sub {
+    margin: 0 0 18px;
+    color: var(--primary);
+    font-size: 12pt;
+    font-weight: 700;
+  }
+  .cover-objekt {
+    margin: 0 0 16px;
+    font-size: 20pt;
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .cover-range { margin: 0 0 18px; font-size: 11pt; color: var(--text); }
+  .cover-rule {
+    border: none;
+    border-top: 2px solid var(--primary);
+    margin: 0 auto 18px;
+    width: 40%;
+  }
   .cover-meta { margin: 0 0 4px; font-size: 10pt; color: var(--muted); }
   .cover-meta--strong { color: var(--text); font-weight: 600; }
-  .cover-toc { position: absolute; bottom: 8mm; left: 0; right: 0; padding: 0 4mm; }
-  .cover-toc-title { margin: 0 0 6px; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .cover-toc-list { margin: 0; padding-left: 18px; font-size: 9pt; color: var(--muted); columns: 2; }
+  .cover-toc { position: absolute; bottom: 6mm; left: 0; right: 0; padding: 0 2mm; }
+  .cover-toc-title {
+    margin: 0 0 6px;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .cover-toc-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 9.5pt;
+    color: var(--text);
+    columns: 1;
+  }
+  .cover-toc-list li { margin-bottom: 3px; }
 
   .running-head {
     display: flex;
@@ -311,31 +364,64 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
   }
   .section-title {
     margin: 0 0 14px;
-    font-size: 15pt;
+    font-size: 12pt;
     font-weight: 700;
-    color: var(--text);
-    border-bottom: 2pt solid var(--primary);
-    padding-bottom: 4px;
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 6px;
   }
-  .sub-title { margin: 18px 0 8px; font-size: 11pt; font-weight: 700; }
+  .section-num { margin-right: 4px; }
+  .sub-title {
+    margin: 18px 0 8px;
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--primary);
+  }
 
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
-  .kpi-card { border: 0.5pt solid var(--line); padding: 10px 8px; text-align: center; }
-  .kpi-val { font-size: 14pt; font-weight: 700; line-height: 1.2; }
-  .kpi-lbl { font-size: 8pt; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .kpi-sub { margin: 4px 0 0; font-size: 7pt; color: var(--muted); line-height: 1.3; }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .kpi-card {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px 8px;
+    text-align: center;
+    background: var(--tint);
+  }
+  .kpi-val {
+    font-size: 14pt;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--primary);
+  }
+  .kpi-lbl {
+    font-size: 7.5pt;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .kpi-sub {
+    margin: 4px 0 0;
+    font-size: 7pt;
+    color: var(--muted);
+    line-height: 1.3;
+  }
 
-  .data-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
   .data-table thead { display: table-header-group; }
   .data-table th {
-    font-size: 8pt;
+    font-size: 7.5pt;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     color: var(--muted);
-    border-bottom: 0.75pt solid var(--line);
+    border-bottom: 1.5px solid var(--primary);
     padding: 6px 5px;
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
   }
   .data-table td {
     border-bottom: 0.5pt solid var(--line);
@@ -349,49 +435,97 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
   .data-table .col-date { width: 14mm; white-space: nowrap; }
   .massnahmen-table tr { break-inside: avoid; page-break-inside: avoid; }
   .foot-note { font-size: 8pt; color: var(--muted); padding-top: 8px; }
-  .foot-sum { font-weight: 700; }
+  .foot-sum { font-weight: 700; color: var(--text); }
   .foot-star { color: var(--muted); }
 
   .leer-box {
     margin: 8px 0;
     padding: 12px 14px;
-    background: var(--zebra);
-    border: 0.5pt solid var(--line);
+    background: var(--tint);
+    border: 1px solid var(--line);
+    border-radius: 4px;
     color: var(--muted);
     font-size: 9.5pt;
   }
 
   .hint-box {
     margin-top: 14px;
-    padding: 10px 12px;
-    border: 0.5pt solid var(--line);
-    background: #fff;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--tint);
   }
-  .hint-title { margin: 0 0 6px; font-weight: 700; font-size: 10pt; }
+  .hint-title {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 10pt;
+    color: var(--primary);
+  }
   .hint-box ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 9.5pt; }
 
-  .bar-row { display: grid; grid-template-columns: 32mm 1fr 28mm; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 9.5pt; }
-  .bar-track { height: 7mm; border: 0.5pt solid var(--line); background: #fff; position: relative; }
-  .bar-fill { height: 100%; background: #bbb; border-right: 0.5pt solid #888; min-width: 2mm; }
-  .bar-fill--primary { background: var(--primary); opacity: 0.85; }
-  .bar-val { text-align: right; font-size: 9pt; }
-  .bar-sum { margin-top: 10px; text-align: right; font-weight: 700; font-size: 10pt; border-top: 0.75pt solid var(--line); padding-top: 6px; }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 32mm 1fr 28mm;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 9.5pt;
+  }
+  .bar-label { font-weight: 600; color: var(--text); }
+  .bar-track {
+    height: 7mm;
+    border: 0.5pt solid var(--line);
+    background: #fff;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; background: #c5d0c8; min-width: 2mm; }
+  .bar-fill--primary { background: var(--primary); }
+  .bar-val { text-align: right; font-size: 9pt; color: var(--muted); }
+  .bar-sum {
+    margin-top: 10px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 10pt;
+    color: var(--primary);
+    border-top: 1.5px solid var(--primary);
+    padding-top: 6px;
+  }
 
-  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; border: 0.5pt solid #888; }
-  .dot--done { background: #2d6a4f; border-color: #2d6a4f; }
+  .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+    border: 0.5pt solid #888;
+  }
+  .dot--done { background: ${ACCENT}; border-color: ${ACCENT}; }
   .dot--open { background: #fff; }
   .kosten-offen { font-style: italic; color: var(--muted); }
   .sub-hint { font-size: 8pt; color: var(--muted); margin-top: 2px; }
 
-  .anlage-block { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 0.5pt solid var(--line); }
-  .anlage-block-title { margin: 0 0 4px; font-weight: 700; }
+  .anlage-block {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+  }
+  .anlage-block-title { margin: 0 0 4px; font-weight: 700; color: var(--primary); }
   .anlage-block-summary { margin: 0 0 6px; font-size: 9pt; color: var(--muted); }
   .anlage-block-foot { margin: 6px 0 0; font-size: 8.5pt; color: var(--muted); }
   .anlage-block-foot--warn { font-weight: 700; color: var(--text); }
 
-  .abbinder { margin-top: 20px; font-size: 8.5pt; color: var(--muted); line-height: 1.5; }
-  .abbinder-rule { border: none; border-top: 0.5pt solid var(--line); margin: 0 0 10px; }
+  .abbinder { margin-top: 22px; font-size: 8.5pt; color: var(--muted); line-height: 1.5; }
+  .abbinder-rule {
+    border: none;
+    border-top: 2px solid var(--primary);
+    margin: 0 0 10px;
+  }
   .abbinder-org { margin: 8px 0 0; font-weight: 600; color: var(--text); }
+  .abbinder-brand { margin: 4px 0 0; color: var(--primary); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -405,23 +539,35 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
 </html>`
 }
 
-/** Puppeteer footerTemplate — 3-spaltig laut Spec. */
-export function buildVersammlungsberichtPdfFooterTemplate(vm: VersammlungsberichtViewModel): string {
+/** Puppeteer footer — Angebots-Stil: links Bärenwald, Mitte Seite, rechts HV + Datum */
+export function buildVersammlungsberichtPdfFooterTemplate(
+  vm: VersammlungsberichtViewModel
+): string {
   const org = esc(vm.orgName)
   const erstellt = esc(vm.erstelltAmLabel)
-  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:${TEXT_MUTED};padding:0 20mm 2mm;border-top:0.5pt solid ${LINE};">
-    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;gap:8px;">
-      <span style="flex:1;text-align:left;">Erstellt am ${erstellt}</span>
-      <span style="flex:1;text-align:center;">${org}</span>
-      <span style="flex:1;text-align:right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></span>
+  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:${TEXT_MUTED};padding:4px 16mm 2px;border-top:0.5pt solid #E5E7EB;background:#fff;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;width:100%;">
+      <div style="flex:1;text-align:left;line-height:1.45;">
+        <span style="font-weight:700;color:${ACCENT};">Bärenwald</span><br/>
+        Objektbericht · ${erstellt}
+      </div>
+      <div style="flex:0 0 auto;text-align:center;line-height:1.45;white-space:nowrap;padding:0 8px;">
+        Seite <span class="pageNumber"></span> von <span class="totalPages"></span>
+      </div>
+      <div style="flex:1;text-align:right;line-height:1.45;">
+        ${org}<br/>
+        ${esc(vm.objektTitel)}
+      </div>
     </div>
   </div>`
 }
 
-export function buildVersammlungsberichtPdfHeaderTemplate(vm: VersammlungsberichtViewModel): string {
+export function buildVersammlungsberichtPdfHeaderTemplate(
+  vm: VersammlungsberichtViewModel
+): string {
   const left = esc(vm.objektTitel)
   const right = esc(vm.zeitraumLabel)
-  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:${TEXT_MUTED};padding:2mm 20mm 0;border-bottom:0.5pt solid ${LINE};">
+  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:${TEXT_MUTED};padding:2mm 16mm 0;border-bottom:0.5pt solid ${LINE};">
     <div style="display:flex;justify-content:space-between;width:100%;">
       <span>${left}</span><span>${right}</span>
     </div>

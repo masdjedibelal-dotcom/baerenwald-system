@@ -192,12 +192,36 @@ export function auftragNetto(auftrag: {
   return auftragSummenAusPositionen(pos as AngebotPosition[]).netto
 }
 
+/**
+ * CRM-Umsatz (eine Definition für Monate + Gewerk):
+ * - Aufträge ab Angebotsannahme inkl. Direktauftrag (jeder nicht stornierte Auftrag)
+ * - Direktrechnungen ohne Auftrag (gestellt/bezahlt; ersetzt/storniert/entwurf raus)
+ * - Auftrag-Storno gesamt → fällt raus
+ * - Korrekturen: aktuelle Angebots-/Rechnungssumme zählt (alte ersetzt_durch zählen nicht)
+ */
+export function isUmsatzAuftragStatus(status: string | null | undefined): boolean {
+  const s = String(status ?? '').trim().toLowerCase()
+  return Boolean(s) && s !== 'storniert'
+}
+
+export function isUmsatzDirektRechnung(r: {
+  status?: string | null
+  auftrag_id?: string | null
+  ersetzt_durch?: string | null
+}): boolean {
+  if ((r.auftrag_id ?? '').trim()) return false
+  if ((r.ersetzt_durch ?? '').trim()) return false
+  const st = String(r.status ?? '').trim().toLowerCase()
+  return st === 'gesendet' || st === 'bezahlt' || st === 'versendet'
+}
+
 export type UmsatzMonat = {
   key: string
   label: string
   /** Aktive Aufträge (offen / in Arbeit / Abnahme) */
   offen: number
   abgeschlossen: number
+  /** Direktrechnungen ohne Auftrag */
   rechnungen: number
 }
 
@@ -205,7 +229,57 @@ export function umsatzMonatGesamt(m: Pick<UmsatzMonat, 'offen' | 'abgeschlossen'
   return (Number(m.offen) || 0) + (Number(m.abgeschlossen) || 0) + (Number(m.rechnungen) || 0)
 }
 
-/** Letzte `monateCount` Kalendermonate inkl. aktueller Monat (default 6). */
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthLabel(d: Date): string {
+  return d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
+}
+
+function buildMonthBuckets(
+  range: { from: Date; to: Date } | null | undefined,
+  monateCount: number,
+  now: Date
+): UmsatzMonat[] {
+  const months: UmsatzMonat[] = []
+  if (range) {
+    let cursor = new Date(range.from.getFullYear(), range.from.getMonth(), 1)
+    const end = new Date(range.to.getFullYear(), range.to.getMonth(), 1)
+    while (cursor.getTime() <= end.getTime() && months.length < 24) {
+      months.push({
+        key: monthKey(cursor),
+        label: monthLabel(cursor),
+        offen: 0,
+        abgeschlossen: 0,
+        rechnungen: 0,
+      })
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    }
+    return months
+  }
+  const n = Math.max(1, Math.floor(monateCount))
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      key: monthKey(d),
+      label: monthLabel(d),
+      offen: 0,
+      abgeschlossen: 0,
+      rechnungen: 0,
+    })
+  }
+  return months
+}
+
+export type BuildUmsatzverlaufOpts = {
+  monateCount?: number
+  now?: Date
+  /** Dashboard-Zeitraum — Monate werden aus dem Range gebaut; null = letzte N Monate. */
+  range?: { from: Date; to: Date } | null
+}
+
+/** Umsatzverlauf — gleiche Basis wie Gewerk (Aufträge + Direkt-RE). */
 export function buildUmsatzverlauf(
   auftraege: Array<{
     status: string
@@ -218,41 +292,35 @@ export function buildUmsatzverlauf(
     created_at: string
     netto?: number | null
     auftrag_id?: string | null
+    ersetzt_durch?: string | null
   }> = [],
-  monateCount = 6,
-  now = new Date()
+  monateCountOrOpts: number | BuildUmsatzverlaufOpts = 6,
+  nowArg = new Date()
 ): UmsatzMonat[] {
-  const n = Math.max(1, Math.floor(monateCount))
-  const months: UmsatzMonat[] = []
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const label = d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
-    months.push({ key, label, offen: 0, abgeschlossen: 0, rechnungen: 0 })
-  }
+  const opts: BuildUmsatzverlaufOpts =
+    typeof monateCountOrOpts === 'number'
+      ? { monateCount: monateCountOrOpts, now: nowArg }
+      : monateCountOrOpts
+  const now = opts.now ?? nowArg
+  const months = buildMonthBuckets(opts.range, opts.monateCount ?? 6, now)
   const byKey = new Map(months.map((m) => [m.key, m]))
 
   for (const a of auftraege) {
-    if (a.status === 'storniert') continue
+    if (!isUmsatzAuftragStatus(a.status)) continue
     const created = new Date(a.created_at)
     if (Number.isNaN(created.getTime())) continue
-    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
-    const bucket = byKey.get(key)
+    const bucket = byKey.get(monthKey(created))
     if (!bucket) continue
     const netto = auftragNetto(a as Parameters<typeof auftragNetto>[0])
     if (a.status === 'abgeschlossen') bucket.abgeschlossen += netto
-    else if (a.status === 'offen' || a.status === 'in_arbeit' || a.status === 'abnahme') {
-      bucket.offen += netto
-    }
+    else bucket.offen += netto
   }
 
   for (const r of rechnungen) {
-    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    if ((r.auftrag_id ?? '').trim()) continue
+    if (!isUmsatzDirektRechnung(r)) continue
     const created = new Date(r.created_at)
     if (Number.isNaN(created.getTime())) continue
-    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
-    const bucket = byKey.get(key)
+    const bucket = byKey.get(monthKey(created))
     if (!bucket) continue
     bucket.rechnungen += Number(r.netto) || 0
   }
@@ -260,12 +328,12 @@ export function buildUmsatzverlauf(
   return months
 }
 
-/** @deprecated Nutze buildUmsatzverlauf(..., [], 12) */
+/** @deprecated Nutze buildUmsatzverlauf(..., { monateCount: 12 }) */
 export function buildUmsatzverlauf12m(
   auftraege: Parameters<typeof buildUmsatzverlauf>[0],
   now = new Date()
 ): UmsatzMonat[] {
-  return buildUmsatzverlauf(auftraege, [], 12, now)
+  return buildUmsatzverlauf(auftraege, [], { monateCount: 12, now })
 }
 
 export type GewerkUmsatzZeile = {
@@ -379,39 +447,52 @@ function addGewerkPositionen(
 }
 
 /**
- * Umsatz nach Gewerk (Katalog aus Angebot/Rechnung-Select):
- * - abgeschlossene Aufträge/Leads über Angebotspositionen
- * - plus Rechnungspositionen nur ohne Auftrag (Direktrechnungen)
- * Aggregiert nach gewerk_id/slug → `gewerke.name`, nicht nach Block-Titel.
+ * Umsatz nach Gewerk — gleiche Umsatz-Basis wie Monatsverlauf.
+ * Aufträge (nicht storniert) über Angebots-/Auftragspositionen + Direkt-RE-Positionen.
  */
 export function buildGewerkUmsatz(
-  angebote: Array<{
-    positionen?: unknown
-    leads?: { status?: string | null } | { status?: string | null }[] | null
-    auftraege?: { status?: string | null } | { status?: string | null }[] | null
+  auftraege: Array<{
+    status?: string | null
+    angebote?:
+      | { positionen?: unknown }
+      | { positionen?: unknown }[]
+      | null
+    auftrag_positionen?: AngebotPosition[] | AuftragPosition[] | null
   }>,
   rechnungen: Array<{
     positionen?: unknown
     status?: string | null
     auftrag_id?: string | null
+    ersetzt_durch?: string | null
   }> = [],
   gewerkeKatalog: DashboardGewerkKatalog[] = []
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
   const lookup = buildGewerkLookup(gewerkeKatalog)
   const map = new Map<string, number>()
 
-  for (const ang of angebote) {
-    const lead = Array.isArray(ang.leads) ? ang.leads[0] : ang.leads
-    const auftrag = Array.isArray(ang.auftraege) ? ang.auftraege[0] : ang.auftraege
-    const leadDone = String(lead?.status ?? '').toLowerCase() === 'abgeschlossen'
-    const auftragDone = String(auftrag?.status ?? '').toLowerCase() === 'abgeschlossen'
-    if (!leadDone && !auftragDone) continue
-    addGewerkPositionen(map, ang.positionen, lookup)
+  for (const a of auftraege) {
+    if (!isUmsatzAuftragStatus(a.status)) continue
+    const ang = Array.isArray(a.angebote) ? a.angebote[0] : a.angebote
+    if (ang?.positionen) {
+      addGewerkPositionen(map, ang.positionen, lookup)
+      continue
+    }
+    const pos = a.auftrag_positionen
+    if (!pos?.length) continue
+    const first = pos[0] as AuftragPosition & AngebotPosition
+    if ('preis_fix' in first || 'lohn_fix' in first || 'leistung_name' in first) {
+      addGewerkPositionen(
+        map,
+        auftragPositionenToAngebotPositionen(pos as AuftragPosition[]),
+        lookup
+      )
+    } else {
+      addGewerkPositionen(map, pos, lookup)
+    }
   }
 
   for (const r of rechnungen) {
-    if (String(r.status ?? '').toLowerCase() === 'storniert') continue
-    if ((r.auftrag_id ?? '').trim()) continue
+    if (!isUmsatzDirektRechnung(r)) continue
     addGewerkPositionen(map, r.positionen, lookup)
   }
 

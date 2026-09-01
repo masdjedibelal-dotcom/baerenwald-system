@@ -20,6 +20,7 @@ import {
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
+  isUmsatzAuftragStatus,
   type DashboardZeitraumFilter,
 } from '@/lib/dashboard/dashboard-analytics'
 import {
@@ -190,7 +191,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           .from('rechnungen')
           .select(
             `
-            id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto,
+            id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto, ersetzt_durch,
             kunden(id, name, vorname, nachname)
           `
           )
@@ -203,8 +204,9 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, auftrag_id, positionen')
+          .select('id, status, created_at, auftrag_id, ersetzt_durch, positionen')
           .neq('status', 'storniert')
+          .neq('status', 'entwurf')
           .order('created_at', { ascending: false })
           .limit(800)
       )
@@ -254,6 +256,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     kunde_id?: string | null
     netto?: number | null
     brutto?: number | null
+    ersetzt_durch?: string | null
     kunden?:
       | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }
       | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }[]
@@ -264,6 +267,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     status: string
     created_at: string
     auftrag_id?: string | null
+    ersetzt_durch?: string | null
     positionen?: unknown
   }>
 
@@ -324,20 +328,21 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     },
   ]
 
-  // Umsatzverlauf: letzte 6 Monate — aktive/abgeschlossene Aufträge + Rechnungen
+  // Umsatz: Aufträge ab Annahme/Direkt + Direkt-RE (gleiche Basis Monate/Gewerk)
   const umsatzMonate = buildUmsatzverlauf(
-    auftraege.map((a) => ({
+    auftraegeZ.map((a) => ({
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
       angebote: a.angebote as never,
     })),
-    rechnungen.map((r) => ({
+    rechnungenZ.map((r) => ({
       status: r.status,
       created_at: r.created_at,
       netto: r.netto,
       auftrag_id: r.auftrag_id,
+      ersetzt_durch: r.ersetzt_durch,
     })),
-    6
+    { range: zeitraumRange, monateCount: 6 }
   )
 
   const auftraegeFunnelZ = auftraegeZ.filter(
@@ -372,16 +377,54 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
       slug: String(g.slug ?? ''),
     })
   )
+
+  const umsatzAuftraegeZ = auftraegeZ.filter((a) => isUmsatzAuftragStatus(String(a.status ?? '')))
+  const angebotIdsForGewerk = [
+    ...new Set(
+      umsatzAuftraegeZ
+        .map((a) => String(a.angebot_id ?? '').trim())
+        .filter(Boolean)
+    ),
+  ].slice(0, 200)
+
+  const angebotPositionenById = new Map<string, unknown>()
+  for (let i = 0; i < angebotIdsForGewerk.length; i += 40) {
+    const chunk = angebotIdsForGewerk.slice(i, i + 40)
+    const rows = await safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db.from('angebote').select('id, positionen').in('id', chunk)
+      )
+    )
+    for (const row of rows as Array<{ id?: string; positionen?: unknown }>) {
+      const id = String(row.id ?? '').trim()
+      if (id) angebotPositionenById.set(id, row.positionen)
+    }
+  }
+
   const gewerk = buildGewerkUmsatz(
-    angeboteZ.map((a) => ({
-      positionen: a.positionen,
-      leads: a.leads as never,
-      auftraege: a.auftraege as never,
-    })),
+    umsatzAuftraegeZ.map((a) => {
+      const angId = String(a.angebot_id ?? '').trim()
+      const pos = angId ? angebotPositionenById.get(angId) : undefined
+      const embedded = a.angebote as
+        | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }
+        | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }[]
+        | null
+        | undefined
+      const base = Array.isArray(embedded) ? embedded[0] : embedded
+      return {
+        status: String(a.status ?? ''),
+        angebote: base
+          ? { ...base, positionen: pos }
+          : pos
+            ? { positionen: pos }
+            : null,
+      }
+    }),
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
       auftrag_id: r.auftrag_id,
+      ersetzt_durch: r.ersetzt_durch,
     })),
     gewerkeKatalog
   )

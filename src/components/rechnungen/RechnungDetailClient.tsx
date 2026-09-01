@@ -536,9 +536,7 @@ export function RechnungDetailClient({
     const korrekturDisabled = korrekturModus === 'gesperrt'
     const korrekturHint = korrekturDisabled
       ? `${statusLabel} — Korrektur nicht möglich`
-      : korrekturModus === 'storno_neu'
-        ? 'Storno + neue RE'
-        : undefined
+      : undefined
 
     const erinnerungOk =
       belegTyp === 'rechnung' && (st === 'gesendet' || ueberfaellig) && st !== 'bezahlt' && st !== 'storniert'
@@ -558,13 +556,21 @@ export function RechnungDetailClient({
         icon: <MockIcon ctx="btn" n="file" size={16} />,
         onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
       },
-      {
-        label: korrekturModus === 'storno_neu' ? 'Storno / Korrektur' : 'Korrektur',
+    ]
+
+    // Gesendet/Bezahlt: Korrektur nur über Sekundär-CTA „Rechnung korrigieren“
+    // (Storno-Gutschrift + neue RE). Kein zweites Menü „Storno / Korrektur“.
+    if (korrekturModus !== 'storno_neu' && !secondaryAction) {
+      items.push({
+        label: 'Korrektur',
         icon: <MockIcon ctx="btn" n="pencil" size={16} />,
         disabled: korrekturDisabled,
         hint: korrekturHint,
         onClick: () => handleKorrigieren(),
-      },
+      })
+    }
+
+    items.push(
       {
         label: 'Zahlungserinnerung',
         icon: <MockIcon ctx="btn" n="mail" size={16} />,
@@ -580,8 +586,8 @@ export function RechnungDetailClient({
               onClick: () => setRechnungConfirm('unbezahlt'),
             },
           ] as ActionsMenuItem[])
-        : []),
-    ]
+        : [])
+    )
     return items
   }, [
     isEingehend,
@@ -593,6 +599,7 @@ export function RechnungDetailClient({
     ueberfaellig,
     router,
     refresh,
+    secondaryAction,
   ])
 
   const projektTitelAnzeige = isEingehend

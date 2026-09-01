@@ -241,7 +241,7 @@ function GewerkUmsatzCard({
       <div className="card-b">
         {(zeilen ?? []).length === 0 ? (
           <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
-            Noch keine abgeschlossenen Vorgänge mit Gewerken.
+            Noch keine beauftragten Umsätze mit Gewerken.
           </p>
         ) : (
           <div className="space-y-3">
