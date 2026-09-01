@@ -7,6 +7,7 @@ import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
 import { neuePositionsId, positionVkNettoStueck } from '@/lib/angebot-positionen'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { resolvePositionBeschreibungExport } from '@/lib/gewerke-ausfuehrung'
+import { withResolvedGewerkMeta } from '@/lib/angebote/resolve-position-gewerk'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
 import type { WizardPosition } from '@/lib/angebote/angebot-wizard-types'
 
@@ -275,11 +276,19 @@ export function dokumentZeilenToAngebotPositionen(
         kostenverteilung,
       })
       const isRegie = Boolean(z.regieSchein)
+      const gewerkFields = withResolvedGewerkMeta(
+        {
+          gewerk_id: z.gewerk_id ?? '',
+          gewerk_slug: z.gewerk_slug,
+          gewerk_name: z.gewerkName ?? 'Allgemein',
+        },
+        gewerke
+      )
       out.push({
         id: z.id,
-        gewerk_id: z.gewerk_id ?? '',
-        gewerk_name: z.gewerkName ?? 'Allgemein',
-        gewerk_slug: z.gewerk_slug,
+        gewerk_id: gewerkFields.gewerk_id,
+        gewerk_name: gewerkFields.gewerk_name,
+        gewerk_slug: gewerkFields.gewerk_slug,
         gewerk_block_key: z.gewerk_block_key?.trim() || undefined,
         leistung: z.bezeichnung.trim() || 'Position',
         beschreibung: resolvePositionBeschreibungExport(

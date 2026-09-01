@@ -11,6 +11,10 @@ import {
 import { splitNettoStueck, type KostenVerteilung } from '@/lib/angebot-kosten-split'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
+import {
+  resolveGewerkForAngebotPositionen,
+} from '@/lib/angebote/resolve-position-gewerk'
+import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { syncAngebotPositionenZuAuftrag } from '@/lib/auftraege/sync-angebot-zu-auftrag'
 import { istFreitextPosition, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
@@ -347,7 +351,14 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
       : null
   const ekById = input.ekNettoByPositionId ?? null
 
-  const next = [...gate.positionen]
+  const gewerke = await loadGewerkeAusfuehrung(gate.supabase!)
+  const positionenResolved = await resolveGewerkForAngebotPositionen(
+    gate.supabase!,
+    gate.positionen,
+    gewerke
+  )
+
+  const next = [...positionenResolved]
   let updated = 0
   const gewerkIds = new Set<string>()
 
@@ -395,7 +406,7 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     }
     updated++
 
-    const gid = current.gewerk_id?.trim()
+    const gid = next[idx]!.gewerk_id?.trim()
     if (!gid) {
       return {
         ok: false,

@@ -374,6 +374,8 @@ export function PosBoard({
     const np = neuePosBoardLine({
       id,
       gewerk: gewerkName,
+      gewerk_id: pl.gewerk_id?.trim() || pl.gewerke?.id?.trim() || null,
+      gewerk_slug: pl.gewerke?.slug?.trim() || null,
       name: pl.leistung,
       beschreibung: '',
       menge: 1,
@@ -393,7 +395,7 @@ export function PosBoard({
   }
 
   const addFromKatalog = (r: {
-    position: { titel: string; gewerk_name?: string | null }
+    position: { titel: string; gewerk_id?: string; gewerk_name?: string | null; gewerk_slug?: string | null }
     variante: {
       id: string
       beschreibung: string
@@ -413,6 +415,8 @@ export function PosBoard({
     const np = neuePosBoardLine({
       id,
       gewerk: gewerkName,
+      gewerk_id: r.position.gewerk_id?.trim() || null,
+      gewerk_slug: r.position.gewerk_slug?.trim() || null,
       name: r.position.titel,
       beschreibung: r.beschreibung,
       menge: r.menge,

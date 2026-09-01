@@ -15,13 +15,17 @@ import {
   type DokumentZeile,
   type MwstSatzOption,
 } from '@/lib/dokument-zeilen'
-import type { AngebotPosition } from '@/lib/types'
+import { withResolvedGewerkMeta } from '@/lib/angebote/resolve-position-gewerk'
+import type { AngebotPosition, Gewerk } from '@/lib/types'
 
 export type PosBoardLineKind = 'position' | 'freitext' | 'nachlass'
 
 export type PosBoardLine = {
   id: string
   gewerk: string
+  /** Gewerk-UUID (Katalog/Preisliste) — für Speichern & Zuweisung */
+  gewerk_id?: string | null
+  gewerk_slug?: string | null
   name: string
   beschreibung?: string
   menge: number
@@ -91,6 +95,8 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
   return {
     id: p.id,
     gewerk: p.gewerk_name?.trim() || p.gewerk_id || POS_BOARD_DEFAULT_GEWERK,
+    gewerk_id: p.gewerk_id?.trim() || null,
+    gewerk_slug: p.gewerk_slug?.trim() || null,
     name: displayName,
     beschreibung: name ? beschreibungRaw : '',
     menge: Number(p.menge) || 0,
@@ -111,9 +117,25 @@ export function posBoardLineFromAngebotPosition(p: AngebotPosition): PosBoardLin
   }
 }
 
+function resolvePosBoardGewerkFields(
+  line: PosBoardLine,
+  base: Partial<AngebotPosition> | undefined,
+  gewerke: Gewerk[]
+): Pick<AngebotPosition, 'gewerk_id' | 'gewerk_name' | 'gewerk_slug'> {
+  return withResolvedGewerkMeta(
+    {
+      gewerk_id: line.gewerk_id?.trim() || base?.gewerk_id?.trim() || '',
+      gewerk_slug: line.gewerk_slug?.trim() || base?.gewerk_slug?.trim(),
+      gewerk_name: line.gewerk?.trim() || base?.gewerk_name?.trim() || POS_BOARD_DEFAULT_GEWERK,
+    },
+    gewerke
+  )
+}
+
 export function posBoardLineToAngebotPosition(
   line: PosBoardLine,
-  base?: Partial<AngebotPosition>
+  base?: Partial<AngebotPosition>,
+  gewerke: Gewerk[] = []
 ): AngebotPosition {
   const m = Math.max(line.menge || 1, 0.0001)
   const vk = Math.round((Number(line.preis) || 0) * 100) / 100
@@ -127,12 +149,13 @@ export function posBoardLineToAngebotPosition(
     kostenverteilung,
   })
   const isRegie = Boolean(line.regieSchein)
+  const gewerkFields = resolvePosBoardGewerkFields(line, base, gewerke)
   return {
     ...(base ?? {}),
     id: line.id,
-    gewerk_id: base?.gewerk_id ?? '',
-    gewerk_name: line.gewerk,
-    gewerk_slug: base?.gewerk_slug,
+    gewerk_id: gewerkFields.gewerk_id,
+    gewerk_name: gewerkFields.gewerk_name,
+    gewerk_slug: gewerkFields.gewerk_slug,
     gewerk_block_key: base?.gewerk_block_key,
     leistung: line.name,
     leistung_name: line.name,
@@ -175,10 +198,11 @@ export function posBoardLinesFromAngebotPositionen(
 
 export function posBoardLinesToAngebotPositionen(
   lines: PosBoardLine[] | null | undefined,
-  baseById?: Map<string, Partial<AngebotPosition>>
+  baseById?: Map<string, Partial<AngebotPosition>>,
+  gewerke: Gewerk[] = []
 ): AngebotPosition[] {
   const list = Array.isArray(lines) ? lines : []
-  return list.map((line) => posBoardLineToAngebotPosition(line, baseById?.get(line.id)))
+  return list.map((line) => posBoardLineToAngebotPosition(line, baseById?.get(line.id), gewerke))
 }
 
 export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoardLine {
@@ -186,6 +210,8 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
   return {
     id: z.id,
     gewerk: z.gewerkName?.trim() || GEWERK_NAME_ALLGEMEIN,
+    gewerk_id: z.gewerk_id?.trim() || null,
+    gewerk_slug: z.gewerk_slug?.trim() || null,
     // Leer lassen dürfen — sonst springt der Editor bei Löschen zurück auf „Position“
     name: z.bezeichnung ?? '',
     beschreibung: z.positionBeschreibung ?? undefined,
@@ -209,12 +235,24 @@ export function posBoardLineFromDokumentArtikel(z: DokumentArtikelZeile): PosBoa
 
 export function posBoardLineToDokumentArtikel(
   line: PosBoardLine,
-  base?: Partial<DokumentArtikelZeile>
+  base?: Partial<DokumentArtikelZeile>,
+  gewerke: Gewerk[] = []
 ): DokumentArtikelZeile {
   const mwst: MwstSatzOption =
     line.ust === 0 || line.ust === 7 ? line.ust : 19
   const kostenverteilung = parseKostenverteilung(
     line.kostenverteilung ?? base?.kostenverteilung
+  )
+  const gewerkFields = resolvePosBoardGewerkFields(
+    line,
+    base
+      ? {
+          gewerk_id: base.gewerk_id,
+          gewerk_slug: base.gewerk_slug,
+          gewerk_name: base.gewerkName,
+        }
+      : undefined,
+    gewerke
   )
   return {
     ...neueArtikelZeile({
@@ -227,9 +265,9 @@ export function posBoardLineToDokumentArtikel(
       einheit: line.einheit,
       vkNetto: line.preis,
       mwstSatz: mwst,
-      gewerkName: line.gewerk,
-      gewerk_id: base?.gewerk_id,
-      gewerk_slug: base?.gewerk_slug,
+      gewerkName: gewerkFields.gewerk_name,
+      gewerk_id: gewerkFields.gewerk_id,
+      gewerk_slug: gewerkFields.gewerk_slug,
       gewerk_block_key: base?.gewerk_block_key,
       preisliste_id: line.variante_id || line.preisliste_id || base?.preisliste_id,
       variante_id: line.variante_id || line.preisliste_id || base?.variante_id,
@@ -287,7 +325,8 @@ export function dokumentZeilenToPosBoardLines(zeilen: DokumentZeile[]): PosBoard
 /** Ersetzt alle PosBoard-Zeilen inkl. Freitext/Nachlass. */
 export function posBoardLinesToDokumentZeilen(
   lines: PosBoardLine[],
-  existing: DokumentZeile[]
+  existing: DokumentZeile[],
+  gewerke: Gewerk[] = []
 ): DokumentZeile[] {
   const baseById = new Map<string, DokumentArtikelZeile>()
   const freitextById = new Map<string, DokumentFreitextZeile>()
@@ -327,7 +366,7 @@ export function posBoardLinesToDokumentZeilen(
       }
       continue
     }
-    out.push(posBoardLineToDokumentArtikel(line, baseById.get(line.id)))
+    out.push(posBoardLineToDokumentArtikel(line, baseById.get(line.id), gewerke))
   }
 
   return nachlass ? [...out, nachlass] : out

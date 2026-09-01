@@ -668,7 +668,7 @@ export function AngebotWizard({
   }
 
   function onPosBoardChange(next: PosBoardLine[]) {
-    syncZeilenToPositions(posBoardLinesToDokumentZeilen(next, zeilen))
+    syncZeilenToPositions(posBoardLinesToDokumentZeilen(next, zeilen, gewerke))
   }
 
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])

@@ -680,7 +680,7 @@ export function RechnungWizard({
   }, [draftSnapshot])
 
   function onPosBoardChange(next: PosBoardLine[]) {
-    setZeilen(posBoardLinesToDokumentZeilen(next, zeilen))
+    setZeilen(posBoardLinesToDokumentZeilen(next, zeilen, gewerke))
   }
 
   function patchPlanZeile(id: string, patch: Partial<ZahlungsplanZeile>) {
