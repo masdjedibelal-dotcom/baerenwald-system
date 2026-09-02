@@ -257,7 +257,10 @@ function PositionAccordionItem({
       return plain || null
     }
     if (z.typ === 'gesamtrabatt') {
-      return z.modus === 'prozent' ? `${z.wert} % Nachlass` : 'Betrag-Nachlass'
+      if (z.modus === 'prozent') return `${z.wert} % Nachlass`
+      if (z.modus === 'ziel_netto') return `Ziel Netto ${z.wert} €`
+      if (z.modus === 'ziel_brutto') return `Ziel Brutto ${z.wert} €`
+      return 'Betrag-Nachlass'
     }
     return null
   })()
@@ -343,19 +346,64 @@ function PositionAccordionItem({
                 autoFocus={display === 'editor'}
               />
             </WizardField>
-            <WizardField label="Art des Nachlasses">
+            <WizardField label="Art des Nachlasses" hint="Oder neuen Gesamtbetrag setzen — Rabatt wird berechnet">
               <select
                 className="input w-full"
-                value={z.modus}
-                onChange={(e) =>
-                  onPatch({ modus: e.target.value as DokumentGesamtrabattZeile['modus'] })
+                value={
+                  z.modus === 'ziel_netto' || z.modus === 'ziel_brutto' ? 'ziel' : z.modus
                 }
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === 'ziel') {
+                    const artikelNetto = summeArtikelNetto(zeilen)
+                    onPatch({
+                      modus: 'ziel_netto',
+                      wert:
+                        z.modus === 'ziel_netto' || z.modus === 'ziel_brutto'
+                          ? z.wert
+                          : Math.round(Math.max(0, artikelNetto) * 100) / 100,
+                    })
+                    return
+                  }
+                  onPatch({ modus: v as DokumentGesamtrabattZeile['modus'] })
+                }}
               >
                 <option value="prozent">Prozent vom Netto</option>
                 <option value="betrag">Fester Betrag</option>
+                <option value="ziel">Neuer Gesamtbetrag</option>
               </select>
             </WizardField>
-            <WizardField label={z.modus === 'prozent' ? 'Prozent' : 'Betrag netto'}>
+            {z.modus === 'ziel_netto' || z.modus === 'ziel_brutto' ? (
+              <WizardField label="Basis">
+                <div className="seg" role="group" aria-label="Netto oder Brutto">
+                  <button
+                    type="button"
+                    className={z.modus === 'ziel_netto' ? 'on' : undefined}
+                    onClick={() => onPatch({ modus: 'ziel_netto' })}
+                  >
+                    Netto
+                  </button>
+                  <button
+                    type="button"
+                    className={z.modus === 'ziel_brutto' ? 'on' : undefined}
+                    onClick={() => onPatch({ modus: 'ziel_brutto' })}
+                  >
+                    Brutto
+                  </button>
+                </div>
+              </WizardField>
+            ) : null}
+            <WizardField
+              label={
+                z.modus === 'prozent'
+                  ? 'Prozent'
+                  : z.modus === 'ziel_brutto'
+                    ? 'Neuer Brutto-Gesamtbetrag'
+                    : z.modus === 'ziel_netto'
+                      ? 'Neuer Netto-Gesamtbetrag'
+                      : 'Betrag netto'
+              }
+            >
               <div className="txt-prefix">
                 <span className="prefix">{z.modus === 'prozent' ? '%' : '€'}</span>
                 <ClearableNumberInput

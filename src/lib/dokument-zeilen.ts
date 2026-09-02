@@ -77,13 +77,66 @@ export type DokumentFreitextZeile = {
   gewerk_block_key?: string
 }
 
+/** Nachlass-Art: Prozent / fester Abzug / Ziel-Gesamtbetrag (Netto oder Brutto). */
+export type GesamtrabattModus = 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+
 export type DokumentGesamtrabattZeile = {
   id: string
   typ: 'gesamtrabatt'
   bezeichnung: string
-  modus: 'prozent' | 'betrag'
+  modus: GesamtrabattModus
+  /** Prozent, Abzugsbetrag netto, oder Ziel-Gesamtbetrag (je nach modus) */
   wert: number
   gewerk_block_key?: string
+}
+
+export function parseGesamtrabattModus(raw: string | null | undefined): GesamtrabattModus {
+  const m = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+  if (m === 'betrag') return 'betrag'
+  if (m === 'ziel_netto' || m === 'zielnetto') return 'ziel_netto'
+  if (m === 'ziel_brutto' || m === 'zielbrutto') return 'ziel_brutto'
+  return 'prozent'
+}
+
+export function isGesamtrabattZielModus(
+  modus: string | null | undefined
+): modus is 'ziel_netto' | 'ziel_brutto' {
+  return modus === 'ziel_netto' || modus === 'ziel_brutto'
+}
+
+/** Abzug (positiv, netto) aus Modus + Wert. */
+export function gesamtrabattAbzugFromModus(
+  modus: GesamtrabattModus,
+  wert: number,
+  artikelNetto: number,
+  artikelBrutto?: number
+): number {
+  const netto = Math.max(0, artikelNetto)
+  if (modus === 'prozent') {
+    const p = Math.max(0, Math.min(100, wert))
+    if (p <= 0 || netto <= 0) return 0
+    return Math.round(netto * (p / 100) * 100) / 100
+  }
+  if (modus === 'betrag') {
+    if (wert <= 0 || netto <= 0) return 0
+    return Math.round(Math.min(netto, Math.max(0, wert)) * 100) / 100
+  }
+  if (modus === 'ziel_netto') {
+    const ziel = Math.max(0, wert)
+    return Math.round(Math.max(0, netto - ziel) * 100) / 100
+  }
+  // ziel_brutto → proportionaler Netto-Abzug (auch bei gemischter USt)
+  const brutto =
+    artikelBrutto != null && Number.isFinite(artikelBrutto) && artikelBrutto > 0
+      ? artikelBrutto
+      : Math.round(netto * 1.19 * 100) / 100
+  if (brutto <= 0 || netto <= 0) return 0
+  const ziel = Math.max(0, wert)
+  if (ziel >= brutto) return 0
+  const zielNetto = (ziel / brutto) * netto
+  return Math.round(Math.max(0, netto - zielNetto) * 100) / 100
 }
 
 export type DokumentZeile = DokumentArtikelZeile | DokumentFreitextZeile | DokumentGesamtrabattZeile
@@ -152,19 +205,19 @@ export function istPreisPosition(p: AngebotPosition): boolean {
   return !istFreitextPosition(p) && !istGesamtrabattPosition(p)
 }
 
-/** Meta aus gespeicherter Nachlass-Position (`beschreibung` = `prozent:10` / `betrag:200`). */
+/** Meta aus gespeicherter Nachlass-Position (`beschreibung` = `prozent:10` / `betrag:200` / `ziel_netto:500`). */
 export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
-  modus: 'prozent' | 'betrag'
+  modus: GesamtrabattModus
   wert: number
   bezeichnung: string
 } {
   const besch = (p.beschreibung ?? '').trim()
   const colon = besch.indexOf(':')
-  const modusRaw = colon >= 0 ? besch.slice(0, colon).trim().toLowerCase() : ''
+  const modusRaw = colon >= 0 ? besch.slice(0, colon).trim() : ''
   const wertRaw = colon >= 0 ? besch.slice(colon + 1).trim() : ''
-  const modus: 'prozent' | 'betrag' = modusRaw === 'betrag' ? 'betrag' : 'prozent'
+  const modus = parseGesamtrabattModus(modusRaw)
   let wert = Math.abs(Number(String(wertRaw).replace(',', '.')))
-  if (!Number.isFinite(wert) || wert <= 0) {
+  if (!Number.isFinite(wert) || (wert <= 0 && !isGesamtrabattZielModus(modus))) {
     wert =
       Math.abs(Number(p.gesamt_min) || 0) ||
       Math.abs(Number(p.lohn_netto) || 0) ||
@@ -180,16 +233,18 @@ export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
 /** Nachlass-Abzug (positiv) aus Angebots-Positionen — auch wenn Beträge beim Laden auf 0 gesetzt wurden. */
 export function gesamtrabattAbzugAusAngebotPositionen(
   positionen: AngebotPosition[],
-  artikelNetto: number
+  artikelNetto: number,
+  /** Dokument-USt für Ziel-Brutto (Fallback 19). */
+  mwstSatz = 19
 ): number {
   const r = positionen.find(istGesamtrabattPosition)
   if (!r) return 0
   const { modus, wert } = parseGesamtrabattMetaFromPosition(r)
-  if (wert <= 0) return 0
-  if (modus === 'prozent') {
-    return Math.round(artikelNetto * (Math.min(100, wert) / 100) * 100) / 100
-  }
-  return Math.round(Math.min(Math.max(0, artikelNetto), wert) * 100) / 100
+  const artikelBrutto =
+    modus === 'ziel_brutto'
+      ? Math.round(Math.max(0, artikelNetto) * (1 + Math.max(0, mwstSatz) / 100) * 100) / 100
+      : undefined
+  return gesamtrabattAbzugFromModus(modus, wert, artikelNetto, artikelBrutto)
 }
 
 export function artikelZeilenNetto(z: DokumentArtikelZeile): number {
@@ -205,13 +260,26 @@ export function summeArtikelNetto(zeilen: DokumentZeile[]): number {
     .reduce((s, z) => s + artikelZeilenNetto(z), 0)
 }
 
+/** Brutto der Artikelzeilen (je Zeile mit eigenem MwSt-Satz). */
+export function summeArtikelBrutto(zeilen: DokumentZeile[]): number {
+  return (
+    Math.round(
+      zeilen
+        .filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+        .reduce((s, z) => {
+          const netto = artikelZeilenNetto(z)
+          const f = (Number(z.mwstSatz) || 19) / 100
+          return s + netto * (1 + f)
+        }, 0) * 100
+    ) / 100
+  )
+}
+
 export function gesamtrabattBetrag(zeilen: DokumentZeile[], artikelNetto: number): number {
   const r = zeilen.find((z): z is DokumentGesamtrabattZeile => z.typ === 'gesamtrabatt')
-  if (!r || r.wert <= 0) return 0
-  if (r.modus === 'prozent') {
-    return Math.round(artikelNetto * (Math.min(100, r.wert) / 100) * 100) / 100
-  }
-  return Math.round(Math.min(artikelNetto, r.wert) * 100) / 100
+  if (!r) return 0
+  const artikelBrutto = r.modus === 'ziel_brutto' ? summeArtikelBrutto(zeilen) : undefined
+  return gesamtrabattAbzugFromModus(r.modus, r.wert, artikelNetto, artikelBrutto)
 }
 
 export function getGesamtrabattZeile(zeilen: DokumentZeile[]): DokumentGesamtrabattZeile | null {
@@ -385,14 +453,13 @@ export function angebotPositionenToDokumentZeilen(
       continue
     }
     if (slug === ZEILE_SLUG_GESAMTRABATT) {
-      const besch = p.beschreibung ?? ''
-      const [modus, wertRaw] = besch.split(':')
+      const meta = parseGesamtrabattMetaFromPosition(p)
       out.push({
         id: p.id,
         typ: 'gesamtrabatt',
-        bezeichnung: p.leistung ?? 'Gesamtrabatt',
-        modus: modus === 'betrag' ? 'betrag' : 'prozent',
-        wert: Math.abs(Number(wertRaw) || Math.abs(p.gesamt_min ?? 0)),
+        bezeichnung: meta.bezeichnung || p.leistung || 'Gesamtrabatt',
+        modus: meta.modus,
+        wert: meta.wert,
         gewerk_block_key: p.gewerk_block_key?.trim() || undefined,
       })
       continue

@@ -46,16 +46,12 @@ export function resolveRechnungKorrekturUi(r: RechnungKorrekturUiInput): Rechnun
   }
   if (st !== 'entwurf') return { filterKey: null, dualBadges: null }
 
-  const art = String(r.korrektur_art ?? 'entwurf').trim().toLowerCase()
-  const gespeichert = art === 'gespeichert'
-  const filterKey: RechnungKorrekturFilterKey = gespeichert
-    ? 'korrektur_gespeichert'
-    : 'korrektur_entwurf'
+  // DB: korrektur_art nur 'gutschrift' | 'ersetzt' — Entwurf vs. gespeichert über Status
   return {
-    filterKey,
+    filterKey: 'korrektur_entwurf',
     dualBadges: {
       primary: 'Gesendet',
-      secondary: RECHNUNG_KORREKTUR_FILTER_LABELS[filterKey],
+      secondary: RECHNUNG_KORREKTUR_FILTER_LABELS.korrektur_entwurf,
     },
   }
 }
@@ -85,35 +81,42 @@ export async function linkRechnungKorrekturKette(
   supabase: {
     from: (table: string) => {
       update: (values: Record<string, unknown>) => {
-        eq: (column: string, value: string) => unknown
+        eq: (column: string, value: string) => {
+          select: (cols: string) => PromiseLike<{ error: { message: string } | null }>
+        }
       }
     }
   },
   input: {
     originalId: string
     neuId: string
-    art: 'entwurf' | 'gespeichert'
+    art: 'gutschrift' | 'ersetzt'
   }
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const now = new Date().toISOString()
-  const neuRes = (await supabase
+  const neuRes = await supabase
     .from('rechnungen')
     .update({
       korrektur_von: input.originalId,
       korrektur_art: input.art,
       updated_at: now,
     })
-    .eq('id', input.neuId)) as { error: { message: string } | null }
+    .eq('id', input.neuId)
+    .select('id')
   if (neuRes?.error) {
     console.warn('[linkRechnungKorrekturKette] korrektur_von:', neuRes.error.message)
+    return { ok: false, message: neuRes.error.message }
   }
-  const origRes = (await supabase
+  const origRes = await supabase
     .from('rechnungen')
     .update({ ersetzt_durch: input.neuId, updated_at: now })
-    .eq('id', input.originalId)) as { error: { message: string } | null }
+    .eq('id', input.originalId)
+    .select('id')
   if (origRes?.error) {
     console.warn('[linkRechnungKorrekturKette] ersetzt_durch:', origRes.error.message)
+    return { ok: false, message: origRes.error.message }
   }
+  return { ok: true }
 }
 
 export function rechnungKorrekturModus(status: RechnungStatus | string | null | undefined): RechnungKorrekturModus {

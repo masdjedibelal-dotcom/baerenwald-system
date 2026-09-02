@@ -5,7 +5,7 @@ import { MockField } from '@/components/mock-ui/MockForm'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
 import { toast } from '@/components/ui/app-toast'
-import { KiChatComposer } from '@/components/assistent/KiChatComposer'
+import { KiChatComposer, KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
 import {
   angebotKiGenerate,
   angebotKiLernen,
@@ -206,6 +206,8 @@ export function AngebotKiAssistentButton({
                 onSubmit={() => void generieren()}
                 disabled={pending}
                 placeholder="z. B. Bad 8 m²: Abbruch Altfliesen, Abdichtung, Fliesenwand/-boden Mittelklasse…"
+                maxChars={KI_CHAT_POSITIONEN_MAX_CHARS}
+                maxRows={10}
               />
             </MockField>
           ) : null}

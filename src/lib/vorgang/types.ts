@@ -46,6 +46,8 @@ export type VorgangRechnungInput = {
   brutto?: number | null
   ist_wiederkehrend?: boolean | null
   wiederkehr_turnus?: string | null
+  /** rechnung | gutschrift — Gutschriften gewinnen nie die Stamm-Phase. */
+  beleg_typ?: string | null
 }
 
 export type VorgangLeadInput = {
@@ -120,6 +122,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   korrektur_art?: string | null
   /** ausgehend (Default) | eingehend (Partner-Rechnung). */
   rechnungRichtung?: 'ausgehend' | 'eingehend'
+  /** rechnung (Default) | gutschrift (Storno-Begleiter). */
+  belegTyp?: 'rechnung' | 'gutschrift' | null
   /** Nur eingehend: angebot_handwerker.id für Ensure/Deep-Link. */
   angebotHandwerkerId?: string | null
   /** Geschäftsvolumen für Listen-Summe (einmal pro Lead/Vorgang). */

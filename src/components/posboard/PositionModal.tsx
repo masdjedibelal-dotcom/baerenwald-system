@@ -4,8 +4,9 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Toggle } from '@/components/ui/Toggle'
+import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
@@ -49,12 +50,17 @@ export function PositionModal({
   onClose,
   showUst = true,
   gewerke = [],
+  artikelNetto = 0,
+  artikelBrutto = 0,
 }: {
   position: PosBoardLine
   onChange: (patch: Partial<PosBoardLine>) => void
   onClose: () => void
   showUst?: boolean
   gewerke?: string[]
+  /** Summe der Positionen vor Nachlass (für Zielbetrag) */
+  artikelNetto?: number
+  artikelBrutto?: number
 }) {
   const p = position
   const kind = p.kind ?? 'position'
@@ -119,33 +125,20 @@ export function PositionModal({
               autoFocus
             />
           </Field>
-          <Field label="Art des Nachlasses">
-            <select
-              className="sel"
-              value={p.nachlassModus ?? 'prozent'}
-              onChange={(e) => {
-                const modus = e.target.value as 'prozent' | 'betrag'
-                onChange({
-                  nachlassModus: modus,
-                  einheit: modus === 'prozent' ? '%' : '€',
-                })
-              }}
-            >
-              <option value="prozent">Prozent vom Netto</option>
-              <option value="betrag">Fester Betrag</option>
-            </select>
-          </Field>
-          <Field label={(p.nachlassModus ?? 'prozent') === 'prozent' ? 'Prozent' : 'Betrag netto'}>
-            <div className="txt-prefix">
-              <span className="prefix">{(p.nachlassModus ?? 'prozent') === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={p.preis}
-                onValueChange={(preis) => onChange({ preis })}
-              />
-            </div>
-          </Field>
+          <NachlassModusFields
+            modus={(p.nachlassModus ?? 'prozent') as GesamtrabattModus}
+            wert={p.preis}
+            artikelNetto={artikelNetto}
+            artikelBrutto={artikelBrutto}
+            onChange={(next) => {
+              const modus = (next.nachlassModus ?? p.nachlassModus ?? 'prozent') as GesamtrabattModus
+              onChange({
+                ...next,
+                nachlassModus: modus,
+                einheit: modus === 'prozent' ? '%' : '€',
+              })
+            }}
+          />
         </div>
       ) : (
         <div className="form-grid">

@@ -165,12 +165,12 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       await linkRechnungKorrekturKette(supabase, {
         originalId: origId,
         neuId: params.id,
-        art: 'gespeichert',
+        art: 'gutschrift',
       })
       detailRec = {
         ...detailRec,
         korrektur_von: origId,
-        korrektur_art: 'gespeichert',
+        korrektur_art: 'gutschrift',
       }
     }
   }

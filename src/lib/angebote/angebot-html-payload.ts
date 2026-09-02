@@ -47,7 +47,7 @@ function firstJoin<T>(raw: T | T[] | null | undefined): T | null {
   return Array.isArray(raw) ? (raw[0] ?? null) : raw
 }
 
-/** Empfängerblock + Anrede-Kontext — gleiche Logik wie Rechnung (WEG + c/o HV + z. Hd. AP). */
+/** Empfängerblock + Anrede-Kontext — HV+Objekt = WEG/c/o, sonst Firma + AP. */
 export function resolveAngebotDokumentEmpfaenger(detail: {
   kunden?: AngebotDetail['kunden']
   kunden_objekte?: KundenObjekt | KundenObjekt[] | null

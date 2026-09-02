@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
-import { KiChatComposer } from '@/components/assistent/KiChatComposer'
+import { KiChatComposer, KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useVisualViewportFrame } from '@/hooks/useVisualViewportFrame'
@@ -313,6 +313,9 @@ export function AssistentPanel() {
   const chatStarted =
     messages.some((m) => m.role === 'user') || pending || Boolean(autoSession)
 
+  const isPositionenScope =
+    scoped?.scopeId === 'positionen' || scoped?.scopeId === 'position'
+
   const startHeadline = autoSession
     ? autoSession.title
     : scopeMeta
@@ -324,7 +327,7 @@ export function AssistentPanel() {
       ? scoped?.layer === 'over-sheet'
         ? scoped.scopeId === 'feld'
           ? 'KI-Assistent: Sag, wie der Feldtext werden soll — danach Übernehmen.'
-          : scoped.scopeId === 'positionen' || scoped.scopeId === 'position'
+          : isPositionenScope
             ? 'KI-Assistent: Beschreib die Position(en) — danach Übernehmen in die Karte.'
             : 'KI-Assistent: Beschreib, was du brauchst — danach Übernehmen.'
         : 'Ich bin dein KI-Assistent für diesen Editor.'
@@ -730,6 +733,10 @@ export function AssistentPanel() {
             disabled={pending}
             placeholder={scopeMeta?.placeholder ?? 'Nachricht schreiben…'}
             inputRef={inputRef}
+            maxChars={
+              isPositionenScope ? KI_CHAT_POSITIONEN_MAX_CHARS : undefined
+            }
+            maxRows={isPositionenScope ? 10 : undefined}
           />
         </div>
       </aside>

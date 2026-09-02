@@ -1,7 +1,7 @@
 'use client'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
@@ -12,6 +12,12 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 import { cn } from '@/lib/utils'
+
+/**
+ * Mobil: Bottom-Sheet öffnet genau unter dem Sticky-CTA.
+ * Ohne Guard trifft der gleiche Touch die erste Option → versehentliche Korrektur.
+ */
+const INTERACT_DELAY_MS = 450
 
 export function RechnungKorrekturWahlModal({
   open,
@@ -32,9 +38,22 @@ export function RechnungKorrekturWahlModal({
 }) {
   const [pending, startTransition] = useTransition()
   const [mode, setMode] = useState<'korrigieren' | 'neu' | null>(null)
+  const [interactReady, setInteractReady] = useState(false)
   const nr = rechnungsnummer?.trim() || 'diese Rechnung'
 
-  function waehleKorrigieren() {
+  useEffect(() => {
+    if (!open) {
+      setMode(null)
+      setInteractReady(false)
+      return
+    }
+    setInteractReady(false)
+    const t = window.setTimeout(() => setInteractReady(true), INTERACT_DELAY_MS)
+    return () => window.clearTimeout(t)
+  }, [open])
+
+  function starteKorrigieren() {
+    if (!interactReady || pending) return
     setMode('korrigieren')
     startTransition(async () => {
       // Gesendet/Bezahlt: Storno-Gutschrift + Ersatz-Entwurf, dann Wizard auf dem Entwurf
@@ -55,14 +74,15 @@ export function RechnungKorrekturWahlModal({
         return
       }
       if (korr.mode === 'storno_neu') {
-        toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+        toast.success('Korrektur-Entwurf angelegt — bitte prüfen und erst dann versenden')
       }
       onClose()
       onKorrigieren(res.bootstrap)
     })
   }
 
-  function waehleNeu() {
+  function starteNeu() {
+    if (!interactReady || pending) return
     setMode('neu')
     onClose()
     onNeueRechnung()
@@ -77,9 +97,29 @@ export function RechnungKorrekturWahlModal({
       subtitle="Was möchtest du tun?"
       size="md"
       footer={
-        <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
-          Abbrechen
-        </MockBtn>
+        <div className="kunde-create-footer" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
+            Abbrechen
+          </MockBtn>
+          <MockBtn
+            kind="primary"
+            disabled={!interactReady || pending || !mode}
+            onClick={() => {
+              if (mode === 'korrigieren') starteKorrigieren()
+              else if (mode === 'neu') starteNeu()
+            }}
+          >
+            {pending
+              ? mode === 'korrigieren'
+                ? 'Storno + Entwurf…'
+                : 'Lädt…'
+              : mode === 'korrigieren'
+                ? 'Korrektur anlegen'
+                : mode === 'neu'
+                  ? 'Neue Rechnung anlegen'
+                  : 'Bitte wählen'}
+          </MockBtn>
+        </div>
       }
     >
       <p
@@ -87,19 +127,26 @@ export function RechnungKorrekturWahlModal({
         style={{ color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.45 }}
       >
         <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{nr}</strong> ist bereits
-        versendet. Bitte wählen — eine Korrektur ersetzt die bestehende Rechnung, eine neue
-        Rechnung ist ein zusätzlicher Beleg.
+        versendet. Eine Korrektur ersetzt die bestehende Rechnung (Storno + neuer Entwurf) —{' '}
+        <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>
+          es geht noch keine Mail raus
+        </strong>
+        , bis du im Wizard bewusst „Versenden“ bestätigst.
       </p>
 
-      <div className="doctype-row doctype-row--stack">
+      <div
+        className="doctype-row doctype-row--stack"
+        style={!interactReady ? { pointerEvents: 'none', opacity: 0.72 } : undefined}
+        aria-busy={!interactReady || undefined}
+      >
         <button
           type="button"
           className={cn(
             'doctype-radio-opt doctype-radio-opt--block',
             mode === 'korrigieren' && 'on'
           )}
-          disabled={pending}
-          onClick={waehleKorrigieren}
+          disabled={pending || !interactReady}
+          onClick={() => setMode('korrigieren')}
         >
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
@@ -107,9 +154,8 @@ export function RechnungKorrekturWahlModal({
               Diese Rechnung korrigieren
             </span>
             <span className="hint">
-              {pending && mode === 'korrigieren'
-                ? 'Storno + Entwurf werden angelegt…'
-                : 'Nur wenn Betrag oder Positionen falsch sind: Storno-Gutschrift zur alten RE + neue Rechnung. Beide PDFs gehen in einer Mail raus.'}
+              Nur wenn Betrag oder Positionen falsch sind: Storno-Gutschrift + neue Rechnung als
+              Entwurf. Versand erst nach Bestätigung im Wizard.
             </span>
           </span>
         </button>
@@ -120,8 +166,8 @@ export function RechnungKorrekturWahlModal({
             'doctype-radio-opt doctype-radio-opt--block',
             mode === 'neu' && 'on'
           )}
-          disabled={pending}
-          onClick={waehleNeu}
+          disabled={pending || !interactReady}
+          onClick={() => setMode('neu')}
         >
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
@@ -130,9 +176,8 @@ export function RechnungKorrekturWahlModal({
               <MockBadge kind="aktiv">Zusatzleistung</MockBadge>
             </span>
             <span className="hint">
-              {pending && mode === 'neu'
-                ? 'Lädt…'
-                : 'Separater Beleg — z. B. Regie, WhatsApp-Absprache oder weiterer Posten. Die bestehende Rechnung bleibt unverändert.'}
+              Separater Beleg — z. B. Regie oder weiterer Posten. Die bestehende Rechnung bleibt
+              unverändert.
             </span>
           </span>
         </button>

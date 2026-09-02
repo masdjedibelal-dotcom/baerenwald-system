@@ -103,6 +103,7 @@ export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
   const st = (rechnung.status ?? '').trim().toLowerCase()
   if (!st || st === 'storniert' || st === 'entwurf') return false
+  if (String(rechnung.beleg_typ ?? '').toLowerCase() === 'gutschrift') return false
   if (isSatellitenRechnung(rechnung)) return false
   return true
 }
@@ -368,6 +369,50 @@ export function resolveSatellitenRechnungVorgang(
   input: ResolveVorgangInput,
   rechnung: VorgangRechnungInput
 ): ResolvedVorgang {
+  const st = (rechnung.status ?? '').trim().toLowerCase()
+  const titelFallback = input.titel?.trim() || 'Rechnung'
+  const belegTyp = String(rechnung.beleg_typ ?? 'rechnung').toLowerCase()
+  const nr = rechnung.rechnungsnummer?.trim()
+
+  if (belegTyp === 'gutschrift') {
+    const unterstatus =
+      st === 'bezahlt' ? 'bezahlt' : st === 'storniert' ? 'storniert' : st === 'entwurf' ? 'entwurf' : 'gesendet'
+    return {
+      phase: 'rechnung',
+      unterstatus,
+      unterstatusLabel:
+        unterstatus === 'entwurf'
+          ? 'Storno-Gutschrift'
+          : unterstatusLabel('rechnung', unterstatus),
+      needsAction: false,
+      actor: null,
+      badges: {},
+      ueberfaellig: false,
+      kanalMeta: kanalMetaFromLead(input.lead.kanal) ?? null,
+      titel: nr ? `Storno-Gutschrift ${nr}` : 'Storno-Gutschrift',
+      entityId: rechnung.id,
+      entityType: 'rechnung',
+      updatedAt: entityTs(rechnung),
+    }
+  }
+
+  // Stornierte RE sind keine phase-winning Entities — direkt als Satellit „storniert“ ausweisen
+  if (st === 'storniert') {
+    return {
+      phase: 'rechnung',
+      unterstatus: 'storniert',
+      unterstatusLabel: unterstatusLabel('rechnung', 'storniert'),
+      needsAction: false,
+      actor: null,
+      badges: {},
+      ueberfaellig: false,
+      kanalMeta: kanalMetaFromLead(input.lead.kanal) ?? null,
+      titel: satellitenRechnungTitel(rechnung, titelFallback),
+      entityId: rechnung.id,
+      entityType: 'rechnung',
+      updatedAt: entityTs(rechnung),
+    }
+  }
   const forced: VorgangRechnungInput = { ...rechnung, rechnung_art: 'voll' }
   const resolved = resolveVorgang({
     lead: input.lead,

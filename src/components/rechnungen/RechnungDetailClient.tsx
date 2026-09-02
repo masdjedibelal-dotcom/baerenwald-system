@@ -1,5 +1,6 @@
 'use client'
 import { actionBusy, useTransition } from '@/components/ui/action-busy'
+import { confirmAction } from '@/components/ui/confirm-action'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
@@ -383,15 +384,25 @@ export function RechnungDetailClient({
 
   function handleSenden() {
     const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
-    void actionBusy.run(istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…', async () => {
-      const r = await sendRechnung(detail.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success(istKorrektur ? 'Korrektur gesendet' : 'Rechnung gesendet')
-      setDetail((d) => ({ ...d, status: 'gesendet' }))
-      refresh()
+    const nr = detail.rechnungsnummer?.trim()
+    confirmAction({
+      title: istKorrektur ? 'Korrektur wirklich versenden?' : 'Rechnung wirklich versenden?',
+      body: nr
+        ? `${nr} wird per E-Mail an den Kunden gesendet.`
+        : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      confirmLabel: istKorrektur ? 'Korrektur jetzt versenden' : 'Jetzt versenden',
+      cancelLabel: 'Abbrechen',
+      busyLabel: istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…',
+      onConfirm: async () => {
+        const r = await sendRechnung(detail.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(istKorrektur ? 'Korrektur gesendet' : 'Rechnung gesendet')
+        setDetail((d) => ({ ...d, status: 'gesendet' }))
+        refresh()
+      },
     })
   }
 
@@ -492,6 +503,7 @@ export function RechnungDetailClient({
     if (rechnungDarfImWizardBearbeitetWerden(detail.status)) {
       return {
         label: 'Rechnung bearbeiten',
+        shortLabel: 'Bearbeiten',
         icon: 'pencil',
         onClick: handleKorrigieren,
         disabled: pending,
@@ -500,10 +512,11 @@ export function RechnungDetailClient({
     if (rechnungKorrekturModus(detail.status) === 'storno_neu') {
       return {
         label: 'Rechnung korrigieren',
+        shortLabel: 'Korrigieren',
         icon: 'pencil',
         onClick: handleKorrigieren,
         disabled: pending,
-        title: 'Storno-Gutschrift + neue Rechnung',
+        title: 'Storno-Gutschrift + neue Rechnung — noch kein Versand',
       }
     }
     return null

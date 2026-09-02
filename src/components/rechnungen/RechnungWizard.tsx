@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check, FileText } from 'lucide-react'
+import { Check, FileText, Send } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
@@ -18,8 +18,8 @@ import { PosBoard } from '@/components/posboard/PosBoard'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { DateInput } from '@/components/ui/DateInput'
-import { ActionsMenu } from '@/components/ui/actions-menu'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { confirmAction } from '@/components/ui/confirm-action'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -975,6 +975,13 @@ export function RechnungWizard({
     }
   }
 
+  /** Nach Speichern/Versand: immer schließen. onDone zuerst (Navigation), danach onClose (Overlay zu). */
+  function finishAndLeave(id: string) {
+    onDone?.(id)
+    onClose()
+    router.refresh()
+  }
+
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
       toast.error('Plan anpassen (100 %)')
@@ -1023,9 +1030,7 @@ export function RechnungWizard({
         setSheet(null)
         setKundeEditOpen(false)
         setPlanEditorOpen(false)
-        onDone?.(id)
-        onClose()
-        router.refresh()
+        finishAndLeave(id)
         return
       }
 
@@ -1050,9 +1055,7 @@ export function RechnungWizard({
       setSheet(null)
       setKundeEditOpen(false)
       setPlanEditorOpen(false)
-      onDone?.(id)
-      onClose()
-      router.refresh()
+      finishAndLeave(id)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
     } finally {
@@ -1080,9 +1083,7 @@ export function RechnungWizard({
     setKundeEditOpen(false)
     setPlanEditorOpen(false)
     setSheet(null)
-    onDone?.(id)
-    onClose()
-    router.refresh()
+    finishAndLeave(id)
   }
 
   function handleRequestClose() {
@@ -1329,6 +1330,26 @@ export function RechnungWizard({
     </div>
   )
 
+  function requestVersenden() {
+    if (saving) return
+    confirmAction({
+      title: istKorrekturVersand
+        ? 'Korrektur wirklich versenden?'
+        : 'Rechnung wirklich versenden?',
+      body: istKorrekturVersand
+        ? 'Storno-Gutschrift und neue Rechnung gehen per E-Mail an den Kunden.'
+        : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      confirmLabel: istKorrekturVersand
+        ? 'Korrektur jetzt versenden'
+        : 'Jetzt versenden',
+      cancelLabel: 'Abbrechen',
+      busyLabel: null,
+      onConfirm: () => {
+        void handleFinish(true)
+      },
+    })
+  }
+
   const headerEnd = (
     <>
       <button
@@ -1343,43 +1364,29 @@ export function RechnungWizard({
       >
         <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
       </button>
-      <ActionsMenu
-        sheetTitle="Rechnung"
-        align="right"
-        trigger={
-          <span
-            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Als Entwurf speichern oder senden"
-            title="Als Entwurf speichern oder senden"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </span>
-        }
-        items={[
-          {
-            label: saving ? 'Speichern…' : 'Als Entwurf speichern',
-            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            onClick: () => {
-              if (saving || (hasPlan && !planOk)) return
-              void handleFinish(false)
-            },
-          },
-          {
-            label: saving
-              ? istKorrekturVersand
-                ? 'Korrektur wird gesendet…'
-                : 'Senden…'
-              : istKorrekturVersand
-                ? 'Korrektur versenden'
-                : 'Senden',
-            icon: <MockIcon ctx="btn" n="send" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinish(true)
-            },
-          },
-        ]}
-      />
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={requestVersenden}
+        aria-label={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
+        title={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
+      >
+        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+        disabled={saving}
+        onClick={() => {
+          if (saving || (hasPlan && !planOk)) return
+          void handleFinish(false)
+        }}
+        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+      >
+        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
     </>
   )
 

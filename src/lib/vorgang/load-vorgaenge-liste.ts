@@ -154,7 +154,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   const leadLimit = scoped ? 80 : 200
 
   const RECHNUNG_SELECT =
-    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, richtung, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
+    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, richtung, beleg_typ, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
 
   let handwerkerLeadIds: string[] | null = null
   if (handwerkerId) {
@@ -414,6 +414,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     korrektur_von?: string | null
     korrektur_art?: string | null
     richtung?: string | null
+    beleg_typ?: string | null
     handwerker_id?: string | null
     angebot_handwerker_id?: string | null
     angebote?: { lead_id: string | null } | { lead_id: string | null }[] | null
@@ -459,6 +460,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     korrektur_von?: string | null
     korrektur_art?: string | null
     richtung: 'ausgehend' | 'eingehend'
+    beleg_typ: string | null
     handwerker_id: string | null
     handwerker_name: string | null
     angebot_handwerker_id: string | null
@@ -495,6 +497,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       korrektur_von: r.korrektur_von ?? null,
       korrektur_art: r.korrektur_art ?? null,
       richtung,
+      beleg_typ: String(r.beleg_typ ?? 'rechnung').toLowerCase() || 'rechnung',
       handwerker_id: r.handwerker_id?.trim() || null,
       handwerker_name: hwName,
       angebot_handwerker_id: r.angebot_handwerker_id?.trim() || null,
@@ -567,7 +570,15 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       brutto: r.brutto,
       ist_wiederkehrend: r.ist_wiederkehrend,
       wiederkehr_turnus: r.wiederkehr_turnus,
+      beleg_typ: r.beleg_typ,
+      ersetzt_durch: r.ersetzt_durch ?? null,
+      korrektur_von: r.korrektur_von ?? null,
+      korrektur_art: r.korrektur_art ?? null,
     }))
+    /** Stamm-Resolver ohne Gutschriften (die nur als Erledigt-Satelliten erscheinen). */
+    const leadRechnungenStamm = leadRechnungen.filter(
+      (r) => String(r.beleg_typ ?? '').toLowerCase() !== 'gutschrift'
+    )
 
     const resolveInput = {
       lead: {
@@ -591,7 +602,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       },
       angebote: leadAngebote,
       auftraege: leadAuftraege,
-      rechnungen: leadRechnungen,
+      rechnungen: leadRechnungenStamm,
     }
 
     const resolved = resolveVorgang(resolveInput)
@@ -601,7 +612,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       lead: resolveInput.lead,
       angebote: leadAngebote,
       auftraege: leadAuftraege,
-      rechnungen: leadRechnungen,
+      rechnungen: leadRechnungenStamm,
     })
 
     const handwerkerIds = Array.from(
@@ -625,7 +636,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       lead,
       angebote: angeboteByLead.get(lead.id) ?? [],
       auftraege: auftraegeByLead.get(lead.id) ?? [],
-      rechnungen: leadRechnungen,
+      rechnungen: leadRechnungenStamm,
     })
 
     const wertLabelForPhase = (phase: VorgangPhase, entityId: string): string | null => {
@@ -673,7 +684,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       !hatAbschlagsplan &&
       resolved.phase === 'auftrag' &&
       resolved.unterstatus === 'abgeschlossen' &&
-      !leadRechnungen.some(isPhaseWinningRechnung)
+      !leadRechnungenStamm.some(isPhaseWinningRechnung)
 
     const listPhase: VorgangPhase = rechnungAusstehend ? 'rechnung' : resolved.phase
     const listUnterstatus = rechnungAusstehend ? 'ausstehend' : resolved.unterstatus
@@ -736,15 +747,20 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       rechnungAusstehend
     if (showSatelliten) {
       for (const r of leadRechnungen) {
-        if (r.status === 'storniert' || r.status === 'entwurf') continue
+        const istGutschrift = String(r.beleg_typ ?? '').toLowerCase() === 'gutschrift'
+        // Normale Entwürfe ausblenden; Storno-Gutschriften erscheinen unter Erledigt
+        if (r.status === 'entwurf' && !istGutschrift) continue
         if (resolved.entityId === r.id) continue
         const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
-        if (hatAbschlagsplan) {
-          if (art !== 'abschlag' && art !== 'schluss') continue
-          if (!istRechnungGestelltOderBezahlt(r.status)) continue
-        } else if (resolved.phase === 'auftrag' || rechnungAusstehend) {
-          // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
-          if (art !== 'abschlag') continue
+        const istStorniert = r.status === 'storniert'
+        if (!istGutschrift) {
+          if (hatAbschlagsplan) {
+            if (art !== 'abschlag' && art !== 'schluss') continue
+            if (!istStorniert && !istRechnungGestelltOderBezahlt(r.status)) continue
+          } else if (resolved.phase === 'auftrag' || rechnungAusstehend) {
+            // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
+            if (art !== 'abschlag') continue
+          }
         }
         const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)
         const satWieder = resolveListeWiederkehr({
@@ -753,7 +769,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           lead: resolveInput.lead,
           angebote: leadAngebote,
           auftraege: leadAuftraege,
-          rechnungen: leadRechnungen,
+          rechnungen: leadRechnungenStamm,
         })
         rows.push({
           ...sat,
@@ -767,17 +783,26 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           handwerkerIds,
           ist_wiederkehrend: satWieder.ist_wiederkehrend,
           wiederkehr_turnus: satWieder.wiederkehr_turnus,
+          ersetzt_durch: r.ersetzt_durch ?? null,
+          korrektur_von: r.korrektur_von ?? null,
+          korrektur_art: r.korrektur_art ?? null,
+          belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
+          rechnungRichtung: 'ausgehend',
         })
       }
     }
   }
 
   for (const r of standaloneRechnungen) {
-    if (r.status === 'storniert') continue
+    const istGutschrift = r.beleg_typ === 'gutschrift'
     const nr = r.rechnungsnummer?.trim()
-    const titel = nr
-      ? `Rechnung ${nr}`
-      : r.kunde_name?.trim() || 'Direktrechnung'
+    const titel = istGutschrift
+      ? nr
+        ? `Storno-Gutschrift ${nr}`
+        : 'Storno-Gutschrift'
+      : nr
+        ? `Rechnung ${nr}`
+        : r.kunde_name?.trim() || 'Direktrechnung'
     const resolved = resolveStandaloneDirektrechnung({
       rechnung: {
         id: r.id,
@@ -791,6 +816,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
         brutto: r.brutto,
         ist_wiederkehrend: r.ist_wiederkehrend,
         wiederkehr_turnus: r.wiederkehr_turnus,
+        beleg_typ: r.beleg_typ,
       },
       titel,
       kundeName: r.kunde_name,
@@ -804,14 +830,19 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     rows.push({
       ...resolved,
       titel,
-      unterstatusLabel: unterstatusLabel('rechnung', resolved.unterstatus),
+      unterstatusLabel: istGutschrift
+        ? r.status === 'entwurf'
+          ? 'Storno-Gutschrift'
+          : unterstatusLabel('rechnung', resolved.unterstatus)
+        : unterstatusLabel('rechnung', resolved.unterstatus),
       kanalMeta: 'Direktkunde',
       leadId: '',
       kundeId: r.kunde_id,
       kundeName: r.kunde_name,
       wertLabel,
       listenSummeEuro,
-      listeSummeZaehlen: true,
+      // Stornierte / Gutschriften nicht in der offenen Summe
+      listeSummeZaehlen: r.status !== 'storniert' && !istGutschrift,
       detailHref: detailHrefForPhase('rechnung', r.id, ''),
       handwerkerIds: [],
       ist_wiederkehrend: Boolean(r.ist_wiederkehrend),
@@ -821,6 +852,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       korrektur_von: r.korrektur_von ?? null,
       korrektur_art: r.korrektur_art ?? null,
       rechnungRichtung: 'ausgehend',
+      belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
     })
   }
 

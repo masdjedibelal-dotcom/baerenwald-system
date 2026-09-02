@@ -81,16 +81,16 @@ function gewerkOf(p: PosBoardLine): string {
 }
 
 function defaultMengeLabel(p: PosBoardLine): string {
-  if (p.kind === 'freitext') return '—'
-  if (p.kind === 'nachlass') {
-    return p.nachlassModus === 'betrag' ? 'Betrag' : `${p.preis || 0} %`
-  }
+  if (p.kind === 'freitext' || p.kind === 'nachlass') return ''
   return `${p.menge != null ? p.menge + ' ' : ''}${p.einheit || ''}`.trim()
 }
 
 function defaultPreisLabel(p: PosBoardLine, lineNetto: number): string {
   if (p.kind === 'freitext') return '—'
   if (p.kind === 'nachlass') {
+    if (p.nachlassModus === 'ziel_netto' || p.nachlassModus === 'ziel_brutto') {
+      return `→ ${formatEurBetrag(p.preis || 0)}`
+    }
     if (p.nachlassModus === 'betrag') return `−${formatEurBetrag(p.preis || 0)}`
     return `−${p.preis || 0} %`
   }
@@ -324,7 +324,7 @@ export function PosBoard({
   const addNachlass = (
     draft?: {
       name?: string
-      nachlassModus?: 'prozent' | 'betrag'
+      nachlassModus?: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
       preis?: number
     },
     gewerk?: string
@@ -335,11 +335,12 @@ export function PosBoard({
     const existing = positionen.find((p) => p.kind === 'nachlass')
     if (existing) {
       if (draft) {
+        const modus = draft.nachlassModus ?? existing.nachlassModus ?? 'prozent'
         update(existing.id, {
           name: draft.name?.trim() || existing.name,
-          nachlassModus: draft.nachlassModus ?? existing.nachlassModus ?? 'prozent',
+          nachlassModus: modus,
           preis: draft.preis ?? existing.preis,
-          einheit: (draft.nachlassModus ?? existing.nachlassModus) === 'betrag' ? '€' : '%',
+          einheit: modus === 'prozent' ? '%' : '€',
           gewerk: gewerk !== undefined ? gewerk.trim() : existing.gewerk,
         })
       }
@@ -353,7 +354,7 @@ export function PosBoard({
       gewerk: g,
       name: draft?.name?.trim() || 'Nachlass',
       menge: 1,
-      einheit: modus === 'betrag' ? '€' : '%',
+      einheit: modus === 'prozent' ? '%' : '€',
       preis: draft?.preis ?? 0,
       ust: 0,
       kind: 'nachlass',
@@ -549,6 +550,20 @@ export function PosBoard({
     0
   )
   const brutto = netto + ust
+  /** Positionssummen vor Nachlass — für Zielbetrag-Nachlass. */
+  const artikelNettoVorNachlass = positionen
+    .filter((p) => (p.kind ?? 'position') === 'position')
+    .reduce((s, p) => s + _line(p), 0)
+  const artikelBruttoVorNachlass =
+    Math.round(
+      positionen
+        .filter((p) => (p.kind ?? 'position') === 'position')
+        .reduce((s, p) => {
+          const n = _line(p)
+          const f = (p.ust != null ? Number(p.ust) : 19) / 100
+          return s + n * (1 + f)
+        }, 0) * 100
+    ) / 100
 
   const groups = useMemo((): PosTableGroup[] => {
     const map = new Map<string, PosBoardLine[]>()
@@ -570,8 +585,14 @@ export function PosBoard({
           name: namePlain || beschPlain || '(ohne Bezeichnung)',
           beschreibung: namePlain ? beschPlain : '',
           mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
-          menge: typeof p.menge === 'number' ? p.menge : Number(p.menge) || undefined,
-          einheit: p.einheit || undefined,
+          menge:
+            p.kind === 'nachlass' || p.kind === 'freitext'
+              ? undefined
+              : typeof p.menge === 'number'
+                ? p.menge
+                : Number(p.menge) || undefined,
+          einheit: p.kind === 'nachlass' || p.kind === 'freitext' ? undefined : p.einheit || undefined,
+          mengeEditable: p.kind !== 'nachlass' && p.kind !== 'freitext',
           preisLabel: preisLabelOf ? preisLabelOf(p) : defaultPreisLabel(p, lineNetto),
           badge: badgeOf ? badgeOf(p) : defaultBadge(p),
         }
@@ -799,7 +820,11 @@ export function PosBoard({
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
         onMengeChange={
           editable
-            ? (id, menge) => update(id, { menge })
+            ? (id, menge) => {
+                const row = positionen.find((p) => p.id === id)
+                if (!row || row.kind === 'nachlass' || row.kind === 'freitext') return
+                update(id, { menge })
+              }
             : undefined
         }
         showTotals={showTotals ?? showUst !== false}
@@ -887,6 +912,8 @@ export function PosBoard({
                 onClose={helpers.onClose}
                 showUst={showUst}
                 gewerke={gewerkOptions}
+                artikelNetto={artikelNettoVorNachlass}
+                artikelBrutto={artikelBruttoVorNachlass}
               />
             )
         : null}

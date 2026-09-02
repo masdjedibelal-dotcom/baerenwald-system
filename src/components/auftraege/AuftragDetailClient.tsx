@@ -51,6 +51,7 @@ import type {
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { ClientOnly } from '@/components/ui/ClientOnly'
+import { confirmAction } from '@/components/ui/confirm-action'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
@@ -954,17 +955,35 @@ export function AuftragDetailClient({
 
   const versendeNaechsteRechnung = useCallback(
     (rechnungId: string) => {
-      startTransition(async () => {
-        const r = await sendRechnung(rechnungId)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        toast.success('Rechnung gesendet')
-        refresh()
+      const row = rechnungenListe.find((r) => r.id === rechnungId)
+      const nr = row?.rechnungsnummer?.trim()
+      confirmAction({
+        title: 'Rechnung wirklich versenden?',
+        body: nr
+          ? `${nr} wird per E-Mail an den Kunden gesendet.`
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+        confirmLabel: 'Jetzt versenden',
+        cancelLabel: 'Abbrechen',
+        busyLabel: 'Wird gesendet…',
+        onConfirm: async () => {
+          const r = await sendRechnung(rechnungId)
+          if (!r.ok) {
+            toast.error(r.message)
+            return
+          }
+          toast.success('Rechnung gesendet')
+          refresh()
+        },
       })
     },
-    [refresh]
+    [refresh, rechnungenListe]
+  )
+
+  const openRechnungZurPruefung = useCallback(
+    (rechnungId: string) => {
+      router.push(`/rechnungen/${rechnungId}`)
+    },
+    [router]
   )
 
   const markiereNaechsteRechnungBezahlt = useCallback(
@@ -1159,7 +1178,11 @@ export function AuftragDetailClient({
                 rechnungBezahlt:
                   detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
                 naechsterAbschlagSenden: Boolean(
-                  hatAbschlagsplan && naechsteRechnungAktion?.art === 'erstellen'
+                  hatAbschlagsplan &&
+                    naechsteRechnungAktion &&
+                    (naechsteRechnungAktion.art === 'erstellen' ||
+                      naechsteRechnungAktion.art === 'versenden') &&
+                    naechsteRechnungAktion.abschlag
                 ),
                 naechsteRechnungAktion:
                   detail.status === 'abgeschlossen'
@@ -1169,6 +1192,19 @@ export function AuftragDetailClient({
                     : undefined,
               })
               if (!cta) return null
+              const draftArt =
+                naechsteRechnungAktion?.rechnungId != null
+                  ? rechnungenListe.find((r) => r.id === naechsteRechnungAktion.rechnungId)
+                      ?.rechnung_art
+                  : null
+              const versandLabel =
+                draftArt === 'schluss' ||
+                (hatAbschlagsplan && draftArt === 'voll' && !naechsteRechnungAktion?.abschlag)
+                  ? 'Schlussrechnung versenden'
+                  : draftArt === 'abschlag' ||
+                      (hatAbschlagsplan && naechsteRechnungAktion?.abschlag)
+                    ? 'Abschlag versenden'
+                    : 'Rechnung versenden'
               const onClick = () => {
                 if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
                   openAuftragAbschliessen()
@@ -1201,7 +1237,8 @@ export function AuftragDetailClient({
                 }
               }
               return {
-                label: cta.label,
+                label:
+                  cta.id === 'rechnung_versenden' ? versandLabel : cta.label,
                 icon: cta.icon,
                 onClick,
                 disabled: pending,
@@ -1209,16 +1246,33 @@ export function AuftragDetailClient({
             })()}
             secondary={(() => {
               if (istStorniert) return null
+              // Nie zweiten „Versenden“-Button — mobil links leicht mit „Korrigieren“ verwechselt.
               if (
                 detail.status === 'abgeschlossen' &&
                 naechsteRechnungAktion?.art === 'versenden' &&
                 naechsteRechnungAktion.rechnungId
               ) {
                 return {
-                  label: 'Rechnung versenden',
-                  icon: 'send',
-                  onClick: () => versendeNaechsteRechnung(naechsteRechnungAktion.rechnungId!),
+                  label: 'Rechnung prüfen',
+                  icon: 'file-invoice',
+                  onClick: () =>
+                    openRechnungZurPruefung(naechsteRechnungAktion.rechnungId!),
                   disabled: pending,
+                  title: 'Rechnung öffnen — korrigieren oder erst dann versenden',
+                }
+              }
+              if (
+                detail.status === 'abgeschlossen' &&
+                naechsteRechnungAktion?.art === 'bezahlt' &&
+                naechsteRechnungAktion.rechnungId
+              ) {
+                return {
+                  label: 'Rechnung öffnen',
+                  icon: 'file-invoice',
+                  onClick: () =>
+                    openRechnungZurPruefung(naechsteRechnungAktion.rechnungId!),
+                  disabled: pending,
+                  title: 'Rechnung öffnen — dort korrigieren',
                 }
               }
               if (detail.angebot_id) {

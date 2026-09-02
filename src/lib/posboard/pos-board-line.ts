@@ -38,7 +38,7 @@ export type PosBoardLine = {
   /** Zeilentyp — Standard Position */
   kind?: PosBoardLineKind
   /** Nur kind=nachlass */
-  nachlassModus?: 'prozent' | 'betrag'
+  nachlassModus?: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
   /** Legacy Preisliste-ID (= oft Katalog-Varianten-ID nach Import) */
   preisliste_id?: string | null
   /** Katalog-Variante (Herkunft) */

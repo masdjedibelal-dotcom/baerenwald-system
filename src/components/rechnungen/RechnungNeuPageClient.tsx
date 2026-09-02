@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -21,6 +22,8 @@ export function RechnungNeuPageClient({
   bootstrap: RechnungWizardBootstrap
 }) {
   const router = useRouter()
+  /** true nach Speichern/Versand — onClose darf dann nicht mehr history/Liste überschreiben */
+  const finishedRef = useRef(false)
   const zahlungszielTage =
     Math.max(1, parseInt(firm.zahlungsziel_tage, 10) || defaultZahlungszielTage(bootstrap.kunde?.typ))
 
@@ -29,8 +32,8 @@ export function RechnungNeuPageClient({
       router.replace(`/rechnungen/${rechnungId}`)
       return
     }
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back()
+    if (bootstrap.auftragId) {
+      router.replace(`/auftraege/${bootstrap.auftragId}`)
       return
     }
     router.replace('/vorgaenge?tab=rechnung')
@@ -43,8 +46,14 @@ export function RechnungNeuPageClient({
       preislisten={preislisten}
       firm={firm}
       zahlungszielTage={zahlungszielTage}
-      onClose={() => leave()}
-      onDone={(rechnungId) => leave(rechnungId)}
+      onClose={() => {
+        if (finishedRef.current) return
+        leave()
+      }}
+      onDone={(rechnungId) => {
+        finishedRef.current = true
+        leave(rechnungId)
+      }}
     />
   )
 }

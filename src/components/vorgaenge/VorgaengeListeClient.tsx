@@ -149,6 +149,8 @@ type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 function statusKind(row: VorgangListeRow): string {
   const u = row.unterstatus.toLowerCase()
+  // Storno-Gutschrift: eigener Badge-Look unter Erledigt
+  if (row.belegTyp === 'gutschrift') return 'storniert'
   // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
   if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
   if (row.phase === 'rechnung') {
@@ -211,6 +213,8 @@ function dateKey(row: VorgangListeRow): string {
 
 /** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
 function isVorgangErledigt(row: VorgangListeRow): boolean {
+  // Storno-Gutschriften immer unter Erledigt (nie Offen)
+  if (row.belegTyp === 'gutschrift') return true
   const kind = statusKind(row)
   return kind === 'storniert' || kind === 'fertig'
 }
@@ -617,18 +621,31 @@ export function VorgaengeListeClient({
   }, [lifecycleRows, filter, showHwEingang])
 
   const counts = useMemo(() => {
+    // Phasen-Chips immer über alle Phasen zählen — nicht über den aktiven Phasen-Filter
+    // (sonst sind bei „Rechnung“ Anfrage/Angebot/Auftrag fälschlich 0).
+    const ausgehend = baseRows.filter(
+      (v) => (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend'
+    )
+    const offen = ausgehend.filter((v) => !isVorgangErledigt(v))
+    const imLifecycle = ausgehend.filter((v) =>
+      lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+    )
     const c: Record<string, number> = {}
     for (const p of VORGANG_FILTERS) {
       if (p === 'alle') {
-        c[p] = lifecycleRows.length
+        c[p] = imLifecycle.length
       } else if (p === 'bestand') {
-        c[p] = lifecycleRows.filter((v) => v.ist_wiederkehrend).length
+        // Bestand-Tab zeigt nur offene Wiederkehr-Vorgänge
+        c[p] = offen.filter((v) => v.ist_wiederkehrend).length
+      } else if (p === 'rechnung') {
+        c[p] = imLifecycle.filter((v) => v.phase === 'rechnung').length
       } else {
-        c[p] = lifecycleRows.filter((v) => v.phase === p).length
+        // Anfrage / Angebot / Auftrag: Tab erzwingt Offen → immer Offen-Zähler
+        c[p] = offen.filter((v) => v.phase === p).length
       }
     }
     return c
-  }, [lifecycleRows])
+  }, [baseRows, lifecycle])
 
   const filteredBase = useMemo(() => {
     return lifecycleRows.filter((v) => {

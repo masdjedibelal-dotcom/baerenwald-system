@@ -163,14 +163,33 @@ export function rechnungStatusDisplay(
   return { label, variant }
 }
 
+/** True wenn Inhalt nach dem Kundenversand erneut gespeichert wurde (ohne erneuten Versand). */
+export function angebotInhaltGeaendertNachVersand(
+  sentAt: string | null | undefined,
+  updatedAt: string | null | undefined
+): boolean {
+  const sent = (sentAt ?? '').trim()
+  const upd = (updatedAt ?? '').trim()
+  if (!sent || !upd) return false
+  const sentMs = Date.parse(sent)
+  const updMs = Date.parse(upd)
+  if (!Number.isFinite(sentMs) || !Number.isFinite(updMs)) return false
+  // Versand setzt oft beide Timestamps fast gleich — 90s Puffer
+  return updMs - sentMs > 90_000
+}
+
 /** Dezente Kopf-Zeile unter Titel bei Versand (gesendet_am / versendet_am / Fallback). */
 export function gesendetDetailSubline(
   sentAt: string | null | undefined,
-  fallbackAt?: string | null | undefined
+  fallbackAt?: string | null | undefined,
+  opts?: { inhaltGeaendert?: boolean }
 ): string {
   const raw = (sentAt ?? fallbackAt ?? '').trim()
-  if (!raw) return 'Gesendet'
-  return `Gesendet · ${formatDatum(raw)}`
+  const base = !raw ? 'Gesendet' : `Gesendet · ${formatDatum(raw)}`
+  if (opts?.inhaltGeaendert) {
+    return `${base} · geändert — noch nicht erneut versendet`
+  }
+  return base
 }
 
 /** Sekundär-Badge: Bauprojekt vs. Standardauftrag (nur Typ-Hinweis, kein Workflow-Status). */

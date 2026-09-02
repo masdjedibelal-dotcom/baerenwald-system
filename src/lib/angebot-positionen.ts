@@ -490,8 +490,8 @@ export function summenAusPositionen(
 
   const artikelNettoMin = lohnZeileMin + materialZeileMin
   const artikelNettoMax = lohnZeileMax + materialZeileMax
-  const nachlass = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMin)
-  const nachlassMax = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMax)
+  const nachlass = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMin, mwstSatz)
+  const nachlassMax = gesamtrabattAbzugAusAngebotPositionen(list, artikelNettoMax, mwstSatz)
   const nettoMin = Math.max(0, Math.round((artikelNettoMin - nachlass) * 100) / 100)
   const nettoMax = Math.max(0, Math.round((artikelNettoMax - nachlassMax) * 100) / 100)
   const f = mwstSatz / 100

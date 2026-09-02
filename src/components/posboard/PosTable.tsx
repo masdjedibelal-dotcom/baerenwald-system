@@ -41,6 +41,8 @@ export type PosTableItem = {
   /** Rohwert für Inline-Edit */
   menge?: number
   einheit?: string
+  /** false = kein Mengen-Input (Nachlass/Freitext) — nur Label oder leer */
+  mengeEditable?: boolean
   preisLabel?: string
   badge?: PosTableBadge | null
 }
@@ -258,8 +260,8 @@ function PosRowContent({
         {it.beschreibung ? (
           <div className="pt-desc pt-desc--clamp2">{it.beschreibung}</div>
         ) : null}
-        <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !onMengeChange}>
-          {onMengeChange ? (
+        <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !(onMengeChange && it.mengeEditable !== false)}>
+          {onMengeChange && it.mengeEditable !== false ? (
             <span className="pt2-menge pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
               <ClearableNumberInput
                 className="pt2-menge-input"
@@ -278,7 +280,7 @@ function PosRowContent({
         </div>
       </div>
       <div className="pt2-menge pt2-menge--desk">
-        {onMengeChange ? (
+        {onMengeChange && it.mengeEditable !== false ? (
           <span className="pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
             <ClearableNumberInput
               className="pt2-menge-input"

@@ -1,5 +1,5 @@
 import { formatKundennr } from '@/lib/angebot-utils'
-import { normalizeAngebotPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
   firmenBankverbindungZeilen,
   firmenSteuerFooterZeilen,
@@ -162,6 +162,7 @@ export function buildRechnungHtmlInput(
     defaultMwstSatz: defaultMwst,
   }
   const berechnung = berechneRechnung(positionen, berechnungOpts)
+  const summenPos = summenAusPositionen(positionen, berechnung.mwst_satz || defaultMwst)
 
   const privat = istPrivatKundeTyp(row.kunden.typ)
   // Privat / Schluss: kein Arbeitskosten-Block — nur klare Gesamtabrechnung
@@ -309,6 +310,13 @@ export function buildRechnungHtmlInput(
       mwst_prozent: berechnung.mwst_satz,
       mwst_betrag: berechnung.mwst_betrag,
       brutto: berechnung.brutto,
+      ...(summenPos.nachlassNetto > 0
+        ? {
+            nachlass_netto: Math.round(summenPos.nachlassNetto * 100) / 100,
+            nachlass_label: summenPos.nachlassLabel || 'Nachlass',
+            netto_vor_nachlass: Math.round(summenPos.nettoVorNachlass * 100) / 100,
+          }
+        : {}),
     },
     kostenaufstellung,
     rechtshinweise: {

@@ -63,7 +63,7 @@ import {
 } from '@/lib/angebot-einfach'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
+import { angebotStatusDisplay, angebotInhaltGeaendertNachVersand, gesendetDetailSubline } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
@@ -400,9 +400,15 @@ export function AngebotDetailPageClient({
     ].filter(Boolean)
     return parts.join(' · ')
   }, [projektTitel, summenMail.bruttoMin, gueltigBisYmd])
+  const gesendetAm = gesendetAmWert(detail)
+  const inhaltGeaendertNachVersand =
+    (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
+    angebotInhaltGeaendertNachVersand(gesendetAm, detail.updated_at)
   const headSub =
     statusEinfach === 'gesendet'
-      ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
+      ? gesendetDetailSubline(gesendetAm, detail.updated_at, {
+          inhaltGeaendert: inhaltGeaendertNachVersand,
+        })
       : undefined
 
   const dangerAction = useMemo((): DetailActionDef | null => {
@@ -746,6 +752,23 @@ export function AngebotDetailPageClient({
           {detail.updated_at ? ` am ${formatDatum(detail.updated_at)}` : ''}
           {detail.ablehnung_grund ? ` — ${detail.ablehnung_grund}` : ''}
         </p>
+      ) : null}
+
+      {inhaltGeaendertNachVersand ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <p className="text-[length:var(--fs-text)] text-amber-950">
+            Inhalt geändert seit Versand
+            {gesendetAm ? ` am ${formatDatum(gesendetAm)}` : ''} — der Kunde hat die neue
+            Fassung noch nicht per E-Mail.
+          </p>
+          <Button
+            type="button"
+            onClick={() => setKundeVersandOpen(true)}
+            disabled={pending}
+          >
+            Korrigierte Fassung senden
+          </Button>
+        </div>
       ) : null}
 
       {hatAngebotHandwerker(detail.angebot_handwerker) && !detail.ist_partner_einholung ? (

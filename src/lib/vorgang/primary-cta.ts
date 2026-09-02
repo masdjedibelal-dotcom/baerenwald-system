@@ -137,7 +137,7 @@ export function primaryCta(
           id: 'rechnung_versenden',
           label: ctx.naechsterAbschlagSenden
             ? 'Abschlag versenden'
-            : 'Schlussrechnung versenden',
+            : 'Rechnung versenden',
           icon: 'send',
         }
       }

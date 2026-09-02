@@ -15,11 +15,12 @@ import {
   type KatalogVariante,
 } from '@/lib/katalog/katalog-types'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 import { Toggle } from '@/components/ui/Toggle'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { cn } from '@/lib/utils'
 import type { KatalogPickResult } from '@/components/posboard/KatalogPickModal'
 
@@ -45,7 +46,7 @@ export type FreitextDraft = {
 
 export type NachlassDraft = {
   name: string
-  nachlassModus: 'prozent' | 'betrag'
+  nachlassModus: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
   preis: number
 }
 
@@ -86,6 +87,8 @@ export function PositionAddSheet({
   allowGewerk = false,
   allowNachlass = false,
   allowOhneGewerk = false,
+  artikelNetto = 0,
+  artikelBrutto = 0,
   onPickKatalog,
   onAddFrei,
   onAddFreitext,
@@ -103,6 +106,9 @@ export function PositionAddSheet({
   allowNachlass?: boolean
   /** Leeres Gewerk = „Ohne Gewerk“ (Komplex) */
   allowOhneGewerk?: boolean
+  /** Für Nachlass „Neuer Gesamtbetrag“ */
+  artikelNetto?: number
+  artikelBrutto?: number
   onPickKatalog: (result: KatalogPickResult) => void
   onAddFrei: (draft: FreiePositionDraft) => void
   onAddFreitext?: (draft: FreitextDraft) => void
@@ -762,36 +768,19 @@ export function PositionAddSheet({
               placeholder="Nachlass"
             />
           </div>
-          <div className="field">
-            <div className="field-label">Art</div>
-            <select
-              className="sel"
-              value={nachlass.nachlassModus}
-              onChange={(e) =>
-                setNachlass((n) => ({
-                  ...n,
-                  nachlassModus: e.target.value as 'prozent' | 'betrag',
-                }))
-              }
-            >
-              <option value="prozent">Prozent vom Netto</option>
-              <option value="betrag">Fester Betrag</option>
-            </select>
-          </div>
-          <div className="field">
-            <div className="field-label">
-              {nachlass.nachlassModus === 'prozent' ? 'Prozent' : 'Betrag netto'}
-            </div>
-            <div className="txt-prefix">
-              <span className="prefix">{nachlass.nachlassModus === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={nachlass.preis}
-                onValueChange={(preis) => setNachlass((n) => ({ ...n, preis }))}
-              />
-            </div>
-          </div>
+          <NachlassModusFields
+            modus={nachlass.nachlassModus as GesamtrabattModus}
+            wert={nachlass.preis}
+            artikelNetto={artikelNetto}
+            artikelBrutto={artikelBrutto}
+            onChange={(next) =>
+              setNachlass((n) => ({
+                ...n,
+                nachlassModus: (next.nachlassModus ?? n.nachlassModus) as NachlassDraft['nachlassModus'],
+                preis: next.preis ?? n.preis,
+              }))
+            }
+          />
         </div>
       ) : null}
 

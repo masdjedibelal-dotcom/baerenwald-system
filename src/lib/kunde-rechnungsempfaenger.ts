@@ -1,6 +1,7 @@
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import {
   istKundeGewerbeTyp,
+  istKundeHausverwaltungTyp,
   kundeHausnummer,
   kundeStrasse,
   kundeStrasseHausnummerZeile,
@@ -289,8 +290,9 @@ export function resolveWegRechnungsname(objekt: KundenObjekt): string {
 
 /**
  * Rechnungs-Empfängerblock:
- * - Mit Objekt (WEG): Name = WEG/Objekt; Adresse = c/o HV + z. Hd. AP + HV-Büroadresse.
- * - Ohne Objekt: klassische HV-/Kundenadresse.
+ * - HV + Objekt (WEG): Name = WEG/Objekt; Adresse = c/o HV + z. Hd. AP + HV-Büroadresse.
+ * - Gewerbe / Privat / HV ohne Objekt: Firmenname bzw. Name + Ansprechpartner + Büroadresse
+ *   (Objekt nur als Leistungsort „Durchführung in:“, nicht als Empfänger).
  */
 export function formatRechnungEmpfaengerFuerDokument(
   kunde: KundeStammFull,
@@ -301,8 +303,10 @@ export function formatRechnungEmpfaengerFuerDokument(
 ): { name: string; adresse: string } {
   const objekt = opts?.objekt ?? null
   const hatObjekt = Boolean(objekt && (objekt.titel?.trim() || kundenObjektHatAnschrift(objekt)))
+  const istHv = istKundeHausverwaltungTyp(kunde.typ)
 
-  if (!hatObjekt || !objekt) {
+  // WEG-/c/o-Format nur für Hausverwaltung mit Objekt — nie für Gewerbe/Privat
+  if (!istHv || !hatObjekt || !objekt) {
     return formatKundeEmpfaengerFuerDokument(kunde, null, {
       selectedAnsprechpartnerId: opts?.selectedAnsprechpartnerId,
     })

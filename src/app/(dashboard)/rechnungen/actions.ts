@@ -262,23 +262,8 @@ export async function updateRechnungEntwurf(
 
   if (error) return { ok: false, message: error.message }
 
-  // Korrektur-Entwurf → nach Speichern als „Korrektur Gespeichert“ markieren
-  const { data: korMeta } = await supabase
-    .from('rechnungen')
-    .select('korrektur_von, korrektur_art, status')
-    .eq('id', id)
-    .maybeSingle()
-  if (
-    korMeta &&
-    String(korMeta.korrektur_von ?? '').trim() &&
-    String(korMeta.status ?? '').toLowerCase() === 'entwurf' &&
-    String(korMeta.korrektur_art ?? '').toLowerCase() !== 'gespeichert'
-  ) {
-    await supabase
-      .from('rechnungen')
-      .update({ korrektur_art: 'gespeichert', updated_at: new Date().toISOString() })
-      .eq('id', id)
-  }
+  // Korrektur-Entwurf: Art bleibt 'gutschrift' (DB-Check) — UI leitet Status aus status ab
+  // absichtlich kein Update auf ungültige Werte wie 'gespeichert'/'entwurf'
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${id}`)
@@ -495,8 +480,8 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       einleitung: orig.einleitung ?? null,
       hinweise: orig.hinweise ?? null,
       zahlungsbedingungen: orig.zahlungsbedingungen ?? null,
-      mail_einleitung: orig.mail_einleitung ?? null,
-      mail_betreff: orig.mail_betreff ?? null,
+      mail_einleitung: null,
+      mail_betreff: null,
       ansprechpartner_id: orig.ansprechpartner_id ?? null,
       kunde_objekt_id: orig.kunde_objekt_id ?? null,
       objekt_anlage_id: orig.objekt_anlage_id ?? null,
@@ -505,6 +490,8 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       rechnung_art: orig.rechnung_art ?? 'voll',
       abschlag_index: orig.abschlag_index ?? null,
       zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
+      korrektur_von: rechnungId,
+      korrektur_art: 'gutschrift',
     },
     berechnung,
     {
@@ -518,11 +505,51 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     return { ok: false, message: neuErr?.message ?? 'Neue Rechnung konnte nicht angelegt werden.' }
   }
 
-  await linkRechnungKorrekturKette(supabase, {
+  const link = await linkRechnungKorrekturKette(supabase, {
     originalId: rechnungId,
     neuId: neu.id as string,
-    art: 'entwurf',
+    art: 'gutschrift',
   })
+  if (!link.ok) {
+    console.warn('[korrigiereRechnung] link:', link.message)
+  }
+
+  // Sicherstellen: korrektur_von + ersetzt_durch (sonst kein Storno-Anhang / keine Korrektur-Mail)
+  const { data: linked } = await supabase
+    .from('rechnungen')
+    .select('korrektur_von')
+    .eq('id', neu.id)
+    .maybeSingle()
+  if (!String(linked?.korrektur_von ?? '').trim()) {
+    const { error: forceErr } = await supabase
+      .from('rechnungen')
+      .update({
+        korrektur_von: rechnungId,
+        korrektur_art: 'gutschrift',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', neu.id)
+    if (forceErr) {
+      console.warn('[korrigiereRechnung] korrektur_von force:', forceErr.message)
+    }
+  }
+  const { data: origLinked } = await supabase
+    .from('rechnungen')
+    .select('ersetzt_durch')
+    .eq('id', rechnungId)
+    .maybeSingle()
+  if (String(origLinked?.ersetzt_durch ?? '').trim() !== String(neu.id)) {
+    const { error: forceOrig } = await supabase
+      .from('rechnungen')
+      .update({
+        ersetzt_durch: neu.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', rechnungId)
+    if (forceOrig) {
+      console.warn('[korrigiereRechnung] ersetzt_durch force:', forceOrig.message)
+    }
+  }
 
   // Storno-Gutschrift: Bezug bleibt auf Original; optional Hinweis auf Nachfolger in Notizen weglassen
   revalidatePath('/rechnungen')
@@ -1104,30 +1131,82 @@ export async function sendRechnung(
       }
     }
 
-    // Direktrechnung / FAB: Gutschrift nach Korrektur ohne Auftrag/Planzeile mitnehmen
-    if (!stornoAnhang && kundeIdMeta && !auftragIdMeta) {
+    // Fallback: Original mit ersetzt_durch = diese RE (auch wenn korrektur_von fehlt)
+    if (!stornoAnhang) {
+      const { data: ersetzt } = await supabase
+        .from('rechnungen')
+        .select('id')
+        .eq('ersetzt_durch', rechnungId)
+        .eq('status', 'storniert')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const origId = String(ersetzt?.id ?? '').trim()
+      if (origId) {
+        const found = await loadGutschriftAnhang(origId)
+        if (found) stornoAnhang = found
+      }
+    }
+
+    // Fallback: Original zeigt fälschlich auf die Gutschrift (ersetzt_durch = GS-ID)
+    if (!stornoAnhang && kundeIdMeta) {
+      const { data: thisRec } = await supabase
+        .from('rechnungen')
+        .select('created_at')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      const createdMs = thisRec?.created_at ? Date.parse(String(thisRec.created_at)) : NaN
+
       const { data: openGs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, bezug_rechnung_id')
+        .select('id, rechnungsnummer, bezug_rechnung_id, created_at, auftrag_id')
         .eq('kunde_id', kundeIdMeta)
         .eq('beleg_typ', 'gutschrift')
         .eq('status', 'entwurf')
-        .is('auftrag_id', null)
         .order('created_at', { ascending: false })
-        .limit(8)
+        .limit(12)
+
       for (const gs of openGs ?? []) {
         const bezugId = String(gs.bezug_rechnung_id ?? '').trim()
         if (!bezugId) continue
         const { data: orig } = await supabase
           .from('rechnungen')
-          .select('id, status, kunde_id')
+          .select('id, status, kunde_id, ersetzt_durch')
           .eq('id', bezugId)
           .maybeSingle()
         if (!orig || String(orig.status) !== 'storniert') continue
         if (String(orig.kunde_id ?? '') !== kundeIdMeta) continue
+
+        // Passend wenn: ersetzt_durch = diese RE, oder ersetzt_durch = diese GS, oder zeitnah erzeugt
+        const ersetzt = String(orig.ersetzt_durch ?? '').trim()
+        const gsCreated = gs.created_at ? Date.parse(String(gs.created_at)) : NaN
+        const zeitnah =
+          Number.isFinite(createdMs) &&
+          Number.isFinite(gsCreated) &&
+          Math.abs(createdMs - gsCreated) <= 15 * 60 * 1000
+        const kettePasst =
+          ersetzt === rechnungId || ersetzt === String(gs.id) || !ersetzt || zeitnah
+        if (!kettePasst) continue
+
         const found = await loadGutschriftAnhang(bezugId)
         if (found) {
           stornoAnhang = found
+          // Kette nachziehen (Prod-Altlast: ersetzt_durch zeigte auf GS statt neue RE)
+          if (ersetzt !== rechnungId) {
+            await supabase
+              .from('rechnungen')
+              .update({ ersetzt_durch: rechnungId, updated_at: new Date().toISOString() })
+              .eq('id', bezugId)
+            await supabase
+              .from('rechnungen')
+              .update({
+                korrektur_von: bezugId,
+                korrektur_art: 'gutschrift',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', rechnungId)
+              .is('korrektur_von', null)
+          }
           break
         }
       }
@@ -1207,11 +1286,27 @@ export async function sendRechnung(
     ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
     : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
-  const mailEinleitung = stornoAnhang
-    ? mailEinleitungBase
+
+  // Korrektur-Kette auch ohne stornoAnhang erkennen (ersetzt_durch → diese RE)
+  let korrekturVonId = String(rec.korrektur_von ?? '').trim()
+  if (!korrekturVonId) {
+    const { data: ersetzt } = await supabase
+      .from('rechnungen')
+      .select('id')
+      .eq('ersetzt_durch', rechnungId)
+      .eq('status', 'storniert')
+      .limit(1)
+      .maybeSingle()
+    korrekturVonId = String(ersetzt?.id ?? '').trim()
+  }
+
+  const istKorrekturVersand = Boolean(stornoAnhang) || Boolean(korrekturVonId)
+
+  // Korrektur: nie die kopierte PDF-Einleitung („Hiermit stellen wir…“) — Standard-Korrekturtext
+  const mailEinleitung = istKorrekturVersand
+    ? null
     : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
 
-  const korrekturVonId = String(rec.korrektur_von ?? '').trim()
   let korrekturOriginalNr =
     stornoAnhang?.bezugRechnungsnummer?.trim() || null
   if (!korrekturOriginalNr && korrekturVonId) {
@@ -1222,7 +1317,6 @@ export async function sendRechnung(
       .maybeSingle()
     korrekturOriginalNr = String(origNrRow?.rechnungsnummer ?? '').trim() || null
   }
-  const istKorrekturVersand = Boolean(stornoAnhang) || Boolean(korrekturVonId)
 
   const tpl = buildRechnungMail(
     {
@@ -1261,11 +1355,7 @@ export async function sendRechnung(
     an: toList.length ? toList : (email as string),
     cc: options?.cc?.map((v) => v.trim()).filter(Boolean),
     anName: empfaenger.ansprechpartner || kunde?.name || null,
-    betreff: istKorrekturVersand
-      ? sanitizeRechnungMailBetreff(
-          rechnungKorrekturMailBetreff(rechnungsnummer, branding.firmenname)
-        )
-      : tpl.betreff,
+    betreff: tpl.betreff,
     html: tpl.html,
     pdfBuffer: pdf.buffer,
     pdfName: `Rechnung-${rechnungsnummer}.pdf`,

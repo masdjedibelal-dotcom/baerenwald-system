@@ -232,6 +232,7 @@ export function DetailActionsBar({
                   key={`${item.slot}-${item.action.label}`}
                   item={item}
                   size="md"
+                  compact={Boolean(item.action.shortLabel?.trim())}
                   className={cn(
                     item.slot === 'secondary' && 'detail-mobile-action-bar__secondary',
                     item.slot === 'danger' && 'detail-mobile-action-bar__danger'

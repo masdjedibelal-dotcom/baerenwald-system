@@ -928,16 +928,19 @@ export function AngebotWizard({
         setDraftDirty(false)
         onSaved?.(res.angebotId)
         if (opts?.notify) {
+          const bereitsGesendet = Boolean(bootstrap?.bereitsGesendet)
           toast.success(
             istNachtrag
               ? 'Nachtrag gespeichert'
               : istAuftragKorrektur
                 ? hatGestellteAbschlaege
-                  ? 'Korrektur gespeichert — Abschläge unverändert'
-                  : 'Korrektur gespeichert'
-                : res.angebotsnr?.trim()
-                  ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-                  : 'Entwurf gespeichert'
+                  ? 'Korrektur gespeichert — Abschläge unverändert. Zum Kunden: Versenden.'
+                  : 'Korrektur gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
+                : bereitsGesendet
+                  ? 'Änderungen gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
+                  : res.angebotsnr?.trim()
+                    ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+                    : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
@@ -975,6 +978,7 @@ export function AngebotWizard({
       onSaved,
       istAuftragKorrektur,
       hatGestellteAbschlaege,
+      bootstrap?.bereitsGesendet,
       auftragKorrekturId,
       zahlungsplan,
       projekt,

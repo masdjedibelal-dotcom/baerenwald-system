@@ -2,16 +2,18 @@
 
 import { Percent, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
+import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import {
   formatEurBetrag,
   gesamtrabattBetrag,
   getGesamtrabattZeile,
   neueGesamtrabattZeile,
   setGesamtrabattInZeilen,
+  summeArtikelBrutto,
   summeArtikelNetto,
   type DokumentGesamtrabattZeile,
   type DokumentZeile,
+  type GesamtrabattModus,
 } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +32,7 @@ export function DokumentGesamtrabattPanel({
   variant = 'wizard',
 }: Props) {
   const artikelNetto = summeArtikelNetto(zeilen)
+  const artikelBrutto = summeArtikelBrutto(zeilen)
   const rabatt = getGesamtrabattZeile(zeilen)
   const abzug = gesamtrabattBetrag(zeilen, artikelNetto)
   const nettoNachRabatt = Math.round((artikelNetto - abzug) * 100) / 100
@@ -44,6 +47,13 @@ export function DokumentGesamtrabattPanel({
 
   function addRabatt() {
     onChange(setGesamtrabattInZeilen(zeilen, neueGesamtrabattZeile({ bezeichnung: 'Rabatt' })))
+  }
+
+  function patchFromNachlassFields(next: { nachlassModus?: GesamtrabattModus; preis?: number }) {
+    patchRabatt({
+      ...(next.nachlassModus ? { modus: next.nachlassModus } : {}),
+      ...(next.preis != null ? { wert: next.preis } : {}),
+    })
   }
 
   if (variant === 'lex') {
@@ -66,8 +76,8 @@ export function DokumentGesamtrabattPanel({
         <p className="text-[11px] font-medium uppercase tracking-wide text-bw-text-muted">
           Gesamtrabatt (auf alle Positionen)
         </p>
-        <div className="lex-zeile lex-zeile--rabatt flex flex-wrap items-end gap-2">
-          <label className="lex-form-field form-field min-w-[140px] flex-1">
+        <div className="lex-zeile lex-zeile--rabatt space-y-2">
+          <label className="lex-form-field form-field block">
             <span className="form-field-label">Bezeichnung</span>
             <input
               className="input w-full"
@@ -75,44 +85,28 @@ export function DokumentGesamtrabattPanel({
               onChange={(e) => patchRabatt({ bezeichnung: e.target.value })}
             />
           </label>
-          <label className="lex-form-field form-field w-[110px] shrink-0">
-            <span className="form-field-label">Art</span>
-            <select
-              className="input w-full"
-              value={rabatt.modus}
-              onChange={(e) =>
-                patchRabatt({ modus: e.target.value as DokumentGesamtrabattZeile['modus'] })
-              }
-            >
-              <option value="prozent">Prozent</option>
-              <option value="betrag">Betrag</option>
-            </select>
-          </label>
-          <label className="lex-form-field form-field w-[100px] shrink-0">
-            <span className="form-field-label">Wert</span>
-            <div className="relative">
-              <ClearableNumberInput
-                min={0}
-                className="input w-full pr-7"
-                value={rabatt.wert}
-                onValueChange={(wert) => patchRabatt({ wert })}
-              />
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-bw-text-muted">
-                {rabatt.modus === 'prozent' ? '%' : '€'}
-              </span>
+          <NachlassModusFields
+            modus={rabatt.modus}
+            wert={rabatt.wert}
+            artikelNetto={artikelNetto}
+            artikelBrutto={artikelBrutto}
+            inputClassName="input"
+            selectClassName="input w-full"
+            onChange={patchFromNachlassFields}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[13px] font-semibold tabular-nums text-bw-text">
+              −{formatEurBetrag(abzug)}
             </div>
-          </label>
-          <div className="flex min-w-[88px] shrink-0 items-center justify-end pb-0.5 text-[13px] font-semibold tabular-nums text-bw-text">
-            −{formatEurBetrag(abzug)}
+            <button
+              type="button"
+              className="flex h-10 w-9 shrink-0 items-center justify-center text-bw-text-muted hover:text-status-cancel-text"
+              onClick={removeRabatt}
+              aria-label="Gesamtrabatt entfernen"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-9 shrink-0 items-center justify-center text-bw-text-muted hover:text-status-cancel-text"
-            onClick={removeRabatt}
-            aria-label="Gesamtrabatt entfernen"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
         {abzug > 0 ? (
           <p className="text-right text-[12px] text-bw-text-muted">
@@ -153,8 +147,8 @@ export function DokumentGesamtrabattPanel({
       </div>
 
       {rabatt ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block text-sm sm:col-span-2">
+        <div className="mt-3 space-y-3">
+          <label className="block text-sm">
             <span className="input-label">Bezeichnung</span>
             <input
               className="input w-full"
@@ -163,31 +157,17 @@ export function DokumentGesamtrabattPanel({
               placeholder="z. B. Rabatt"
             />
           </label>
-          <label className="block text-sm">
-            <span className="input-label">Art</span>
-            <select
-              className="input w-full"
-              value={rabatt.modus}
-              onChange={(e) =>
-                patchRabatt({ modus: e.target.value as DokumentGesamtrabattZeile['modus'] })
-              }
-            >
-              <option value="prozent">Prozent vom Netto</option>
-              <option value="betrag">Fester Betrag (netto)</option>
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="input-label">{rabatt.modus === 'prozent' ? 'Prozent' : 'Betrag'}</span>
-            <div className="txt-prefix">
-              <span className="prefix">{rabatt.modus === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
-                className="input"
-                min={0}
-                value={rabatt.wert}
-                onValueChange={(wert) => patchRabatt({ wert })}
-              />
-            </div>
-          </label>
+          <div className="form-grid">
+            <NachlassModusFields
+              modus={rabatt.modus}
+              wert={rabatt.wert}
+              artikelNetto={artikelNetto}
+              artikelBrutto={artikelBrutto}
+              inputClassName="input"
+              selectClassName="input w-full"
+              onChange={patchFromNachlassFields}
+            />
+          </div>
         </div>
       ) : (
         <p className="mt-2 text-[12px] text-bw-text-muted">

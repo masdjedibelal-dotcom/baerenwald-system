@@ -12,15 +12,17 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useSpeechDictation } from '@/hooks/useSpeechDictation'
 import { cn } from '@/lib/utils'
 
-const MAX_ROWS = 4
+const DEFAULT_MAX_ROWS = 4
 const LINE_PX = 22
-/** Max. Zeichen für Tippen und Sprachergebnis. */
-const MAX_CHARS = 500
+/** Default: kurze Chat-Nachrichten. Positions-KI setzt höher (Paste aus ChatGPT). */
+export const KI_CHAT_DEFAULT_MAX_CHARS = 500
+/** Mehrere LV-Positionen aus ChatGPT / Langprompt. */
+export const KI_CHAT_POSITIONEN_MAX_CHARS = 4000
 /** Max. Aufnahmedauer Sprachnotiz. */
 const VOICE_MAX_SEC = 60
 
-function clampText(s: string) {
-  return s.length <= MAX_CHARS ? s : s.slice(0, MAX_CHARS)
+function clampText(s: string, max: number) {
+  return s.length <= max ? s : s.slice(0, max)
 }
 
 function VoiceWaves({ active }: { active: boolean }) {
@@ -34,9 +36,9 @@ function VoiceWaves({ active }: { active: boolean }) {
 }
 
 /**
- * Chat-Composer im GPT-Muster: Mic · Textfeld (1–4 Zeilen) · Senden.
+ * Chat-Composer im GPT-Muster: Mic · Textfeld · Senden.
  * Sprache: Wellen beim Aufnehmen → Stopp → Text sichtbar → Senden.
- * Limits: 30 s Aufnahme, 500 Zeichen.
+ * Limits: 60 s Aufnahme; Zeichen via `maxChars` (Default 500, Positions-KI 4000).
  */
 export function KiChatComposer({
   value,
@@ -45,6 +47,8 @@ export function KiChatComposer({
   disabled,
   placeholder = 'Nachricht schreiben…',
   inputRef,
+  maxChars = KI_CHAT_DEFAULT_MAX_CHARS,
+  maxRows = DEFAULT_MAX_ROWS,
 }: {
   value: string
   onChange: (v: string) => void
@@ -52,6 +56,10 @@ export function KiChatComposer({
   disabled?: boolean
   placeholder?: string
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
+  /** Zeichenlimit Tippen / Paste / Sprache (Default 500). */
+  maxChars?: number
+  /** Max. sichtbare Zeilen vor Scroll (Default 4). */
+  maxRows?: number
 }) {
   const [voicePhase, setVoicePhase] = useState<'idle' | 'listening' | 'review'>('idle')
   const [interim, setInterim] = useState('')
@@ -63,11 +71,13 @@ export function KiChatComposer({
   const hadListeningRef = useRef(false)
   const finishingRef = useRef(false)
   const finishVoiceRef = useRef<() => void>(() => {})
+  const maxCharsRef = useRef(maxChars)
   valueRef.current = value
   interimRef.current = interim
+  maxCharsRef.current = maxChars
 
   const setClamped = (next: string) => {
-    onChange(clampText(next))
+    onChange(clampText(next, maxCharsRef.current))
   }
 
   const speech = useSpeechDictation({
@@ -75,8 +85,12 @@ export function KiChatComposer({
       setClamped([valueRef.current.trim(), chunk.trim()].filter(Boolean).join(' '))
     },
     onInterim: (t) => {
-      const room = Math.max(0, MAX_CHARS - valueRef.current.trim().length - (valueRef.current.trim() ? 1 : 0))
-      setInterim(clampText(t).slice(0, room || MAX_CHARS))
+      const limit = maxCharsRef.current
+      const room = Math.max(
+        0,
+        limit - valueRef.current.trim().length - (valueRef.current.trim() ? 1 : 0)
+      )
+      setInterim(clampText(t, limit).slice(0, room || limit))
     },
   })
 
@@ -84,16 +98,17 @@ export function KiChatComposer({
     const el = taRef.current
     if (!el || voicePhase === 'listening') return
     el.style.height = 'auto'
-    const max = LINE_PX * MAX_ROWS
+    const max = LINE_PX * maxRows
     el.style.height = `${Math.min(el.scrollHeight, max)}px`
-  }, [value, voicePhase, taRef])
+  }, [value, voicePhase, taRef, maxRows])
 
   function finishVoice() {
     if (finishingRef.current) return
     finishingRef.current = true
     speech.stop()
     const merged = clampText(
-      [valueRef.current.trim(), interimRef.current.trim()].filter(Boolean).join(' ')
+      [valueRef.current.trim(), interimRef.current.trim()].filter(Boolean).join(' '),
+      maxCharsRef.current
     )
     if (merged) setClamped(merged)
     setInterim('')
@@ -147,16 +162,16 @@ export function KiChatComposer({
     return () => window.clearInterval(tick)
   }, [voicePhase])
 
-  // Live-Text während Aufnahme auf 500 Zeichen deckeln → Stopp
+  // Live-Text während Aufnahme auf maxChars deckeln → Stopp
   useEffect(() => {
     if (voicePhase !== 'listening') return
     const live = [value.trim(), interim.trim()].filter(Boolean).join(' ')
-    if (live.length >= MAX_CHARS) finishVoiceRef.current()
-  }, [value, interim, voicePhase])
+    if (live.length >= maxChars) finishVoiceRef.current()
+  }, [value, interim, voicePhase, maxChars])
 
   function handleSubmit(e?: FormEvent) {
     e?.preventDefault()
-    const text = clampText(value.trim())
+    const text = clampText(value.trim(), maxChars)
     if (disabled || !text) return
     if (text !== value) setClamped(text)
     speech.stop()
@@ -187,9 +202,12 @@ export function KiChatComposer({
     }
   }
 
-  const livePreview = clampText([value.trim(), interim.trim()].filter(Boolean).join(' '))
+  const livePreview = clampText(
+    [value.trim(), interim.trim()].filter(Boolean).join(' '),
+    maxChars
+  )
   const chars = value.length
-  const nearLimit = chars >= MAX_CHARS - 50
+  const nearLimit = chars >= maxChars - Math.min(80, Math.floor(maxChars * 0.05))
 
   if (voicePhase === 'listening') {
     return (
@@ -203,7 +221,7 @@ export function KiChatComposer({
             {livePreview || 'Ich höre zu…'}
           </p>
           <p className="ki-chat-composer__voice-meta">
-            Max. {VOICE_MAX_SEC}s · {livePreview.length}/{MAX_CHARS} Zeichen
+            Max. {VOICE_MAX_SEC}s · {livePreview.length}/{maxChars} Zeichen
           </p>
           <button
             type="button"
@@ -244,7 +262,7 @@ export function KiChatComposer({
           ref={taRef as React.RefObject<HTMLTextAreaElement>}
           className="ki-chat-composer__input"
           rows={1}
-          maxLength={MAX_CHARS}
+          maxLength={maxChars}
           placeholder={
             voicePhase === 'review' ? 'Text prüfen und senden…' : placeholder
           }
@@ -272,10 +290,10 @@ export function KiChatComposer({
         <p
           className={cn(
             'ki-chat-composer__count',
-            chars >= MAX_CHARS && 'is-limit'
+            chars >= maxChars && 'is-limit'
           )}
         >
-          {chars}/{MAX_CHARS}
+          {chars}/{maxChars}
         </p>
       ) : null}
       {speech.error ? (

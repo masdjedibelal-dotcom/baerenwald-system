@@ -30,7 +30,7 @@ const COL_LABELS: Record<ColId, string> = {
   bezeichnung: 'Bezeichnung',
   menge: 'Menge',
   preis: 'Preis',
-  status: 'Status',
+  status: 'Fortschritt',
   gewerk: 'Gewerk',
   handwerker: 'Handwerker',
   ek: 'EK',

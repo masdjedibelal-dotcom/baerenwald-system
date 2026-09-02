@@ -1315,7 +1315,7 @@ export async function saveRechnungWizardDraft(
       await linkRechnungKorrekturKette(supabaseCheck, {
         originalId: input.rechnungId,
         neuId: created.id,
-        art: 'gespeichert',
+        art: 'gutschrift',
       })
 
       const { data: nr } = await supabaseCheck
