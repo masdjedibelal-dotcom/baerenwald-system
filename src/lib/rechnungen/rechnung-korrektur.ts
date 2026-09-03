@@ -126,7 +126,13 @@ export function rechnungKorrekturModus(status: RechnungStatus | string | null | 
   return 'gesperrt'
 }
 
-/** Snapshot der belegrelevanten Felder — Diff entscheidet über Storno-Gutschrift. */
+/** Snapshot der belegrelevanten Felder — Diff entscheidet über Storno-Gutschrift.
+ *
+ * Korrektur MIT Storno (gesendet/bezahlt + Diff): Positionen, Steuer, Daten,
+ * PDF-Texte, Ansprechpartner (Empfängerblock), Objekt/Leistungsort.
+ * Nur Korrektur OHNE Storno: Mail-Betreff/-Einleitung, Fälligkeit, Zahlungsbedingungen
+ * (nicht in diesem Fingerprint → Update am Original).
+ */
 export type RechnungMaterialSnapshot = {
   positionen: AngebotPosition[] | unknown
   reverse_charge_13b?: boolean | null
@@ -216,6 +222,10 @@ export type RechnungKorrekturSibling = {
   rechnung_art?: string | null
   abschlag_index?: number | null
   bezug_rechnung_id?: string | null
+  korrektur_von?: string | null
+  ersetzt_durch?: string | null
+  rechnungsnummer?: string | null
+  brutto?: number | null
 }
 
 /** Ob zur Rechnung bereits eine Storno-Gutschrift (mit Bezug) existiert. */
@@ -228,6 +238,89 @@ export function hatStornoGutschriftZuRechnung(
       String(s.beleg_typ ?? '') === 'gutschrift' &&
       String(s.bezug_rechnung_id ?? '') === rechnungId
   )
+}
+
+/** Gutschrift-ID zur Original-RE (neueste Entwurf/gesendet). */
+export function findeStornoGutschriftId(
+  originalRechnungId: string,
+  siblings: Array<{
+    id: string
+    beleg_typ?: string | null
+    bezug_rechnung_id?: string | null
+    status?: string | null
+    created_at?: string | null
+  }>
+): string | null {
+  const orig = String(originalRechnungId ?? '').trim()
+  if (!orig) return null
+  const candidates = siblings.filter((s) => {
+    if (String(s.beleg_typ ?? '') !== 'gutschrift') return false
+    if (String(s.bezug_rechnung_id ?? '').trim() !== orig) return false
+    const st = String(s.status ?? '').toLowerCase()
+    return st === 'entwurf' || st === 'gesendet' || st === 'versendet'
+  })
+  candidates.sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+    return tb - ta
+  })
+  return candidates[0]?.id ?? null
+}
+
+/**
+ * Korrektur-Kette: neue RE ↔ Original ↔ Storno-Gutschrift.
+ * `mitStorno` = Ersatz nach materieller Änderung (Gutschrift erwartet).
+ */
+export type RechnungKorrekturKette = {
+  neuId: string
+  originalId: string | null
+  gutschriftId: string | null
+  mitStorno: boolean
+  korrekturArt: string | null
+}
+
+export function resolveRechnungKorrekturKette(input: {
+  neuId: string
+  korrektur_von?: string | null
+  korrektur_art?: string | null
+  /** Siblings derselben Kunde/Auftrag-Gruppe (mind. Gutschriften + ggf. Original). */
+  siblings?: Array<{
+    id: string
+    beleg_typ?: string | null
+    bezug_rechnung_id?: string | null
+    status?: string | null
+    created_at?: string | null
+    ersetzt_durch?: string | null
+  }>
+}): RechnungKorrekturKette {
+  const neuId = String(input.neuId ?? '').trim()
+  const originalId = String(input.korrektur_von ?? '').trim() || null
+  const art = String(input.korrektur_art ?? '').trim().toLowerCase() || null
+  const siblings = input.siblings ?? []
+
+  let resolvedOriginal = originalId
+  if (!resolvedOriginal) {
+    // Verzögerter Storno: Original kann noch gesendet/bezahlt sein, ersetzt_durch zeigt schon auf neu
+    const viaErsetzt = siblings.find(
+      (s) => String(s.ersetzt_durch ?? '').trim() === neuId
+    )
+    resolvedOriginal = viaErsetzt?.id ?? null
+  }
+
+  const gutschriftId = resolvedOriginal
+    ? findeStornoGutschriftId(resolvedOriginal, siblings)
+    : null
+
+  // korrektur_von existiert nur nach materieller Korrektur (Storno + neue RE)
+  const mitStorno = Boolean(resolvedOriginal)
+
+  return {
+    neuId,
+    originalId: resolvedOriginal,
+    gutschriftId,
+    mitStorno,
+    korrekturArt: art,
+  }
 }
 
 /**
@@ -298,6 +391,8 @@ export function findeKorrekturOriginalId(
   const candidates = siblings.filter((s) => {
     if (s.id === neu.id) return false
     if (String(s.beleg_typ ?? 'rechnung') === 'gutschrift') return false
+    // Verzögerter Storno: Original noch gesendet/bezahlt, aber ersetzt_durch = neu
+    if (String(s.ersetzt_durch ?? '').trim() === neu.id) return true
     if (String(s.status ?? '') !== 'storniert') return false
     const sTs = s.created_at ? new Date(s.created_at).getTime() : 0
     if (sTs >= neuTs) return false
@@ -314,4 +409,144 @@ export function findeKorrekturOriginalId(
     return tb - ta
   })
   return candidates[0]?.id ?? null
+}
+
+export type RechnungKorrekturKetteMemberRole = 'original' | 'gutschrift' | 'neu'
+
+export type RechnungKorrekturKetteMember = {
+  id: string
+  role: RechnungKorrekturKetteMemberRole
+  rechnungsnummer: string | null
+  status: string
+  brutto: number | null
+  beleg_typ: string | null
+  current: boolean
+}
+
+export type RechnungKorrekturKetteUi = {
+  pending: boolean
+  members: RechnungKorrekturKetteMember[]
+}
+
+export type RechnungKorrekturKetteSiblingRow = {
+  id: string
+  status?: string | null
+  beleg_typ?: string | null
+  bezug_rechnung_id?: string | null
+  korrektur_von?: string | null
+  ersetzt_durch?: string | null
+  rechnungsnummer?: string | null
+  brutto?: number | null
+  created_at?: string | null
+}
+
+/**
+ * Baut die sichtbare Korrektur-Kette für Detail-UI aus aktueller RE + Sibling-Zeilen.
+ */
+export function buildRechnungKorrekturKetteUi(
+  current: {
+    id: string
+    status?: string | null
+    beleg_typ?: string | null
+    bezug_rechnung_id?: string | null
+    korrektur_von?: string | null
+    ersetzt_durch?: string | null
+    rechnungsnummer?: string | null
+    brutto?: number | null
+  },
+  siblings: RechnungKorrekturKetteSiblingRow[]
+): RechnungKorrekturKetteUi | null {
+  const byId = new Map<string, RechnungKorrekturKetteSiblingRow>()
+  for (const s of siblings) byId.set(s.id, s)
+  byId.set(current.id, { ...current, id: current.id })
+
+  const beleg = String(current.beleg_typ ?? 'rechnung').toLowerCase()
+  let originalId: string | null = null
+  let neuId: string | null = null
+
+  if (beleg === 'gutschrift') {
+    originalId = String(current.bezug_rechnung_id ?? '').trim() || null
+  } else if (String(current.korrektur_von ?? '').trim()) {
+    originalId = String(current.korrektur_von).trim()
+    neuId = current.id
+  } else if (String(current.ersetzt_durch ?? '').trim()) {
+    originalId = current.id
+    neuId = String(current.ersetzt_durch).trim()
+  } else {
+    const neuVia = siblings.find(
+      (s) =>
+        String(s.korrektur_von ?? '').trim() === current.id &&
+        String(s.beleg_typ ?? 'rechnung').toLowerCase() !== 'gutschrift'
+    )
+    if (neuVia) {
+      originalId = current.id
+      neuId = neuVia.id
+    }
+  }
+
+  if (!originalId && !neuId) return null
+
+  if (!neuId && originalId) {
+    const viaErsetzt = byId.get(originalId)
+    const ersetzt = String(viaErsetzt?.ersetzt_durch ?? '').trim()
+    if (ersetzt) neuId = ersetzt
+    else {
+      const neuVia = siblings.find(
+        (s) =>
+          String(s.korrektur_von ?? '').trim() === originalId &&
+          String(s.beleg_typ ?? 'rechnung').toLowerCase() !== 'gutschrift'
+      )
+      neuId = neuVia?.id ?? null
+    }
+  }
+
+  if (!originalId && neuId) {
+    const neu = byId.get(neuId)
+    originalId = String(neu?.korrektur_von ?? '').trim() || null
+    if (!originalId) {
+      const orig = siblings.find((s) => String(s.ersetzt_durch ?? '').trim() === neuId)
+      originalId = orig?.id ?? null
+    }
+  }
+
+  if (!originalId) return null
+
+  const gsId = findeStornoGutschriftId(originalId, siblings)
+  const memberIds: Array<{ id: string; role: RechnungKorrekturKetteMemberRole }> = [
+    { id: originalId, role: 'original' },
+  ]
+  if (gsId) memberIds.push({ id: gsId, role: 'gutschrift' })
+  if (neuId && neuId !== originalId) memberIds.push({ id: neuId, role: 'neu' })
+
+  if (memberIds.length < 2) return null
+
+  const members: RechnungKorrekturKetteMember[] = memberIds.map(({ id, role }) => {
+    const row = byId.get(id)
+    return {
+      id,
+      role,
+      rechnungsnummer: row?.rechnungsnummer?.trim() || null,
+      status: String(row?.status ?? 'entwurf'),
+      brutto: row?.brutto ?? null,
+      beleg_typ: row?.beleg_typ ?? null,
+      current: id === current.id,
+    }
+  })
+
+  const orig = members.find((m) => m.role === 'original')
+  const pending =
+    members.some((m) => m.status.toLowerCase() === 'entwurf') ||
+    Boolean(
+      orig &&
+        orig.status.toLowerCase() !== 'storniert' &&
+        String(byId.get(orig.id)?.ersetzt_durch ?? '').trim()
+    )
+
+  return { pending, members }
+}
+
+export function korrekturKetteMemberRoleLabel(role: RechnungKorrekturKetteMemberRole): string {
+  if (role === 'original') return 'Original'
+  if (role === 'gutschrift') return 'Storno-Gutschrift'
+  return 'Korrektur'
 }

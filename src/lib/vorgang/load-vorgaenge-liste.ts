@@ -154,7 +154,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   const leadLimit = scoped ? 80 : 200
 
   const RECHNUNG_SELECT =
-    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, richtung, beleg_typ, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
+    'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, bezug_rechnung_id, richtung, beleg_typ, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
 
   let handwerkerLeadIds: string[] | null = null
   if (handwerkerId) {
@@ -413,6 +413,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     ersetzt_durch?: string | null
     korrektur_von?: string | null
     korrektur_art?: string | null
+    bezug_rechnung_id?: string | null
     richtung?: string | null
     beleg_typ?: string | null
     handwerker_id?: string | null
@@ -459,6 +460,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     ersetzt_durch?: string | null
     korrektur_von?: string | null
     korrektur_art?: string | null
+    bezug_rechnung_id?: string | null
     richtung: 'ausgehend' | 'eingehend'
     beleg_typ: string | null
     handwerker_id: string | null
@@ -496,6 +498,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ersetzt_durch: r.ersetzt_durch ?? null,
       korrektur_von: r.korrektur_von ?? null,
       korrektur_art: r.korrektur_art ?? null,
+      bezug_rechnung_id: r.bezug_rechnung_id ?? null,
       richtung,
       beleg_typ: String(r.beleg_typ ?? 'rechnung').toLowerCase() || 'rechnung',
       handwerker_id: r.handwerker_id?.trim() || null,
@@ -574,6 +577,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ersetzt_durch: r.ersetzt_durch ?? null,
       korrektur_von: r.korrektur_von ?? null,
       korrektur_art: r.korrektur_art ?? null,
+      bezug_rechnung_id: r.bezug_rechnung_id ?? null,
     }))
     /** Stamm-Resolver ohne Gutschriften (die nur als Erledigt-Satelliten erscheinen). */
     const leadRechnungenStamm = leadRechnungen.filter(
@@ -736,6 +740,11 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
               ?.korrektur_art ?? null
           : null,
+      bezug_rechnung_id:
+        listPhase === 'rechnung' && !rechnungAusstehend
+          ? (rechnungenByLead.get(lead.id) ?? []).find((r) => r.id === resolved.entityId)
+              ?.bezug_rechnung_id ?? null
+          : null,
     })
 
     // Abschläge als eigene Zeilen (auch wenn Stamm als „Rechnung ausstehend“ läuft).
@@ -748,12 +757,14 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     if (showSatelliten) {
       for (const r of leadRechnungen) {
         const istGutschrift = String(r.beleg_typ ?? '').toLowerCase() === 'gutschrift'
-        // Normale Entwürfe ausblenden; Storno-Gutschriften erscheinen unter Erledigt
-        if (r.status === 'entwurf' && !istGutschrift) continue
+        const istKorrekturEntwurf =
+          r.status === 'entwurf' && Boolean(String(r.korrektur_von ?? '').trim())
+        // Normale Entwürfe ausblenden; Korrektur-Entwürfe + Storno-Gutschriften behalten
+        if (r.status === 'entwurf' && !istGutschrift && !istKorrekturEntwurf) continue
         if (resolved.entityId === r.id) continue
         const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
         const istStorniert = r.status === 'storniert'
-        if (!istGutschrift) {
+        if (!istGutschrift && !istKorrekturEntwurf) {
           if (hatAbschlagsplan) {
             if (art !== 'abschlag' && art !== 'schluss') continue
             if (!istStorniert && !istRechnungGestelltOderBezahlt(r.status)) continue
@@ -786,6 +797,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           ersetzt_durch: r.ersetzt_durch ?? null,
           korrektur_von: r.korrektur_von ?? null,
           korrektur_art: r.korrektur_art ?? null,
+          bezug_rechnung_id: r.bezug_rechnung_id ?? null,
           belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
           rechnungRichtung: 'ausgehend',
         })
@@ -851,6 +863,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ersetzt_durch: r.ersetzt_durch ?? null,
       korrektur_von: r.korrektur_von ?? null,
       korrektur_art: r.korrektur_art ?? null,
+      bezug_rechnung_id: r.bezug_rechnung_id ?? null,
       rechnungRichtung: 'ausgehend',
       belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
     })

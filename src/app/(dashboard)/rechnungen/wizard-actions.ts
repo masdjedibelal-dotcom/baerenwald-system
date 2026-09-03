@@ -1299,7 +1299,9 @@ export async function saveRechnungWizardDraft(
         }
       }
 
-      const gutschrift = await createGutschriftFromRechnung(input.rechnungId)
+      const gutschrift = await createGutschriftFromRechnung(input.rechnungId, {
+        deferOriginalStorno: true,
+      })
       if (!gutschrift.ok) return gutschrift
 
       const created = await createRechnungEntwurf({

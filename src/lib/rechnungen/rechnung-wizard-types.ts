@@ -90,15 +90,27 @@ export type RechnungWizardBootstrap = {
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
   /**
-   * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
-   * nur Mail → ohne Storno. Auch Ersatz-Entwurf mit korrektur_von.
+   * Versendete/bezahlte RE im Wizard:
+   * - materielle Änderung → Korrektur MIT Storno (Gutschrift + neue RE)
+   * - nur Mail/Fälligkeit → Update ohne Storno
+   * Auch Ersatz-Entwurf mit korrektur_von.
    */
   korrekturKontext?: {
     originalStatus: string
     originalNr: string
     materialFingerprint: string
-    /** true = bereits Ersatz-Entwurf (korrektur_von gesetzt) */
+    /** true = bereits Ersatz-Entwurf (korrektur_von gesetzt) → Versand mit Storno-PDF */
     istErsatzEntwurf?: boolean
+  } | null
+  /**
+   * Frisch angelegte Korrektur-Session (Storno + Ersatz).
+   * Beim Schließen ohne Speichern → Rollback (kein verwaister Entwurf).
+   */
+  korrekturSession?: {
+    originalId: string
+    gutschriftId: string
+    neuId: string
+    originalStatus: string
   } | null
 }
 

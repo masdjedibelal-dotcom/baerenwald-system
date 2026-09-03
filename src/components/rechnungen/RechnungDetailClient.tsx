@@ -52,6 +52,7 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
+import { RechnungKorrekturKetteCard } from '@/components/rechnungen/RechnungKorrekturKetteCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -176,8 +177,9 @@ export function RechnungDetailClient({
   angebotDetail = null,
   auftragDetail = null,
   auftragRechnungen = [],
-  nachfolgerRechnungId = null,
+  nachfolgerRechnungId: _nachfolgerRechnungId = null,
   darfStornoZuruecknehmen = false,
+  korrekturKette = null,
 }: {
   detail: Rechnung
   kleinunternehmerFirma: boolean
@@ -196,6 +198,8 @@ export function RechnungDetailClient({
   nachfolgerRechnungId?: string | null
   /** Soft-Storno ohne Gutschrift → zurücknehmbar */
   darfStornoZuruecknehmen?: boolean
+  /** Original ↔ Storno-GS ↔ Korrektur */
+  korrekturKette?: import('@/lib/rechnungen/rechnung-korrektur').RechnungKorrekturKetteUi | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -386,10 +390,16 @@ export function RechnungDetailClient({
     const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
     const nr = detail.rechnungsnummer?.trim()
     confirmAction({
-      title: istKorrektur ? 'Korrektur wirklich versenden?' : 'Rechnung wirklich versenden?',
-      body: nr
-        ? `${nr} wird per E-Mail an den Kunden gesendet.`
-        : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      title: istKorrektur
+        ? 'Korrektur mit Storno wirklich versenden?'
+        : 'Rechnung wirklich versenden?',
+      body: istKorrektur
+        ? nr
+          ? `${nr}: Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.`
+          : 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.'
+        : nr
+          ? `${nr} wird per E-Mail an den Kunden gesendet.`
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
       confirmLabel: istKorrektur ? 'Korrektur jetzt versenden' : 'Jetzt versenden',
       cancelLabel: 'Abbrechen',
       busyLabel: istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…',
@@ -399,7 +409,7 @@ export function RechnungDetailClient({
           toast.error(r.message)
           return
         }
-        toast.success(istKorrektur ? 'Korrektur gesendet' : 'Rechnung gesendet')
+        toast.success(istKorrektur ? 'Korrektur mit Storno gesendet' : 'Rechnung gesendet')
         setDetail((d) => ({ ...d, status: 'gesendet' }))
         refresh()
       },
@@ -516,7 +526,7 @@ export function RechnungDetailClient({
         icon: 'pencil',
         onClick: handleKorrigieren,
         disabled: pending,
-        title: 'Storno-Gutschrift + neue Rechnung — noch kein Versand',
+        title: 'Storno-Gutschrift + neue Rechnung — Original bleibt bis Versand gültig',
       }
     }
     return null
@@ -712,6 +722,7 @@ export function RechnungDetailClient({
 
   const uebersichtInhalt = (
     <div className="space-y-6">
+      {korrekturKette ? <RechnungKorrekturKetteCard kette={korrekturKette} /> : null}
       {stammdatenInhalt}
       {!isEingehend ? (
         <VorgangPhasenVerlauf

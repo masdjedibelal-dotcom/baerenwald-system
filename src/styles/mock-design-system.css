@@ -8058,6 +8058,36 @@ button.vg-check {
   color: var(--text-3);
   border: 0.5px solid var(--border);
 }
+.vg-kette-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.vg-kette-toggle:hover {
+  background: rgba(22, 32, 27, 0.06);
+  color: var(--text-2);
+}
+.vg-row--kette-child .vg-vorgang {
+  padding-left: 10px;
+}
+.vg-kette-role {
+  display: inline-block;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-3);
+  margin-right: 4px;
+}
+.vg-row--kette-child {
+  background: color-mix(in srgb, var(--bg-soft) 80%, transparent);
+}
 @keyframes vg-row-flash {
   0% { background: color-mix(in srgb, var(--green) 28%, transparent); }
   100% { background: transparent; }

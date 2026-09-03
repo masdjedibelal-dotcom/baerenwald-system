@@ -19,6 +19,10 @@ import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
+  groupVorgaengeByKorrekturKette,
+  korrekturKetteRoleLabel,
+} from '@/lib/vorgang/korrektur-kette-groups'
+import {
   runDeleteStandaloneRechnung,
   runDeleteVorgang,
   runDuplicateAnfrage,
@@ -105,8 +109,19 @@ function vorgaengeEmptyHint(opts: {
   return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
 }
 
+/** Original mit laufender Korrektur (noch nicht storniert). */
+function isKorrekturPendingOriginal(row: VorgangListeRow): boolean {
+  return (
+    Boolean(row.ersetzt_durch) &&
+    row.unterstatus.toLowerCase() !== 'storniert' &&
+    row.unterstatus.toLowerCase() !== 'ersetzt'
+  )
+}
+
 function isErsetzt(row: VorgangListeRow): boolean {
-  return row.unterstatus.toLowerCase() === 'ersetzt' || Boolean(row.ersetzt_durch)
+  if (isKorrekturPendingOriginal(row)) return false
+  const st = row.unterstatus.toLowerCase()
+  return st === 'ersetzt' || (Boolean(row.ersetzt_durch) && st === 'storniert')
 }
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
@@ -213,8 +228,10 @@ function dateKey(row: VorgangListeRow): string {
 
 /** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
 function isVorgangErledigt(row: VorgangListeRow): boolean {
-  // Storno-Gutschriften immer unter Erledigt (nie Offen)
-  if (row.belegTyp === 'gutschrift') return true
+  // Storno-Gutschrift-Entwurf gehört zur offenen Korrektur
+  if (row.belegTyp === 'gutschrift') {
+    return String(row.unterstatus).toLowerCase() !== 'entwurf'
+  }
   const kind = statusKind(row)
   return kind === 'storniert' || kind === 'fertig'
 }
@@ -285,6 +302,8 @@ export function VorgaengeListeClient({
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
+  /** Aufgeklappte Korrektur-Ketten (rootId). */
+  const [ketteOpen, setKetteOpen] = useState<Record<string, boolean>>({})
   const visibleCols: Record<DataColId, boolean> = {
     kunde: true,
     titel: true,
@@ -847,6 +866,10 @@ export function VorgaengeListeClient({
 
   const isMobile = useIsMobile()
   const displayItems = isMobile ? infiniteItems : pageItems
+  const displayGroups = useMemo(
+    () => groupVorgaengeByKorrekturKette(displayItems).groups,
+    [displayItems]
+  )
 
   const allPageSelected =
     displayItems.length > 0 && displayItems.every((v) => selected[rowKey(v)])
@@ -1367,7 +1390,10 @@ export function VorgaengeListeClient({
             }
           />
         ) : (
-          displayItems.map((v) => {
+          displayGroups.map((group) => {
+            const hasKette = group.members.length > 1
+            const open = Boolean(ketteOpen[group.rootId]) || (hasKette && group.pending)
+            const v = group.head
             const key = rowKey(v)
             const kind = statusKind(v)
             const label = statusLabel(v)
@@ -1380,6 +1406,7 @@ export function VorgaengeListeClient({
                   })
                 : null
             const ersetzt = isErsetzt(v)
+            const pendingOrig = isKorrekturPendingOriginal(v)
             const del = () => {
               if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
               else runDeleteVorgang(v.leadId, router)
@@ -1431,10 +1458,41 @@ export function VorgaengeListeClient({
                 ) : null}
                 {visibleCols.titel ? (
                 <div className="vg-vorgang">
-                  <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
-                    {v.titel}
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+                  >
+                    {hasKette ? (
+                      <button
+                        type="button"
+                        className="vg-kette-toggle"
+                        aria-expanded={open}
+                        aria-label={open ? 'Kette zuklappen' : 'Kette aufklappen'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setKetteOpen((prev) => ({
+                            ...prev,
+                            [group.rootId]: !open,
+                          }))
+                        }}
+                      >
+                        <MockIcon
+                          ctx="default"
+                          n={open ? 'chevron-down' : 'chevron-right'}
+                          size={14}
+                        />
+                      </button>
+                    ) : null}
+                    <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
+                      {hasKette && group.pending ? group.label : v.titel}
+                    </div>
                   </div>
-                  {ersetzt ? <span className="vg-chip-ersetzt">ersetzt</span> : null}
+                  {pendingOrig ? (
+                    <span className="vg-chip-ersetzt">Korrektur läuft</span>
+                  ) : ersetzt ? (
+                    <span className="vg-chip-ersetzt">ersetzt</span>
+                  ) : hasKette && !group.pending ? (
+                    <span className="vg-chip-ersetzt">Korrektur-Kette</span>
+                  ) : null}
                 </div>
                 ) : null}
                 {visibleCols.phase ? (
@@ -1484,7 +1542,9 @@ export function VorgaengeListeClient({
                       />
                     </span>
                   ) : null}
-                  {korrekturUi?.dualBadges ? (
+                  {hasKette && group.pending ? (
+                    <MockBadge kind="neu">Korrektur Entwurf</MockBadge>
+                  ) : korrekturUi?.dualBadges ? (
                     <>
                       <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
                       <MockBadge kind="neu">{korrekturUi.dualBadges.secondary}</MockBadge>
@@ -1508,26 +1568,105 @@ export function VorgaengeListeClient({
                 </div>
               </div>
             )
+            const childRows =
+              hasKette && open
+                ? group.members
+                    .filter((m) => m.row.entityId !== v.entityId)
+                    .map((m) => {
+                      const child = m.row
+                      const cKey = rowKey(child)
+                      const cKind = statusKind(child)
+                      const cLabel = statusLabel(child)
+                      return (
+                        <div
+                          key={cKey}
+                          className={cn('vg-row', 'vg-row--kette-child', selected[cKey] && 'sel')}
+                          onClick={() => openDetail(child)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openDetail(child)
+                            }
+                          }}
+                        >
+                          <ListRowCheck
+                            checked={Boolean(selected[cKey])}
+                            onToggle={() => toggleSel(cKey)}
+                          />
+                          {visibleCols.kunde ? <div className="vg-kunde" /> : null}
+                          {visibleCols.titel ? (
+                            <div className="vg-vorgang">
+                              <div className="t" title={child.titel}>
+                                <span className="vg-kette-role">
+                                  {korrekturKetteRoleLabel(m.role)}
+                                </span>{' '}
+                                {child.titel}
+                              </div>
+                            </div>
+                          ) : null}
+                          {visibleCols.phase ? (
+                            <div className="vg-phase">
+                              <span className="ph-neutral">
+                                <MockIcon ctx="default" n="receipt" size={13} />
+                                Rechnung
+                              </span>
+                            </div>
+                          ) : null}
+                          {visibleCols.wert ? (
+                            <div
+                              className="vg-wert"
+                              style={{
+                                textAlign: 'right',
+                                fontWeight: 500,
+                                fontVariantNumeric: 'tabular-nums',
+                                fontSize: 'var(--fs-text)',
+                              }}
+                            >
+                              {child.wertLabel ?? '—'}
+                            </div>
+                          ) : null}
+                          {visibleCols.datum ? (
+                            <div
+                              className="vg-datum"
+                              style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
+                            >
+                              {formatDatum(child.updatedAt)}
+                            </div>
+                          ) : null}
+                          {visibleCols.status ? (
+                            <div className="vg-status">
+                              <MockBadge kind={cKind}>{cLabel}</MockBadge>
+                            </div>
+                          ) : null}
+                          <div className="vg-row-menu" />
+                        </div>
+                      )
+                    })
+                : null
             return (
-              <SwipeRow
-                key={key}
-                disabled={!isMobile}
-                leftActions={
-                  isMobile
-                    ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
-                    : undefined
-                }
-                rightActions={
-                  isMobile
-                    ? [
-                        { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
-                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
-                      ]
-                    : undefined
-                }
-              >
-                {row}
-              </SwipeRow>
+              <div key={`kette:${group.rootId}`} className={hasKette ? 'vg-kette' : undefined}>
+                <SwipeRow
+                  disabled={!isMobile}
+                  leftActions={
+                    isMobile
+                      ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
+                      : undefined
+                  }
+                  rightActions={
+                    isMobile
+                      ? [
+                          { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
+                          { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
+                        ]
+                      : undefined
+                  }
+                >
+                  {row}
+                </SwipeRow>
+                {childRows}
+              </div>
             )
           })
         )}

@@ -55,6 +55,7 @@ import {
   sendRechnungWizard,
   syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { abbrecheRechnungKorrekturSession } from '@/app/(dashboard)/rechnungen/actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
   createAbschlussberichtPdf,
@@ -77,7 +78,7 @@ import {
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
 import {
-  defaultRechnungKorrekturMailEinleitung,
+  defaultRechnungKorrekturMitStornoMailEinleitung,
   defaultRechnungMailEinleitung,
 } from '@/lib/mail/rechnung-mail'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -353,6 +354,9 @@ export function RechnungWizard({
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
+  const korrekturSession = bootstrap.korrekturSession ?? null
+  /** true = Nutzer hat Entwurf bewusst behalten (Speichern/Versand) — kein Rollback. */
+  const korrekturSessionKeptRef = useRef(false)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
   const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
@@ -573,11 +577,13 @@ export function RechnungWizard({
   const activeVersandId = versandRechnungId ?? rechnungId
   const vorschauRechnungId = previewRechnungId ?? activeVersandId
   const istKorrekturVersand = Boolean(korrekturKontext)
+  /** Materielle Korrektur an gesendeter RE → Storno-Gutschrift + neue RE. */
+  const istKorrekturMitStorno = istKorrekturVersand
   const defaultBetreff = istKorrekturVersand
     ? `Korrektur · ${previewNr} · ${rTitel}`
     : `${previewNr} · ${rTitel}`
-  const defaultMailEinleitung = istKorrekturVersand
-    ? defaultRechnungKorrekturMailEinleitung('sie', {
+  const defaultMailEinleitung = istKorrekturMitStorno
+    ? defaultRechnungKorrekturMitStornoMailEinleitung('sie', {
         originalNr: korrekturKontext?.originalNr,
         neueNr: previewNr !== 'Rechnung' ? previewNr : null,
       })
@@ -815,6 +821,7 @@ export function RechnungWizard({
         } else if (opts?.notify) {
           toast.autoSaved({ label: 'Entwurf' })
         }
+        if (korrekturSession) korrekturSessionKeptRef.current = true
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
@@ -916,6 +923,7 @@ export function RechnungWizard({
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
       if (opts?.notify) toast.autoSaved({ label: 'Entwurf' })
+      if (korrekturSession) korrekturSessionKeptRef.current = true
       return res.versandRechnungId
     } catch (e) {
       if (!silent) {
@@ -982,7 +990,33 @@ export function RechnungWizard({
 
   /** Nach Speichern/Versand: immer schließen. onDone zuerst (Navigation), danach onClose (Overlay zu). */
   function finishAndLeave(id: string) {
+    if (korrekturSession) korrekturSessionKeptRef.current = true
     onDone?.(id)
+    onClose()
+    router.refresh()
+  }
+
+  async function rollbackKorrekturSessionIfNeeded() {
+    if (!korrekturSession || korrekturSessionKeptRef.current) return
+    const r = await abbrecheRechnungKorrekturSession({
+      originalId: korrekturSession.originalId,
+      gutschriftId: korrekturSession.gutschriftId,
+      neuId: korrekturSession.neuId,
+      originalStatus: korrekturSession.originalStatus,
+    })
+    if (!r.ok) {
+      toast.error(r.message || 'Korrektur-Abbruch fehlgeschlagen')
+      return
+    }
+    toast.info('Korrektur verworfen — kein Entwurf gespeichert')
+  }
+
+  async function closeWizardClean() {
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setPlanEditorOpen(false)
+    setSheet(null)
+    await rollbackKorrekturSessionIfNeeded()
     onClose()
     router.refresh()
   }
@@ -1066,14 +1100,6 @@ export function RechnungWizard({
     } finally {
       setSaving(false)
     }
-  }
-
-  async function closeWizardClean() {
-    setCloseConfirmOpen(false)
-    setKundeEditOpen(false)
-    setPlanEditorOpen(false)
-    setSheet(null)
-    onClose()
   }
 
   async function handleSaveDraftAndClose() {
@@ -1338,12 +1364,16 @@ export function RechnungWizard({
   function requestVersenden() {
     if (saving) return
     confirmAction({
-      title: istKorrekturVersand
-        ? 'Korrektur wirklich versenden?'
-        : 'Rechnung wirklich versenden?',
-      body: istKorrekturVersand
-        ? 'Storno-Gutschrift und neue Rechnung gehen per E-Mail an den Kunden.'
-        : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      title: istKorrekturMitStorno
+        ? 'Korrektur mit Storno wirklich versenden?'
+        : istKorrekturVersand
+          ? 'Korrektur wirklich versenden?'
+          : 'Rechnung wirklich versenden?',
+      body: istKorrekturMitStorno
+        ? 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs per E-Mail an den Kunden.'
+        : istKorrekturVersand
+          ? 'Die korrigierte Rechnung geht per E-Mail an den Kunden.'
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
       confirmLabel: istKorrekturVersand
         ? 'Korrektur jetzt versenden'
         : 'Jetzt versenden',
@@ -1998,6 +2028,7 @@ export function RechnungWizard({
               projektTitel={rechnungTitel || rTitel}
               empfaengerHint={mailTo[0] || kundeEmail || kundeName}
               istKorrektur={istKorrekturVersand}
+              mitStornoAnhang={istKorrekturMitStorno}
               korrekturOriginalNr={korrekturKontext?.originalNr ?? null}
             />
           </div>

@@ -120,6 +120,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   /** Rechnungskorrektur: Verweis auf Original. */
   korrektur_von?: string | null
   korrektur_art?: string | null
+  /** Storno-Gutschrift → Original-RE. */
+  bezug_rechnung_id?: string | null
   /** ausgehend (Default) | eingehend (Partner-Rechnung). */
   rechnungRichtung?: 'ausgehend' | 'eingehend'
   /** rechnung (Default) | gutschrift (Storno-Begleiter). */

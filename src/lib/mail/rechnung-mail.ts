@@ -103,8 +103,36 @@ export function defaultRechnungMailEinleitung(anrede: AngebotMailAnrede = 'sie')
     : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:'
 }
 
-/** Standard-Einleitung bei Korrekturversand (Storno + neue RE). */
+/** Standard-Einleitung bei Korrektur ohne Storno (nur neue/korrigierte RE im Anhang). */
 export function defaultRechnungKorrekturMailEinleitung(
+  anrede: AngebotMailAnrede = 'sie',
+  opts?: {
+    originalNr?: string | null
+    neueNr?: string | null
+  }
+): string {
+  const orig = opts?.originalNr?.trim() || null
+  const neu = opts?.neueNr?.trim() || null
+  if (anrede === 'du') {
+    if (orig && neu && orig !== neu) {
+      return `wir korrigieren die Rechnung ${orig} — im Anhang findest du die korrigierte Rechnung ${neu}.`
+    }
+    if (orig) {
+      return `wir korrigieren die Rechnung ${orig} — im Anhang findest du die korrigierte Rechnung.`
+    }
+    return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang findest du die korrigierte Rechnung.'
+  }
+  if (orig && neu && orig !== neu) {
+    return `wir korrigieren die Rechnung ${orig} — im Anhang finden Sie die korrigierte Rechnung ${neu}.`
+  }
+  if (orig) {
+    return `wir korrigieren die Rechnung ${orig} — im Anhang finden Sie die korrigierte Rechnung.`
+  }
+  return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang finden Sie die korrigierte Rechnung.'
+}
+
+/** Standard-Einleitung bei Korrektur mit Storno-Gutschrift + neuer RE (zwei PDFs). */
+export function defaultRechnungKorrekturMitStornoMailEinleitung(
   anrede: AngebotMailAnrede = 'sie',
   opts?: {
     originalNr?: string | null
@@ -142,12 +170,13 @@ export function buildRechnungMail(
   const nr = esc(data.rechnungsnummer)
   const faellig = esc(data.faelligAm)
   const titel = esc(data.projektTitel?.trim() || data.rechnungsnummer)
-  const istKorrektur = Boolean(data.istKorrektur || data.mitStornoAnhang)
+  const mitStorno = Boolean(data.mitStornoAnhang)
+  const istKorrektur = Boolean(data.istKorrektur || mitStorno)
 
   const introRaw =
     data.mailEinleitung?.trim() ||
-    (data.mitStornoAnhang
-      ? defaultRechnungKorrekturMailEinleitung(anrede, {
+    (mitStorno
+      ? defaultRechnungKorrekturMitStornoMailEinleitung(anrede, {
           originalNr: data.stornoBezugRechnungsnummer,
           gutschriftNr: data.stornoGutschriftNummer,
           neueNr: data.rechnungsnummer,
@@ -164,7 +193,7 @@ export function buildRechnungMail(
     ? anrede === 'du'
       ? 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
       : 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
-    : data.mitStornoAnhang
+    : mitStorno
       ? anrede === 'du'
         ? data.stornoGutschriftNummer
           ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`

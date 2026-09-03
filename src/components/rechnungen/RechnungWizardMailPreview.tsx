@@ -16,6 +16,7 @@ export function RechnungWizardMailPreview({
   rechnungsnummer,
   empfaengerHint,
   istKorrektur,
+  mitStornoAnhang,
   korrekturOriginalNr,
 }: {
   rechnungId: string | null
@@ -29,6 +30,8 @@ export function RechnungWizardMailPreview({
   rechnungsnummer?: string | null
   empfaengerHint?: string
   istKorrektur?: boolean
+  /** Korrektur mit Storno-Gutschrift (zwei PDFs). */
+  mitStornoAnhang?: boolean
   korrekturOriginalNr?: string | null
 }) {
   const [html, setHtml] = useState('')
@@ -50,6 +53,7 @@ export function RechnungWizardMailPreview({
         projektTitel,
         rechnungsnummer,
         istKorrektur: Boolean(istKorrektur),
+        mitStornoAnhang: Boolean(mitStornoAnhang),
         korrekturOriginalNr: korrekturOriginalNr?.trim() || null,
       }).then((res) => {
         if (cancelled) return
@@ -80,6 +84,7 @@ export function RechnungWizardMailPreview({
     projektTitel,
     rechnungsnummer,
     istKorrektur,
+    mitStornoAnhang,
     korrekturOriginalNr,
   ])
 

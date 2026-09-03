@@ -74,6 +74,12 @@ export function RechnungKorrekturWahlModal({
         return
       }
       if (korr.mode === 'storno_neu') {
+        res.bootstrap.korrekturSession = {
+          originalId: rechnungId,
+          gutschriftId: korr.stornoId,
+          neuId: korr.neuId,
+          originalStatus: korr.originalStatus,
+        }
         toast.success('Korrektur-Entwurf angelegt — bitte prüfen und erst dann versenden')
       }
       onClose()
@@ -127,11 +133,9 @@ export function RechnungKorrekturWahlModal({
         style={{ color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.45 }}
       >
         <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{nr}</strong> ist bereits
-        versendet. Eine Korrektur ersetzt die bestehende Rechnung (Storno + neuer Entwurf) —{' '}
-        <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>
-          es geht noch keine Mail raus
-        </strong>
-        , bis du im Wizard bewusst „Versenden“ bestätigst.
+        versendet. Eine Korrektur legt Storno-Gutschrift und neuen Entwurf an — das Original bleibt
+        bis zum Versand gültig. Es geht noch keine Mail raus, bis du im Wizard bewusst „Versenden“
+        bestätigst.
       </p>
 
       <div
