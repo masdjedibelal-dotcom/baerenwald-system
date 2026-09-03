@@ -34,6 +34,10 @@ import {
   MelderLeistungsortFields,
   type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
+import {
+  KundenVersandEmailField,
+  versandFolgtKontakt,
+} from '@/components/crm/KundenVersandEmailField'
 import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
@@ -412,7 +416,7 @@ export function AngebotWizard({
   const [previewLoading, setPreviewLoading] = useState(false)
 
   const ansprechpartnerId = meta.ansprechpartner_id?.trim() || null
-  /** Gewählter AP, sonst Primär — steuert Anzeige, Anrede & Mail. */
+  /** Gewählter AP, sonst Primär — steuert Anzeige & Anrede (nicht zwingend Versand-Mail). */
   const effektivAp =
     (ansprechpartnerId
       ? apRows.find((a) => a.id === ansprechpartnerId)
@@ -1329,6 +1333,9 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Kunde"
         context="canvas"
+        overlayClassName={
+          objektNeuOpen || kundeEditOpen ? 'editor-sheet-overlay--recessed' : undefined
+        }
         headerEnd={
           kundeZumBearbeiten ? (
             <button
@@ -1360,13 +1367,22 @@ export function AngebotWizard({
               value={ansprechpartnerId ?? ''}
               onChange={(e) => {
                 const next = e.target.value.trim() || null
+                const prevKontakt = sheetEmail
                 setMeta((m) => ({ ...m, ansprechpartner_id: next }))
                 const ap = next
                   ? apRows.find((a) => a.id === next)
                   : apRows.find((a) => a.ist_primaer)
-                const mail = (ap?.email?.trim() || sheetKunde?.email || '').trim()
-                if (mail && isValidEmail(mail)) setMailTo([mail])
-                else if (!mail) setMailTo([])
+                const mail = (
+                  ap?.email?.trim() ||
+                  sheetKunde?.email ||
+                  leadState.kontakt_email ||
+                  ''
+                ).trim()
+                setMailTo((prev) => {
+                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                  if (mail && isValidEmail(mail)) return [mail]
+                  return []
+                })
                 setDraftDirty(true)
               }}
               disabled={!(hvKundeId || kundeId)}
@@ -1376,11 +1392,25 @@ export function AngebotWizard({
                 <option key={ap.id} value={ap.id}>
                   {ap.name.trim() || 'Ohne Name'}
                   {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
                   {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
                 </option>
               ))}
             </select>
           </MockField>
+          <KundenVersandEmailField
+            apRows={apRows}
+            kontaktEmail={sheetEmail}
+            kundeStammEmail={sheetKunde?.email ?? leadState.kontakt_email}
+            versandEmail={mailTo[0] ?? ''}
+            disabled={!(hvKundeId || kundeId)}
+            onChange={(next) => {
+              if (next && isValidEmail(next)) setMailTo([next])
+              else if (sheetEmail && isValidEmail(sheetEmail)) setMailTo([sheetEmail])
+              else setMailTo([])
+              setDraftDirty(true)
+            }}
+          />
           <div className="gfc-row">
             <span className="gfc-l">{sheetFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
             <span className="gfc-v">{displayVorname || '—'}</span>
@@ -1398,7 +1428,7 @@ export function AngebotWizard({
             <span className="gfc-v">{sheetStadt || '—'}</span>
           </div>
           <div className="gfc-row">
-            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-l">E-Mail (Kontakt)</span>
             <span className="gfc-v">{sheetEmail || <em>fehlt</em>}</span>
           </div>
           <div className="gfc-row">
@@ -1441,6 +1471,7 @@ export function AngebotWizard({
           onClose={() => setObjektNeuOpen(false)}
           kundeId={hvKundeId}
           verwaltungName={crowKundeValue}
+          context="canvas"
           onSaved={(objekt) => {
             setHvObjekte((prev) => {
               if (prev.some((o) => o.id === objekt.id)) return prev

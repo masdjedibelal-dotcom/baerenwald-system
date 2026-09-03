@@ -27,6 +27,10 @@ import {
   MelderLeistungsortFields,
   type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
+import {
+  KundenVersandEmailField,
+  versandFolgtKontakt,
+} from '@/components/crm/KundenVersandEmailField'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import {
   Ustg13bHilfeSheet,
@@ -226,7 +230,7 @@ export function RechnungWizard({
     [kundeNamen.vorname, kundeNamen.nachname].filter(Boolean).join(' ') ||
     kunde?.name?.trim() ||
     'Kunde wählen'
-  /** Gewählter AP, sonst Primär — steuert Anzeige & Mail-Vorbelegung. */
+  /** Gewählter AP, sonst Primär — steuert Anzeige & Anrede (nicht zwingend Versand-Mail). */
   const effektivAp =
     (ansprechpartnerId
       ? apRows.find((a) => a.id === ansprechpartnerId)
@@ -238,6 +242,7 @@ export function RechnungWizard({
     : null
   const displayVorname = apNamen?.vorname || kundeNamen.vorname
   const displayNachname = apNamen?.nachname || kundeNamen.nachname
+  /** Kontakt-Mail des Ansprechpartners (Anzeige / Default-Versand). */
   const kundeEmail =
     (effektivAp?.email?.trim() || kunde?.email || '').trim()
   const kundeTelefon =
@@ -1416,6 +1421,9 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Kunde"
         context="canvas"
+        overlayClassName={
+          objektNeuOpen || kundeEditOpen ? 'editor-sheet-overlay--recessed' : undefined
+        }
         headerEnd={
           kunde ? (
             <button
@@ -1447,11 +1455,18 @@ export function RechnungWizard({
               value={ansprechpartnerId ?? ''}
               onChange={(e) => {
                 const next = e.target.value.trim() || null
+                const prevKontakt = kundeEmail
                 setAnsprechpartnerId(next)
-                const ap = next ? apRows.find((a) => a.id === next) : apRows.find((a) => a.ist_primaer)
+                const ap = next
+                  ? apRows.find((a) => a.id === next)
+                  : apRows.find((a) => a.ist_primaer)
                 const mail = (ap?.email?.trim() || kunde?.email || '').trim()
-                if (mail && isValidEmail(mail)) setMailTo([mail])
-                else if (!mail) setMailTo([])
+                /* Nur nachziehen, wenn Versand noch dem alten Ansprechpartner folgt. */
+                setMailTo((prev) => {
+                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                  if (mail && isValidEmail(mail)) return [mail]
+                  return []
+                })
                 setDraftDirty(true)
               }}
               disabled={!kundeId}
@@ -1461,11 +1476,25 @@ export function RechnungWizard({
                 <option key={ap.id} value={ap.id}>
                   {ap.name.trim() || 'Ohne Name'}
                   {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
                   {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
                 </option>
               ))}
             </select>
           </MockField>
+          <KundenVersandEmailField
+            apRows={apRows}
+            kontaktEmail={kundeEmail}
+            kundeStammEmail={kunde?.email}
+            versandEmail={mailTo[0] ?? ''}
+            disabled={!kundeId}
+            onChange={(next) => {
+              if (next && isValidEmail(next)) setMailTo([next])
+              else if (kundeEmail && isValidEmail(kundeEmail)) setMailTo([kundeEmail])
+              else setMailTo([])
+              setDraftDirty(true)
+            }}
+          />
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
             <span className="gfc-v">{displayVorname || '—'}</span>
@@ -1483,7 +1512,7 @@ export function RechnungWizard({
             <span className="gfc-v">{kundeStadt || '—'}</span>
           </div>
           <div className="gfc-row">
-            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-l">E-Mail (Kontakt)</span>
             <span className="gfc-v">{kundeEmail || <em>fehlt</em>}</span>
           </div>
           <div className="gfc-row">
@@ -1533,6 +1562,7 @@ export function RechnungWizard({
           onClose={() => setObjektNeuOpen(false)}
           kundeId={kundeId}
           verwaltungName={kundeName}
+          context="canvas"
           onSaved={(objekt) => {
             setHvObjekte((prev) => {
               if (prev.some((o) => o.id === objekt.id)) return prev

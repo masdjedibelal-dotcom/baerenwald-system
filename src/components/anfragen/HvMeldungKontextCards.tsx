@@ -281,6 +281,7 @@ export function HvMeldungKontextCards({
         open={editOpen}
         onClose={() => setEditOpen(false)}
         title="Melder & Leistungsort"
+        overlayClassName={objektNeuOpen ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
           <button
             type="button"
@@ -308,6 +309,7 @@ export function HvMeldungKontextCards({
           open={objektNeuOpen}
           onClose={() => setObjektNeuOpen(false)}
           kundeId={agKundeId}
+          overlayClassName="editor-sheet-overlay--stack"
           onSaved={(objekt) => {
             setObjekte((prev) => {
               if (prev.some((o) => o.id === objekt.id)) return prev

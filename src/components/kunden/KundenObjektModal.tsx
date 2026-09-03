@@ -2,7 +2,7 @@
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockModal } from '@/components/mock-ui/MockModal'
@@ -21,6 +21,8 @@ export function KundenObjektModal({
   verwaltungName,
   editObjekt,
   onSaved,
+  context = 'detail',
+  overlayClassName,
 }: {
   open: boolean
   onClose: () => void
@@ -29,6 +31,10 @@ export function KundenObjektModal({
   verwaltungName?: string
   editObjekt?: KundenObjekt | null
   onSaved: (objekt: KundenObjekt) => void
+  /** canvas = über Wizard/DocumentCanvas (z. B. Rechnung → Kunde → Objekt anlegen). */
+  context?: EditorSheetContext
+  /** z. B. editor-sheet-overlay--stack über einem Detail-Sheet. */
+  overlayClassName?: string
 }) {
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
@@ -161,7 +167,8 @@ export function KundenObjektModal({
       onClose={onClose}
       title={isEdit ? 'Objekt bearbeiten' : 'Objekt anlegen'}
       crumb={isEdit ? 'Objekt >' : 'Neues Objekt >'}
-      context="detail"
+      context={context}
+      overlayClassName={overlayClassName}
       dirty={dirty}
       size="lg"
       onConfirm={requestSpeichern}

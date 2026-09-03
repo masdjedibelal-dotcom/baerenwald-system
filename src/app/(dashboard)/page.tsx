@@ -204,7 +204,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, auftrag_id, ersetzt_durch, positionen')
+          .select('id, status, created_at, auftrag_id, ersetzt_durch, positionen, netto')
           .neq('status', 'storniert')
           .neq('status', 'entwurf')
           .order('created_at', { ascending: false })
@@ -269,6 +269,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     auftrag_id?: string | null
     ersetzt_durch?: string | null
     positionen?: unknown
+    netto?: number | null
   }>
 
   const leadsZ = leads.filter((l) => {
@@ -328,13 +329,52 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     },
   ]
 
-  // Umsatz: Aufträge ab Annahme/Direkt + Direkt-RE (gleiche Basis Monate/Gewerk)
-  const umsatzMonate = buildUmsatzverlauf(
-    auftraegeZ.map((a) => ({
+  // Umsatz: Aufträge ab Annahme/Direkt + Direkt-RE — Verlauf & Gewerk mit derselben Netto-Basis
+  const umsatzAuftraegeZ = auftraegeZ.filter((a) => isUmsatzAuftragStatus(String(a.status ?? '')))
+  const angebotIdsForGewerk = [
+    ...new Set(
+      umsatzAuftraegeZ
+        .map((a) => String(a.angebot_id ?? '').trim())
+        .filter(Boolean)
+    ),
+  ].slice(0, 200)
+
+  const angebotPositionenById = new Map<string, unknown>()
+  for (let i = 0; i < angebotIdsForGewerk.length; i += 40) {
+    const chunk = angebotIdsForGewerk.slice(i, i + 40)
+    const rows = await safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db.from('angebote').select('id, positionen').in('id', chunk)
+      )
+    )
+    for (const row of rows as Array<{ id?: string; positionen?: unknown }>) {
+      const id = String(row.id ?? '').trim()
+      if (id) angebotPositionenById.set(id, row.positionen)
+    }
+  }
+
+  const umsatzAuftraegeEnrich = umsatzAuftraegeZ.map((a) => {
+    const angId = String(a.angebot_id ?? '').trim()
+    const pos = angId ? angebotPositionenById.get(angId) : undefined
+    const embedded = a.angebote as
+      | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }
+      | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }[]
+      | null
+      | undefined
+    const base = Array.isArray(embedded) ? embedded[0] : embedded
+    return {
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
-      angebote: a.angebote as never,
-    })),
+      angebote: base
+        ? { ...base, positionen: pos }
+        : pos
+          ? { positionen: pos }
+          : null,
+    }
+  })
+
+  const umsatzMonate = buildUmsatzverlauf(
+    umsatzAuftraegeEnrich,
     rechnungenZ.map((r) => ({
       status: r.status,
       created_at: r.created_at,
@@ -378,53 +418,14 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     })
   )
 
-  const umsatzAuftraegeZ = auftraegeZ.filter((a) => isUmsatzAuftragStatus(String(a.status ?? '')))
-  const angebotIdsForGewerk = [
-    ...new Set(
-      umsatzAuftraegeZ
-        .map((a) => String(a.angebot_id ?? '').trim())
-        .filter(Boolean)
-    ),
-  ].slice(0, 200)
-
-  const angebotPositionenById = new Map<string, unknown>()
-  for (let i = 0; i < angebotIdsForGewerk.length; i += 40) {
-    const chunk = angebotIdsForGewerk.slice(i, i + 40)
-    const rows = await safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db.from('angebote').select('id, positionen').in('id', chunk)
-      )
-    )
-    for (const row of rows as Array<{ id?: string; positionen?: unknown }>) {
-      const id = String(row.id ?? '').trim()
-      if (id) angebotPositionenById.set(id, row.positionen)
-    }
-  }
-
   const gewerk = buildGewerkUmsatz(
-    umsatzAuftraegeZ.map((a) => {
-      const angId = String(a.angebot_id ?? '').trim()
-      const pos = angId ? angebotPositionenById.get(angId) : undefined
-      const embedded = a.angebote as
-        | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }
-        | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }[]
-        | null
-        | undefined
-      const base = Array.isArray(embedded) ? embedded[0] : embedded
-      return {
-        status: String(a.status ?? ''),
-        angebote: base
-          ? { ...base, positionen: pos }
-          : pos
-            ? { positionen: pos }
-            : null,
-      }
-    }),
+    umsatzAuftraegeEnrich,
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
       auftrag_id: r.auftrag_id,
       ersetzt_durch: r.ersetzt_durch,
+      netto: r.netto,
     })),
     gewerkeKatalog
   )

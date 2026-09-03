@@ -440,22 +440,84 @@ function addGewerkPositionen(
   for (const p of pos) {
     const name = resolveDashboardGewerkLabel(p, lookup)
     if (!name) continue
-    const line = Number(p.gesamt_min) || Number(p.vk_netto) || 0
-    if (line <= 0) continue
+    const gesamt = Number(p.gesamt_min)
+    const vk = Number(p.vk_netto) || 0
+    const menge = Number(p.menge) || 1
+    const line =
+      Number.isFinite(gesamt) && gesamt !== 0 ? gesamt : Math.round(vk * menge * 100) / 100
+    if (!(line > 0)) continue
     map.set(name, (map.get(name) ?? 0) + line)
   }
 }
 
+/** Gewerk-Anteile aus Positionen; Summe wird später auf auftragNetto / RE-Netto skaliert. */
+function gewerkAnteileFromPositionen(
+  positionen: unknown,
+  lookup: GewerkLookup
+): Map<string, number> {
+  const map = new Map<string, number>()
+  addGewerkPositionen(map, positionen, lookup)
+  return map
+}
+
+function addScaledToGewerkMap(
+  target: Map<string, number>,
+  anteile: Map<string, number>,
+  sollNetto: number
+) {
+  if (!(sollNetto > 0)) return
+  let partsSum = 0
+  for (const amt of anteile.values()) {
+    if (amt > 0) partsSum += amt
+  }
+  if (partsSum <= 0) {
+    target.set('Sonstiges', (target.get('Sonstiges') ?? 0) + sollNetto)
+    return
+  }
+  for (const [name, amt] of anteile) {
+    if (!(amt > 0)) continue
+    target.set(name, (target.get(name) ?? 0) + sollNetto * (amt / partsSum))
+  }
+}
+
+function positionenFromUmsatzAuftrag(a: {
+  angebote?:
+    | { positionen?: unknown }
+    | { positionen?: unknown }[]
+    | null
+  auftrag_positionen?: AngebotPosition[] | AuftragPosition[] | null
+}): unknown {
+  const ang = Array.isArray(a.angebote) ? a.angebote[0] : a.angebote
+  if (ang?.positionen) return ang.positionen
+  const pos = a.auftrag_positionen
+  if (!pos?.length) return null
+  const first = pos[0] as AuftragPosition & AngebotPosition
+  if ('preis_fix' in first || 'lohn_fix' in first || 'leistung_name' in first) {
+    return auftragPositionenToAngebotPositionen(pos as AuftragPosition[])
+  }
+  return pos
+}
+
 /**
- * Umsatz nach Gewerk — gleiche Umsatz-Basis wie Monatsverlauf.
- * Aufträge (nicht storniert) über Angebots-/Auftragspositionen + Direkt-RE-Positionen.
+ * Umsatz nach Gewerk — **dieselbe Euro-Basis** wie Monatsverlauf (`auftragNetto` + Direkt-RE-Netto).
+ * Positionen steuern nur die Aufteilung auf Gewerke (skaliert auf den Netto-Soll).
  */
 export function buildGewerkUmsatz(
   auftraege: Array<{
     status?: string | null
     angebote?:
-      | { positionen?: unknown }
-      | { positionen?: unknown }[]
+      | {
+          gesamt_fix?: number | null
+          gesamt_min?: number | null
+          gesamt_max?: number | null
+          positionen?: unknown
+        }
+      | {
+          gesamt_fix?: number | null
+          gesamt_min?: number | null
+          gesamt_max?: number | null
+          positionen?: unknown
+        }[]
       | null
     auftrag_positionen?: AngebotPosition[] | AuftragPosition[] | null
   }>,
@@ -464,6 +526,7 @@ export function buildGewerkUmsatz(
     status?: string | null
     auftrag_id?: string | null
     ersetzt_durch?: string | null
+    netto?: number | null
   }> = [],
   gewerkeKatalog: DashboardGewerkKatalog[] = []
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
@@ -472,40 +535,36 @@ export function buildGewerkUmsatz(
 
   for (const a of auftraege) {
     if (!isUmsatzAuftragStatus(a.status)) continue
-    const ang = Array.isArray(a.angebote) ? a.angebote[0] : a.angebote
-    if (ang?.positionen) {
-      addGewerkPositionen(map, ang.positionen, lookup)
-      continue
-    }
-    const pos = a.auftrag_positionen
-    if (!pos?.length) continue
-    const first = pos[0] as AuftragPosition & AngebotPosition
-    if ('preis_fix' in first || 'lohn_fix' in first || 'leistung_name' in first) {
-      addGewerkPositionen(
-        map,
-        auftragPositionenToAngebotPositionen(pos as AuftragPosition[]),
-        lookup
-      )
-    } else {
-      addGewerkPositionen(map, pos, lookup)
-    }
+    const soll = auftragNetto(a)
+    if (!(soll > 0)) continue
+    const anteile = gewerkAnteileFromPositionen(positionenFromUmsatzAuftrag(a), lookup)
+    addScaledToGewerkMap(map, anteile, soll)
   }
 
   for (const r of rechnungen) {
     if (!isUmsatzDirektRechnung(r)) continue
-    addGewerkPositionen(map, r.positionen, lookup)
+    const fromPos = gewerkAnteileFromPositionen(r.positionen, lookup)
+    let partsSum = 0
+    for (const amt of fromPos.values()) {
+      if (amt > 0) partsSum += amt
+    }
+    const soll =
+      Number(r.netto) > 0 ? Number(r.netto) : partsSum > 0 ? partsSum : 0
+    if (!(soll > 0)) continue
+    addScaledToGewerkMap(map, fromPos, soll)
   }
 
   const gesamt = Array.from(map.values()).reduce((a, b) => a + b, 0)
   const zeilen = Array.from(map.entries())
     .map(([name, netto]) => ({
       name,
-      netto,
+      netto: Math.round(netto * 100) / 100,
       anteil: gesamt > 0 ? Math.round((netto / gesamt) * 100) : 0,
     }))
     .sort((a, b) => b.netto - a.netto)
 
-  return { zeilen, gesamt }
+  const gesamtRounded = Math.round(gesamt * 100) / 100
+  return { zeilen, gesamt: gesamtRounded }
 }
 
 export type RankingZeile = {

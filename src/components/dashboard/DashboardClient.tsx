@@ -33,6 +33,12 @@ export type DashboardKpi = {
 
 const UMSATZ_BAR_FILL = '#2E7D52'
 
+/** Kompakt für enge Monatsspalten — ganze Euro, geschütztes Leerzeichen vor €. */
+function formatEurCompact(n: number): string {
+  const v = Number.isFinite(n) ? n : 0
+  return `${Math.round(v).toLocaleString('de-DE')}\u00A0€`
+}
+
 function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const safeMonths = Array.isArray(months) ? months : []
   const totals = safeMonths.map((m) => umsatzMonatGesamt(m))
@@ -117,14 +123,14 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[320px] border-collapse text-[length:var(--fs-meta)]">
+          <table className="w-full min-w-[280px] border-collapse text-[11px] leading-tight">
             <thead>
               <tr className="border-b border-[var(--border)]">
-                <th className="px-1.5 py-1.5 text-left font-medium text-[var(--text-3)]"> </th>
+                <th className="px-1 py-1 text-left font-medium text-[var(--text-3)]"> </th>
                 {safeMonths.map((m) => (
                   <th
                     key={m.key}
-                    className="px-1.5 py-1.5 text-right font-medium tabular-nums text-[var(--text-3)]"
+                    className="px-1 py-1 text-right font-medium tabular-nums text-[var(--text-3)]"
                   >
                     {m.label}
                   </th>
@@ -133,13 +139,13 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
             </thead>
             <tbody>
               <tr className="border-b border-[var(--border)] font-semibold last:border-0">
-                <td className="whitespace-nowrap px-1.5 py-1.5 text-[var(--text-2)]">Gesamt</td>
+                <td className="whitespace-nowrap px-1 py-1 text-[var(--text-2)]">Gesamt</td>
                 {safeMonths.map((m) => (
                   <td
                     key={m.key}
-                    className="px-1.5 py-1.5 text-right tabular-nums text-[var(--text)]"
+                    className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[var(--text)]"
                   >
-                    {formatEurBetrag(umsatzMonatGesamt(m))}
+                    {formatEurCompact(umsatzMonatGesamt(m))}
                   </td>
                 ))}
               </tr>
@@ -328,8 +334,8 @@ function TopRankingCard({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[length:var(--fs-text)] font-medium">{r.name}</div>
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[length:var(--fs-meta)] text-[var(--text-2)]">
-                    <span className="font-medium tabular-nums text-[var(--text)]">
-                      {formatEurBetrag(r.umsatz)}
+                    <span className="whitespace-nowrap font-medium tabular-nums text-[var(--text)]">
+                      {formatEurCompact(r.umsatz)}
                     </span>
                     <span className="tabular-nums text-[var(--text-3)]">
                       {r.vorgaenge} {r.vorgaenge === 1 ? 'Vorgang' : 'Vorgänge'}
@@ -344,7 +350,7 @@ function TopRankingCard({
             <div
               className="list-row head"
               style={{
-                gridTemplateColumns: '32px minmax(160px, 1.6fr) 88px minmax(110px, 1fr)',
+                gridTemplateColumns: '32px minmax(140px, 1.5fr) 72px minmax(88px, 0.85fr)',
                 gap: 8,
               }}
             >
@@ -358,7 +364,7 @@ function TopRankingCard({
                 key={r.id}
                 className="list-row"
                 style={{
-                  gridTemplateColumns: '32px minmax(160px, 1.6fr) 88px minmax(110px, 1fr)',
+                  gridTemplateColumns: '32px minmax(140px, 1.5fr) 72px minmax(88px, 0.85fr)',
                   gap: 8,
                   alignItems: 'center',
                 }}
@@ -371,8 +377,8 @@ function TopRankingCard({
                 </div>
                 <div className="text-[length:var(--fs-text)] tabular-nums">{r.vorgaenge}</div>
                 <div>
-                  <div className="text-[length:var(--fs-text)] font-medium tabular-nums">
-                    {formatEurBetrag(r.umsatz)}
+                  <div className="whitespace-nowrap text-[length:var(--fs-meta)] font-medium tabular-nums">
+                    {formatEurCompact(r.umsatz)}
                   </div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
                     <div
