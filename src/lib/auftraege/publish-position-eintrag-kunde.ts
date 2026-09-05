@@ -13,14 +13,24 @@ export async function publishPositionEintragFuerKunde(input: {
   eintragId: string
   auftragId: string
   typ: string
+  /** Expliziter Portal-Titel (sonst Typ · Leistung). */
+  titel?: string | null
   beschreibung?: string | null
   leistungName?: string | null
+  leistungNames?: string[] | null
   erstelltVon?: string | null
   handwerkerId?: string | null
 }): Promise<void> {
+  const leistungLabel =
+    (input.leistungNames ?? [])
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .join(', ') ||
+    input.leistungName?.trim() ||
+    null
   const titelParts = [
-    eintragTypLabel(input.typ as never) || 'Bautagebuch',
-    input.leistungName?.trim() || null,
+    input.titel?.trim() || eintragTypLabel(input.typ as never) || 'Bautagebuch',
+    input.titel?.trim() ? null : leistungLabel,
   ].filter(Boolean)
 
   const { data: fotos } = await supabaseAdmin

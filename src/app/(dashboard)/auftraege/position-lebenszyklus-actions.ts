@@ -52,7 +52,8 @@ async function loadPosition(positionId: string) {
 }
 
 async function insertCrmEintrag(opts: {
-  positionId: string
+  positionId?: string | null
+  auftragId?: string | null
   typ: EintragTyp
   beschreibung: string | null
   zeitMinuten: number | null
@@ -61,10 +62,16 @@ async function insertCrmEintrag(opts: {
   rueckdatiertGrund?: string | null
   ereignisZeit?: string | null
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const positionId = opts.positionId?.trim() || null
+  const auftragId = opts.auftragId?.trim() || null
+  if (!positionId && !auftragId) {
+    return { ok: false, message: 'Position oder Auftrag fehlt.' }
+  }
   const { data, error } = await supabaseAdmin
     .from('position_eintraege')
     .insert({
-      position_id: opts.positionId,
+      position_id: positionId,
+      auftrag_id: auftragId,
       typ: opts.typ,
       beschreibung: opts.beschreibung,
       zeit_minuten: opts.zeitMinuten,
@@ -79,6 +86,27 @@ async function insertCrmEintrag(opts: {
 
   if (error) return { ok: false, message: migrationHint(error.message) }
   return { ok: true, id: String(data.id) }
+}
+
+  eintragId: string,
+  positionIds: string[]
+): Promise<ActionResult> {
+  const unique = Array.from(new Set(positionIds.map((id) => id.trim()).filter(Boolean)))
+  if (!unique.length) return { ok: true }
+  const { error } = await supabaseAdmin.from('position_eintrag_leistungen').insert(
+    unique.map((position_id) => ({ eintrag_id: eintragId, position_id }))
+  )
+  if (error) {
+    if (/position_eintrag_leistungen|does not exist/i.test(error.message)) {
+      return {
+        ok: false,
+        message:
+          'Migration position_eintrag_leistungen fehlt noch. Bitte `20260905151439_position_eintrag_leistungen.sql` anwenden.',
+      }
+    }
+    return { ok: false, message: migrationHint(error.message) }
+  }
+  return { ok: true }
 }
 
 async function attachCrmFoto(opts: {
@@ -108,7 +136,7 @@ function revalidateAuftrag(auftragId: string) {
   revalidatePath(`/auftraege/${auftragId}`)
 }
 
-/** Alle Positions-Einträge eines Auftrags (gruppiert über Positionen). */
+/** Alle Positions-/Tagebuch-Einträge eines Auftrags (inkl. freie Notizen ohne Leistung). */
 export async function listAuftragPositionEintraege(
   auftragId: string
 ): Promise<PositionEintrag[]> {
@@ -119,19 +147,44 @@ export async function listAuftragPositionEintraege(
     .from('auftrag_positionen')
     .select('id')
     .eq('auftrag_id', auftragId)
-  if (posErr || !posRows?.length) return []
+  if (posErr) {
+    console.error('[listAuftragPositionEintraege] positionen', posErr.message)
+    return []
+  }
 
-  const ids = posRows.map((p) => String(p.id))
-  const { data, error } = await supabaseAdmin
+  const ids = (posRows ?? []).map((p) => String(p.id))
+  let query = supabaseAdmin
     .from('position_eintraege')
     .select('*, eintrag_fotos(*)')
-    .in('position_id', ids)
     .order('created_at', { ascending: true })
+
+  if (ids.length > 0) {
+    query = query.or(`auftrag_id.eq.${auftragId},position_id.in.(${ids.join(',')})`)
+  } else {
+    query = query.eq('auftrag_id', auftragId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     if (/relation .* does not exist|position_eintraege/i.test(error.message)) return []
     console.error('[listAuftragPositionEintraege]', error.message)
     return []
+  }
+
+  const eintragIds = (data ?? []).map((row) => String(row.id))
+  const junctionByEintrag = new Map<string, string[]>()
+  if (eintragIds.length > 0) {
+    const { data: junctionRows } = await supabaseAdmin
+      .from('position_eintrag_leistungen')
+      .select('eintrag_id, position_id')
+      .in('eintrag_id', eintragIds)
+    for (const j of junctionRows ?? []) {
+      const eid = String(j.eintrag_id)
+      const list = junctionByEintrag.get(eid) ?? []
+      list.push(String(j.position_id))
+      junctionByEintrag.set(eid, list)
+    }
   }
 
   const out: PositionEintrag[] = []
@@ -158,9 +211,16 @@ export async function listAuftragPositionEintraege(
         display_url: display,
       })
     }
+    const eid = String(row.id)
+    const junctionIds = junctionByEintrag.get(eid) ?? []
+    const primaryPos = row.position_id != null ? String(row.position_id) : null
+    const leistungIds = Array.from(
+      new Set([...(primaryPos ? [primaryPos] : []), ...junctionIds])
+    )
     out.push({
-      id: String(row.id),
-      position_id: String(row.position_id),
+      id: eid,
+      position_id: primaryPos,
+      auftrag_id: row.auftrag_id != null ? String(row.auftrag_id) : auftragId,
       typ: String(row.typ),
       beschreibung: row.beschreibung ?? null,
       beschreibung_roh: row.beschreibung_roh ?? null,
@@ -172,6 +232,7 @@ export async function listAuftragPositionEintraege(
       ereignis_zeit: row.ereignis_zeit ?? null,
       created_at: row.created_at ?? null,
       eintrag_fotos: fotos,
+      leistung_position_ids: leistungIds,
     })
   }
   return out
@@ -304,6 +365,7 @@ export async function createCrmPositionEintrag(
 
   const eintrag = await insertCrmEintrag({
     positionId,
+    auftragId: String(pos.auftrag_id),
     typ: input.typ,
     beschreibung: input.beschreibung?.trim() || null,
     zeitMinuten,
@@ -384,6 +446,173 @@ export async function createCrmPositionEintrag(
 
   revalidateAuftrag(String(pos.auftrag_id))
   return { ok: true, eintragId: eintrag.id, positionId }
+}
+
+export type CrmTagebuchEintragInput = {
+  auftragId: string
+  /** 0..n Leistungen — leer = freie Notiz. */
+  positionIds?: string[]
+  /** Optional: ausgewählte Leistungen als erledigt setzen. */
+  erledigtPositionIds?: string[]
+  titel?: string | null
+  beschreibung?: string | null
+  /** @deprecated — nutze fotoStoragePaths */
+  fotoStoragePath?: string | null
+  /** 1..n Storage-Pfade / URLs */
+  fotoStoragePaths?: string[]
+  fotoCaptureAt?: string | null
+  fotoNachgereicht?: boolean
+  fotoNachreichGrund?: string | null
+  quelle?: EintragQuelle | null
+  rueckdatiertGrund?: string | null
+  ereignisZeit?: string | null
+}
+
+type TagebuchResult =
+  | { ok: true; eintragId: string; positionId: string | null }
+  | { ok: false; message: string }
+
+/**
+ * CRM-Tagebuch: ein narrativer Eintrag, optional 0..n Leistungen (Junction).
+ * Kein Start-Gate — Fortschritt/Notiz unabhängig vom Positions-Lebenszyklus.
+ */
+export async function createCrmTagebuchEintrag(
+  input: CrmTagebuchEintragInput
+): Promise<TagebuchResult> {
+  const auth = await crmAuth()
+  if (!auth.ok) return auth
+
+  const auftragId = input.auftragId?.trim()
+  if (!auftragId) return { ok: false, message: 'Auftrag fehlt.' }
+
+  const positionIds = Array.from(
+    new Set((input.positionIds ?? []).map((id) => id.trim()).filter(Boolean))
+  )
+  const erledigtIds = Array.from(
+    new Set((input.erledigtPositionIds ?? []).map((id) => id.trim()).filter(Boolean))
+  )
+
+  const titel = input.titel?.trim() || ''
+  const beschreibungRaw = input.beschreibung?.trim() || ''
+  const text = [titel, beschreibungRaw].filter(Boolean).join('\n\n')
+  const fotoPaths = Array.from(
+    new Set(
+      [
+        ...(input.fotoStoragePaths ?? []),
+        ...(input.fotoStoragePath ? [input.fotoStoragePath] : []),
+      ]
+        .map((p) => p.trim())
+        .filter(Boolean)
+    )
+  )
+
+  if (!text && !fotoPaths.length) {
+    return { ok: false, message: 'Titel, Text oder Foto angeben.' }
+  }
+  if (input.fotoNachgereicht && !input.fotoNachreichGrund?.trim()) {
+    return { ok: false, message: 'Bitte Grund für nachgereichtes Foto angeben.' }
+  }
+
+  let leistungNames: string[] = []
+  if (positionIds.length > 0) {
+    const { data: posRows, error: posErr } = await supabaseAdmin
+      .from('auftrag_positionen')
+      .select('id, leistung_name, auftrag_id')
+      .eq('auftrag_id', auftragId)
+      .in('id', positionIds)
+    if (posErr) return { ok: false, message: migrationHint(posErr.message) }
+    if ((posRows ?? []).length !== positionIds.length) {
+      return { ok: false, message: 'Eine oder mehrere Leistungen gehören nicht zum Auftrag.' }
+    }
+    leistungNames = (posRows ?? [])
+      .map((p) => String(p.leistung_name ?? '').trim())
+      .filter(Boolean)
+  }
+
+  for (const eid of erledigtIds) {
+    if (!positionIds.includes(eid)) {
+      return { ok: false, message: 'Erledigt nur für ausgewählte Leistungen möglich.' }
+    }
+  }
+
+  const typ: EintragTyp = positionIds.length > 0 ? 'fortschritt' : 'notiz'
+  const primaryPos = positionIds[0] ?? null
+
+  const eintrag = await insertCrmEintrag({
+    positionId: primaryPos,
+    auftragId,
+    typ,
+    beschreibung: text || (fotoPaths.length ? 'Foto-Update' : null),
+    zeitMinuten: null,
+    userId: auth.userId,
+    quelle: input.quelle ?? 'vor_ort',
+    rueckdatiertGrund: input.rueckdatiertGrund?.trim() || null,
+    ereignisZeit: input.ereignisZeit ?? null,
+  })
+  if (!eintrag.ok) return eintrag
+
+  const linked = await linkEintragLeistungen(eintrag.id, positionIds)
+  if (!linked.ok) return linked
+
+  for (const path of fotoPaths) {
+    const attached = await attachCrmFoto({
+      eintragId: eintrag.id,
+      storagePath: path,
+      captureAt: input.fotoCaptureAt ?? null,
+      nachgereicht: Boolean(input.fotoNachgereicht),
+      nachreichGrund: input.fotoNachreichGrund ?? null,
+    })
+    if (!attached.ok) return attached
+  }
+
+  if (erledigtIds.length > 0) {
+    const now = new Date().toISOString()
+    await supabaseAdmin
+      .from('auftrag_positionen')
+      .update({
+        leistung_status: 'erledigt',
+        erledigt_am: input.ereignisZeit ?? now,
+      })
+      .in('id', erledigtIds)
+  }
+
+  await writeAuditEvent({
+    entityType: 'auftrag',
+    entityId: auftragId,
+    aktion: 'crm_tagebuch_eintrag',
+    actorId: auth.userId,
+    actorRolle: 'crm',
+    payload: {
+      eintrag_id: eintrag.id,
+      position_ids: positionIds,
+      erledigt_position_ids: erledigtIds,
+      foto_count: fotoPaths.length,
+      typ,
+    },
+  })
+
+  try {
+    const { publishPositionEintragFuerKunde } = await import(
+      '@/lib/auftraege/publish-position-eintrag-kunde'
+    )
+    await publishPositionEintragFuerKunde({
+      eintragId: eintrag.id,
+      auftragId,
+      typ,
+      titel: titel || null,
+      beschreibung: beschreibungRaw || text || null,
+      leistungNames,
+      erstelltVon: auth.userId,
+    })
+  } catch (e) {
+    console.warn(
+      '[createCrmTagebuchEintrag] Kunden-Publish fehlgeschlagen',
+      e instanceof Error ? e.message : e
+    )
+  }
+
+  revalidateAuftrag(auftragId)
+  return { ok: true, eintragId: eintrag.id, positionId: primaryPos }
 }
 
 /** Prüfschritt weitere_arbeit: Anerkennen / Rückfrage / Ablehnen. */

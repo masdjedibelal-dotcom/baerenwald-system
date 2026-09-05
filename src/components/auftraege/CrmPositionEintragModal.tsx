@@ -1,16 +1,20 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Camera } from 'lucide-react'
+import { X } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { Button } from '@/components/ui/Button'
+import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-import { createCrmPositionEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import { createCrmTagebuchEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import type { AuftragPosition } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
-/** Bautagebuch-Eintrag: Leistung · Titel · Beschreibung · Fotos. */
+const MAX_FOTOS = 12
+
+/** Bautagebuch-Eintrag: 0..n Leistungen · Titel · Beschreibung · mehrere Fotos. */
 export function CrmPositionEintragModal({
   open,
   onClose,
@@ -27,10 +31,12 @@ export function CrmPositionEintragModal({
   onSaved?: () => void
 }) {
   const [pending, setPending] = useState(false)
-  const [positionId, setPositionId] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [erledigtIds, setErledigtIds] = useState<string[]>([])
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
-  const [fotoPath, setFotoPath] = useState('')
+  const [fotoPaths, setFotoPaths] = useState<string[]>([])
 
   const sortedPos = useMemo(
     () =>
@@ -46,54 +52,98 @@ export function CrmPositionEintragModal({
 
   useEffect(() => {
     if (!open) return
-    setPositionId(initialPositionId?.trim() || '')
+    const initial = initialPositionId?.trim()
+    setSelectedIds(initial ? [initial] : [])
+    setErledigtIds([])
     setTitel('')
     setBeschreibung('')
-    setFotoPath('')
+    setFotoPaths([])
   }, [open, initialPositionId])
 
-  async function uploadFoto(file: File) {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('filename', file.name)
-    const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
-      method: 'POST',
-      body: fd,
+  function toggleLeistung(id: string) {
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      setErledigtIds((er) => er.filter((x) => next.includes(x)))
+      return next
     })
-    const json = (await res.json()) as { url?: string; error?: string }
-    if (!res.ok || !json.url) {
-      toast.error(json.error || 'Upload fehlgeschlagen')
+  }
+
+  function selectKeineLeistung() {
+    setSelectedIds([])
+    setErledigtIds([])
+  }
+
+  function selectAlleLeistungen() {
+    const all = sortedPos.map((p) => p.id)
+    setSelectedIds(all)
+    setErledigtIds((er) => er.filter((x) => all.includes(x)))
+  }
+
+  function toggleErledigt(id: string) {
+    if (!selectedIds.includes(id)) return
+    setErledigtIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  async function uploadFotos(files: File[]) {
+    if (!files.length || uploading) return
+    const room = MAX_FOTOS - fotoPaths.length
+    if (room <= 0) {
+      toast.error(`Maximal ${MAX_FOTOS} Fotos pro Eintrag.`)
       return
     }
-    setFotoPath(json.url)
-    toast.success('Foto hochgeladen')
+    const batch = files.slice(0, room)
+    setUploading(true)
+    try {
+      const added: string[] = []
+      for (const file of batch) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('filename', file.name)
+        const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+          method: 'POST',
+          body: fd,
+        })
+        const json = (await res.json()) as { url?: string; error?: string }
+        if (!res.ok || !json.url) {
+          toast.error(json.error || `Upload fehlgeschlagen: ${file.name}`)
+          continue
+        }
+        added.push(json.url)
+      }
+      if (added.length) {
+        setFotoPaths((prev) => [...prev, ...added])
+        toast.success(
+          added.length === 1 ? 'Foto hochgeladen' : `${added.length} Fotos hochgeladen`
+        )
+      }
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function removeFoto(url: string) {
+    setFotoPaths((prev) => prev.filter((u) => u !== url))
   }
 
   function speichern() {
-    if (!titel.trim() && !beschreibung.trim() && !fotoPath) {
+    if (!titel.trim() && !beschreibung.trim() && !fotoPaths.length) {
       toast.error('Titel, Text oder Foto angeben.')
       return
     }
-    const targetPos = positionId || sortedPos[0]?.id || ''
-    if (!targetPos) {
-      toast.error('Keine Leistung am Auftrag — Eintrag nicht möglich.')
-      return
-    }
-    const text = [titel.trim(), beschreibung.trim()].filter(Boolean).join('\n\n')
 
     setPending(true)
     void actionBusy
       .run('Tagebuch-Eintrag wird gespeichert…', async () => {
-        const r = await createCrmPositionEintrag({
-          positionId: targetPos,
-          typ: 'fortschritt',
-          beschreibung: text || (fotoPath ? 'Foto-Update' : null),
+        const r = await createCrmTagebuchEintrag({
+          auftragId,
+          positionIds: selectedIds,
+          erledigtPositionIds: erledigtIds,
+          titel: titel.trim() || null,
+          beschreibung: beschreibung.trim() || null,
           quelle: 'vor_ort',
-          rueckdatiertGrund: null,
-          ereignisZeit: null,
-          zeitStd: null,
-          zeitMin: null,
-          fotoStoragePath: fotoPath.trim() || null,
+          fotoStoragePaths: fotoPaths,
         })
         if (!r.ok) {
           toast.error(r.message)
@@ -106,7 +156,14 @@ export function CrmPositionEintragModal({
       .finally(() => setPending(false))
   }
 
-  const dirty = Boolean(beschreibung.trim() || titel.trim() || fotoPath)
+  const busy = pending || uploading
+  const dirty = Boolean(
+    beschreibung.trim() ||
+      titel.trim() ||
+      fotoPaths.length ||
+      selectedIds.length ||
+      erledigtIds.length
+  )
 
   return (
     <EditorSheet
@@ -114,10 +171,10 @@ export function CrmPositionEintragModal({
       onClose={onClose}
       title="Tagebuch-Eintrag"
       size="lg"
-      dirty={dirty && !pending}
+      dirty={dirty && !busy}
       footer={
         <div className="sheet-footer-actions ldr-cta">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
             Abbrechen
           </Button>
           <Button type="button" variant="primary" loading={pending} onClick={speichern}>
@@ -127,21 +184,91 @@ export function CrmPositionEintragModal({
       }
     >
       <div className="space-y-4">
-        <label className="block">
-          <span className="lt-field-lbl">Leistung</span>
-          <select
-            className="input"
-            value={positionId}
-            onChange={(e) => setPositionId(e.target.value)}
-          >
-            <option value="">Leistung auswählen…</option>
-            {sortedPos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.leistung_name?.trim() || 'Leistung'}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <span className="lt-field-lbl">Leistungen</span>
+          <p className="sheet-editable-field__hint" style={{ marginTop: 0 }}>
+            Optional — keine, eine oder mehrere anhaken.
+          </p>
+          {sortedPos.length === 0 ? (
+            <p className="mt-2 text-sm text-muted">
+              Keine Leistungen am Auftrag — Speichern als freier Eintrag.
+            </p>
+          ) : (
+            <>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    'btn sm',
+                    selectedIds.length === 0 ? 'primary' : 'secondary'
+                  )}
+                  disabled={busy}
+                  onClick={selectKeineLeistung}
+                >
+                  Keine Leistung
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary sm"
+                  disabled={busy || selectedIds.length === sortedPos.length}
+                  onClick={selectAlleLeistungen}
+                >
+                  Alle auswählen
+                </button>
+                <span className="text-xs text-muted">
+                  {selectedIds.length === 0
+                    ? 'Freier Tageseintrag ohne Leistungsbezug'
+                    : `${selectedIds.length} von ${sortedPos.length} ausgewählt`}
+                </span>
+              </div>
+              <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
+                {sortedPos.map((p) => {
+                  const checked = selectedIds.includes(p.id)
+                  const erledigt = erledigtIds.includes(p.id)
+                  const alreadyDone = String(p.leistung_status ?? '') === 'erledigt'
+                  return (
+                    <li
+                      key={p.id}
+                      className={cn(
+                        'rounded-lg border px-3 py-2',
+                        checked ? 'border-accent bg-accent/5' : 'border-border'
+                      )}
+                    >
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checked}
+                          disabled={busy}
+                          onChange={() => toggleLeistung(p.id)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">
+                            {p.leistung_name?.trim() || 'Leistung'}
+                          </span>
+                          {alreadyDone ? (
+                            <span className="text-xs text-muted">bereits erledigt</span>
+                          ) : null}
+                        </span>
+                      </label>
+                      {checked && !alreadyDone ? (
+                        <label className="mt-1.5 ml-6 flex cursor-pointer items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={erledigt}
+                            disabled={busy}
+                            onChange={() => toggleErledigt(p.id)}
+                          />
+                          Als erledigt markieren
+                        </label>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </div>
 
         <SheetEditableField
           label="Titel"
@@ -165,19 +292,47 @@ export function CrmPositionEintragModal({
 
         <div>
           <span className="lt-field-lbl">Fotos</span>
-          <label className="lt-foto-zone">
-            <Camera className="h-5 w-5" aria-hidden />
-            <span>{fotoPath ? 'Foto gesetzt — tippen zum Ändern' : 'Foto hinzufügen'}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) void uploadFoto(f)
-              }}
+          {fotoPaths.length < MAX_FOTOS ? (
+            <FotoDropZone
+              disabled={busy}
+              multiple
+              label={
+                uploading
+                  ? 'Lädt…'
+                  : fotoPaths.length
+                    ? 'Weitere Fotos hinzufügen'
+                    : 'Fotos tippen oder ablegen'
+              }
+              labelDragging="Fotos hier ablegen"
+              onFiles={(files) => void uploadFotos(files)}
             />
-          </label>
+          ) : null}
+          {fotoPaths.length > 0 ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {fotoPaths.map((url, i) => (
+                <div key={`${url}-${i}`} className="relative aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Foto ${i + 1}`}
+                    className="h-full w-full rounded-md border border-bw-border object-cover"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
+                    disabled={busy}
+                    onClick={() => removeFoto(url)}
+                    aria-label={`Foto ${i + 1} entfernen`}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p className="mt-1.5 text-xs text-muted">
+            Bis zu {MAX_FOTOS} Fotos — Drag & Drop oder Tippen.
+          </p>
         </div>
       </div>
     </EditorSheet>

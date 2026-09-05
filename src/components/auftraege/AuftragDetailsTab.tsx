@@ -229,11 +229,22 @@ export function AuftragLeistungenTab({
       if (cancelled) return
       const enriched: BautagebuchListenEintrag[] = []
       for (const e of list) {
-        const meta = e.position_id ? posMetaById.get(e.position_id) : null
+        const ids =
+          e.leistung_position_ids?.length
+            ? e.leistung_position_ids
+            : e.position_id
+              ? [e.position_id]
+              : []
+        const names = ids
+          .map((id) => posMetaById.get(id)?.name)
+          .filter((n): n is string => Boolean(n?.trim()))
+        const hw =
+          ids.map((id) => posMetaById.get(id)?.handwerkerName).find((n) => n?.trim()) ?? null
         enriched.push({
           ...e,
-          leistungName: meta?.name ?? null,
-          handwerkerName: meta?.handwerkerName ?? null,
+          leistungName: names[0] ?? null,
+          leistungNames: names,
+          handwerkerName: hw,
         })
       }
       setBautagebuchEintraege(enriched)

@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 
 export type BautagebuchListenEintrag = PositionEintrag & {
   leistungName?: string | null
+  /** Mehrere Leistungen (Junction), Anzeige mit Komma. */
+  leistungNames?: string[]
   handwerkerName?: string | null
 }
 
@@ -186,9 +188,15 @@ export function AuftragBautagebuchSection({
                       {e.handwerkerName?.trim() ? (
                         <span className="bt-inserat__chip">{e.handwerkerName.trim()}</span>
                       ) : null}
-                      {e.leistungName?.trim() ? (
+                      {(e.leistungNames?.length ? e.leistungNames : e.leistungName?.trim()
+                        ? [e.leistungName.trim()]
+                        : []
+                      ).length > 0 ? (
                         <span className="bt-inserat__chip bt-inserat__chip--muted">
-                          {e.leistungName.trim()}
+                          {(e.leistungNames?.length
+                            ? e.leistungNames
+                            : [e.leistungName!.trim()]
+                          ).join(', ')}
                         </span>
                       ) : (
                         <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
@@ -229,9 +237,12 @@ export function AuftragBautagebuchSection({
               {active.handwerkerName?.trim() ? (
                 <span className="bt-inserat__chip">{active.handwerkerName.trim()}</span>
               ) : null}
-              {active.leistungName?.trim() ? (
+              {active.leistungName?.trim() || active.leistungNames?.length ? (
                 <span className="bt-inserat__chip bt-inserat__chip--muted">
-                  {active.leistungName.trim()}
+                  {(active.leistungNames?.length
+                    ? active.leistungNames
+                    : [active.leistungName!.trim()]
+                  ).join(', ')}
                 </span>
               ) : null}
               {activeStunden ? (

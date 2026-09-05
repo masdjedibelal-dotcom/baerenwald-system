@@ -52,6 +52,8 @@ export type PositionEintrag = {
   ereignis_zeit?: string | null
   created_at?: string | null
   eintrag_fotos?: EintragFoto[] | null
+  /** Junction 0..n Leistungen (zusätzlich zu position_id). */
+  leistung_position_ids?: string[]
 }
 
 export type EintragFoto = {
