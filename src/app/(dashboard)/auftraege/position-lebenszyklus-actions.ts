@@ -88,6 +88,7 @@ async function insertCrmEintrag(opts: {
   return { ok: true, id: String(data.id) }
 }
 
+async function linkEintragLeistungen(
   eintragId: string,
   positionIds: string[]
 ): Promise<ActionResult> {
