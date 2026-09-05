@@ -297,7 +297,8 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
   }
 
   for (const p of zuSenden) {
-    if (p.preis_partner == null || Number(p.preis_partner) <= 0) {
+    const ek = p.preis_partner == null ? null : Number(p.preis_partner)
+    if (ek == null || !Number.isFinite(ek) || ek < 0) {
       return {
         ok: false,
         message: `„${String(p.leistung_name ?? 'Leistung')}“: preis_partner (Netto-Zeile) fehlt — Handwerker kann nicht annehmen.`,
