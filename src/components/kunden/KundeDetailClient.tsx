@@ -470,11 +470,13 @@ export function KundeDetailClient({
       {zeigtOrganisationTab ? (
         <FreigabeSettingsCard
           showHmAuto
+          showAkutFaelle
           value={{
             notfall_direkt: kunde.notfall_direkt ?? true,
             freigabe_schwelle_eur:
               kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
             hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
+            akut_fall_ids: kunde.akut_fall_ids ?? [],
           }}
           onSave={async (next) =>
             saveKundeFreigabeRegeln(kunde.id, {
@@ -482,6 +484,7 @@ export function KundeDetailClient({
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
               freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
               hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
+              akut_fall_ids: next.akut_fall_ids ?? [],
             })
           }
           onSaved={() => refresh()}

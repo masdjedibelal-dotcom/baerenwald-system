@@ -42,10 +42,6 @@ function melderAdresse(lead: LeadDetail): string {
   return [strasse, plzOrt, einheit ? `Einheit ${einheit}` : null].filter(Boolean).join(', ') || '—'
 }
 
-function formatEur(n: number): string {
-  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
-}
-
 const FREIGABE_BADGE: Record<
   OrgFreigabeStatus,
   { label: string; tone: 'yel' | 'grn' | 'muted' | 'red' }
@@ -76,24 +72,14 @@ function PropRow({ label, value }: { label: string; value: ReactNode }) {
 
 /**
  * HV-Meldung: Melder + Leistungsort.
- * Schwellen-Hinweis nur nach Angebot und nur wenn Direktauftrag unter Schwelle möglich ist.
  * Stift: Melder/Objekt im CRM nachträglich setzen (ohne Anfrage-Wizard).
  */
 export function HvMeldungKontextCards({
   lead,
-  direktAuftragUnterSchwelle,
   angebotId,
   onSaved,
 }: {
   lead: LeadDetail
-  /**
-   * Nur am Angebot setzen, wenn Betrag ≤ Freigabe-Schwelle → Direktauftrag ohne HV.
-   * Vorher / sonst: kein Schwellen-Hinweis.
-   */
-  direktAuftragUnterSchwelle?: {
-    betragEur: number
-    schwelleEur: number
-  } | null
   angebotId?: string | null
   onSaved?: () => void
 }) {
@@ -114,13 +100,6 @@ export function HvMeldungKontextCards({
 
   const melderTel = lead.melder_telefon?.trim() || lead.kontakt_telefon?.trim() || null
   const melderMail = lead.melder_email?.trim() || lead.kontakt_email?.trim() || null
-
-  const showDirektUnterSchwelle =
-    direktAuftragUnterSchwelle != null &&
-    Number.isFinite(direktAuftragUnterSchwelle.betragEur) &&
-    direktAuftragUnterSchwelle.betragEur > 0 &&
-    Number.isFinite(direktAuftragUnterSchwelle.schwelleEur) &&
-    direktAuftragUnterSchwelle.schwelleEur > 0
 
   const [editOpen, setEditOpen] = useState(false)
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
@@ -204,18 +183,6 @@ export function HvMeldungKontextCards({
           </div>
         </div>
         <div className="card-b">
-          {showDirektUnterSchwelle && direktAuftragUnterSchwelle ? (
-            <div className="mb-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--surface-2,#f7f7f5)] px-3 py-2">
-              <div className="text-[length:var(--fs-meta)] font-semibold text-[var(--text)]">
-                Direktauftrag möglich — unter Freigabe-Schwelle
-              </div>
-              <p className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                Angebotspreis {formatEur(direktAuftragUnterSchwelle.betragEur)} ≤ Schwelle{' '}
-                {formatEur(direktAuftragUnterSchwelle.schwelleEur)}. Auftrag ohne HV-Freigabe /
-                ohne Kundenmail anlegen.
-              </p>
-            </div>
-          ) : null}
           <div className="detail-soft-block">
             <div className="props">
               <PropRow label="Name" value={melderName(lead)} />

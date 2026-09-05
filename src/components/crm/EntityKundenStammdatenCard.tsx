@@ -52,6 +52,8 @@ type Props = {
   onEdit?: () => void
   /** Optionaler Hinweis über dem View-Body (z. B. fehlende Rechnungsfelder) */
   banner?: ReactNode
+  /** Hinweis direkt unter Portal-/Kundenakte-Buttons (z. B. Direktauftrag-Schwelle) */
+  footerBanner?: ReactNode
 }
 
 function PropRow({ label, value }: { label: string; value: ReactNode }) {
@@ -109,6 +111,7 @@ export function EntityKundenStammdatenCard({
   onEdit,
   onSaved,
   banner,
+  footerBanner,
 }: Props) {
   const [draft, setDraft] = useState(initial)
   const [typ, setTyp] = useState(kundeTyp ?? null)
@@ -227,6 +230,9 @@ export function EntityKundenStammdatenCard({
             </div>
           ) : null}
         </div>
+      ) : null}
+      {footerBanner ? (
+        <div className="stammdaten-footer-banner">{footerBanner}</div>
       ) : null}
     </>
   )

@@ -6,12 +6,12 @@ import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
 
 export function ObjektUebersichtKpiCard({
   kpis,
-  jahr,
   onHistorieClick,
   onBerichtClick,
 }: {
   kpis: ObjektKpiSnapshot
-  jahr: number
+  /** @deprecated ungenutzt — Kosten ohne Jahreszahl */
+  jahr?: number
   onHistorieClick?: () => void
   onBerichtClick?: () => void
 }) {
@@ -23,7 +23,7 @@ export function ObjektUebersichtKpiCard({
         </div>
         <div className="flex flex-wrap gap-2">
           {onBerichtClick ? (
-            <MockBtn sm kind="secondary" icon="file-text" onClick={onBerichtClick}>
+            <MockBtn sm kind="primary" icon="file-text" onClick={onBerichtClick}>
               {DOC.berichtErstellen}
             </MockBtn>
           ) : null}
@@ -50,7 +50,7 @@ export function ObjektUebersichtKpiCard({
             },
             {
               icon: 'euro',
-              label: `Kosten ${jahr}`,
+              label: 'Gesamtkosten',
               value:
                 kpis.kostenLaufendesJahr > 0
                   ? `${kpis.kostenLaufendesJahr.toLocaleString('de-DE')} €`

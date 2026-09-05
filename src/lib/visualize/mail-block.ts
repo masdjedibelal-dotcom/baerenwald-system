@@ -20,5 +20,5 @@ export function mailKiVisualisierungBlock(
       ? 'Im Angebot findest du eine <strong>KI-generierte Visualisierung</strong> — so könnte dein Projekt aussehen (PDF).'
       : 'Im Angebot finden Sie eine <strong>KI-generierte Visualisierung</strong> — so könnte Ihr Projekt aussehen (PDF).'
 
-  return `<p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
+  return `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
 }

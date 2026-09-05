@@ -217,7 +217,7 @@ export function buildRechnungMail(
     label: summaryLabel,
     title: titel,
     priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
-    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
+    metaHtml: `<p style="font-size:15px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
   const contact = mailKundenContactLine(anrede, b.telefon)
@@ -234,8 +234,8 @@ export function buildRechnungMail(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,

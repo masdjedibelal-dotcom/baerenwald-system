@@ -4,7 +4,8 @@
  *
  * Einfache Regel (kein Kleinreparatur-Pfad):
  * - Immer Angebot (außer Akut-Direkt ohne Angebot).
- * - Freigabe-System aktiv (freigabe|direkt) + unter Schwelle → keine HV-Freigabe (Info),
+ * - Freigabe-System aktiv (freigabe|direkt) + unter Schwelle → keine HV-Freigabe;
+ *   Hinweis steht in der normalen Angebots-Mail (keine Extra-Info-Mail).
  *   Primary „Direkt Auftrag“ im CRM (kein stiller Auto-Accept).
  * - Über Schwelle → Freigabe/Annahme abwarten.
  * - System nicht aktiv → nur Angebot, auf Annahme warten.
@@ -14,7 +15,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   mailOrgFreigabeAngefordert,
-  mailOrgAngebotZurInfo,
 } from '@/lib/email/meldung-mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
@@ -399,25 +399,36 @@ export async function syncOrgFreigabeNachAngebot(input: {
       return { ok: true, status: 'nicht_noetig', erforderlich: false }
     }
 
-    // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe, nur Info.
-    // Auftrag legt der Nutzer per Primary „Direkt Auftrag“ an (kein stiller Auto-Accept).
-    const info = await sendOrgAngebotInfoOnce({
-      leadId,
-      angebotId,
-      orgKundeId,
-      orgEmail,
-      orgName,
-      objektTitel,
-      betrag,
-      bypassGrund,
-    })
+    // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe.
+    // Keine zweite „Angebot zur Information“-Mail — die normale Angebots-Mail
+    // (ctaMode unter_schwelle_direkt) enthält den Schwellen-Hinweis bereits.
+    const { data: existingInfo } = await supabaseAdmin
+      .from('org_freigabe_log')
+      .select('id')
+      .eq('angebot_id', angebotId)
+      .eq('aktion', 'info_gesendet')
+      .limit(1)
+      .maybeSingle()
+    if (!existingInfo?.id) {
+      await supabaseAdmin.from('org_freigabe_log').insert({
+        lead_id: leadId,
+        angebot_id: angebotId,
+        auftraggeber_kunde_id: orgKundeId,
+        aktion: 'info_gesendet',
+        betrag_eur: betrag > 0 ? betrag : null,
+        notiz:
+          bypassGrund === 'akut'
+            ? 'Bypass akut — Hinweis in Angebots-Mail, keine Extra-Info-Mail'
+            : 'Bypass Schwelle — Hinweis in Angebots-Mail, keine Extra-Info-Mail',
+        erstellt_von: 'crm',
+      })
+    }
 
     return {
       ok: true,
       status: 'nicht_noetig',
       erforderlich: false,
-      mailOk: info.mailOk,
-      ...(info.mailError ? { mailError: info.mailError } : {}),
+      mailOk: true,
     }
   }
 
@@ -482,60 +493,6 @@ export async function syncOrgFreigabeNachAngebot(input: {
     mailOk: false,
     mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
   }
-}
-
-async function sendOrgAngebotInfoOnce(input: {
-  leadId: string
-  angebotId: string
-  orgKundeId: string
-  orgEmail?: string
-  orgName: string
-  objektTitel: string
-  betrag: number
-  bypassGrund?: 'schwelle' | 'akut' | null
-}): Promise<{ mailOk: boolean; mailError?: string }> {
-  const { data: existing } = await supabaseAdmin
-    .from('org_freigabe_log')
-    .select('id')
-    .eq('angebot_id', input.angebotId)
-    .eq('aktion', 'info_gesendet')
-    .limit(1)
-    .maybeSingle()
-  if (existing?.id) return { mailOk: true }
-
-  await supabaseAdmin.from('org_freigabe_log').insert({
-    lead_id: input.leadId,
-    angebot_id: input.angebotId,
-    auftraggeber_kunde_id: input.orgKundeId,
-    aktion: 'info_gesendet',
-    betrag_eur: input.betrag > 0 ? input.betrag : null,
-    erstellt_von: 'crm',
-  })
-
-  if (!input.orgEmail) {
-    return { mailOk: false, mailError: 'Keine Org-E-Mail für Angebots-Info' }
-  }
-  const branding = await getMailBranding(supabaseAdmin)
-  const tpl = mailOrgAngebotZurInfo(
-    {
-      orgName: input.orgName,
-      objektTitel: input.objektTitel,
-      betragEur: input.betrag,
-      portalLink: buildPortalLoginLink(),
-      bypassGrund: input.bypassGrund ?? 'schwelle',
-    },
-    branding
-  )
-  const sent = await awaitOrgFreigabeMail({
-    typ: 'org_angebot_info',
-    an: input.orgEmail,
-    anName: input.orgName,
-    betreff: tpl.betreff,
-    html: tpl.html,
-    leadId: input.leadId,
-    kundeId: input.orgKundeId,
-  })
-  return sent.mailOk ? { mailOk: true } : { mailOk: false, mailError: sent.mailError }
 }
 
 /** Org-Freigabe nach Partner-Nachtrag wenn Summe Schwelle überschreitet. */

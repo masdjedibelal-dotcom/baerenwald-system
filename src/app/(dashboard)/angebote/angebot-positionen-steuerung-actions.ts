@@ -77,7 +77,7 @@ function vkLineFromInput(
 }
 
 function ekStueckFromInput(ekNetto: number | null | undefined, menge: number): number | undefined {
-  if (ekNetto == null || !Number.isFinite(ekNetto) || ekNetto <= 0) return undefined
+  if (ekNetto == null || !Number.isFinite(ekNetto) || ekNetto < 0) return undefined
   const m = Math.max(menge, 0.0001)
   return Math.round((ekNetto / m) * 100) / 100
 }
@@ -176,7 +176,7 @@ export async function updateAngebotPositionSteuerung(
 
   const ekInput =
     data.ek_netto !== undefined
-      ? data.ek_netto != null && Number.isFinite(data.ek_netto) && data.ek_netto > 0
+      ? data.ek_netto != null && Number.isFinite(data.ek_netto) && data.ek_netto >= 0
         ? data.ek_netto
         : null
       : current.einkaufspreis != null
@@ -346,7 +346,7 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     'Handwerker'
 
   const ekGlobal =
-    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
+    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
       ? Math.round(input.ekNetto * 100) / 100
       : null
   const ekById = input.ekNettoByPositionId ?? null
@@ -376,10 +376,10 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
         : 1
     const fromMap = ekById?.[posId]
     const ekLine =
-      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+      fromMap != null && Number.isFinite(fromMap) && fromMap >= 0
         ? Math.round(fromMap * 100) / 100
         : ekGlobal
-    if (ekLine == null || ekLine <= 0) {
+    if (ekLine == null || ekLine < 0) {
       return {
         ok: false,
         message: `Partner-EK fehlt für „${current.leistung_name?.trim() || current.leistung || 'Leistung'}“.`,

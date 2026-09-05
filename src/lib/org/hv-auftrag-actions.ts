@@ -7,24 +7,13 @@ function hergangFromLead(lead: {
   kontakt_nachricht?: string | null
   notizen?: string | null
   situation?: string | null
-  melder_name?: string | null
-  created_at?: string | null
 }): string {
-  const bits: string[] = []
-  if (lead.created_at) {
-    const d = new Date(lead.created_at).toLocaleDateString('de-DE')
-    bits.push(
-      `Am ${d} wurde der Schaden gemeldet` +
-        (lead.melder_name ? ` (${lead.melder_name})` : '') +
-        '.'
-    )
-  }
-  const body =
-    lead.kontakt_nachricht?.trim() ||
-    lead.notizen?.trim() ||
-    lead.situation?.trim()
-  if (body) bits.push(body)
-  return bits.join(' ') || 'Schadenmeldung aus dem Vorgang.'
+  const beschreibung =
+    lead.kontakt_nachricht?.trim() || lead.notizen?.trim() || ''
+  if (beschreibung) return beschreibung
+  const sit = lead.situation?.trim()
+  if (sit && !/^(reparatur|notfall|schaden|sonstiges)$/i.test(sit)) return sit
+  return 'Schadensbeschreibung fehlt — bitte vor Einreichung bei der Versicherung ergänzen.'
 }
 
 /** Erzeugt echte Schadenakte (pdf-lib) und speichert URL am Auftrag. */
@@ -132,7 +121,6 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
     objektTitel,
     objektAdresse,
     versicherungsNr: versNr,
-    schadenNr: versNr,
     schadendatum:
       (lead?.created_at as string | undefined) ??
       (auftrag.created_at as string | undefined) ??
@@ -142,8 +130,6 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
       kontakt_nachricht: lead?.kontakt_nachricht as string | null,
       notizen: lead?.notizen as string | null,
       situation: lead?.situation as string | null,
-      melder_name: lead?.melder_name as string | null,
-      created_at: lead?.created_at as string | null,
     }),
     chronologie,
     befundZeilen,

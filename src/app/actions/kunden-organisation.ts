@@ -205,6 +205,7 @@ export async function saveKundeFreigabeRegeln(
     notfall_direkt: boolean
     freigabe_modus?: FreigabeModus
     hm_auto_zuweisen?: boolean
+    akut_fall_ids?: string[] | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = kundeId?.trim()
@@ -226,6 +227,8 @@ export async function saveKundeFreigabeRegeln(
         ? 'direkt'
         : 'freigabe'
 
+  const { normalizeAkutFallIds } = await import('@/lib/org/sofortmassnahme-faelle')
+
   const payload: Record<string, unknown> = {
     freigabe_modus: freigabeModus,
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
@@ -234,14 +237,27 @@ export async function saveKundeFreigabeRegeln(
   if (input.hm_auto_zuweisen !== undefined) {
     payload.hm_auto_zuweisen = Boolean(input.hm_auto_zuweisen)
   }
+  if (input.akut_fall_ids !== undefined) {
+    payload.akut_fall_ids = normalizeAkutFallIds(input.akut_fall_ids)
+  }
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {
-    if (/hm_auto_zuweisen/i.test(error.message)) {
-      const { hm_auto_zuweisen: _drop, ...withoutHm } = payload
+    const msg = error.message ?? ''
+    let nextPayload = payload
+    if (/hm_auto_zuweisen/i.test(msg)) {
+      const { hm_auto_zuweisen: _drop, ...withoutHm } = nextPayload
       void _drop
+      nextPayload = withoutHm
+    }
+    if (/akut_fall_ids/i.test(msg)) {
+      const { akut_fall_ids: _dropAkut, ...withoutAkut } = nextPayload
+      void _dropAkut
+      nextPayload = withoutAkut
+    }
+    if (nextPayload !== payload) {
       const retry = await withCrmReadFallback(async (db) =>
-        db.from('kunden').update(withoutHm).eq('id', id)
+        db.from('kunden').update(nextPayload).eq('id', id)
       )
       if (retry.error) return { ok: false, message: retry.error.message }
     } else {

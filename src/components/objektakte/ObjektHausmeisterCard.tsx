@@ -5,6 +5,8 @@ import { useTransition } from '@/components/ui/action-busy'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -18,9 +20,14 @@ import {
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
+import { LIST } from '@/lib/crm-labels'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
+
+const HM_LIST_COLS = 'minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.4fr) 44px'
 
 type Props = {
   kundeId: string
@@ -31,9 +38,8 @@ type Props = {
 }
 
 /**
- * Hausmeister am Objekt — analog HV-Portal:
- * ohne Zuordnung → neu anlegen; optional bestehenden Org-HM zuweisen.
- * Portal-Zeile wie Kunde/Handwerker: Status · Einladen/Aktivieren · Login.
+ * Hausmeister am Objekt — gleiche Listen-Card wie Kontakte/Ansprechpartner
+ * (ap-list + ⋯-Menü für Bearbeiten/Entfernen).
  */
 export function ObjektHausmeisterCard({
   kundeId,
@@ -42,6 +48,7 @@ export function ObjektHausmeisterCard({
   amObjekt: initialAmObjekt,
   onChanged,
 }: Props) {
+  const isMobile = useIsMobile()
   const [liste, setListe] = useState(initialListe)
   const [amObjekt, setAmObjekt] = useState(initialAmObjekt)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -56,6 +63,8 @@ export function ObjektHausmeisterCard({
   const [err, setErr] = useState<string | null>(null)
   const [registered, setRegistered] = useState<boolean | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [removePending, setRemovePending] = useState(false)
 
   useEffect(() => {
     setListe(initialListe)
@@ -72,7 +81,6 @@ export function ObjektHausmeisterCard({
       return
     }
     if (!portalKundeId) {
-      // Primary Staff: Auth existiert schon (CRM) → nach Aktivierung „aktiv“
       setRegistered(false)
       return
     }
@@ -84,7 +92,6 @@ export function ObjektHausmeisterCard({
         setRegistered(true)
         return
       }
-      // Primary Staff: Auth oft nur an Handwerker/CRM — trotzdem Login möglich
       if (primaryStaff) {
         setRegistered(true)
         return
@@ -180,17 +187,21 @@ export function ObjektHausmeisterCard({
     })
   }
 
-  function entfernen() {
-    if (!amObjekt || amObjekt.isLegacy) return
-    startTransition(async () => {
+  async function runEntfernen() {
+    if (!amObjekt || amObjekt.isLegacy || removePending) return
+    setRemovePending(true)
+    try {
       const r = await removeObjektHausmeister(kundeId, objektId)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
+      setRemoveOpen(false)
       toast.success('Zuordnung entfernt')
       onChanged()
-    })
+    } finally {
+      setRemovePending(false)
+    }
   }
 
   function einladenOderAktivieren() {
@@ -267,121 +278,181 @@ export function ObjektHausmeisterCard({
     })),
   ]
 
-  const ctaLabel =
-    amObjekt && !amObjekt.isLegacy
-      ? 'Bearbeiten'
-      : amObjekt?.isLegacy
-        ? 'Als Org-HM speichern'
-        : 'Anlegen'
-
   const showPortalZeile =
     amObjekt && !amObjekt.isLegacy && amObjekt.portal_zugang
-  const statusLabel =
-    registered === true
-      ? 'Portal aktiv'
-      : registered === false
-        ? 'Noch nicht registriert'
-        : showPortalZeile
-          ? '…'
-          : null
-  const showInvite = showPortalZeile && registered === false
+  const statusLabel = amObjekt?.isLegacy
+    ? 'Legacy (Objekt-Kontakt)'
+    : !amObjekt?.portal_zugang
+      ? 'Ohne Portal'
+      : registered === true
+        ? 'Portal aktiv'
+        : registered === false
+          ? 'Noch nicht registriert'
+          : '…'
+  const showInvite = Boolean(showPortalZeile && registered === false)
   const showLogin =
-    showPortalZeile && registered === true && Boolean(portalKundeId) && isCrmAdmin
+    Boolean(showPortalZeile && registered === true && portalKundeId && isCrmAdmin)
 
-  const headerActions = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      {amObjekt && !amObjekt.isLegacy ? (
-        <MockBtn sm className="danger-outline" disabled={pending} onClick={entfernen}>
-          Entfernen
-        </MockBtn>
-      ) : null}
-      <MockBtn
-        sm
-        kind={amObjekt && !amObjekt.isLegacy ? 'secondary' : 'primary'}
-        icon={amObjekt && !amObjekt.isLegacy ? undefined : 'plus'}
-        onClick={openSheet}
-        disabled={pending}
+  function rowMenu(): EntityMenuItem[] {
+    if (!amObjekt) return []
+    const items: EntityMenuItem[] = [
+      {
+        icon: 'pencil',
+        label: amObjekt.isLegacy ? 'Als Org-HM speichern' : 'Bearbeiten',
+        onClick: openSheet,
+      },
+    ]
+    if (showInvite) {
+      items.push({
+        icon: 'send',
+        label: primaryStaff ? 'Portal aktivieren' : 'Einladen',
+        onClick: einladenOderAktivieren,
+        disabled: pending,
+      })
+    }
+    if (showLogin) {
+      items.push({
+        icon: 'log-in',
+        label: 'Login',
+        onClick: () => void openLogin(),
+        disabled: loginBusy || pending,
+      })
+    }
+    if (!amObjekt.isLegacy) {
+      items.push('sep', {
+        icon: 'trash',
+        label: 'Entfernen',
+        danger: true,
+        onClick: () => setRemoveOpen(true),
+      })
+    }
+    return items
+  }
+
+  function rowBody() {
+    if (!amObjekt) return null
+    const kontakt = amObjekt.email?.trim() || '—'
+    return (
+      <div
+        className={isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row'}
+        style={isMobile ? undefined : { gridTemplateColumns: HM_LIST_COLS }}
       >
-        {ctaLabel}
-      </MockBtn>
-    </div>
-  )
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={openSheet}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{amObjekt.name}</span>
+              </div>
+              <div className="ap-mobile-card__meta">{statusLabel}</div>
+              <div className="ap-mobile-card__meta">{kontakt}</div>
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">{amObjekt.name}</span>
+              <span className="ap-list__dim">
+                {showPortalZeile ? (
+                  <span className="vgid-portal" style={{ display: 'inline-flex' }}>
+                    <span
+                      className={cn(
+                        'd',
+                        registered === true ? 'is-on' : registered === false ? 'is-off' : ''
+                      )}
+                      aria-hidden
+                    />
+                    <span className="t">{statusLabel}</span>
+                  </span>
+                ) : (
+                  statusLabel
+                )}
+              </span>
+              <span className="ap-list__dim">{kontakt}</span>
+            </>
+          )}
+        </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={rowMenu()} title={amObjekt.name} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
-      <MockCard title="Hausmeister" icon="key" actions={headerActions}>
+      <MockCard
+        title={amObjekt ? 'Hausmeister · 1' : 'Hausmeister'}
+        icon="key"
+        actions={
+          !amObjekt ? (
+            <MockBtn sm kind="primary" icon="plus" onClick={openSheet} disabled={pending}>
+              {LIST.hinzufuegen}
+            </MockBtn>
+          ) : null
+        }
+      >
         {!amObjekt ? (
           <MockEmpty
             icon="key"
             title="Kein Hausmeister"
-            hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen. Über „+“ oben hinzufügen."
+            hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen."
           />
+        ) : isMobile ? (
+          <div className="ap-cards">{rowBody()}</div>
         ) : (
-          <div className="space-y-2" style={{ fontSize: 'var(--fs-body)' }}>
-            <div>
-              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{amObjekt.name}</div>
-              {amObjekt.email ? (
-                <div style={{ color: 'var(--text-3)', marginTop: 2 }}>{amObjekt.email}</div>
-              ) : null}
+          <div className="ap-list">
+            <div
+              className="ap-list__head"
+              style={{ gridTemplateColumns: HM_LIST_COLS }}
+            >
+              <span>Name</span>
+              <span>Status</span>
+              <span>Kontakt</span>
+              <span aria-hidden />
             </div>
-            {amObjekt.isLegacy ? (
-              <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)', margin: 0 }}>
-                Noch unter Objekt-Kontakte. Bitte hier als Org-Hausmeister speichern, damit Portal und
-                Auto-Zuweisung greifen.
-              </p>
-            ) : !amObjekt.portal_zugang ? (
-              <div style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-                Portal-Zugang: nein
-              </div>
-            ) : (
-              <div className="vgid-portal">
-                <span
-                  className={cn(
-                    'd',
-                    registered === true ? 'is-on' : registered === false ? 'is-off' : ''
-                  )}
-                  aria-hidden
-                />
-                <span className="t">{statusLabel}</span>
-                {showInvite ? (
-                  <span className="a">
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="send"
-                      onClick={einladenOderAktivieren}
-                      disabled={pending}
-                      aria-label={primaryStaff ? 'Portal aktivieren' : 'Portal-Einladung senden'}
-                      title={
-                        primaryStaff
-                          ? 'Team-Login als Hausmeister aktivieren'
-                          : 'Portal-Einladung erneut senden'
-                      }
-                    >
-                      {primaryStaff ? 'Aktivieren' : 'Einladen'}
-                    </MockBtn>
-                  </span>
-                ) : null}
-                {showLogin ? (
-                  <span className="a">
-                    <MockBtn
-                      sm
-                      kind="ghost"
-                      icon="log-in"
-                      onClick={() => void openLogin()}
-                      disabled={loginBusy || pending}
-                      aria-label="Hausmeister-Portal Login"
-                      title="Als Hausmeister im Portal anmelden"
-                    >
-                      Login
-                    </MockBtn>
-                  </span>
-                ) : null}
-              </div>
-            )}
+            {rowBody()}
           </div>
         )}
       </MockCard>
+
+      <MockModal
+        open={removeOpen}
+        onClose={() => {
+          if (!removePending) setRemoveOpen(false)
+        }}
+        icon="trash"
+        title="Hausmeister entfernen?"
+        sub="Zuordnung am Objekt aufheben."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={removePending} onClick={() => setRemoveOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={removePending ? undefined : 'trash'}
+              disabled={removePending}
+              onClick={() => void runEntfernen()}
+            >
+              {removePending ? 'Wird entfernt…' : 'Entfernen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {removePending
+            ? 'Bitte warten…'
+            : `„${amObjekt?.name ?? 'Hausmeister'}“ wird vom Objekt entfernt.`}
+        </div>
+      </MockModal>
 
       <EditorSheet
         open={sheetOpen}

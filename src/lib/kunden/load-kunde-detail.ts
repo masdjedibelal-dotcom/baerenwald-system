@@ -143,7 +143,7 @@ const KUNDE_DETAIL_SELECT_BASE = `
 const KUNDE_ORG_FIELDS = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
       impressum_url, datenschutz_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids, hm_auto_zuweisen,
       kleinreparaturen_ohne_angebot,
       ist_spam, spam_markiert_am,
     `
@@ -151,7 +151,7 @@ const KUNDE_ORG_FIELDS = `
 const KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
       impressum_url, datenschutz_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, hm_auto_zuweisen,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids, hm_auto_zuweisen,
       ist_spam, spam_markiert_am,
     `
 
@@ -195,14 +195,20 @@ async function fetchKundeDetailRow(
 
   if (isMissingKundeColumnError(full.error)) {
     const msg = (full.error.message ?? '').toLowerCase()
-    if (msg.includes('hm_auto_zuweisen')) {
+    if (msg.includes('hm_auto_zuweisen') || msg.includes('akut_fall_ids')) {
       console.warn(
-        '[loadKundeDetail] Spalte hm_auto_zuweisen fehlt — Fallback ohne Flag:',
+        '[loadKundeDetail] Spalte hm_auto_zuweisen/akut_fall_ids fehlt — Fallback:',
         full.error.message
       )
-      const withoutHm = KUNDE_DETAIL_SELECT.replace(/,?\s*hm_auto_zuweisen/g, '')
+      let withoutOptional = KUNDE_DETAIL_SELECT
+      if (msg.includes('hm_auto_zuweisen')) {
+        withoutOptional = withoutOptional.replace(/,?\s*hm_auto_zuweisen/g, '')
+      }
+      if (msg.includes('akut_fall_ids')) {
+        withoutOptional = withoutOptional.replace(/,?\s*akut_fall_ids/g, '')
+      }
       const midHm = await withCrmReadFallback(async (db) =>
-        db.from('kunden').select(withoutHm).eq('id', id).maybeSingle()
+        db.from('kunden').select(withoutOptional).eq('id', id).maybeSingle()
       )
       if (!midHm.error) {
         return { data: (midHm.data as KundeDetailPayload | null) ?? null, error: null }

@@ -191,17 +191,17 @@ export function AuftragLeistungZuweisungModal({
 
     if (isSingle) {
       ekNum = parseNum(partnerNetto)
-      if (ekNum == null || ekNum <= 0) {
-        toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+      if (ekNum == null || ekNum < 0) {
+        toast.error('Partner-EK (netto) angeben (0 € oder mehr).')
         return
       }
     } else {
       ekByPositionId = {}
       for (const p of selectedPositions) {
         const n = parseNum(ekByPos[p.id] ?? '')
-        if (n == null || n <= 0) {
+        if (n == null || n < 0) {
           toast.error(
-            `Partner-EK fehlt für „${p.leistung_name?.trim() || 'Leistung'}“ (größer als 0 €).`
+            `Partner-EK fehlt für „${p.leistung_name?.trim() || 'Leistung'}“ (0 € oder mehr).`
           )
           return
         }
@@ -337,11 +337,11 @@ export function AuftragLeistungZuweisungModal({
   const ekOk = (() => {
     if (isSingle) {
       const n = parseNum(partnerNetto)
-      return n != null && n > 0
+      return n != null && n >= 0
     }
     return selectedPositions.every((p) => {
       const n = parseNum(ekByPos[p.id] ?? '')
-      return n != null && n > 0
+      return n != null && n >= 0
     })
   })()
   const canSend = !pending && selectedHwIds.size > 0 && ekOk
@@ -494,7 +494,7 @@ export function AuftragLeistungZuweisungModal({
                   type="number"
                   className="input"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                   value={partnerNetto}
                   onChange={(e) => {
@@ -507,7 +507,7 @@ export function AuftragLeistungZuweisungModal({
               </div>
               {!ekOk ? (
                 <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
-                  Pflicht — größer als 0 €
+                  Pflicht — 0 € oder mehr
                 </span>
               ) : null}
             </label>
@@ -527,7 +527,7 @@ export function AuftragLeistungZuweisungModal({
               {selectedPositions.map((p) => {
                 const raw = ekByPos[p.id] ?? ''
                 const n = parseNum(raw)
-                const rowOk = n != null && n > 0
+                const rowOk = n != null && n >= 0
                 return (
                   <div key={p.id} className="hw-zuw-ek-row" role="row">
                     <span className="hw-zuw-ek-name" role="cell" title={p.leistung_name}>
@@ -545,7 +545,7 @@ export function AuftragLeistungZuweisungModal({
                           type="number"
                           className="input"
                           step="0.01"
-                          min="0.01"
+                          min="0"
                           required
                           value={raw}
                           onChange={(e) => setEkForPos(p.id, e.target.value)}
@@ -561,7 +561,7 @@ export function AuftragLeistungZuweisungModal({
             </div>
             {!ekOk ? (
               <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
-                Für jede Leistung Partner-EK größer als 0 € eintragen
+                Für jede Leistung Partner-EK eintragen (0 € oder mehr)
               </span>
             ) : null}
           </div>

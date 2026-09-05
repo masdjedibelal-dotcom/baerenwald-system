@@ -370,7 +370,10 @@ export function AuftragPositionenGewerkView({
                                   EK intern: {formatPreis(einkaufIntern, null, null)}
                                 </span>
                               ) : null}
-                              {!eigenleistung && pos.preis_partner != null && pos.preis_partner > 0 ? (
+                              {!eigenleistung &&
+                              pos.preis_partner != null &&
+                              Number.isFinite(pos.preis_partner) &&
+                              pos.preis_partner >= 0 ? (
                                 <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
                                   EK Partner: {formatPreis(pos.preis_partner, null, null)}
                                 </span>

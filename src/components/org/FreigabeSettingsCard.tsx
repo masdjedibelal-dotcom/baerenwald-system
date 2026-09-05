@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useTransition } from '@/components/ui/action-busy'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { SofortmassnahmeFaelleEditor } from '@/components/org/SofortmassnahmeFaelleEditor'
 import { toast } from '@/components/ui/app-toast'
+import {
+  akutFallIdsEqual,
+  normalizeAkutFallIds,
+  type AkutFallId,
+} from '@/lib/org/sofortmassnahme-faelle'
 import { cn } from '@/lib/utils'
 import { LIST } from '@/lib/crm-labels'
 
@@ -19,6 +25,8 @@ export type FreigabeSettingsValue = {
   freigabe_schwelle_eur: number | null
   /** Nur HV-Kunde (Org), nicht Objekt-Override */
   hm_auto_zuweisen?: boolean | null
+  /** Nur HV-Kunde: Whitelist Sofortmaßnahme-Fälle */
+  akut_fall_ids?: string[] | null
 }
 
 function snapSchwelle(raw: number): number {
@@ -40,6 +48,7 @@ function parseEditorState(value: FreigabeSettingsValue) {
     akut: value.notfall_direkt !== false,
     schwelleAn,
     schwelle: schwelleAn ? snapSchwelle(raw!) : SCHWELLE_DEFAULT,
+    akutFaelle: normalizeAkutFallIds(value.akut_fall_ids),
   }
 }
 
@@ -54,6 +63,8 @@ type Props = {
   onErbenChange?: (erben: boolean) => void
   /** HV-Kunde: Hausmeister-Auto-Zuweisung anzeigen/speichern */
   showHmAuto?: boolean
+  /** HV-Kunde: Sofortmaßnahme-Fall-Auswahl (nicht am Objekt) */
+  showAkutFaelle?: boolean
   onSave: (next: FreigabeSettingsValue) => Promise<{ ok: true } | { ok: false; message: string }>
   onSaved?: () => void
   className?: string
@@ -66,6 +77,7 @@ export function FreigabeSettingsCard({
   erben = false,
   onErbenChange,
   showHmAuto = false,
+  showAkutFaelle = false,
   onSave,
   onSaved,
   className,
@@ -79,6 +91,7 @@ export function FreigabeSettingsCard({
   const [schwelleAn, setSchwelleAn] = useState(parsed.schwelleAn)
   const [schwelle, setSchwelle] = useState(parsed.schwelle)
   const [hmAuto, setHmAuto] = useState(Boolean(value.hm_auto_zuweisen))
+  const [akutFaelle, setAkutFaelle] = useState<AkutFallId[]>(parsed.akutFaelle)
 
   useEffect(() => {
     if (skipSyncRef.current) {
@@ -89,7 +102,8 @@ export function FreigabeSettingsCard({
     setAkut(next.akut)
     setSchwelleAn(next.schwelleAn)
     setSchwelle(next.schwelle)
-  }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, erben])
+    setAkutFaelle(next.akutFaelle)
+  }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, editSource.akut_fall_ids, erben])
 
   useEffect(() => {
     setHmAuto(Boolean(value.hm_auto_zuweisen))
@@ -102,13 +116,15 @@ export function FreigabeSettingsCard({
     (akut !== baseline.akut ||
       schwelleAn !== baseline.schwelleAn ||
       (schwelleAn && schwelle !== baseline.schwelle) ||
-      (showHmAuto && hmAuto !== Boolean(value.hm_auto_zuweisen)))
+      (showHmAuto && hmAuto !== Boolean(value.hm_auto_zuweisen)) ||
+      (showAkutFaelle && !akutFallIdsEqual(akutFaelle, baseline.akutFaelle)))
 
   function buildPayload(): FreigabeSettingsValue {
     return {
       notfall_direkt: akut,
       freigabe_schwelle_eur: schwelleAn ? snapSchwelle(schwelle) || null : null,
       ...(showHmAuto ? { hm_auto_zuweisen: hmAuto } : {}),
+      ...(showAkutFaelle ? { akut_fall_ids: akutFaelle } : {}),
     }
   }
 
@@ -143,6 +159,12 @@ export function FreigabeSettingsCard({
       freigabe_schwelle_eur: fromKunde.schwelleAn ? fromKunde.schwelle : null,
     })
   }
+
+  const akutHint = !akut
+    ? 'Aus: Auch Sofortmaßnahmen laufen über Angebot und Freigabe.'
+    : showAkutFaelle
+      ? 'Aktiv: Nur die ausgewählten Fälle ohne Freigabe, nur Info an HV.'
+      : 'z. B. Wasser läuft, kein Strom, Heizung komplett aus — ohne Freigabe, nur Info an HV'
 
   return (
     <MockCard
@@ -196,9 +218,7 @@ export function FreigabeSettingsCard({
         <div className="freigabe-settings-card__row">
           <div className="freigabe-settings-card__row-text">
             <div className="freigabe-settings-card__label">Direktbeauftragung bei Sofortmaßnahmen</div>
-            <div className="freigabe-settings-card__hint">
-              z. B. Wasser läuft, kein Strom, Heizung komplett aus — ohne Freigabe, nur Info an HV
-            </div>
+            <div className="freigabe-settings-card__hint">{akutHint}</div>
           </div>
           <button
             type="button"
@@ -209,6 +229,17 @@ export function FreigabeSettingsCard({
             onClick={() => setAkut((v) => !v)}
           />
         </div>
+
+        {showAkutFaelle && !erben ? (
+          <div className="freigabe-settings-card__faelle">
+            <div className="freigabe-settings-card__label">Sofortmaßnahme-Fälle</div>
+            <SofortmassnahmeFaelleEditor
+              selected={akutFaelle}
+              onChange={setAkutFaelle}
+              disabled={disabled}
+            />
+          </div>
+        ) : null}
 
         <div className="freigabe-settings-card__row">
           <div className="freigabe-settings-card__row-text">

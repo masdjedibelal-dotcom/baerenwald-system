@@ -291,13 +291,9 @@ async function buildAbnahmeMail(input: {
     input.anrede === 'du' ? `Hallo ${vorname},` : `Guten Tag ${kunde.name?.trim() || vorname},`
   const textHtml = escapeHtml(input.nachricht.trim()).replace(/\n/g, '<br/>')
   const branding = await getMailBranding(supabaseAdmin)
-  const anhangHinweis = mailText(
-    input.anrede,
-    'Das Abnahmeprotokoll findest du im PDF-Anhang.',
-    'Das Abnahmeprotokoll finden Sie im PDF-Anhang.'
-  )
   const html = mailHtmlBase(
-    `${anredeLine}<br/><br/>${textHtml}<p style="font-size:13px;color:#6B7280;margin:16px 0 0;">${anhangHinweis}</p>`,
+    `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 14px;">${escapeHtml(anredeLine)}</p>
+    <p style="font-size:15px;color:#374151;line-height:1.6;margin:0;">${textHtml}</p>`,
     input.betreff.trim(),
     branding,
     undefined,

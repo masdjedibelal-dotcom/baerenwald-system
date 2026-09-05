@@ -27,6 +27,7 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { DirektauftragUnterSchwelleBanner } from '@/components/anfragen/DirektauftragUnterSchwelleBanner'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -567,11 +568,22 @@ export function AngebotDetailPageClient({
 
   const stammdatenInhalt = (
     <>
-      <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+      <AngebotStammdatenCard
+        detail={detail}
+        lead={lead}
+        onSaved={() => refresh()}
+        footerBanner={
+          direktAuftragUnterSchwelleHinweis ? (
+            <DirektauftragUnterSchwelleBanner
+              betragEur={direktAuftragUnterSchwelleHinweis.betragEur}
+              schwelleEur={direktAuftragUnterSchwelleHinweis.schwelleEur}
+            />
+          ) : null
+        }
+      />
       {lead ? (
         <HvMeldungKontextCards
           lead={lead}
-          direktAuftragUnterSchwelle={direktAuftragUnterSchwelleHinweis}
           angebotId={detail.id}
           onSaved={() => refresh()}
         />

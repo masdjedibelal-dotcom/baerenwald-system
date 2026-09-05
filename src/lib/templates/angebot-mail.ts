@@ -453,12 +453,12 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
-      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
+      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
         ${ctaText}
       </p>
       ${grussHtml}
-      <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
+      <p style="font-size:15px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
   return mailHtmlBase(
@@ -513,7 +513,7 @@ export function buildAngebotGueltigReminderMail(
       <h1 style="font-size:22px;font-weight:700;color:#111111;margin:0 0 20px;">${h1}</h1>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anredeText}</p>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
       <p style="margin:0 0 20px;">
         ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
       </p>`

@@ -350,7 +350,7 @@ export function defaultWizardMeta(
   const leistungsumfang = leistungsumfangAusLead.trim() || projektLabel
   const recht = defaultAngebotRechtshinweise(kundeTyp, firm ?? defaultFirmenEinstellungen())
   return {
-    titel: `Angebot ${projektLabel} — ${kundenName}`,
+    titel: [projektLabel, kundenName].filter(Boolean).join(' — ') || 'Projekt',
     /** Mock: plusDaysISO(14) */
     gueltig_bis: plusDaysYmd(14),
     einleitung: defaultAngebotEinleitungText(effAnrede, leistungsumfang),

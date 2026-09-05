@@ -1539,6 +1539,27 @@ div.input input::placeholder {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+.historie-ap-list .ap-list__row:hover {
+  background: var(--bg-soft);
+}
+.historie-summe {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.historie-summe strong {
+  font-size: var(--fs-text);
+  font-weight: 650;
+  color: var(--text);
+  white-space: nowrap;
+}
 
 .list-row:last-child { border-bottom: none; }
 .list-row:hover { background: var(--bg-soft); }
@@ -1802,6 +1823,28 @@ button.wv-chip:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.stammdaten-footer-banner {
+  margin-top: 12px;
+}
+.crm-direkt-schwelle-banner {
+  padding: 10px 12px;
+  border-radius: var(--r-md, 8px);
+  border: 0.5px solid color-mix(in srgb, var(--yel-tx, #8a6a00) 32%, var(--border));
+  background: var(--yel-bg, #fff8eb);
+  color: var(--yel-tx, #8a6a00);
+}
+.crm-direkt-schwelle-banner__title {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+.crm-direkt-schwelle-banner__body {
+  margin: 2px 0 0;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--text-2, var(--text-3));
 }
 .vgid-chip--secondary {
   font-size: var(--fs-meta);
@@ -6900,6 +6943,113 @@ textarea.wizard-dok-beschreibung {
   margin-top: 2px;
   font-size: var(--fs-meta);
   color: var(--text-4);
+}
+.freigabe-settings-card__faelle {
+  padding: 4px 0 12px;
+  border-top: 0.5px solid var(--border);
+}
+.freigabe-settings-card__faelle > .freigabe-settings-card__label {
+  margin-bottom: 8px;
+}
+.sofortmassnahme-faelle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sofortmassnahme-faelle__intro,
+.sofortmassnahme-faelle__footnote {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.sofortmassnahme-faelle__empty {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 0.5px dashed var(--border);
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.sofortmassnahme-faelle__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sofortmassnahme-faelle__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+}
+.sofortmassnahme-faelle__item-label {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-meta);
+  color: var(--text);
+  line-height: 1.4;
+}
+.sofortmassnahme-faelle__remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -4px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.sofortmassnahme-faelle__remove:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+.sofortmassnahme-faelle__katalog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sofortmassnahme-faelle__gruppe-title {
+  margin: 0 0 6px;
+  font-size: var(--fs-text);
+  font-weight: 650;
+  color: var(--text);
+}
+.sofortmassnahme-faelle__katalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sofortmassnahme-faelle__katalog-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.sofortmassnahme-faelle__katalog-btn:hover {
+  background: var(--bg-soft);
 }
 .freigabe-settings-card__actions {
   display: flex;
@@ -12413,19 +12563,20 @@ textarea.input:focus {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Scroll über .editor-sheet__body — Inhalt nicht quetschen */
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* Desktop-Slide: Beschreibung/Notiz füllen den restlichen Body statt grauer Leere */
-.editor-sheet--slide .hw-anfrage-body .hw-anfrage-field:has(textarea) {
-  flex: 1 1 auto;
-  min-height: 0;
+/* Natürliche Höhe: sonst schrumpfen Flex-Kinder und der Body scrollt nie */
+.hw-anfrage-body > * {
+  flex: 0 0 auto;
 }
+
 .editor-sheet--slide .hw-anfrage-body textarea.input {
-  flex: 1 1 auto;
   min-height: 88px;
-  resize: none;
+  height: auto;
+  resize: vertical;
 }
 
 .hw-anfrage-field {

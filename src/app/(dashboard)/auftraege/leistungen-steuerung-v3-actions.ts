@@ -125,7 +125,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
 
   const ekGlobal =
-    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
+    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
       ? Math.round(input.ekNetto * 100) / 100
       : null
   const ekById = input.ekNettoByPositionId ?? null
@@ -147,7 +147,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     const posId = String(row.id)
     const fromMap = ekById?.[posId]
     const ekPos =
-      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+      fromMap != null && Number.isFinite(fromMap) && fromMap >= 0
         ? Math.round(fromMap * 100) / 100
         : ekGlobal
     const partnerPatch =
