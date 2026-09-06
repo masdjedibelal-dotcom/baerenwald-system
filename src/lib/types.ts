@@ -705,6 +705,8 @@ export type AuftragHandwerkerRow = {
   notizen?: string | null
   projektvertrag_bestaetigt_am?: string | null
   projektvertrag_quelle?: 'crm_wizard' | 'portal_bestaetigung' | null
+  /** Partner meldet Auftrag erledigt (ohne Abnahme) */
+  erledigt_gemeldet_am?: string | null
   /** Vom CRM gewählte Pflicht-Unterlagen; null = Legacy-Automatik im Portal */
   compliance_pflicht_slugs?: string[] | null
   handwerker?: {

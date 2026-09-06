@@ -135,7 +135,8 @@ export function AuftragKundenUpdatePanel({
           label="Details für Kundin"
           value={beschreibung}
           onChange={(e) => setBeschreibung(e.target.value)}
-          rows={4}
+          long
+          plain
           placeholder="Was wurde gemacht, was folgt als Nächstes…"
         />
 

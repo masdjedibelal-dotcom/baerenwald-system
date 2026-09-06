@@ -21,7 +21,6 @@ import { clearAuftragHandwerkerPositionen } from '@/app/(dashboard)/auftraege/ha
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
-import { AuftragAbnahmeFreigabeBanner } from '@/components/auftraege/AuftragAbnahmeFreigabeBanner'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -345,11 +344,46 @@ export function AuftragLeistungenTab({
 
       {leistungenView === 'leistungen' ? (
         <>
-          <AuftragAbnahmeFreigabeBanner
-            auftragId={detail.id}
-            disabled={disabled}
-            onChanged={onSaved}
-          />
+          {(() => {
+            const hwErledigt = (detail.auftrag_handwerker ?? []).filter(
+              (z) =>
+                Boolean(z.erledigt_gemeldet_am) &&
+                String(z.status ?? '').toLowerCase() !== 'ersetzt'
+            )
+            const posErledigtHw = new Map<string, string>()
+            for (const p of detail.auftrag_positionen ?? []) {
+              const hwId = p.handwerker_id?.trim()
+              if (!hwId) continue
+              if (String(p.handwerker_status ?? '').toLowerCase() !== 'erledigt') continue
+              if (hwErledigt.some((z) => z.handwerker_id === hwId)) continue
+              const name = p.handwerker?.name?.trim() || 'Handwerker'
+              posErledigtHw.set(hwId, name)
+            }
+            if (!hwErledigt.length && !posErledigtHw.size) return null
+            return (
+              <div className="flex flex-wrap gap-2" aria-label="Handwerker erledigt">
+                {hwErledigt.map((z) => (
+                  <span
+                    key={z.id}
+                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                  >
+                    HW erledigt
+                    {z.handwerker?.name?.trim() || z.handwerker?.firma?.trim()
+                      ? ` · ${z.handwerker?.firma?.trim() || z.handwerker?.name?.trim()}`
+                      : ''}
+                  </span>
+                ))}
+                {Array.from(posErledigtHw.entries()).map(([hwId, name]) => (
+                  <span
+                    key={hwId}
+                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                  >
+                    HW erledigt · {name}
+                  </span>
+                ))}
+              </div>
+            )
+          })()}
           <AuftragPartnerPositionsPruefungPanel
             auftragId={detail.id}
             disabled={disabled}

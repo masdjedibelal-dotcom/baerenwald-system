@@ -91,6 +91,7 @@ function anfrageLabelForPosition(
   if (anerkennung === 'anerkannt') return 'Freigegeben'
   if (anerkennung === 'abgelehnt') return 'Abgelehnt'
   if (!p.handwerker_id) return null
+  if (String(p.handwerker_status ?? '').toLowerCase() === 'erledigt') return 'HW erledigt'
   const antwort = handwerkerAntwortAnzeige(p)
   if (antwort?.label) return antwort.label
   return auftragHwStatusLabel(p.handwerker_status)

@@ -32,9 +32,10 @@ import type { AuftragPosition } from '@/lib/types'
 type Step = 'loading' | 'hw' | 'frage' | 'checkliste'
 
 /**
- * Auftrag abschließen:
- * - Mit HW-Abnahmeprotokoll: Vorschau + Speichern / Speichern und senden
- * - Ohne HW-Protokoll: Frage → optionale manuelle Checkliste
+ * Auftrag abschließen (Abnahme optional):
+ * - Mit HW-Protokoll: Vorschau übernehmen oder ohne Abnahme schließen
+ * - Ohne HW-Protokoll: Frage → optional manuelle Checkliste oder direkt schließen
+ * Abschluss ohne Abnahme wird nie durch fehlende HW-Teilabnahme blockiert.
  */
 export function AuftragAbschliessenSheet({
   open,
@@ -71,6 +72,7 @@ export function AuftragAbschliessenSheet({
     let cancelled = false
     void getAbschliessenKontext(auftragId).then((ctx) => {
       if (cancelled) return
+      // Nur wenn tatsächlich HW-Protokolle vorliegen — sonst nie Freigabe-Pipeline erzwingen.
       if (ctx.mode === 'hw' && ctx.protokolle.length) {
         setHwProtokolle(ctx.protokolle)
         setStep('hw')
@@ -90,20 +92,6 @@ export function AuftragAbschliessenSheet({
     setPending(true)
     void actionBusy
       .run('Auftrag wird abgeschlossen…', async () => {
-        const ctx = await getAbschliessenKontext(auftragId)
-        if (ctx.mode === 'hw') {
-          toast.error('HW-Protokoll zuerst speichern')
-          setHwProtokolle(ctx.protokolle)
-          setStep('hw')
-          return
-        }
-        if (ctx.zeilen.length > 0 && !ctx.gateOk) {
-          toast.error(
-            ctx.gateMessage ||
-              'Eingereichte Teilabnahmen zuerst freigeben, dann abschließen.'
-          )
-          return
-        }
         const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
         if (!r.ok) {
           toast.error(r.message)
@@ -218,6 +206,14 @@ export function AuftragAbschliessenSheet({
           <div className="sheet-footer-actions zahlplan-editor-footer">
             <Button
               type="button"
+              variant="ghost"
+              disabled={pending}
+              onClick={abschliessenOhneAbnahme}
+            >
+              Ohne Abnahme
+            </Button>
+            <Button
+              type="button"
               variant="secondary"
               disabled={pending}
               loading={pending && pendingKind === 'save'}
@@ -238,6 +234,10 @@ export function AuftragAbschliessenSheet({
         }
       >
         <div className="space-y-5">
+          <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed">
+            Handwerker-Protokoll vorhanden — optional übernehmen. Auftrag kann auch ohne
+            Abnahme geschlossen werden.
+          </p>
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}
@@ -261,7 +261,7 @@ export function AuftragAbschliessenSheet({
               disabled={pending}
               onClick={abschliessenOhneAbnahme}
             >
-              Speichern
+              Ohne Abnahme
             </Button>
             <Button
               type="button"
@@ -270,15 +270,15 @@ export function AuftragAbschliessenSheet({
               loading={pending}
               onClick={() => setStep('checkliste')}
             >
-              Erstellen
+              Abnahme erstellen
             </Button>
           </div>
         }
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-          Kein Handwerker-Abnahmeprotokoll vorhanden. Soll ein Abnahmeprotokoll mit
-          Leistungs-Checkliste und Mängeln erstellt und in den Dokumenten abgelegt werden?
-          Signatur erfolgt vor Ort / im Portal — nicht hier.
+          Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
+          Abnahmeprotokoll mit Leistungs-Checkliste und Mängeln erstellen. Signatur erfolgt
+          vor Ort / im Portal — nicht hier.
         </p>
       </EditorSheet>
     )
@@ -335,7 +335,8 @@ export function AuftragAbschliessenSheet({
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>
           <Textarea
-            rows={2}
+            long
+            plain
             value={notizen}
             onChange={(e) => setNotizen(e.target.value)}
             placeholder="Optional"

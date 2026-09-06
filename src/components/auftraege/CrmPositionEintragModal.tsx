@@ -284,7 +284,7 @@ export function CrmPositionEintragModal({
           value={beschreibung}
           onSave={setBeschreibung}
           multiline
-          rows={4}
+          rows={14}
           kiExtraHint="Bautagebuch-Eintrag — Was ist auf der Baustelle passiert?"
           placeholder="Was ist auf der Baustelle passiert?"
           sheetContext="detail"

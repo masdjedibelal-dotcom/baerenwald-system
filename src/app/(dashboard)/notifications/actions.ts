@@ -14,6 +14,7 @@ export type CrmNotificationTyp =
   | 'handwerker_abgelehnt'
   | 'handwerker_einreichung'
   | 'hw_rechnung_eingegangen'
+  | 'hw_auftrag_erledigt'
   | 'vorgang_angenommen'
   | 'vorgang_abgelehnt'
   | 'angebot_entscheidung'
@@ -68,6 +69,8 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Handwerker-Angebot eingereicht'
     case 'hw_rechnung_eingegangen':
       return 'HW-Rechnung eingegangen'
+    case 'hw_auftrag_erledigt':
+      return 'Auftrag erledigt gemeldet'
     case 'vorgang_angenommen':
       return 'Vorgang angenommen'
     case 'vorgang_abgelehnt':
@@ -113,6 +116,7 @@ function typIcon(typ: CrmNotificationTyp): string {
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'auftrag_abgeschlossen':
+    case 'hw_auftrag_erledigt':
       return 'check'
     case 'abnahme_freigabe_ausstehend':
       return 'clipboard-check'
@@ -151,6 +155,7 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'abnahme_bestaetigt':
     case 'abnahme_freigabe_ausstehend':
     case 'auftrag_abgeschlossen':
+    case 'hw_auftrag_erledigt':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
     case 'partner_compliance_pruefung':
@@ -177,6 +182,8 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Der Partner hat ein Angebot / Konditionen im Portal eingereicht — bitte prüfen.'
     case 'hw_rechnung_eingegangen':
       return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Vorgänge → Rechnung → Eingehend prüfen.'
+    case 'hw_auftrag_erledigt':
+      return 'Partner meldet Auftrag erledigt. Abnahme ist optional — du kannst den Auftrag direkt abschließen.'
     case 'vorgang_angenommen':
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
@@ -395,6 +402,7 @@ async function collectCrmNotificationItems(opts?: {
     pvRes,
     abnahmeTlRes,
     freigabeRes,
+    hwErledigtRes,
     auftraegeRes,
     posMelRes,
     waRes,
@@ -478,6 +486,15 @@ async function collectCrmNotificationItems(opts?: {
       .eq('ebene', 'handwerker')
       .gte('updated_at', since)
       .order('updated_at', { ascending: false })
+      .limit(PER_SOURCE_LIMIT),
+    supabase
+      .from('auftrag_handwerker')
+      .select(
+        'id, auftrag_id, erledigt_gemeldet_am, handwerker:handwerker_id(name, firma), auftraege:auftrag_id(titel)'
+      )
+      .not('erledigt_gemeldet_am', 'is', null)
+      .gte('erledigt_gemeldet_am', since)
+      .order('erledigt_gemeldet_am', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
     supabase
       .from('auftraege')
@@ -967,6 +984,31 @@ async function collectCrmNotificationItems(opts?: {
       createdAt: (row.updated_at as string) || (row.created_at as string) || since,
       gelesen: false,
     })
+  }
+
+  // ── Partner: Auftrag erledigt gemeldet ───────────────────────
+  if (!hwErledigtRes.error) {
+    for (const row of hwErledigtRes.data ?? []) {
+      const auftragId = (row.auftrag_id as string | null)?.trim()
+      if (!auftragId) continue
+      const hw = one(
+        row.handwerker as
+          | { name?: string | null; firma?: string | null }
+          | { name?: string | null; firma?: string | null }[]
+          | null
+      )
+      const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
+      const hwName = hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
+      items.push({
+        sourceKey: `hw_auftrag_erledigt:${row.id}`,
+        typ: 'hw_auftrag_erledigt',
+        title: `${hwName}: Auftrag erledigt`,
+        subtitle: auf?.titel?.trim() || 'Abnahme optional — Auftrag abschließen',
+        href: `/auftraege/${auftragId}?tab=leistungen`,
+        createdAt: (row.erledigt_gemeldet_am as string) || since,
+        gelesen: false,
+      })
+    }
   }
 
   // ── Auftrag abgeschlossen ────────────────────────────────────

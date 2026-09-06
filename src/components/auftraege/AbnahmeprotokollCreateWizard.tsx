@@ -425,7 +425,7 @@ export function AbnahmeprotokollCreateWizard({
         value={meta.hinweis_sonstiges}
         onSave={(hinweis_sonstiges) => patchMeta({ hinweis_sonstiges })}
         multiline
-        rows={3}
+        rows={14}
         kiExtraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
         placeholder="Optional…"
       />
@@ -440,7 +440,7 @@ export function AbnahmeprotokollCreateWizard({
         value={notizen}
         onSave={setNotizen}
         multiline
-        rows={3}
+        rows={14}
         placeholder="Interne Anmerkungen…"
       />
     </div>
@@ -636,7 +636,7 @@ export function AbnahmeprotokollCreateWizard({
               value={meta.leistungsumfang_kurz}
               onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
               multiline
-              rows={4}
+              rows={14}
               sheetContext="detail"
               placeholder="Leistungsumfang…"
             />

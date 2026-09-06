@@ -5773,24 +5773,57 @@ select.sel option {
   flex-shrink: 0;
 }
 
-/* Angebot-Wizard Dokument-Sheet: kompakte Fotos + größere Beschreibung */
+/* Angebot-Wizard / CRM: Langtext-Beschreibung (~12–16 Zeilen, Scroll im Feld) */
+.ta--long,
 .wizard-dok-beschreibung.ta,
-textarea.wizard-dok-beschreibung {
-  min-height: 160px;
+textarea.wizard-dok-beschreibung,
+textarea.ta--long,
+textarea.input.ta--long {
+  min-height: 12rem !important;
+  max-height: min(40dvh, 20rem);
+  overflow-y: auto;
+  resize: vertical;
+  line-height: 1.5;
+  box-sizing: border-box;
 }
 
-/* Desktop: mehr Beschreibung sichtbar → Fotos weiter unten */
+/* Floors (.auftrag-pos-compact / .props) dürfen Langtexte nicht quetschen */
+.auftrag-pos-compact textarea.input.ta--long,
+.auftrag-pos-compact textarea.wizard-dok-beschreibung,
+.auftrag-pos-compact textarea.ta--long,
+.props .prop-v textarea.input.ta--long,
+.props .prop-v textarea.wizard-dok-beschreibung {
+  min-height: 12rem !important;
+  max-height: min(40dvh, 20rem);
+  overflow-y: auto;
+  resize: vertical;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  line-height: 1.5;
+}
+
+/* Desktop: etwas mehr Schreibfläche */
 @media (min-width: 768px) {
+  .ta--long,
+  .wizard-dok-beschreibung.ta,
+  textarea.wizard-dok-beschreibung,
+  textarea.ta--long,
+  textarea.input.ta--long {
+    min-height: 14rem !important;
+    max-height: min(42vh, 22rem);
+  }
+
   .sheet-editable-field--dok-beschreibung .sheet-editable-field__value--multi {
     -webkit-line-clamp: 12;
-    min-height: 168px;
-    max-height: min(42vh, 280px);
+    min-height: 12rem;
+    max-height: min(42vh, 22rem);
     overflow-y: auto;
   }
 
-  .sheet-editable-field--dok-beschreibung textarea.wizard-dok-beschreibung {
-    min-height: 168px;
-    max-height: min(42vh, 280px);
+  .sheet-editable-field--dok-beschreibung textarea.wizard-dok-beschreibung,
+  .sheet-editable-field--dok-beschreibung textarea.ta--long {
+    min-height: 14rem !important;
+    max-height: min(42vh, 22rem);
   }
 
   .wizard-dok-fotos {
@@ -23081,9 +23114,24 @@ button.crow.crow--tap:hover {
   -webkit-box-orient: vertical;
 }
 .sheet-editable-field__value--multi {
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 10;
   white-space: pre-wrap;
-  min-height: 88px;
+  min-height: 12rem;
+  max-height: min(40dvh, 20rem);
+  overflow-y: auto;
+}
+
+/* RichText mit long: Scroll im Editor-Body statt Sheet quetschen */
+.rich-text-editor.ta--long {
+  max-height: min(40dvh, 20rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rich-text-editor.ta--long .rich-text-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 .sheet-editable-field__value.is-empty {
   color: var(--text-4);

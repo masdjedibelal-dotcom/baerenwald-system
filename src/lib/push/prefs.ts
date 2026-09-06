@@ -80,6 +80,7 @@ export function pushPrefKeyForNotificationTyp(
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
     case 'hw_rechnung_eingegangen':
+    case 'hw_auftrag_erledigt':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
     case 'partner_compliance_pruefung':

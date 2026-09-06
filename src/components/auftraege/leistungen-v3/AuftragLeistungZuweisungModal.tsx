@@ -472,8 +472,8 @@ export function AuftragLeistungZuweisungModal({
                 disabled={pending || pickerOpen}
               >
                 <textarea
-                  className="input ta"
-                  rows={5}
+                  className="input ta ta--long"
+                  rows={14}
                   value={beschreibung}
                   onChange={(e) => {
                     setDirty(true)

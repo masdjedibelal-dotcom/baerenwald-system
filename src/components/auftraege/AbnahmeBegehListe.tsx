@@ -405,7 +405,8 @@ export function AbnahmeBegehListe({
             extraHint="Kurzbeschreibung unter dem Titel im PDF."
           >
             <Textarea
-              rows={3}
+              long
+              plain
               value={draftNotiz}
               onChange={(e) => setDraftNotiz(e.target.value)}
               placeholder="Kurzbeschreibung fürs Protokoll…"
@@ -463,7 +464,8 @@ export function AbnahmeBegehListe({
             extraHint="Beschreibung unter dem Titel im PDF."
           >
             <Textarea
-              rows={4}
+              long
+              plain
               value={editNotiz}
               onChange={(e) => setEditNotiz(e.target.value)}
               placeholder="Beschreibung unter dem Titel im PDF…"
@@ -665,7 +667,8 @@ export function AbnahmeMaengelCheckliste({
             extraHint="Details zur Nacharbeit im Protokoll."
           >
             <Textarea
-              rows={3}
+              long
+              plain
               value={draftNotiz}
               onChange={(e) => setDraftNotiz(e.target.value)}
               placeholder="Details zur Nacharbeit…"

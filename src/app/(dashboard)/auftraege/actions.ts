@@ -71,8 +71,30 @@ async function setAuftragStatus(
     fortschritt,
     updated_at: new Date().toISOString(),
   }
+  // Abschluss ohne Abnahme darf abnahme_datum nicht setzen — nur wenn Protokoll existiert.
   if (status === 'abgeschlossen') {
-    patch.abnahme_datum = new Date().toISOString().slice(0, 10)
+    const [{ data: aufRow }, { data: protRow }] = await Promise.all([
+      supabase
+        .from('auftraege')
+        .select('abnahme_protokoll_url, abnahme_datum')
+        .eq('id', auftragId)
+        .maybeSingle(),
+      supabase
+        .from('auftrag_abnahmeprotokolle')
+        .select('abnahme_datum')
+        .eq('auftrag_id', auftragId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    const hasProtokoll =
+      Boolean((aufRow?.abnahme_protokoll_url as string | null)?.trim()) ||
+      Boolean(protRow?.abnahme_datum)
+    if (hasProtokoll) {
+      const fromProt = (protRow?.abnahme_datum as string | null)?.trim()?.slice(0, 10)
+      const fromAuf = (aufRow?.abnahme_datum as string | null)?.trim()?.slice(0, 10)
+      patch.abnahme_datum = fromProt || fromAuf || new Date().toISOString().slice(0, 10)
+    }
   }
   const { error } = await supabase.from('auftraege').update(patch).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }

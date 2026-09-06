@@ -243,7 +243,8 @@ export function TagebuchAnfordernSheet({
             label="Notiz an Partner (optional)"
             value={notiz}
             onChange={(e) => setNotiz(e.target.value)}
-            rows={3}
+            long
+            plain
             placeholder="z. B. Bitte Fortschritt und Fotos von heute nachtragen…"
           />
         </div>

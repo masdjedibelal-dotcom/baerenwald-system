@@ -147,8 +147,8 @@ export function EntityProjektUebersichtCard({
               extraHint="Projektbeschreibung (kundensichtbar)."
             >
               <textarea
-                className="input"
-                rows={3}
+                className="input ta ta--long"
+                rows={14}
                 value={draft.beschreibung}
                 onChange={(e) => patch({ beschreibung: e.target.value })}
               />

@@ -1530,23 +1530,23 @@ export type AbschliessenHwProtokollVorschau = {
   ort: string | null
 }
 
-/** Abschluss-UI: HW-Vorschau wenn Partner-Protokoll vorliegt, sonst manuelle Checkliste. */
+/** Abschluss-UI: HW-Vorschau wenn Partner-Protokoll vorliegt — Abnahme bleibt optional. */
 export async function getAbschliessenKontext(auftragId: string): Promise<{
   mode: 'hw' | 'manual'
   zeilen: AbnahmeHwFreigabeZeile[]
   protokolle: AbschliessenHwProtokollVorschau[]
+  /** Legacy: Freigabe-Gate blockiert Abschluss ohne Abnahme nicht mehr. */
   gateOk: boolean
   gateMessage?: string
 }> {
   const zeilen = await loadAbnahmeHwFreigabeZeilen(auftragId)
-  const gate = kannGesamtabnahmeErzeugen(zeilen)
+  // gateOk immer true — CRM darf ohne HW-Teilabnahme schließen; Abnahme optional.
   if (!hatHwAbnahmeZurAbschlussVorschau(zeilen)) {
     return {
       mode: 'manual',
       zeilen,
       protokolle: [],
-      gateOk: gate.ok,
-      gateMessage: gate.message,
+      gateOk: true,
     }
   }
 
@@ -1580,8 +1580,7 @@ export async function getAbschliessenKontext(auftragId: string): Promise<{
     mode: protokolle.length ? 'hw' : 'manual',
     zeilen,
     protokolle,
-    gateOk: gate.ok,
-    gateMessage: gate.message,
+    gateOk: true,
   }
 }
 

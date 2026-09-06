@@ -13,7 +13,7 @@ type Props = {
   onSave: (value: string) => void
   placeholder?: string
   multiline?: boolean
-  /** Zeilen im Edit-Textarea (default 10) */
+  /** Zeilen im Edit-Textarea (default 14 für Beschreibung) */
   rows?: number
   /** KI-Sparkles im Edit-Sheet / Inline */
   kiExtraHint?: string | null
@@ -45,7 +45,7 @@ export function SheetEditableField({
   onSave,
   placeholder = 'Tippen zum Bearbeiten…',
   multiline = false,
-  rows = 10,
+  rows = 14,
   kiExtraHint,
   disabled,
   autoOpen,
@@ -85,7 +85,7 @@ export function SheetEditableField({
   if (!useSheet) {
     const control = multiline ? (
       <textarea
-        className="input ta wizard-dok-beschreibung"
+        className="input ta ta--long wizard-dok-beschreibung"
         rows={rows}
         value={value}
         disabled={disabled}
@@ -103,7 +103,7 @@ export function SheetEditableField({
     )
 
     return (
-      <div className={cn('sheet-editable-field sheet-editable-field--inline full', className)}>
+      <div className={cn('sheet-editable-field sheet-editable-field--inline full', multiline && 'sheet-editable-field--dok-beschreibung', className)}>
         {hint ? <p className="sheet-editable-field__hint">{hint}</p> : null}
         {showKi ? (
           <KiAssistFieldLabel
@@ -129,7 +129,7 @@ export function SheetEditableField({
 
   return (
     <>
-      <div className={cn('sheet-editable-field full', className)}>
+      <div className={cn('sheet-editable-field full', multiline && 'sheet-editable-field--dok-beschreibung', className)}>
         <div className="lt-field-lbl">{label}</div>
         {hint ? <p className="sheet-editable-field__hint">{hint}</p> : null}
         <div className="sheet-editable-field__row">
@@ -182,7 +182,7 @@ export function SheetEditableField({
             >
               {multiline ? (
                 <textarea
-                  className="input ta wizard-dok-beschreibung"
+                  className="input ta ta--long wizard-dok-beschreibung"
                   rows={rows}
                   value={draft}
                   autoFocus
@@ -209,7 +209,7 @@ export function SheetEditableField({
             <div className="full">
               {multiline ? (
                 <textarea
-                  className="input ta wizard-dok-beschreibung"
+                  className="input ta ta--long wizard-dok-beschreibung"
                   rows={rows}
                   value={draft}
                   autoFocus

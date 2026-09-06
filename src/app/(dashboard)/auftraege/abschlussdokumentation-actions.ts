@@ -224,12 +224,14 @@ async function markAuftragAbgeschlossen(
 ) {
   const detail = await loadAuftragDetail(auftragId)
   const now = new Date().toISOString()
+  const existingAbnahme = detail?.abnahme_datum?.trim()?.slice(0, 10) || null
   await supabaseAdmin
     .from('auftraege')
     .update({
       status: 'abgeschlossen',
       fortschritt: 100,
-      abnahme_datum: detail?.abnahme_datum ?? now.slice(0, 10),
+      // Nur setzen wenn Abnahme wirklich vorliegt — Abschluss ohne Abnahme lässt Feld leer.
+      ...(existingAbnahme ? { abnahme_datum: existingAbnahme } : {}),
       ...(abschlussPdfUrl?.trim()
         ? {
             abschlussdokumentation_url: abschlussPdfUrl.trim(),

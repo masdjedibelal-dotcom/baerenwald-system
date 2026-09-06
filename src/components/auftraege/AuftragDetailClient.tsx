@@ -1246,6 +1246,20 @@ export function AuftragDetailClient({
             })()}
             secondary={(() => {
               if (istStorniert) return null
+              // Primary = Abschließen → Secondary = optionale Abnahme
+              if (
+                detail.status === 'offen' ||
+                detail.status === 'in_arbeit' ||
+                detail.status === 'abnahme'
+              ) {
+                return {
+                  label: 'Abnahme',
+                  icon: 'clipboard-list',
+                  onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+                  disabled: pending,
+                  title: 'Abnahmeprotokoll erstellen (optional)',
+                }
+              }
               // Nie zweiten „Versenden“-Button — mobil links leicht mit „Korrigieren“ verwechselt.
               if (
                 detail.status === 'abgeschlossen' &&
@@ -1286,12 +1300,27 @@ export function AuftragDetailClient({
               return null
             })()}
             menuItems={
-              !istStorniert && detail.angebot_id && detail.lead_id
+              !istStorniert
                 ? [
-                    {
-                      label: 'Nachtrag erstellen',
-                      onClick: openNachtragAngebot,
-                    },
+                    ...(detail.angebot_id &&
+                    (detail.status === 'offen' ||
+                      detail.status === 'in_arbeit' ||
+                      detail.status === 'abnahme')
+                      ? [
+                          {
+                            label: 'Auftrag bearbeiten',
+                            onClick: openAngebotKorrektur,
+                          },
+                        ]
+                      : []),
+                    ...(detail.angebot_id && detail.lead_id
+                      ? [
+                          {
+                            label: 'Nachtrag erstellen',
+                            onClick: openNachtragAngebot,
+                          },
+                        ]
+                      : []),
                   ]
                 : []
             }
