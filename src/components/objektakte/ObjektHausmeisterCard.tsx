@@ -19,6 +19,7 @@ import {
 } from '@/app/actions/org-hausmeister'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
+import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
@@ -27,7 +28,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
-const HM_LIST_COLS = 'minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.4fr) 44px'
+const HM_LIST_COLS = 'minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr) auto'
 
 type Props = {
   kundeId: string
@@ -290,8 +291,10 @@ export function ObjektHausmeisterCard({
           ? 'Noch nicht registriert'
           : '…'
   const showInvite = Boolean(showPortalZeile && registered === false)
-  const showLogin =
-    Boolean(showPortalZeile && registered === true && portalKundeId && isCrmAdmin)
+  /** Login sobald Portal-Stub existiert (nicht erst nach Auth-Check). */
+  const showLogin = Boolean(
+    showPortalZeile && portalKundeId && isCrmAdmin
+  )
 
   function rowMenu(): EntityMenuItem[] {
     if (!amObjekt) return []
@@ -376,8 +379,15 @@ export function ObjektHausmeisterCard({
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
-          style={{ justifyContent: 'flex-end' }}
+          style={{ justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}
         >
+          {showLogin ? (
+            <PortalLoginIconButton
+              kundeId={portalKundeId}
+              label="Hausmeister-Portal öffnen"
+              withLabel
+            />
+          ) : null}
           <MockEntityRowMenu items={rowMenu()} title={amObjekt.name} />
         </div>
       </div>

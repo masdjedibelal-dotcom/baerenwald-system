@@ -35,16 +35,37 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
     return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden.' }
   }
 
+  if (!auftrag.lead_id) {
+    return {
+      ok: false,
+      message:
+        'Schadenakte entfällt bei Direkt-Auftrag/Rechnung ohne Meldung.',
+    }
+  }
+
   let lead: Record<string, unknown> | null = null
   if (auftrag.lead_id) {
     const { data } = await supabaseAdmin
       .from('leads')
       .select(
-        'id, kostentraeger, versicherungs_nr, kontakt_nachricht, notizen, situation, melder_name, created_at, strasse, hausnummer, plz, kunde_objekt_id'
+        'id, kostentraeger, versicherungs_nr, kontakt_nachricht, notizen, situation, melder_name, created_at, strasse, hausnummer, plz, kunde_objekt_id, funnel_daten'
       )
       .eq('id', auftrag.lead_id)
       .maybeSingle()
     lead = data
+  }
+
+  const funnel = lead?.funnel_daten
+  const quelle =
+    funnel && typeof funnel === 'object' && !Array.isArray(funnel)
+      ? String((funnel as { quelle?: unknown }).quelle ?? '').trim()
+      : ''
+  if (quelle === 'crm_direkt_angebot') {
+    return {
+      ok: false,
+      message:
+        'Schadenakte entfällt bei Direkt-Angebot (kein Melde-Hergang).',
+    }
   }
 
   const versNr =
