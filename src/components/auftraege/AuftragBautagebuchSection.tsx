@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Camera, X } from 'lucide-react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
 import { eintragTypLabel, type PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -68,12 +67,10 @@ export function AuftragBautagebuchSection({
   eintraege,
   disabled,
   onAdd,
-  onAnfordern,
 }: {
   eintraege: BautagebuchListenEintrag[]
   disabled?: boolean
   onAdd: () => void
-  onAnfordern?: () => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -102,11 +99,6 @@ export function AuftragBautagebuchSection({
         </div>
         {!disabled ? (
           <div className="bt-feed-h__actions">
-            {onAnfordern ? (
-              <Button type="button" variant="secondary" size="sm" onClick={onAnfordern}>
-                Anfordern
-              </Button>
-            ) : null}
             <button
               type="button"
               className="btn primary sm bt-feed-h__add"

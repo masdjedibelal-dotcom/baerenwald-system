@@ -1,6 +1,5 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import { kundeNameAusAngebot } from '@/lib/angebot-einfach'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
@@ -11,12 +10,10 @@ export function AngebotStammdatenCard({
   detail,
   lead,
   onSaved,
-  footerBanner,
 }: {
   detail: AngebotDetail
   lead?: LeadDetail | null
   onSaved?: () => void
-  footerBanner?: ReactNode
 }) {
   const isHv = lead ? resolvePipelineKontext(lead) === 'hv_meldung' : false
   /** HV: Auftraggeber-Embed, sonst Vertragskunde am Angebot (falls Embed fehlt). */
@@ -56,7 +53,6 @@ export function AngebotStammdatenCard({
       }}
       kundeTyp={isHv ? k?.typ ?? 'hausverwaltung' : detail.kunden?.typ}
       onSaved={onSaved}
-      footerBanner={footerBanner}
     />
   )
 }

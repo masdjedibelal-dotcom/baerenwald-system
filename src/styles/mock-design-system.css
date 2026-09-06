@@ -1846,6 +1846,28 @@ button.wv-chip:hover {
   line-height: 1.4;
   color: var(--text-2, var(--text-3));
 }
+
+/* Info-Banner über DetailShell (Inhalt geändert / Direktauftrag-Schwelle) */
+.detail-info-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.detail-info-banner {
+  border-radius: var(--r-md, 8px);
+  padding: 10px 12px;
+}
+.detail-info-banner--warn {
+  border: 0.5px solid #f5d9a8;
+  background: #fff8eb;
+}
+@media (min-width: 768px) {
+  /* Luft zwischen Banner-Stack und Stammdaten-Menü (dshell) */
+  .detail-info-banners {
+    margin-bottom: 24px;
+  }
+}
 .vgid-chip--secondary {
   font-size: var(--fs-meta);
   padding: 3px 9px;
@@ -19735,9 +19757,9 @@ select:focus-visible {
 
 .editor-sheet-overlay {
   @apply fixed inset-0 z-[320] flex;
-  background: var(--overlay-scrim, rgba(20, 24, 31, 0.58));
-  -webkit-backdrop-filter: blur(var(--overlay-blur, 10px));
-  backdrop-filter: blur(var(--overlay-blur, 10px));
+  background: var(--overlay-scrim, rgba(20, 24, 31, 0.22));
+  -webkit-backdrop-filter: blur(var(--overlay-blur, 18px));
+  backdrop-filter: blur(var(--overlay-blur, 18px));
   /* iOS: Layout-Viewport voll abdecken — keine Lücke unter dem Overlay */
   width: 100%;
   min-height: 100%;
@@ -19789,9 +19811,9 @@ body.has-blocking-overlay .app {
 /* Gestapeltes Sheet: über Parent + eigenes Dim (Parent ist visibility:hidden) */
 .editor-sheet-overlay--stack {
   z-index: 360;
-  background: var(--overlay-scrim-strong, rgba(20, 24, 31, 0.64));
-  -webkit-backdrop-filter: blur(var(--overlay-blur, 10px));
-  backdrop-filter: blur(var(--overlay-blur, 10px));
+  background: var(--overlay-scrim-strong, rgba(20, 24, 31, 0.32));
+  -webkit-backdrop-filter: blur(var(--overlay-blur, 18px));
+  backdrop-filter: blur(var(--overlay-blur, 18px));
 }
 .editor-sheet--stack-bottom {
   height: max-content !important;

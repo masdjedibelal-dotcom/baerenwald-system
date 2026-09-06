@@ -11,7 +11,6 @@ import {
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
-import { TagebuchAnfordernSheet } from '@/components/auftraege/TagebuchAnfordernSheet'
 import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
@@ -30,7 +29,7 @@ import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AngebotDetail, AngebotHandwerkerRow, AuftragDetail, Lead } from '@/lib/types'
+import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -165,7 +164,6 @@ export function AuftragLeistungenTab({
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
-  const [anfordernOpen, setAnfordernOpen] = useState(false)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
   const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
     initialLeistungenView
@@ -443,7 +441,6 @@ export function AuftragLeistungenTab({
           eintraege={bautagebuchEintraege}
           disabled={disabled}
           onAdd={() => openTagebuch(null)}
-          onAnfordern={() => setAnfordernOpen(true)}
         />
       )}
 
@@ -471,19 +468,6 @@ export function AuftragLeistungenTab({
         positionen={detail.auftrag_positionen ?? []}
         initialPositionId={tagebuchPositionId}
         onSaved={() => onSaved?.()}
-      />
-
-      <TagebuchAnfordernSheet
-        open={anfordernOpen}
-        onClose={() => setAnfordernOpen(false)}
-        auftragId={detail.id}
-        auftragHandwerker={detail.auftrag_handwerker ?? []}
-        positionen={detail.auftrag_positionen ?? []}
-        angebotHandwerker={
-          (detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null)
-            ?.angebot_handwerker ?? null
-        }
-        onSent={() => onSaved?.()}
       />
     </div>
   )

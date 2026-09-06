@@ -572,14 +572,6 @@ export function AngebotDetailPageClient({
         detail={detail}
         lead={lead}
         onSaved={() => refresh()}
-        footerBanner={
-          direktAuftragUnterSchwelleHinweis ? (
-            <DirektauftragUnterSchwelleBanner
-              betragEur={direktAuftragUnterSchwelleHinweis.betragEur}
-              schwelleEur={direktAuftragUnterSchwelleHinweis.schwelleEur}
-            />
-          ) : null
-        }
       />
       {lead ? (
         <HvMeldungKontextCards
@@ -766,20 +758,30 @@ export function AngebotDetailPageClient({
         </p>
       ) : null}
 
-      {inhaltGeaendertNachVersand ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <p className="text-[length:var(--fs-text)] text-amber-950">
-            Inhalt geändert seit Versand
-            {gesendetAm ? ` am ${formatDatum(gesendetAm)}` : ''} — der Kunde hat die neue
-            Fassung noch nicht per E-Mail.
-          </p>
-          <Button
-            type="button"
-            onClick={() => setKundeVersandOpen(true)}
-            disabled={pending}
-          >
-            Korrigierte Fassung senden
-          </Button>
+      {inhaltGeaendertNachVersand || direktAuftragUnterSchwelleHinweis ? (
+        <div className="detail-info-banners">
+          {inhaltGeaendertNachVersand ? (
+            <div className="detail-info-banner detail-info-banner--warn flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[length:var(--fs-text)] text-amber-950">
+                Inhalt geändert seit Versand
+                {gesendetAm ? ` am ${formatDatum(gesendetAm)}` : ''} — der Kunde hat die neue
+                Fassung noch nicht per E-Mail.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setKundeVersandOpen(true)}
+                disabled={pending}
+              >
+                Korrigierte Fassung senden
+              </Button>
+            </div>
+          ) : null}
+          {direktAuftragUnterSchwelleHinweis ? (
+            <DirektauftragUnterSchwelleBanner
+              betragEur={direktAuftragUnterSchwelleHinweis.betragEur}
+              schwelleEur={direktAuftragUnterSchwelleHinweis.schwelleEur}
+            />
+          ) : null}
         </div>
       ) : null}
 

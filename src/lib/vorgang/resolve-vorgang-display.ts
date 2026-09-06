@@ -25,6 +25,12 @@ const HV_PHASE: Record<string, string> = {
 
 function pillKind(resolved: ResolvedVorgang): VorgangDisplayStatus['pillKind'] {
   if (resolved.unterstatus === 'storniert' || resolved.unterstatus === 'abgebrochen') return 'storniert'
+  if (
+    resolved.unterstatus === 'hm_erledigt' ||
+    resolved.unterstatus === 'abgeschlossen'
+  ) {
+    return 'fertig'
+  }
   if (resolved.phase === 'anfrage') return 'neu'
   if (
     resolved.phase === 'angebot' &&

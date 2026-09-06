@@ -118,12 +118,24 @@ function pickNewestActive<T>(
   return null
 }
 
-function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): string {
+function leadAnfrageUnterstatus(
+  leadStatus: string,
+  forceStorniert: boolean,
+  hvMeldungStatus?: string | null
+): string {
   if (forceStorniert) return 'storniert'
+  const hv = String(hvMeldungStatus ?? '')
+    .trim()
+    .toLowerCase()
+  // HM selbst erledigt — auch wenn lead.status noch „neu“ (Alt-/Inkonsistenz)
+  if (hv === 'hm_erledigt') return 'hm_erledigt'
+
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
   // Lead schon weiter (Angebot/Auftrag/…) — nicht als offene Anfrage „Neu“ anzeigen
-  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen') return 'abgeschlossen'
+  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen' || s === 'hm_erledigt') {
+    return s === 'hm_erledigt' ? 'hm_erledigt' : 'abgeschlossen'
+  }
   return 'neu'
 }
 
@@ -273,7 +285,7 @@ function resolvePhase(input: ResolveVorgangInput): PhasePick {
   return {
     phase: 'anfrage',
     entityId: lead.id,
-    unterstatus: leadAnfrageUnterstatus(lead.status, false),
+    unterstatus: leadAnfrageUnterstatus(lead.status, false, lead.hv_meldung_status),
     updatedAt: entityTs(lead),
   }
 }
@@ -308,7 +320,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   let unterstatus = pick.unterstatus
   if (pick.phase === 'anfrage' && unterstatus !== 'storniert') {
-    unterstatus = leadAnfrageUnterstatus(lead.status, false)
+    unterstatus = leadAnfrageUnterstatus(lead.status, false, lead.hv_meldung_status)
   }
 
   const angebotAktiv =

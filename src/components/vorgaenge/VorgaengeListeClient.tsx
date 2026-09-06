@@ -184,7 +184,9 @@ function statusKind(row: VorgangListeRow): string {
   ) {
     return 'storniert'
   }
-  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') return 'fertig'
+  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen' || u === 'hm_erledigt') {
+    return 'fertig'
+  }
   if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
   if (u === 'gesendet' || u === 'abnahme' || u === 'kontaktiert' || u === 'termin') return 'warten'
   return 'aktiv'

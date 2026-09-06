@@ -185,7 +185,7 @@ export function buildAuftragNaechsteSchritte(opts: {
     },
     {
       id: 'bautagebuch',
-      label: 'Bautagebuch anfordern / erstellen',
+      label: 'Bautagebuch erstellen',
       dateLabel: bautagebuchDone || abgeschlossen ? 'Erledigt' : 'Optional',
       done: bautagebuchDone || abgeschlossen,
       onClick: bautagebuchDone || abgeschlossen ? undefined : onBautagebuch,
