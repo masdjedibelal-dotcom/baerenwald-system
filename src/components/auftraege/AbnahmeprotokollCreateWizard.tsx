@@ -8,12 +8,14 @@ import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   AbnahmeBegehListe,
+  AbnahmeMaengelCheckliste,
   AbnahmeProgressBar,
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
+import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -36,6 +38,8 @@ import {
   buildAbnahmePunkteInitial,
   filterAbnahmePunkteFuerDokument,
   maengelAusPunkten,
+  maengelFromCheckItems,
+  type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { downloadPdfFromBase64, openPdfFromBase64 } from '@/lib/download-pdf-base64'
@@ -109,11 +113,16 @@ export function AbnahmeprotokollCreateWizard({
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
-  const [punkte, setPunkte] = useState<AbnahmePunkt[]>(() =>
-    initialPunkte?.length
-      ? initialPunkte
-      : buildAbnahmePunkteInitial({ positionen, angebotPositionen, gewerke })
-  )
+  const [punkte, setPunkte] = useState<AbnahmePunkt[]>(() => {
+    if (initialPunkte?.length) return initialPunkte
+    // CRM-Neu: alle Leistungen vorausgewählt → landen im PDF
+    return buildAbnahmePunkteInitial({
+      positionen,
+      angebotPositionen,
+      gewerke,
+    }).map((p) => ({ ...p, status: 'ok' as const }))
+  })
+  const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>([])
   const [abnahmeDatum, setAbnahmeDatum] = useState(initialAbnahmeDatum || heuteYmd())
   const [notizen, setNotizen] = useState(initialNotizen?.trim() || '')
   const [meta, setMeta] = useState<AbnahmeProtokollMeta>(() =>
@@ -135,7 +144,16 @@ export function AbnahmeprotokollCreateWizard({
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
-  const maengelListe = useMemo(() => maengelAusPunkten(punkte), [punkte])
+  const maengelListe = useMemo(() => {
+    const fromPunkte = maengelAusPunkten(punkte)
+    const fromChecks = maengelFromCheckItems(maengelItems)
+    const seen = new Set(fromPunkte.map((m) => m.punkt_id))
+    return [...fromPunkte, ...fromChecks.filter((m) => !seen.has(m.punkt_id))]
+  }, [punkte, maengelItems])
+
+  function buildSaveMaengel() {
+    return maengelListe
+  }
 
   /** Gate: Positionen ohne dokumentierten Abschluss (leistung_status ≠ erledigt). */
   const undokumentiert = useMemo(() => {
@@ -144,23 +162,40 @@ export function AbnahmeprotokollCreateWizard({
     return { n: offen.length, m: alle.length }
   }, [positionen])
 
-  const hasSignatur = Boolean(
-    meta.unterschrift_ort_datum_an.trim() && meta.unterschrift_ort_datum_ag.trim()
-  )
+  const hasSignatur = (() => {
+    const sigOk = (u?: string | null) => {
+      const s = (u ?? '').trim()
+      return s.startsWith('data:image/') || /^https?:\/\//i.test(s)
+    }
+    return Boolean(
+      sigOk(meta.signature_hw_url) &&
+        sigOk(meta.signature_kunde_url) &&
+        (meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim()) &&
+        (meta.kunde_unterschrift_name?.trim() ||
+          meta.ansprechpartner_kunde.trim() ||
+          kundeName.trim())
+    )
+  })()
 
   function patchMeta(patch: Partial<AbnahmeProtokollMeta>) {
     setMeta((m) => ({ ...m, ...patch }))
   }
 
-  /** Ort/Datum-Zeilen vorfüllen, wenn noch leer. */
+  /** Ort/Datum-Zeilen vorfüllen; Signatur-Namen aus Personen übernehmen. */
   function ensureUnterschriftOrtDatum(m: AbnahmeProtokollMeta = meta): AbnahmeProtokollMeta {
     const fallback = defaultUnterschriftOrtDatum(m.uebergabe_ort, abnahmeDatum)
-    if (!fallback) return m
     return {
       ...m,
       unterschrift_ort_datum_an: m.unterschrift_ort_datum_an.trim() || fallback,
       unterschrift_ort_datum_ag: m.unterschrift_ort_datum_ag.trim() || fallback,
       unterschrift_ort_datum_anwesend: m.unterschrift_ort_datum_anwesend.trim() || fallback,
+      hw_unterschrift_name:
+        m.hw_unterschrift_name?.trim() || m.vertreter_an.trim() || null,
+      kunde_unterschrift_name:
+        m.kunde_unterschrift_name?.trim() ||
+        m.ansprechpartner_kunde.trim() ||
+        kundeName.trim() ||
+        null,
     }
   }
 
@@ -260,7 +295,7 @@ export function AbnahmeprotokollCreateWizard({
         auftragId,
         abnahmeDatum,
         punkte,
-        maengel: maengelAusPunkten(punkte),
+        maengel: buildSaveMaengel(),
         notizen: notizen.trim() || null,
         meta: metaReady,
       })
@@ -282,6 +317,10 @@ export function AbnahmeprotokollCreateWizard({
       return
     }
     const metaReady = ensureUnterschriftOrtDatum(meta)
+    const maengel = buildSaveMaengel()
+    if (maengel.length > 0 && metaReady.abnahme_ergebnis === 'abgenommen') {
+      metaReady.abnahme_ergebnis = 'mit_vorbehalt'
+    }
     setMeta(metaReady)
     const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
     const send = Boolean(opts?.send)
@@ -290,7 +329,7 @@ export function AbnahmeprotokollCreateWizard({
         auftragId,
         abnahmeDatum,
         punkte,
-        maengel: maengelAusPunkten(punkte),
+        maengel,
         notizen: notizen.trim() || null,
         meta: metaReady,
         protokollId,
@@ -456,6 +495,10 @@ export function AbnahmeprotokollCreateWizard({
         onChange={setPunkte}
         katalogPositionen={positionen}
       />
+
+      <FieldCard title="Mängel (optional)">
+        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
+      </FieldCard>
 
       {maengelListe.length > 0 ? (
         <FieldCard title="Festgestellte Mängel">
@@ -709,48 +752,129 @@ export function AbnahmeprotokollCreateWizard({
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
-                label="AN"
-                value={meta.unterschrift_ort_datum_an.trim() || '—'}
+                label="Auftragnehmer"
+                value={
+                  meta.signature_hw_url
+                    ? `${meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim() || '—'} · signiert`
+                    : meta.hw_unterschrift_name?.trim() ||
+                      meta.vertreter_an.trim() ||
+                      'Noch nicht signiert'
+                }
               />
               <MobileOverviewField
-                label="AG"
-                value={meta.unterschrift_ort_datum_ag.trim() || '—'}
+                label="Auftraggeber"
+                value={
+                  meta.signature_kunde_url
+                    ? `${meta.kunde_unterschrift_name?.trim() || meta.ansprechpartner_kunde.trim() || kundeName || '—'} · signiert`
+                    : meta.kunde_unterschrift_name?.trim() ||
+                      meta.ansprechpartner_kunde.trim() ||
+                      'Noch nicht signiert'
+                }
               />
               <MobileOverviewField
-                label="Anwesend"
-                value={meta.unterschrift_ort_datum_anwesend.trim() || '—'}
+                label="Ort/Datum"
+                value={
+                  meta.unterschrift_ort_datum_an.trim() ||
+                  meta.unterschrift_ort_datum_ag.trim() ||
+                  '—'
+                }
               />
             </dl>
           }
         >
-          <div className="space-y-3">
+          <div className="space-y-6">
             <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-              Zeile „Ort, Datum“ unter jeder Unterschrift im PDF — leer = aus Übergabe übernommen.
+              Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer /
+              Auftraggeber. Ort/Datum leer = aus Übergabe.
             </p>
-            <Input
-              label="Auftragnehmer — Ort, Datum"
-              value={meta.unterschrift_ort_datum_an}
-              onChange={(e) => patchMeta({ unterschrift_ort_datum_an: e.target.value })}
-              placeholder={
-                defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-              }
-            />
-            <Input
-              label="Auftraggeber — Ort, Datum"
-              value={meta.unterschrift_ort_datum_ag}
-              onChange={(e) => patchMeta({ unterschrift_ort_datum_ag: e.target.value })}
-              placeholder={
-                defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-              }
-            />
-            <Input
-              label="Anwesend — Ort, Datum"
-              value={meta.unterschrift_ort_datum_anwesend}
-              onChange={(e) => patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })}
-              placeholder={
-                defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-              }
-            />
+
+            <div className="space-y-3">
+              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+                Auftragnehmer (Handwerker)
+              </p>
+              <Input
+                label="Name"
+                value={meta.hw_unterschrift_name ?? meta.vertreter_an ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  patchMeta({
+                    hw_unterschrift_name: v,
+                    vertreter_an: v.trim() || meta.vertreter_an,
+                  })
+                }}
+                placeholder="Vor- und Nachname"
+                required
+              />
+              <Input
+                label="Ort, Datum"
+                value={meta.unterschrift_ort_datum_an}
+                onChange={(e) => patchMeta({ unterschrift_ort_datum_an: e.target.value })}
+                placeholder={
+                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+                }
+              />
+              <SignatureCanvas
+                initialDataUrl={meta.signature_hw_url}
+                onChange={(has, dataUrl) => {
+                  patchMeta({ signature_hw_url: has ? dataUrl : null })
+                }}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+                Auftraggeber (Kunde)
+              </p>
+              <Input
+                label="Name"
+                value={
+                  meta.kunde_unterschrift_name ??
+                  meta.ansprechpartner_kunde ??
+                  kundeName ??
+                  ''
+                }
+                onChange={(e) => {
+                  const v = e.target.value
+                  patchMeta({
+                    kunde_unterschrift_name: v,
+                    ansprechpartner_kunde: v.trim() || meta.ansprechpartner_kunde,
+                  })
+                }}
+                placeholder="Vor- und Nachname des Kunden"
+                required
+              />
+              <Input
+                label="Ort, Datum"
+                value={meta.unterschrift_ort_datum_ag}
+                onChange={(e) => patchMeta({ unterschrift_ort_datum_ag: e.target.value })}
+                placeholder={
+                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+                }
+              />
+              <SignatureCanvas
+                initialDataUrl={meta.signature_kunde_url}
+                onChange={(has, dataUrl) => {
+                  patchMeta({ signature_kunde_url: has ? dataUrl : null })
+                }}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
+                Anwesend (optional)
+              </p>
+              <Input
+                label="Ort, Datum"
+                value={meta.unterschrift_ort_datum_anwesend}
+                onChange={(e) =>
+                  patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
+                }
+                placeholder={
+                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+                }
+              />
+            </div>
+
             <Button
               type="button"
               variant="ghost"
@@ -764,7 +888,7 @@ export function AbnahmeprotokollCreateWizard({
                 })
               }}
             >
-              Alle aus Übergabe setzen
+              Ort/Datum aus Übergabe setzen
             </Button>
           </div>
         </MobileEditableBlock>
@@ -844,7 +968,7 @@ export function AbnahmeprotokollCreateWizard({
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         {hasSignatur
           ? 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
-          : 'Unterschriften (Ort/Datum AN + AG) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
+          : 'Beide Unterschriften (Auftragnehmer + Auftraggeber: Name und Zeichnung) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
@@ -869,11 +993,13 @@ export function AbnahmeprotokollCreateWizard({
             }
           />
           <MobileOverviewField
-            label="Unterschrift Ort/Datum"
+            label="Unterschriften"
             value={
-              meta.unterschrift_ort_datum_an.trim() ||
-              meta.unterschrift_ort_datum_ag.trim() ||
-              '—'
+              hasSignatur
+                ? 'AN + AG signiert'
+                : meta.signature_hw_url || meta.signature_kunde_url
+                  ? 'Unvollständig'
+                  : '—'
             }
           />
         </dl>

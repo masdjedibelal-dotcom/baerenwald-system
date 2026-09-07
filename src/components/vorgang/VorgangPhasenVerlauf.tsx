@@ -135,7 +135,9 @@ export function VorgangPhasenVerlauf({
 
   function openRow(row: PhaseRowModel) {
     if (row.state === 'open') return
-    setReadKind(row.kind)
+    // Direkt zur Phase — kein Zwischen-Sheet (Card-in-Card).
+    if (fromRef?.kind === row.kind) return
+    navigateFromPhaseSheet(row.href, row.label)
   }
 
   function closeRead() {
@@ -149,7 +151,6 @@ export function VorgangPhasenVerlauf({
       toast.error(`${label} ist noch nicht verfügbar.`)
       return
     }
-    // Sheet ohne History-Back schließen, sonst frisst history.back() die Navigation
     setReadKind(null)
 
     const targetPath = target.split('?')[0] || target
@@ -178,165 +179,74 @@ export function VorgangPhasenVerlauf({
     setNavBusy(false)
   }, [pathname])
 
-  function onZurPhase() {
-    navigateFromPhaseSheet(active?.href, active?.label ?? 'Phase')
-  }
-
   return (
-    <>
-      <div className={cn('card dshell-framed', className)}>
-        <div className="card-h">
-          <div className="card-title title">Verlauf des Vorgangs</div>
-        </div>
-        <div className="card-b">
-          {isMobile ? (
-            <div
-              ref={stripRef}
-              className="vgp-strip"
-              role="list"
-              aria-label="Phasenverlauf"
-            >
-              {rows.map((row, i) => {
-                const clickable = row.state !== 'open'
-                return (
-                  <div
-                    key={row.kind}
-                    ref={row.state === 'current' ? currentCardRef : undefined}
-                    role="listitem"
-                    className={cn('vgp-strip-item', row.state)}
-                  >
-                    {i > 0 ? <span className="vgp-strip-rail" aria-hidden /> : null}
-                    <button
-                      type="button"
-                      className="vgp-strip-card"
-                      disabled={!clickable}
-                      onClick={() => openRow(row)}
-                      aria-current={row.state === 'current' ? 'step' : undefined}
-                      aria-label={`${row.label}: ${row.kopf}`}
-                    >
-                      <span className="vgp-strip-dot" aria-hidden />
-                      <span className="vgp-strip-label">{row.label}</span>
-                      <span
-                        className={cn(
-                          'vgp-strip-kopf',
-                          row.state === 'open' && 'vgp-leer'
-                        )}
-                      >
-                        {row.kopf}
-                      </span>
-                      {row.betrag ? (
-                        <span className="vgp-strip-betrag">{row.betrag}</span>
-                      ) : null}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <>
-              {earlierCount > 0 && !showEarlier ? (
-                <button
-                  type="button"
-                  className="vgp-earlier"
-                  onClick={() => setShowEarlier(true)}
-                >
-                  <ChevronRight size={14} aria-hidden />
-                  {earlierCount} frühere Phasen anzeigen
-                </button>
-              ) : null}
-              {earlierCount > 0 && showEarlier ? (
-                <button
-                  type="button"
-                  className="vgp-earlier"
-                  onClick={() => setShowEarlier(false)}
-                >
-                  Frühere Phasen ausblenden
-                </button>
-              ) : null}
-              <div className="vgp-list" role="list">
-                {visibleRows.map((row, i) => {
-                  const isLast = i === visibleRows.length - 1
-                  const clickable = row.state !== 'open'
-                  return (
-                    <div
-                      key={row.kind}
-                      role="listitem"
-                      className={cn('vgp', row.state, isLast && 'last')}
-                    >
-                      <button
-                        type="button"
-                        className="vgp-head"
-                        disabled={!clickable}
-                        onClick={() => openRow(row)}
-                        aria-label={`${row.label}: ${row.kopf}`}
-                      >
-                        <span className="vgp-rail" aria-hidden>
-                          <span className="vgp-dot" />
-                        </span>
-                        <span className="vgp-body">
-                          <span className="vgp-top">
-                            <span className="vgp-label">{row.label}</span>
-                            <span
-                              className={cn(
-                                'vgp-kopf',
-                                row.state === 'open' && 'vgp-leer'
-                              )}
-                            >
-                              {row.kopf}
-                            </span>
-                            {row.betrag ? (
-                              <span className="vgp-betrag">{row.betrag}</span>
-                            ) : null}
-                          </span>
-                          {row.sub ? <span className="vgp-sub">{row.sub}</span> : null}
-                        </span>
-                        {clickable ? (
-                          <ChevronRight className="vgp-chv" size={16} aria-hidden />
-                        ) : null}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
+    <div className={cn('vgp-table-wrap', className)}>
+      <div className="vgp-table-head">
+        <span className="vgp-table-title">Verlauf</span>
+        <span className="vgp-table-hint">Phasen des Vorgangs</span>
       </div>
-
-      <EditorSheet
-        open={Boolean(active)}
-        onClose={closeRead}
-        title={active?.sheetTitle ?? ''}
-        crumb={active?.sheetCrumb ?? null}
-        size="lg"
-        manageHistory={false}
-        headerEnd={
-          active?.href && fromRef?.kind !== active.kind ? (
+      <div className="vgp-table" role="table" aria-label="Phasenverlauf">
+        <div className="vgp-table-row vgp-table-row--head" role="row">
+          <span role="columnheader">Phase</span>
+          <span role="columnheader">Status</span>
+          <span role="columnheader" className="vgp-table-num">
+            Betrag
+          </span>
+          <span role="columnheader" className="vgp-table-go" />
+        </div>
+        {rows.map((row) => {
+          const clickable = row.state !== 'open' && fromRef?.kind !== row.kind
+          const onCurrent = fromRef?.kind === row.kind
+          return (
             <button
+              key={row.kind}
               type="button"
-              className="btn primary sm"
-              onClick={onZurPhase}
-              disabled={navBusy}
+              role="row"
+              className={cn(
+                'vgp-table-row',
+                row.state,
+                onCurrent && 'vgp-table-row--here',
+                !clickable && 'vgp-table-row--static'
+              )}
+              disabled={!clickable || navBusy}
+              onClick={() => openRow(row)}
+              aria-current={row.state === 'current' ? 'step' : undefined}
+              aria-label={
+                clickable
+                  ? `${row.label} öffnen: ${row.kopf}`
+                  : `${row.label}: ${row.kopf}`
+              }
             >
-              {navBusy ? 'Laden…' : 'Zur Phase'}
-            </button>
-          ) : null
-        }
-      >
-        {active ? (
-          <div className="phase-sheet-props props">
-            {active.props.map((p) => (
-              <div key={p.k} className="prop">
-                <span className="k">{p.k}</span>
-                <span className="v" style={{ whiteSpace: 'pre-wrap' }}>
-                  {p.v}
+              <span className="vgp-table-phase" role="cell">
+                <span className={cn('vgp-table-dot', row.state)} aria-hidden />
+                {row.label}
+              </span>
+              <span className="vgp-table-status" role="cell">
+                <span
+                  className={cn(
+                    'vgp-table-kopf',
+                    row.state === 'open' && 'vgp-leer'
+                  )}
+                >
+                  {row.kopf}
                 </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </EditorSheet>
-    </>
+                {row.sub ? <span className="vgp-table-sub">{row.sub}</span> : null}
+              </span>
+              <span className="vgp-table-num" role="cell">
+                {row.betrag ?? '—'}
+              </span>
+              <span className="vgp-table-go" role="cell">
+                {clickable ? (
+                  <ChevronRight size={15} aria-hidden />
+                ) : onCurrent ? (
+                  <span className="vgp-table-here">hier</span>
+                ) : null}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

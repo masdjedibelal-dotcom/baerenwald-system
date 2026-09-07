@@ -2,7 +2,9 @@
  * HTML für Abschlussdokumentation-PDF (A4, Bärenwald-Layout wie Angebot/Rechnung).
  */
 
-import { filterAbnahmePunkteFuerDokument, gruppiereAbnahmePunkte, type AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import { abnahmePunkteFuerDokument, gruppiereAbnahmePunkte, type AbnahmePunkt, type AbnahmeMangel } from '@/lib/auftraege/abnahme-protokoll-types'
+import type { AbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
+import { isMangelOffen } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
 import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
@@ -53,6 +55,11 @@ export type AbschlussdokuHtmlInput = {
     preis_netto?: number | null
   }>
   abnahmePunkte: AbnahmePunkt[] | null
+  abnahmeMaengel?: AbnahmeMangel[] | null
+  abnahmeMeta?: AbnahmeProtokollMeta | null
+  abnahmeDatum?: string | null
+  abnahmeNotizen?: string | null
+  abnahmeErgebnisLabel?: string | null
   bautagebuch: Array<{
     datumSort: string
     datumLabel: string
@@ -224,6 +231,8 @@ function abschlussEinleitungInhalte(p: AbschlussdokuHtmlInput): string {
   const parts = ['die erbrachten Leistungen']
   if (p.mitBautagebuch && p.bautagebuch.length > 0) parts.push(ABSCHLUSS_PROTOKOLL_TITEL)
   if (p.abnahmePunkte && p.abnahmePunkte.length > 0) parts.push('Abnahme')
+  else if ((p.abnahmeMaengel && p.abnahmeMaengel.length > 0) || p.abnahmeErgebnisLabel)
+    parts.push('Abnahme')
   if (p.mitFotos && p.fotoUrls.length > 0) parts.push('Fotodokumentation')
   if (parts.length === 1) return parts[0]!
   const last = parts.pop()!
@@ -329,40 +338,101 @@ function leistungenTableHtml(p: AbschlussdokuHtmlInput): string {
   return `<table style="width:100%;border-collapse:collapse;font-size:${fs};">${head}<tbody>${rows}</tbody></table>${summenHtml}`
 }
 
-function abnahmeHtml(punkte: AbnahmePunkt[]): string {
-  const selected = filterAbnahmePunkteFuerDokument(punkte)
-  if (!selected.length) {
-    return `<p style="margin:0;font-size:9pt;color:${MUTED};">Keine Leistungen für die Abnahme ausgewählt.</p>`
+function abnahmeHtml(p: AbschlussdokuHtmlInput): string {
+  const punkte = p.abnahmePunkte ?? []
+  const fuerPdf = abnahmePunkteFuerDokument(punkte)
+  const parts: string[] = []
+
+  if (p.abnahmeDatum || p.abnahmeErgebnisLabel) {
+    parts.push(`<p style="margin:0 0 10px;font-size:9pt;line-height:1.5;color:${TEXT};">
+      ${p.abnahmeDatum ? `<span style="color:${MUTED};">Datum:</span> <strong>${esc(p.abnahmeDatum)}</strong>` : ''}
+      ${p.abnahmeDatum && p.abnahmeErgebnisLabel ? ' · ' : ''}
+      ${p.abnahmeErgebnisLabel ? `<span style="color:${MUTED};">Ergebnis:</span> <strong>${esc(p.abnahmeErgebnisLabel)}</strong>` : ''}
+    </p>`)
   }
-  return gruppiereAbnahmePunkte(selected)
-    .map((block) => {
-      const leistungen = block.leistungen
-        .map((l) => {
-          const bullets = l.punkte
-            .map((pt) => {
-              const mangel =
-                pt.status === 'mangel'
-                  ? `<span style="display:inline-block;min-width:56px;padding:2px 6px;border-radius:999px;font-size:7pt;font-weight:700;background:#FEE2E2;color:#991B1B;margin-right:6px;">Mangel</span>`
-                  : ''
-              const notiz = pt.notiz?.trim()
-              return `<li style="margin:0 0 4px;font-size:8.5pt;list-style:none;">
-                ${mangel}${esc(pt.beschreibung)}
+
+  if (!fuerPdf.length) {
+    parts.push(
+      `<p style="margin:0;font-size:9pt;color:${MUTED};">Keine Leistungen für die Abnahme ausgewählt.</p>`
+    )
+  } else {
+    parts.push(
+      gruppiereAbnahmePunkte(fuerPdf)
+        .map((block) => {
+          const leistungen = block.leistungen
+            .map((l) => {
+              const bullets = l.punkte
+                .map((pt) => {
+                  const mangel =
+                    pt.status === 'mangel'
+                      ? `<span style="display:inline-block;min-width:56px;padding:2px 6px;border-radius:999px;font-size:7pt;font-weight:700;background:#FEE2E2;color:#991B1B;margin-right:6px;">Mangel</span>`
+                      : ''
+                  const notiz = pt.notiz?.trim()
+                  const name = l.leistung_name.trim()
+                  const besch = pt.beschreibung?.trim()
+                  const line =
+                    besch && besch !== name ? besch : name || besch || 'Leistung'
+                  return `<li style="margin:0 0 4px;font-size:8.5pt;list-style:none;">
+                ${mangel}${esc(line)}
                 ${notiz ? `<span style="color:${MUTED};"> — ${esc(notiz)}</span>` : ''}
               </li>`
-            })
-            .join('')
-          return `<div style="margin:0 0 8px;">
-            <p style="margin:0 0 4px;font-size:8.5pt;font-weight:600;color:${TEXT};">${esc(l.leistung_name)}</p>
+                })
+                .join('')
+              return `<div style="margin:0 0 8px;">
+            <p style="margin:0 0 4px;font-size:8.5pt;font-weight:600;color:${TEXT};">${esc(l.leistung_name || 'Leistung')}</p>
             <ul style="margin:0;padding:0;">${bullets}</ul>
           </div>`
-        })
-        .join('')
-      return `<div style="margin-bottom:12px;">
+            })
+            .join('')
+          return `<div style="margin-bottom:12px;">
         <p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:${ACCENT};">${esc(block.gewerk)}</p>
         ${leistungen}
       </div>`
-    })
-    .join('')
+        })
+        .join('')
+    )
+  }
+
+  const offenMaengel = (p.abnahmeMaengel ?? []).filter(isMangelOffen)
+  if (offenMaengel.length) {
+    parts.push(`<div style="margin-top:12px;">
+      <p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:${ACCENT};">Festgestellte Mängel</p>
+      <ul style="margin:0;padding-left:18px;font-size:8.5pt;line-height:1.45;">
+        ${offenMaengel
+          .map((m) => {
+            const titel = (m.titel ?? '').trim()
+            const detail = (m.beschreibung ?? '').trim()
+            const head = titel || detail || 'Mangel'
+            const sub = titel && detail && detail !== titel ? detail : ''
+            return `<li style="margin:0 0 6px;">
+              <strong>${esc(head)}</strong>
+              ${m.frist ? ` <span style="color:#991B1B;">(bis ${esc(m.frist.slice(0, 10))})</span>` : ''}
+              ${sub ? `<div style="color:${MUTED};font-size:8pt;">${esc(sub)}</div>` : ''}
+            </li>`
+          })
+          .join('')}
+      </ul>
+    </div>`)
+  }
+
+  const unterzeichner = [
+    p.abnahmeMeta?.hw_unterschrift_name?.trim() || p.abnahmeMeta?.vertreter_an?.trim(),
+    p.abnahmeMeta?.kunde_unterschrift_name?.trim() ||
+      p.abnahmeMeta?.ansprechpartner_kunde?.trim(),
+  ].filter(Boolean)
+  if (unterzeichner.length) {
+    parts.push(`<p style="margin:12px 0 0;font-size:8.5pt;color:${MUTED};">
+      Unterzeichnet: ${esc(unterzeichner.join(' · '))}
+    </p>`)
+  }
+
+  if (p.abnahmeNotizen?.trim()) {
+    parts.push(`<p style="margin:10px 0 0;font-size:8.5pt;color:${TEXT};">
+      <span style="color:${MUTED};">Anmerkungen:</span> ${esc(p.abnahmeNotizen.trim())}
+    </p>`)
+  }
+
+  return parts.join('')
 }
 
 function bautagebuchUebersichtHtml(eintraege: AbschlussdokuHtmlInput['bautagebuch']): string {
@@ -403,7 +473,7 @@ function bautagebuchUebersichtHtml(eintraege: AbschlussdokuHtmlInput['bautagebuc
 function fotosHtml(bilder: AbschlussdokuHtmlInput['fotoUrls']): string {
   return `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
     ${bilder
-      .slice(0, 16)
+      .slice(0, 24)
       .map((b, i) => {
         const cap = b.caption?.trim()
         return `<figure style="margin:0;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#fff;page-break-inside:avoid;">
@@ -507,7 +577,12 @@ export function buildAbschlussdokumentationHtml(p: AbschlussdokuHtmlInput): stri
   sections.push(`${sectionHeading('Leistungsübersicht')}${leistungenTableHtml(p)}`)
 
   if (p.abnahmePunkte && p.abnahmePunkte.length > 0) {
-    sections.push(`${sectionHeading('Abnahmeprotokoll')}${abnahmeHtml(p.abnahmePunkte)}`)
+    sections.push(`${sectionHeading('Abnahmeprotokoll')}${abnahmeHtml(p)}`)
+  } else if (
+    (p.abnahmeMaengel && p.abnahmeMaengel.length > 0) ||
+    p.abnahmeErgebnisLabel
+  ) {
+    sections.push(`${sectionHeading('Abnahmeprotokoll')}${abnahmeHtml(p)}`)
   }
 
   if (p.mitFotos && p.fotoUrls.length > 0) {

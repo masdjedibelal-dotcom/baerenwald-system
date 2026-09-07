@@ -33,7 +33,7 @@ import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
-import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
+import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotAuswahlZeile } from '@/components/angebote/AngebotAuswahlPanel'
 import {
@@ -217,9 +217,9 @@ export function AngebotDetailPageClient({
     [detail.positionen]
   )
 
+  /** Nur vor Kundenversand — nach Gesendet keine Preis-Edits (Portal würde sofort den neuen Betrag sehen). */
   const kannBearbeiten =
-    (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
-    angebotDarfImWizardBearbeitetWerden(detail.status)
+    statusEinfach === 'entwurf' && angebotDarfImWizardBearbeitetWerden(detail.status)
   const bearbeitenSperrgrund = angebotWizardBearbeitenSperrgrund(detail.status)
 
   const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
@@ -273,7 +273,7 @@ export function AngebotDetailPageClient({
 
   function openWizardBearbeiten() {
     if (!kannBearbeiten) {
-      toast.error('Dieses Angebot kann nicht mehr bearbeitet werden.')
+      toast.error(bearbeitenSperrgrund ?? 'Dieses Angebot kann nicht mehr bearbeitet werden.')
       return
     }
     if (!detail.lead_id || !lead) {
@@ -287,6 +287,21 @@ export function AngebotDetailPageClient({
     }
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(detail.id, detail.lead_id!)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      openWizardMitBootstrap(res.bootstrap)
+    })
+  }
+
+  function openNeuesAngebotAlsKopie() {
+    if (!detail.lead_id) {
+      toast.error('Keine verknüpfte Anfrage.')
+      return
+    }
+    startTransition(async () => {
+      const res = await loadAngebotWizardBootstrapKopie(detail.id, detail.lead_id!)
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -554,6 +569,15 @@ export function AngebotDetailPageClient({
         disabled: pending,
       }
     }
+    if (statusEinfach === 'abgelehnt') {
+      return {
+        label: 'Neues Angebot',
+        icon: 'pencil',
+        onClick: openNeuesAngebotAlsKopie,
+        disabled: pending,
+        title: 'Inhalt als neuen Entwurf übernehmen',
+      }
+    }
     if (bearbeitenSperrgrund) {
       return {
         label: 'Angebot bearbeiten',
@@ -564,7 +588,7 @@ export function AngebotDetailPageClient({
       }
     }
     return null
-  }, [kannBearbeiten, bearbeitenSperrgrund, pending])
+  }, [kannBearbeiten, bearbeitenSperrgrund, pending, statusEinfach])
 
   const stammdatenInhalt = (
     <>

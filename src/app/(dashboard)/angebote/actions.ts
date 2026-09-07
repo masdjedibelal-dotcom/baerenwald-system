@@ -28,6 +28,7 @@ import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import {
   angebotDarfImWizardBearbeitetWerden,
   angebotStatusErlaubtImWizard,
+  angebotWizardBearbeitenSperrgrund,
   defaultAngebotZahlungsbedingungen,
   resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
@@ -615,7 +616,12 @@ export async function updateAngebotProjektFelder(
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
   if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
-    return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
+    return {
+      ok: false,
+      message:
+        angebotWizardBearbeitenSperrgrund(String(current.status)) ??
+        'Dieses Angebot kann nicht mehr bearbeitet werden',
+    }
   }
 
   const db: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -649,7 +655,13 @@ export async function updateAngebot(
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
   if (!angebotStatusErlaubtImWizard(current.status, opts)) {
-    return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
+    return {
+      ok: false,
+      message: opts?.forAuftragKorrektur
+        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        : angebotWizardBearbeitenSperrgrund(String(current.status)) ??
+          'Dieses Angebot kann nicht mehr bearbeitet werden',
+    }
   }
 
   const positionen = normalizeAngebotPositionen(input.positionen)
@@ -2284,7 +2296,7 @@ export async function recordKundeAbgelehntMitDetails(
   const supabase = gate.db
   const { data: row } = await supabase
     .from('angebote')
-    .select('id, status, status_einfach')
+    .select('id, status, status_einfach, lead_id')
     .eq('id', angebotId)
     .maybeSingle()
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
@@ -2310,6 +2322,7 @@ export async function recordKundeAbgelehntMitDetails(
     input.konkurrenz_preis_eur != null && Number.isFinite(input.konkurrenz_preis_eur)
       ? Math.round(input.konkurrenz_preis_eur * 100) / 100
       : null
+  const now = new Date().toISOString()
   const { error } = await supabase
     .from('angebote')
     .update({
@@ -2318,10 +2331,24 @@ export async function recordKundeAbgelehntMitDetails(
       ablehnung_grund: input.grund,
       ablehnung_konkurrenz_preis: kp,
       ablehnung_notiz: input.notiz?.trim() || null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq('id', angebotId)
   if (error) return { ok: false, message: error.message }
+
+  const leadId = String(row.lead_id ?? '').trim()
+  if (leadId) {
+    await supabaseAdmin
+      .from('leads')
+      .update({
+        org_freigabe_status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', leadId)
+      .in('org_freigabe_status', ['ausstehend', 'beschluss_ausstehend', 'freigegeben'])
+    revalidatePath(`/anfragen/${leadId}`)
+  }
+
   revalidatePath('/angebote')
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/')

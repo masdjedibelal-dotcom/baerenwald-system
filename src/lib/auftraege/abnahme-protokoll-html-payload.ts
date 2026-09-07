@@ -4,7 +4,7 @@ import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leis
 import { generateAbnahmeFreitexte } from '@/lib/auftraege/abnahme-protokoll-ki-texte'
 import { auftragTitel, formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import {
-  filterAbnahmePunkteFuerDokument,
+  abnahmePunkteFuerDokument,
   gruppiereAbnahmePunkte,
   type AbnahmeMangel,
   type AbnahmePunkt,
@@ -259,9 +259,15 @@ export function buildAbnahmeProtokollHtmlInput(
   const kunde = detail.kunden!
   const steuer = firmenSteuerFooterZeilen(firm)
   const defaults = buildDefaultAbnahmeMetaFromAuftrag(detail, firm)
+  const incoming = input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null
   const meta = normalizeAbnahmeProtokollMeta({
     ...defaults,
-    ...(input.meta ?? {}),
+    ...(incoming ?? {}),
+    // Signaturen/Namen nie durch Defaults überschreiben
+    signature_hw_url: incoming?.signature_hw_url ?? null,
+    signature_kunde_url: incoming?.signature_kunde_url ?? null,
+    hw_unterschrift_name: incoming?.hw_unterschrift_name ?? null,
+    kunde_unterschrift_name: incoming?.kunde_unterschrift_name ?? null,
   })
 
   return {
@@ -283,7 +289,7 @@ export function buildAbnahmeProtokollHtmlInput(
     abnahmeDatum: formatDe(input.abnahmeDatum),
     kunde_name: kunde.name?.trim() || '—',
     kunde_adresse: kundeAdresseZeilen(kunde),
-    gewerke: gruppiereAbnahmePunkte(filterAbnahmePunkteFuerDokument(input.punkte)),
+    gewerke: gruppiereAbnahmePunkte(abnahmePunkteFuerDokument(input.punkte)),
     maengel: input.maengel,
     notizen: input.notizen?.trim() || null,
     meta,

@@ -8,7 +8,7 @@ import {
 import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
 import { extractJsonObject } from '@/lib/visualize/claude-json'
 import {
-  filterAbnahmePunkteFuerDokument,
+  abnahmePunkteFuerDokument,
   type AbnahmeMangel,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
@@ -35,7 +35,7 @@ export type AbnahmeKiFreitexte = {
 }
 
 function punkteKontext(punkte: AbnahmePunkt[]): string {
-  const selected = filterAbnahmePunkteFuerDokument(punkte)
+  const selected = abnahmePunkteFuerDokument(punkte)
   if (!selected.length) return '(keine Leistungen ausgewählt)'
   return selected
     .slice(0, 40)

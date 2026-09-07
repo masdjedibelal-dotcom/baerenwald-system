@@ -600,19 +600,7 @@ export function VorgangZahlungTab({
             openRechnungBearbeiten(editId)
           },
         })
-        ctas.push({
-          id: 'open',
-          label: 'Öffnen',
-          icon: 'eye',
-          onClick: () => {
-            setOpenRateId(null)
-            if (aktuelleRechnungId === editId) {
-              router.push(`/rechnungen/${editId}?tab=uebersicht`)
-              return
-            }
-            router.push(`/rechnungen/${editId}`)
-          },
-        })
+        // Keine Vorschau/Öffnen hier — PDF-Vorschau erst im Wizard nach Senden.
         ctas.push({
           id: 'edit',
           label: 'Bearbeiten',

@@ -436,38 +436,47 @@ export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
 
 /**
  * Status, in denen das Angebot im Wizard geladen und gespeichert werden darf.
- * Nicht: kunde_akzeptiert (Angenommen → AG-Korrektur) — Detail-CTA ist Referenz.
+ *
+ * Nicht `gesendet_kunde`: solange HV/Kunde nicht reagiert hat, keine Positions-/Preis-
+ * Änderungen (sonst landet der neue Betrag sofort im Portal).
+ * Nicht `kunde_akzeptiert` / `angenommen`: nur über AG-Korrektur (`forAuftragKorrektur`).
  */
 const ANGEBOT_WIZARD_BEARBEITBAR: readonly AngebotStatus[] = [
   'entwurf',
   'gesendet_handwerker',
   'handwerker_akzeptiert',
-  'gesendet_kunde',
 ]
 
 export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
   return (ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(status)
 }
 
+/** Angebot liegt beim Kunden/HV und wartet auf Annahme oder Ablehnung. */
+export function angebotWartetAufKundenentscheidung(status: string): boolean {
+  const s = String(status ?? '').toLowerCase()
+  return (
+    s === 'gesendet_kunde' ||
+    s === 'gesendet' ||
+    s === 'abgelaufen' ||
+    (s.includes('gesendet') && !s.includes('handwerker'))
+  )
+}
+
 /**
- * Auftrags-Korrektur („Auftrag bearbeiten“): angenommenes Angebot darf geladen/gespeichert werden.
- * Abgelehnt / ersetzt / storniert bleiben gesperrt.
+ * Auftrags-Korrektur („Auftrag bearbeiten“): nur angenommenes Angebot.
+ * Abgelehnt / ersetzt / storniert / noch offen beim Kunden → gesperrt.
  */
 export function angebotDarfFuerAuftragKorrektur(status: string): boolean {
   const st = String(status ?? '').toLowerCase()
-  if (st === 'abgelehnt' || st === 'ersetzt' || st.includes('storn')) return false
-  return true
+  return st === 'kunde_akzeptiert' || st === 'angenommen' || st === 'beauftragt'
 }
 
-/** Wizard-Load/Save: Entwurf… oder angenommen (AG-Korrektur), sonst sperren. */
+/** Wizard-Load/Save: Entwurf… oder angenommen nur mit AG-Korrektur-Flag. */
 export function angebotStatusErlaubtImWizard(
   status: string,
   opts?: { forAuftragKorrektur?: boolean }
 ): boolean {
   if (opts?.forAuftragKorrektur) return angebotDarfFuerAuftragKorrektur(status)
-  const st = String(status ?? '').toLowerCase()
-  // Angenommen → Auftrag existiert; Load für „Auftrag bearbeiten“ (Flag kann bei SA-Aufruf fehlen)
-  if (st === 'kunde_akzeptiert' || st === 'angenommen') return true
   return angebotDarfImWizardBearbeitetWerden(status)
 }
 
@@ -476,10 +485,13 @@ export function angebotWizardBearbeitenSperrgrund(status: string): string | null
   if (angebotDarfImWizardBearbeitetWerden(status)) return null
   const s = (status ?? '').toLowerCase()
   if (s === 'kunde_akzeptiert' || s === 'angenommen') {
-    return 'Angenommen — Änderung über AG-Korrektur'
+    return 'Angenommen — Änderung über Auftrag bearbeiten (AG-Korrektur)'
   }
-  if (s.includes('gesendet') || s === 'abgelaufen') {
-    return 'Gesendet — Korrektur über Storno'
+  if (s === 'abgelehnt') {
+    return 'Abgelehnt — neues Angebot über die Anfrage anlegen'
+  }
+  if (angebotWartetAufKundenentscheidung(s)) {
+    return 'Wartet auf Annahme oder Ablehnung — Bearbeiten erst danach möglich'
   }
   return 'Dieses Angebot kann nicht mehr im Wizard bearbeitet werden.'
 }

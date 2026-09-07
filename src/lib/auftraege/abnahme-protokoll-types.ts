@@ -170,7 +170,7 @@ function abnahmeCheckpunkt(
     leistung_id,
     leistung_name,
     beschreibung,
-    status: 'offen',
+    status: 'ok',
     notiz: null,
     foto_urls: [],
   }
@@ -432,7 +432,7 @@ export function setTitelUndNotizFuerLeistung(
   })
 }
 
-/** Auftragsposition → Abnahmepunkt (Status offen = noch nicht abgehakt). */
+/** Auftragsposition → Abnahmepunkt (ok = für PDF ausgewählt, wie Create-Vorauswahl). */
 export function abnahmePunktAusAuftragPosition(pos: AuftragPosition): AbnahmePunkt {
   const id = pos.id?.trim() || neuePositionsId()
   const name = (pos.leistung_name ?? '').trim() || 'Leistung'
@@ -443,14 +443,14 @@ export function abnahmePunktAusAuftragPosition(pos: AuftragPosition): AbnahmePun
     leistung_id: id,
     leistung_name: name,
     beschreibung: beschreibung || name,
-    status: 'offen',
+    status: 'ok',
     notiz: null,
     notizen: [],
     foto_urls: [],
   }
 }
 
-/** Freie erbrachte Leistung ohne Katalog-Bezug. */
+/** Freie erbrachte Leistung ohne Katalog-Bezug (sofort für PDF ausgewählt). */
 export function abnahmePunktErbrachteLeistung(titel = '', notiz = ''): AbnahmePunkt {
   const id = neuePositionsId()
   const name = bereinigeAbnahmeLeistungName(titel) || 'Erbrachte Leistung'
@@ -461,7 +461,7 @@ export function abnahmePunktErbrachteLeistung(titel = '', notiz = ''): AbnahmePu
     leistung_id: id,
     leistung_name: name,
     beschreibung: name,
-    status: 'offen',
+    status: 'ok',
     notiz: null,
     notizen: note ? [note] : [],
     foto_urls: [],
@@ -523,9 +523,18 @@ export function leistungFuerAbnahmeAusgewaehlt(punkte: AbnahmePunkt[]): boolean 
   return punkte.length > 0 && punkte.every((p) => p.status !== 'offen')
 }
 
-/** Nur ausgewählte Abnahmepunkte für PDF/Dokumente (ohne Status-„Abgenommen“). */
+/** Nur ausgewählte Abnahmepunkte für PDF/Dokumente (`offen` = nicht abnahme-relevant). */
 export function filterAbnahmePunkteFuerDokument(punkte: AbnahmePunkt[]): AbnahmePunkt[] {
   return punkte.filter((p) => p.status === 'ok' || p.status === 'mangel')
+}
+
+/**
+ * Punkte für PDF/KI: ausgewählte (`ok`/`mangel`).
+ * Fallback: wenn noch alles `offen` (ältere Entwürfe / Bug beim Hinzufügen) — alle anzeigen.
+ */
+export function abnahmePunkteFuerDokument(punkte: AbnahmePunkt[]): AbnahmePunkt[] {
+  const selected = filterAbnahmePunkteFuerDokument(punkte)
+  return selected.length > 0 ? selected : punkte
 }
 
 export function buildAbnahmePunkteInitial(

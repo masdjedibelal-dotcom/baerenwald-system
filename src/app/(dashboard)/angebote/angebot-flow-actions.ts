@@ -152,8 +152,19 @@ export async function markAngebotAbgelehntEinfach(input: {
     await erledigeInterneNachfassTodos(row.lead_id)
     await supabaseAdmin
       .from('leads')
-      .update({ status: 'abgebrochen', updated_at: now })
+      .update({
+        status: 'abgebrochen',
+        updated_at: now,
+      })
       .eq('id', row.lead_id)
+    await supabaseAdmin
+      .from('leads')
+      .update({
+        org_freigabe_status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', row.lead_id)
+      .in('org_freigabe_status', ['ausstehend', 'beschluss_ausstehend', 'freigegeben'])
     await insertAngebotTimeline(
       row.lead_id,
       id,

@@ -25,6 +25,7 @@ import {
   type AngebotWizardBootstrap,
   type AngebotVariantenPersistJson,
   angebotStatusErlaubtImWizard,
+  angebotWizardBearbeitenSperrgrund,
 } from '@/lib/angebote/angebot-wizard-types'
 import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
@@ -514,8 +515,9 @@ export async function loadAngebotWizardBootstrap(
     return {
       ok: false,
       message: opts?.forAuftragKorrektur
-        ? 'Abgelehnte oder ersetzte Angebote können nicht korrigiert werden.'
-        : 'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.',
+        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        : angebotWizardBearbeitenSperrgrund(ang.status) ??
+          'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.',
     }
   }
 

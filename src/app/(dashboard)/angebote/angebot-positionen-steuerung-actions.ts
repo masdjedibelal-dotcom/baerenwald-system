@@ -10,7 +10,7 @@ import {
 } from '@/lib/angebot-positionen'
 import { splitNettoStueck, type KostenVerteilung } from '@/lib/angebot-kosten-split'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
+import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund } from '@/lib/angebote/angebot-wizard-types'
 import {
   resolveGewerkForAngebotPositionen,
 } from '@/lib/angebote/resolve-position-gewerk'
@@ -34,7 +34,13 @@ async function assertAngebotEditable(angebotId: string) {
 
   if (error || !data) return { ok: false as const, message: 'Angebot nicht gefunden', supabase: null }
   if (!angebotDarfImWizardBearbeitetWerden(String(data.status))) {
-    return { ok: false as const, message: 'Dieses Angebot kann nicht mehr bearbeitet werden.', supabase: null }
+    return {
+      ok: false as const,
+      message:
+        angebotWizardBearbeitenSperrgrund(String(data.status)) ??
+        'Dieses Angebot kann nicht mehr bearbeitet werden.',
+      supabase: null,
+    }
   }
 
   return {

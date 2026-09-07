@@ -4,9 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { listAuftragBautagebuch } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
-import { loadLetztesAbnahmeprotokoll } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
-import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 import type { AuftragDetail } from '@/lib/types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { formatAuftragsNr, auftragTitel } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -23,11 +21,16 @@ import {
 } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { loadLeistungszeitraumAusRechnung } from '@/lib/auftraege/abschlussdokumentation-leistungszeitraum'
+import {
+  collectAbschlussBautagebuch,
+  collectAbschlussFotoUrls,
+  loadAbnahmeForAbschlussbericht,
+} from '@/lib/auftraege/abschlussdokumentation-collect'
 import { renderAbschlussdokumentationPdfBuffer } from '@/lib/auftraege/render-abschlussdokumentation-pdf'
 import { persistAbschlussdokumentationPdf } from '@/lib/auftraege/persist-abschlussdokumentation-pdf'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { sendMail } from '@/lib/mail-service'
-import { normalizeUrlList } from '@/lib/utils'
+import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 
 export type AbschlussdokuOptionen = {
   mitBautagebuch: boolean
@@ -84,21 +87,6 @@ async function loadAbschlussMailKontext(
   }
 }
 
-async function collectFotoUrls(
-  detail: AuftragDetail,
-  bautagebuch: Awaited<ReturnType<typeof listAuftragBautagebuch>>
-): Promise<string[]> {
-  const urls: string[] = []
-  const push = (list: unknown) => {
-    for (const u of normalizeUrlList(list)) {
-      if (u && !urls.includes(u)) urls.push(u)
-    }
-  }
-  for (const e of bautagebuch) push(e.foto_urls)
-  for (const e of detail.formular_eintraege ?? []) push(e.foto_urls)
-  return urls
-}
-
 export type AbschlussVoraussetzungen = {
   hasAbnahme: boolean
   hasRechnung: boolean
@@ -110,6 +98,7 @@ export async function loadAbschlussVoraussetzungen(
   auftragId: string
 ): Promise<AbschlussVoraussetzungen> {
   const detail = await loadAuftragDetail(auftragId)
+  const abnahme = await loadAbnahmeForAbschlussbericht(auftragId)
   const { data: rechnungen } = await supabaseAdmin
     .from('rechnungen')
     .select('id, rechnungsnummer, status')
@@ -123,7 +112,7 @@ export async function loadAbschlussVoraussetzungen(
     | undefined
 
   return {
-    hasAbnahme: Boolean(detail?.abnahme_protokoll_url),
+    hasAbnahme: Boolean(abnahme || detail?.abnahme_protokoll_url),
     hasRechnung: Boolean(rechnung?.id),
     rechnungId: rechnung?.id ?? null,
     rechnungsnummer: rechnung?.rechnungsnummer?.trim() || null,
@@ -279,14 +268,21 @@ async function buildAbschlussPdf(
   const detail = await loadAuftragDetail(auftragId)
   if (!detail?.kunden) return { ok: false as const, message: 'Auftrag/Kunde nicht gefunden' }
 
-  const bautagebuchRaw = optionen.mitBautagebuch ? await listAuftragBautagebuch(auftragId) : []
-  const bautagebuch = bautagebuchRaw
-  const mitBautagebuch = optionen.mitBautagebuch && bautagebuch.length > 0
-  const fotoUrlsRaw = optionen.mitFotos ? await collectFotoUrls(detail, bautagebuchRaw) : []
-  const fotoUrls = fotoUrlsRaw
-  const mitFotos = optionen.mitFotos && fotoUrls.length > 0
+  const [bautagebuchZeilen, abnahme, bautagebuchRaw] = await Promise.all([
+    optionen.mitBautagebuch
+      ? collectAbschlussBautagebuch(auftragId)
+      : Promise.resolve([]),
+    loadAbnahmeForAbschlussbericht(auftragId),
+    optionen.mitFotos || optionen.mitBautagebuch
+      ? listAuftragBautagebuch(auftragId)
+      : Promise.resolve([]),
+  ])
 
-  const abnahme = detail.abnahme_protokoll_url ? await loadLetztesAbnahmeprotokoll(auftragId) : null
+  const mitBautagebuch = optionen.mitBautagebuch && bautagebuchZeilen.length > 0
+  const fotoRows = optionen.mitFotos
+    ? await collectAbschlussFotoUrls(detail, bautagebuchRaw, abnahme?.meta ?? null)
+    : []
+  const mitFotos = optionen.mitFotos && fotoRows.length > 0
 
   const positionen = [...(detail.auftrag_positionen ?? [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
@@ -299,9 +295,14 @@ async function buildAbschlussPdf(
     auftragsNr: formatAuftragsNr(detail),
     projektTitel: auftragTitel(detail),
     positionen,
-    bautagebuch,
-    fotoUrls,
+    bautagebuch: bautagebuchZeilen,
+    fotoUrls: fotoRows,
     abnahmePunkte: abnahme?.punkte ?? null,
+    abnahmeMaengel: abnahme?.maengel ?? null,
+    abnahmeMeta: abnahme?.meta ?? null,
+    abnahmeDatum: abnahme?.abnahmeDatum ?? null,
+    abnahmeNotizen: abnahme?.notizen ?? null,
+    abnahmeErgebnisLabel: abnahme?.ergebnisLabel ?? null,
     mitPreisen: optionen.mitPreisen,
     mitBautagebuch,
     mitFotos,
@@ -313,7 +314,14 @@ async function buildAbschlussPdf(
     leistungszeitraum
   )
 
-  return { ok: true as const, buffer, detail, bautagebuch, fotoUrls, hasAbnahme: Boolean(detail.abnahme_protokoll_url) }
+  return {
+    ok: true as const,
+    buffer,
+    detail,
+    bautagebuch: bautagebuchZeilen,
+    fotoUrls: fotoRows.map((f) => f.url),
+    hasAbnahme: Boolean(abnahme),
+  }
 }
 
 export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
@@ -328,22 +336,20 @@ export async function getAbschlussdokuVorschau(auftragId: string): Promise<{
   abschlussUrl: string | null
 }> {
   const detail = await loadAuftragDetail(auftragId)
-  const bautagebuch = await listAuftragBautagebuch(auftragId)
-  const { listAuftragPositionEintraege } = await import(
-    '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-  )
-  const posEintraege = await listAuftragPositionEintraege(auftragId)
+  const [btbZeilen, btbRaw, abnahme] = await Promise.all([
+    collectAbschlussBautagebuch(auftragId),
+    listAuftragBautagebuch(auftragId),
+    loadAbnahmeForAbschlussbericht(auftragId),
+  ])
   const fotos = detail
-    ? await collectFotoUrls(detail, bautagebuch)
+    ? await collectAbschlussFotoUrls(detail, btbRaw, abnahme?.meta ?? null)
     : []
   const voraus = await loadAbschlussVoraussetzungen(auftragId)
   const abschlussUrl = detail?.abschlussdokumentation_url?.trim() || null
   return {
     positionenCount: detail?.auftrag_positionen?.length ?? 0,
-    bautagebuchCount: bautagebuch.length + posEintraege.length,
-    fotoCount:
-      fotos.length +
-      posEintraege.reduce((n, e) => n + (e.eintrag_fotos?.length ?? 0), 0),
+    bautagebuchCount: btbZeilen.length,
+    fotoCount: fotos.length,
     hasAbnahme: voraus.hasAbnahme,
     hasAbschlussbericht: Boolean(abschlussUrl),
     hasRechnung: voraus.hasRechnung,

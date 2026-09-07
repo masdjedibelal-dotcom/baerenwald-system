@@ -375,7 +375,7 @@ async function rechnungenAbschlagLinks(
   const { data } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung'
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung, ersetzt_durch, korrektur_von'
     )
     .eq('auftrag_id', auftragId)
   const rows = (data ?? []) as Array<
@@ -1154,7 +1154,7 @@ export async function saveRechnungWizardDraft(
         gesamtNetto,
         auftragsReferenz: '',
         projektTitel: '',
-        bereitsGestelltBrutto: berechneBereitsGestellt(links).brutto,
+        bereitsGestelltBrutto: berechneBereitsGestellt(links, input.rechnungId ?? null).brutto,
         vorherigeAbschlaege: links,
         ausserRechnungId: input.rechnungId ?? null,
       })

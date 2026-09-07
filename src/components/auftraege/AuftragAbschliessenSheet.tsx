@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   AbnahmeBegehListe,
@@ -21,6 +22,7 @@ import {
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
+  buildAbnahmePunkteInitial,
   maengelFromCheckItems,
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
@@ -53,6 +55,7 @@ export function AuftragAbschliessenSheet({
   /** Nach Abschluss ohne Abnahme — z. B. Rechnung öffnen */
   onNachRechnung?: () => void
 }) {
+  const router = useRouter()
   const [pending, setPending] = useState(false)
   const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
   const [step, setStep] = useState<Step>('loading')
@@ -86,6 +89,11 @@ export function AuftragAbschliessenSheet({
   }, [open, auftragId])
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
+
+  function openAbnahmeWizard() {
+    onClose()
+    router.push(`/auftraege/${auftragId}/abnahme/erstellen`)
+  }
 
   function abschliessenOhneAbnahme() {
     if (pending) return
@@ -142,6 +150,17 @@ export function AuftragAbschliessenSheet({
 
   function speichernMitAbnahme(sendToKunde: boolean) {
     if (pending) return
+    const readyPunkte =
+      punkte.length > 0
+        ? punkte
+        : buildAbnahmePunkteInitial({ positionen }).map((p) => ({
+            ...p,
+            status: 'ok' as const,
+          }))
+    if (!readyPunkte.some((p) => p.status === 'ok' || p.status === 'mangel')) {
+      toast.error('Mindestens eine Leistung für die Abnahme auswählen.')
+      return
+    }
     setPendingKind(sendToKunde ? 'send' : 'save')
     setPending(true)
     void actionBusy
@@ -156,7 +175,7 @@ export function AuftragAbschliessenSheet({
           const r = await saveAbnahmeAndAbschliessen({
             auftragId,
             abnahmeDatum: heuteYmd(),
-            punkte,
+            punkte: readyPunkte,
             maengel,
             notizen: notizen.trim() || null,
             meta,
@@ -241,6 +260,9 @@ export function AuftragAbschliessenSheet({
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}
+          <Button type="button" variant="secondary" onClick={openAbnahmeWizard}>
+            Eigenes Abnahmeprotokoll erstellen
+          </Button>
         </div>
       </EditorSheet>
     )
@@ -263,13 +285,7 @@ export function AuftragAbschliessenSheet({
             >
               Ohne Abnahme
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              disabled={pending}
-              loading={pending}
-              onClick={() => setStep('checkliste')}
-            >
+            <Button type="button" variant="primary" disabled={pending} onClick={openAbnahmeWizard}>
               Abnahme erstellen
             </Button>
           </div>
@@ -277,8 +293,7 @@ export function AuftragAbschliessenSheet({
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
           Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
-          Abnahmeprotokoll mit Leistungs-Checkliste und Mängeln erstellen. Signatur erfolgt
-          vor Ort / im Portal — nicht hier.
+          Abnahmeprotokoll mit Leistungen, Mängeln und Unterschriften erstellen.
         </p>
       </EditorSheet>
     )
@@ -315,13 +330,20 @@ export function AuftragAbschliessenSheet({
       }
     >
       <div className="space-y-5">
-        <AbnahmeProgressBar done={progress.done} total={progress.total} />
+        <AbnahmeProgressBar done={progress.done} total={progress.total || positionen.length} />
         <div>
           <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
             Leistungen
           </h3>
           <AbnahmeBegehListe
-            punkte={punkte}
+            punkte={
+              punkte.length
+                ? punkte
+                : buildAbnahmePunkteInitial({ positionen }).map((p) => ({
+                    ...p,
+                    status: 'ok' as const,
+                  }))
+            }
             onChange={setPunkte}
             katalogPositionen={positionen}
           />
@@ -342,6 +364,9 @@ export function AuftragAbschliessenSheet({
             placeholder="Optional"
           />
         </label>
+        <Button type="button" variant="ghost" size="sm" onClick={openAbnahmeWizard}>
+          Vollständiges Protokoll mit Unterschriften…
+        </Button>
       </div>
     </EditorSheet>
   )
