@@ -74,6 +74,10 @@ function applyHausverwaltungDefaults(
     payload.notfall_direkt = true
     payload.akut_fall_ids = []
     payload.kleinreparaturen_ohne_angebot = false
+    const n = typeof payload.name === 'string' ? payload.name.trim() : ''
+    if (n && !String(payload.org_anzeigename ?? '').trim()) {
+      payload.org_anzeigename = n
+    }
   }
   // Registrierungs-/Stammadresse → Portal-Profil (org_*)
   if (payload.strasse !== undefined) payload.org_strasse = payload.strasse
@@ -99,6 +103,22 @@ export async function saveKunde(
   }
 
   if (kundeId) {
+    /* Portale nutzen org_anzeigename vor name — bei HV mitziehen, wenn leer oder bisher = alter Name. */
+    if (istKundeHausverwaltungTyp(data.typ) && typeof payload.name === 'string') {
+      const newName = payload.name.trim()
+      if (newName) {
+        const { data: prev } = await withCrmReadFallback(async (db) =>
+          db.from('kunden').select('name, org_anzeigename').eq('id', kundeId).maybeSingle()
+        )
+        const prevName = String((prev as { name?: string } | null)?.name ?? '').trim()
+        const prevOrg = String(
+          (prev as { org_anzeigename?: string | null } | null)?.org_anzeigename ?? ''
+        ).trim()
+        if (!prevOrg || prevOrg === prevName) {
+          payload.org_anzeigename = newName
+        }
+      }
+    }
     const { error } = await withCrmReadFallback(async (db) =>
       db.from('kunden').update(payload).eq('id', kundeId)
     )

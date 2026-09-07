@@ -198,7 +198,11 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             </div>
           </MockField>
 
-          <MockField label="Anzeigename" full>
+          <MockField
+            label="Anzeigename"
+            full
+            hint="Erscheint in den Portalen (HV, Melde, Mieter) — nicht nur der CRM-Kundenname."
+          >
             <input
               className="txt"
               placeholder="z. B. Muster Hausverwaltung GmbH"
