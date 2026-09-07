@@ -28,6 +28,7 @@ export function parseAngebotAnrede(
 export function parseWizardMetaFromNotizen(
   notizen: string | null | undefined
 ): {
+  titel?: string
   einleitung?: string
   schluss?: string
   leistungsumfang?: string
@@ -37,6 +38,7 @@ export function parseWizardMetaFromNotizen(
   try {
     const j = JSON.parse(notizen ?? '{}') as {
       wizard_meta?: {
+        titel?: string
         einleitung?: string
         schluss?: string
         leistungsumfang?: string
@@ -47,6 +49,7 @@ export function parseWizardMetaFromNotizen(
     const wm = j.wizard_meta
     if (!wm) return null
     return {
+      titel: wm.titel,
       einleitung: wm.einleitung,
       schluss: wm.schluss,
       leistungsumfang: wm.leistungsumfang,
