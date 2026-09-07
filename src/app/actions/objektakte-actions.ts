@@ -942,10 +942,14 @@ export async function createPrivatkundeFromBewohner(
   }
 
   const { vorname, nachname } = splitBewohnerName(bewohner.name)
+  const displayName =
+    [vorname, nachname].filter(Boolean).join(' ').trim() ||
+    bewohner.name?.trim() ||
+    'Privatkunde'
   const { data: created, error: createErr } = await supabase
     .from('kunden')
     .insert({
-      name: null,
+      name: displayName,
       vorname,
       nachname,
       email,

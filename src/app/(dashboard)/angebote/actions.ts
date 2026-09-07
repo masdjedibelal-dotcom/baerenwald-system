@@ -227,6 +227,22 @@ export async function searchKunden(q: string) {
   return { kunden: (data ?? []) as Kunde[] }
 }
 
+/** Kurz-Stammdaten für Auswahlfelder (Anfrage / Angebot). */
+export async function getKundeKurz(id: string): Promise<Kunde | null> {
+  const kid = id.trim()
+  if (!kid) return null
+  const { data } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select(
+        'id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at'
+      )
+      .eq('id', kid)
+      .maybeSingle()
+  )
+  return (data as Kunde | null) ?? null
+}
+
 export async function createKundeQuick(input: {
   vorname?: string | null
   nachname?: string | null
@@ -297,7 +313,7 @@ export async function createKundeQuick(input: {
     db
       .from('kunden')
       .insert({
-        name: null,
+        name: displayName || [v, n].filter(Boolean).join(' ') || 'Privatkunde',
         vorname: v || null,
         nachname: n || null,
         email,

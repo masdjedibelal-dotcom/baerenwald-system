@@ -510,10 +510,14 @@ export async function createAnfrage(
   const plzFinal = plz || adresseDb.plz || null
 
   if (!kundeId) {
+    const insertName = (namen.name ?? '').trim()
+    if (!insertName) {
+      return { ok: false, message: 'Bitte Name oder Vor-/Nachname angeben.' }
+    }
     const { data: kundeRow, error: kundeErr } = await supabase
       .from('kunden')
       .insert({
-        name: namen.name,
+        name: insertName,
         vorname: namen.vorname,
         nachname: namen.nachname,
         email: email || null,
@@ -533,7 +537,13 @@ export async function createAnfrage(
       return { ok: false, message: kundeErr?.message ?? 'Kunde konnte nicht angelegt werden.' }
     }
     kundeId = kundeRow.id
-  } else if (hatAnfrageAdresse(adresseFelder)) {
+  } else if (
+    hatAnfrageAdresse(adresseFelder) &&
+    /* HV-Meldung: Leistungsort ist Objekt — HV-Büroadresse nicht überschreiben. */
+    !istHausverwaltung &&
+    !payload.auftraggeber_kunde_id?.trim() &&
+    !payload.kunde_objekt_id?.trim()
+  ) {
     const { error: kUpdErr } = await supabase
       .from('kunden')
       .update({
@@ -577,7 +587,7 @@ export async function createAnfrage(
       const { data: neu, error: neuErr } = await supabase
         .from('kunden')
         .insert({
-          name: null,
+          name: melderName,
           vorname: v || null,
           nachname: n || null,
           email: melderEmail || null,
@@ -623,6 +633,8 @@ export async function createAnfrage(
     }
   }
 
+  const isHvMeldung = istHausverwaltung && Boolean(hvAuftraggeberId)
+
   const { data: leadRow, error: leadErr } = await supabase
     .from('leads')
     .insert({
@@ -635,7 +647,8 @@ export async function createAnfrage(
       melder_email: melderEmail,
       melder_telefon: melderTelefon,
       melder_einheit: melderEinheit,
-      anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
+      anlass: payload.anlass === 'meldung' || isHvMeldung ? 'meldung' : 'projekt',
+      erfassung_von: isHvMeldung ? 'crm' : null,
       kanal: payload.kanal,
       status: 'neu',
       situation: situationFinal,
@@ -645,6 +658,8 @@ export async function createAnfrage(
       preis_min: payload.preis_min ?? null,
       preis_max: payload.preis_max ?? null,
       plz: plzFinal,
+      strasse: adresseDb.strasse,
+      hausnummer: adresseDb.hausnummer,
       zeitraum: payload.zeitraum?.trim() || null,
       zeitraum_von: payload.zeitraum_von?.trim() || null,
       zeitraum_bis: payload.zeitraum_bis?.trim() || null,
@@ -657,6 +672,14 @@ export async function createAnfrage(
       notizen: payload.notizen.trim() || null,
       funnel_daten: funnelDaten,
       freigabe_bypass_grund: freigabeBypassGrund,
+      /** Wie Portal-Mieter-Meldung: HV sieht Ablehnen / Hausmeister / Direkt. */
+      ...(isHvMeldung
+        ? {
+            hv_meldung_status: 'neu',
+            org_freigabe_status: 'nicht_noetig',
+            vorgang_phase: 'eingegangen',
+          }
+        : {}),
       ist_bauprojekt: payload.ist_bauprojekt === true,
       ist_wiederkehrend: payload.ist_wiederkehrend === true,
       wiederkehr_turnus:
@@ -797,12 +820,18 @@ export async function updateAnfrageAusNeuForm(
       nachname: namen.nachname,
       email: email || null,
       telefon: telefon || null,
-      plz: plzFinal,
       typ: kundentyp,
       updated_at: new Date().toISOString(),
     }
-    if (hatAnfrageAdresse(adresseFelder)) {
+    /* HV: Leistungsort nicht auf Kunden-/HV-Adresse schreiben. */
+    if (
+      hatAnfrageAdresse(adresseFelder) &&
+      !istHausverwaltung &&
+      !payload.auftraggeber_kunde_id?.trim() &&
+      !payload.kunde_objekt_id?.trim()
+    ) {
       Object.assign(kundePatch, adresseDb)
+      kundePatch.plz = plzFinal
     }
     const { error: kErr } = await supabase.from('kunden').update(kundePatch).eq('id', kundeId)
     if (kErr) return { ok: false, message: kErr.message }
@@ -816,6 +845,8 @@ export async function updateAnfrageAusNeuForm(
     preis_min: payload.preis_min ?? null,
     preis_max: payload.preis_max ?? null,
     plz: plzFinal,
+    strasse: adresseDb.strasse,
+    hausnummer: adresseDb.hausnummer,
     zeitraum: payload.zeitraum?.trim() || null,
     kundentyp: payload.kundentyp?.trim() || kundentyp,
     kontakt_name: namen.name,
@@ -1041,7 +1072,7 @@ export async function updateLeadMelderUndLeistungsort(
   // HV-Pipeline sicherstellen, falls Lead aus CRM-FAB ohne Auftraggeber kam
   const { data: leadRow } = await supabase
     .from('leads')
-    .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass')
+    .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass, funnel_daten')
     .eq('id', id)
     .maybeSingle()
   if (!leadRow) return { ok: false, message: 'Anfrage nicht gefunden.' }
@@ -1053,6 +1084,41 @@ export async function updateLeadMelderUndLeistungsort(
     if (istKundeHausverwaltungTyp(k?.typ as string | null)) {
       patch.auftraggeber_kunde_id = kundeId
       if (!(leadRow.anlass as string | null)?.trim()) patch.anlass = 'meldung'
+    }
+  }
+
+  /* Wie Portal-Melde: Lead-Adresse = Objekt-Leistungsort. */
+  if (objektId) {
+    const { data: obj } = await supabase
+      .from('kunden_objekte')
+      .select('strasse, hausnummer, plz, ort')
+      .eq('id', objektId)
+      .maybeSingle()
+    if (obj) {
+      const strasse = (obj.strasse as string | null)?.trim() || null
+      const hausnummer = (obj.hausnummer as string | null)?.trim() || null
+      const plz = (obj.plz as string | null)?.trim() || null
+      const ort = (obj.ort as string | null)?.trim() || null
+      patch.strasse = strasse
+      patch.hausnummer = hausnummer
+      if (plz) patch.plz = plz
+      const prevFd =
+        leadRow.funnel_daten &&
+        typeof leadRow.funnel_daten === 'object' &&
+        !Array.isArray(leadRow.funnel_daten)
+          ? { ...(leadRow.funnel_daten as Record<string, unknown>) }
+          : {}
+      patch.funnel_daten = {
+        ...prevFd,
+        strasse,
+        hausnummer,
+        plz,
+        ort,
+        objekt_strasse: strasse,
+        objekt_hausnummer: hausnummer,
+        objekt_plz: plz,
+        objekt_ort: ort,
+      }
     }
   }
 

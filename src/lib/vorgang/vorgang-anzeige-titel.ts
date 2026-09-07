@@ -4,7 +4,7 @@ import { BEREICH_LABELS, SITUATION_LABELS } from '@/lib/utils'
 export type VorgangAnzeigeTitelAngebot = {
   leistungsumfang?: string | null
   notizen?: string | null
-  /** Spalte `angebote.titel` — oft sprechender als Leistungsumfang-Platzhalter */
+  /** Optional / Legacy — Prod hat oft keine Spalte `angebote.titel` */
   titel?: string | null
 }
 
@@ -45,6 +45,7 @@ function angebotSprechenderTitel(
   if (!angebot) return null
   const wm = parseWizardMetaFromNotizen(angebot.notizen)
   const candidates = [
+    wm?.titel,
     angebot.leistungsumfang,
     wm?.leistungsumfang,
     angebot.titel,

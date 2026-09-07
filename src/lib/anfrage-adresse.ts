@@ -31,11 +31,23 @@ export function anfrageAdresseAusPayload(input: {
       ? input.funnel_daten
       : {}
   const plzTop = input.plz?.trim() || null
+  /* HV: Leistungsort = Objekt (`objekt_*`); Kontakt-/Büro-Adresse danach. */
   return {
-    strasse: firstStr(input.strasse, fd.strasse, fd.straße, fd.street),
-    hausnummer: firstStr(input.hausnummer, fd.hausnummer, fd.houseNumber),
-    plz: firstStr(plzTop, fd.plz, input.plz),
-    ort: firstStr(input.ort, fd.ort, fd.city, fd.stadt),
+    strasse: firstStr(
+      fd.objekt_strasse,
+      input.strasse,
+      fd.strasse,
+      fd.straße,
+      fd.street
+    ),
+    hausnummer: firstStr(
+      fd.objekt_hausnummer,
+      input.hausnummer,
+      fd.hausnummer,
+      fd.houseNumber
+    ),
+    plz: firstStr(fd.objekt_plz, plzTop, fd.plz, input.plz),
+    ort: firstStr(fd.objekt_ort, input.ort, fd.ort, fd.city, fd.stadt),
   }
 }
 

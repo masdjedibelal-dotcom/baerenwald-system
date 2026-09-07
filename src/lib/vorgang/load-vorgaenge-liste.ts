@@ -202,7 +202,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           db
             .from('angebote')
             .select(
-              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, titel, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung'
+              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
@@ -372,7 +372,6 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       gesendet_kunde_at: string | null
       leistungsumfang: string | null
       notizen: string | null
-      titel: string | null
       gesamt_fix: number | null
       gesamt_min: number | null
       gesamt_max: number | null
@@ -549,7 +548,8 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       updated_at: a.updated_at,
       leistungsumfang: a.leistungsumfang,
       notizen: a.notizen,
-      titel: a.titel,
+      // Prod hat keine Spalte angebote.titel — Titel kommt aus leistungsumfang / Wizard-Meta in notizen
+      titel: null as string | null,
       ist_wiederkehrend: a.ist_wiederkehrend,
       wiederkehr_turnus: a.wiederkehr_turnus,
     }))

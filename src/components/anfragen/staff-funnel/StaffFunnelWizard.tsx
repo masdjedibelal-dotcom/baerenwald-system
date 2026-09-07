@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage, searchMieterFuerHv, type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
+import { getKundeKurz } from '@/app/(dashboard)/angebote/actions'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
@@ -515,6 +516,21 @@ export function StaffFunnelWizard({
     setBestandskunde(Boolean(defaultKundeId))
     setMeldeAbweichend(false)
     setHvObjekte([])
+  }, [open, defaultKundeId])
+
+  // Bestandskunde aus Kundenakte: Stammdaten nachladen (nicht nur ID setzen)
+  useEffect(() => {
+    if (!open || !defaultKundeId?.trim()) return
+    let cancelled = false
+    void getKundeKurz(defaultKundeId).then((k) => {
+      if (cancelled || !k) return
+      applyKunde(k)
+    })
+    return () => {
+      cancelled = true
+    }
+    // applyKunde bewusst nicht in deps — nur beim Öffnen mit defaultKundeId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultKundeId])
 
   const isHv =

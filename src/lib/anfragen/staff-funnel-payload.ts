@@ -6,6 +6,7 @@ import {
   anliegenToSituation,
 } from '@/lib/anfragen/staff-funnel-types'
 import { needsBeratungPfad } from '@/lib/anfragen/staff-funnel-steps'
+import { meldeAnswersFromStaffFachdetails } from '@/lib/anfragen/staff-fachdetails-melde'
 import { normalizeSituation } from '@/lib/vorab-formular-config'
 import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 
@@ -78,6 +79,20 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     fachdetails.bad_ausstattung = [state.badAusstattung]
   }
 
+  const fachdetailAnswers = meldeAnswersFromStaffFachdetails(fachdetails)
+
+  /* HV wie Portal-Melde: Lead-/Funnel-Adresse = Leistungsort (Objekt), nicht HV-Büro. */
+  const leistungStrasse = isHv
+    ? state.objektStrasse.trim() || null
+    : state.strasse.trim() || null
+  const leistungHausnummer = isHv
+    ? state.objektHausnummer.trim() || null
+    : state.hausnummer.trim() || null
+  const leistungPlz = isHv ? state.objektPlz.trim() || null : state.plz.trim() || null
+  const leistungOrt = isHv
+    ? state.objektOrt.trim() || null
+    : state.ort.trim() || null
+
   const beschreibung = [state.freitext.trim(), state.beratungText.trim()]
     .filter(Boolean)
     .join('\n\n')
@@ -90,14 +105,22 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     kundentyp: state.kundentyp || (isHv ? 'verwaltung' : null),
     vorname: state.vorname.trim() || null,
     nachname: state.nachname.trim() || null,
-    strasse: state.strasse.trim() || null,
-    hausnummer: state.hausnummer.trim() || null,
-    plz: state.plz.trim() || null,
-    ort: state.ort.trim() || null,
+    strasse: leistungStrasse,
+    hausnummer: leistungHausnummer,
+    plz: leistungPlz,
+    ort: leistungOrt,
     objekt_strasse: state.objektStrasse.trim() || null,
     objekt_hausnummer: state.objektHausnummer.trim() || null,
     objekt_plz: state.objektPlz.trim() || null,
     objekt_ort: state.objektOrt.trim() || null,
+    ...(isHv
+      ? {
+          hv_strasse: state.strasse.trim() || null,
+          hv_hausnummer: state.hausnummer.trim() || null,
+          hv_plz: state.plz.trim() || null,
+          hv_ort: state.ort.trim() || null,
+        }
+      : {}),
     kunde_objekt_id: state.kundeObjektId?.trim() || null,
     mieter_vorname: state.mieterVorname.trim() || null,
     mieter_nachname: state.mieterNachname.trim() || null,
@@ -122,6 +145,9 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     badAusstattung: state.badAusstattung || null,
     umfang: state.umfang || null,
     fachdetails,
+    ...(Object.keys(fachdetailAnswers).length > 0
+      ? { fachdetailAnswers }
+      : {}),
     groessen: state.groessen,
     groessen_einheiten: state.groessenEinheiten,
     preis_modus: beratung ? 'komplex' : 'normal',
@@ -150,10 +176,10 @@ export function staffFunnelToPayload(state: StaffFunnelState): NeueAnfragePayloa
     nachname: state.nachname.trim() || null,
     email: state.email.trim(),
     telefon: state.telefon.trim(),
-    plz: state.plz.trim(),
-    strasse: state.strasse.trim() || null,
-    hausnummer: state.hausnummer.trim() || null,
-    ort: state.ort.trim() || null,
+    plz: leistungPlz || '',
+    strasse: leistungStrasse,
+    hausnummer: leistungHausnummer,
+    ort: leistungOrt,
     kanal,
     situation: situationNorm,
     bereiche: isGewerbe ? ['gewerbe'] : state.bereiche,

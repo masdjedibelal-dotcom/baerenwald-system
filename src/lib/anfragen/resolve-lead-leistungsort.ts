@@ -1,6 +1,7 @@
 /**
- * Leistungsort-Anzeige: Objekt-Felder zuerst, sonst Lead-/Funnel-Adresse
- * (Melde vom Objekt-Link füllt oft Lead-Adresse, während kunden_objekte leer ist).
+ * Leistungsort-Anzeige: Objekt zuerst (Join + Funnel `objekt_*`),
+ * dann Lead-Adresse (Portal-Melde schreibt dort den Ausführungsort),
+ * zuletzt Funnel-Kontaktadresse.
  */
 
 export type LeistungsortAdresse = {
@@ -10,10 +11,7 @@ export type LeistungsortAdresse = {
   ort: string
 }
 
-function funnelStr(
-  funnel: unknown,
-  ...keys: string[]
-): string {
+function funnelStr(funnel: unknown, ...keys: string[]): string {
   if (!funnel || typeof funnel !== 'object' || Array.isArray(funnel)) return ''
   const fd = funnel as Record<string, unknown>
   for (const k of keys) {
@@ -36,25 +34,30 @@ export function resolveLeadLeistungsort(lead: {
   } | null
 }): LeistungsortAdresse {
   const o = lead.kunden_objekte
+  const fd = lead.funnel_daten
   return {
     strasse:
       o?.strasse?.trim() ||
+      funnelStr(fd, 'objekt_strasse') ||
       lead.strasse?.trim() ||
-      funnelStr(lead.funnel_daten, 'strasse') ||
+      funnelStr(fd, 'strasse', 'straße', 'street') ||
       '',
     hausnummer:
       o?.hausnummer?.trim() ||
+      funnelStr(fd, 'objekt_hausnummer') ||
       lead.hausnummer?.trim() ||
-      funnelStr(lead.funnel_daten, 'hausnummer') ||
+      funnelStr(fd, 'hausnummer', 'houseNumber') ||
       '',
     plz:
       o?.plz?.trim() ||
+      funnelStr(fd, 'objekt_plz') ||
       lead.plz?.trim() ||
-      funnelStr(lead.funnel_daten, 'plz') ||
+      funnelStr(fd, 'plz') ||
       '',
     ort:
       o?.ort?.trim() ||
-      funnelStr(lead.funnel_daten, 'ort') ||
+      funnelStr(fd, 'objekt_ort') ||
+      funnelStr(fd, 'ort', 'city', 'stadt') ||
       '',
   }
 }

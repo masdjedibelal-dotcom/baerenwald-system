@@ -21,6 +21,7 @@ import {
 import { BEREICH_LABELS, KANAL_LABELS, cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
+import { meldeAnswersFromStaffFachdetails } from '@/lib/anfragen/staff-fachdetails-melde'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import type { Kunde } from '@/lib/types'
 import {
@@ -487,6 +488,13 @@ export function AnfrageNeuForm({
     const situationNorm = normalizeSituation(situation) || situation
     const kanalTyped = (KANAL_VALUES.includes(kanal as LeadKanal) ? kanal : 'telefon') as LeadKanal
 
+    const fachdetailsObj = Object.fromEntries(
+      Object.entries(fachdetails)
+        .filter(([, v]) => v)
+        .map(([k, v]) => [k, [v]])
+    )
+    const fachdetailAnswers = meldeAnswersFromStaffFachdetails(fachdetailsObj)
+
     const funnel_daten: Record<string, unknown> = {
       situation,
       bereiche,
@@ -502,11 +510,8 @@ export function AnfrageNeuForm({
       dringlichkeit: dringlichkeit || null,
       zugaenglichkeit: zugaenglichkeit || null,
       badAusstattung: badAusstattung || null,
-      fachdetails: Object.fromEntries(
-        Object.entries(fachdetails)
-          .filter(([, v]) => v)
-          .map(([k, v]) => [k, [v]])
-      ),
+      fachdetails: fachdetailsObj,
+      ...(Object.keys(fachdetailAnswers).length > 0 ? { fachdetailAnswers } : {}),
       groessen,
       groessen_einheiten: groessenEinheiten,
       quelle: 'crm_manuell',

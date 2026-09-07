@@ -121,6 +121,30 @@ export const FACHDETAIL_VALUE_LABELS: Record<string, string> = {
   leck: 'Leck / Rohrbruch',
   wc: 'WC Reparatur',
   armatur: 'Armatur defekt',
+  wasser_austritt: 'Wasser tritt aus / läuft / tropft',
+  von_decke_wand: 'Wasser aus Decke oder Wand',
+  feucht_ohne_lauf: 'Nur feucht — kein laufendes Wasser',
+  wohnung_kalt: 'Wohnung / Heizung bleibt kalt',
+  kein_warmwasser: 'Kein Warmwasser (Dusche/Hahn kalt)',
+  wasser_am_hk: 'Wasser tropft oder läuft am Heizkörper',
+  geraeusche: 'Knacken / Gluckern / laute Geräusche',
+  kein_strom: 'Kein Strom in der Wohnung / im Bereich',
+  fi_sicherung: 'Sicherung oder FI fliegt raus',
+  einzelner_punkt: 'Nur Steckdose, Licht oder Schalter defekt',
+  klingel: 'Klingel / Türsprecher',
+  garagentor: 'Garagentor öffnet oder schließt nicht',
+  fenster_klemmt_undicht: 'Fenster klemmt oder schließt nicht dicht',
+  scheibe_kaputt: 'Fensterscheibe ist kaputt oder gesprungen',
+  tuer_schloss: 'Tür, Schloss oder Schlüssel-Problem',
+  regenrinne_ueber: 'Die Regenrinne läuft über',
+  wasser_fassade: 'Bei Regen kommt Wasser falsch an der Fassade runter',
+  ziegel_boden: 'Dachziegel liegen am Boden oder fehlen',
+  schimmel_feucht: 'Schimmel oder feuchte Stellen an Wand / Decke',
+  kueche: 'Küche',
+  bad: 'Bad',
+  keller: 'Keller',
+  wohnraum: 'Wohn- / Schlafzimmer',
+  sonstiges: 'Etwas anderes',
   pflege: 'Regelmäßige Pflege',
   gestaltung: 'Neugestaltung',
   baumarbeiten: 'Baumarbeiten',
@@ -830,6 +854,13 @@ export function bereichLabelForFachdetailKey(configKey: string): string {
 
   if (configKey === 'bad_ausstattung') return 'Bad — Ausstattung'
   if (configKey === 'elektro_kaputt') return 'Elektrik — Problem'
+  if (configKey === 'sanitaer_kaputt') return 'Sanitär — Problem'
+  if (configKey === 'sanitaer_ort') return 'Sanitär — Ort'
+  if (configKey === 'heizung_kaputt') return 'Heizung — Problem'
+  if (configKey === 'fenster_kaputt') return 'Fenster / Tür — Problem'
+  if (configKey === 'dach_kaputt') return 'Dach — Problem'
+  if (configKey === 'schimmel_kaputt') return 'Schimmel — Problem'
+  if (configKey === 'schimmel_ort') return 'Schimmel — Ort'
 
   const bereich = BEREICHE.find((b) => b.value === configKey)
   if (bereich) return bereich.label
