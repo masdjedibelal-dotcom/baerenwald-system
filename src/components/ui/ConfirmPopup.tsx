@@ -25,6 +25,7 @@ export function ConfirmPopup({
   saveDraftLabel = 'Als Entwurf speichern',
   onSaveDraft,
   discardLabel,
+  busy = false,
 }: {
   open: boolean
   onClose: () => void
@@ -39,6 +40,8 @@ export function ConfirmPopup({
   onSaveDraft?: () => void
   /** Label für den Verwerfen-/Schließen-Button (Default = confirmLabel). */
   discardLabel?: string
+  /** Speichern läuft — Buttons sperren, Dialog bleibt deckend sichtbar. */
+  busy?: boolean
 }) {
   const [mounted, setMounted] = useState(false)
   const titleId = useId()
@@ -53,8 +56,10 @@ export function ConfirmPopup({
     if (!open || !mounted) return
     const dialog = dialogRef.current
     if (!dialog) return
-    return trapFocus(dialog, () => onCloseRef.current())
-  }, [open, mounted])
+    return trapFocus(dialog, () => {
+      if (!busy) onCloseRef.current()
+    })
+  }, [open, mounted, busy])
 
   if (!open || !mounted) return null
 
@@ -66,6 +71,7 @@ export function ConfirmPopup({
       className="confirm-popup-overlay"
       role="presentation"
       onClick={(e) => {
+        if (busy) return
         if (e.target === e.currentTarget) onClose()
       }}
     >
@@ -75,6 +81,7 @@ export function ConfirmPopup({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-busy={busy || undefined}
         tabIndex={-1}
       >
         <div className="confirm-popup__body">
@@ -95,6 +102,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="primary"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onSaveDraft?.()
@@ -105,6 +113,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="danger"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onConfirm()
@@ -115,6 +124,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="secondary"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onClose()
@@ -128,6 +138,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="danger"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onConfirm()
@@ -138,6 +149,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="primary"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onClose()
@@ -151,6 +163,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="secondary"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onClose()
@@ -161,6 +174,7 @@ export function ConfirmPopup({
               <Button
                 type="button"
                 variant="primary"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
                   onConfirm()

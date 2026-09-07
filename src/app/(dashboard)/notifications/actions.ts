@@ -60,7 +60,7 @@ function typLabel(typ: CrmNotificationTyp): string {
     case 'hm_befund_freigabe':
       return 'Hausmeister-Vorbefund'
     case 'handwerker_update':
-      return 'Neues Update Handwerker'
+      return 'Update zu Leistung'
     case 'handwerker_angenommen':
       return 'Handwerker hat zugesagt'
     case 'handwerker_abgelehnt':
@@ -139,7 +139,7 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'hm_befund_freigabe':
       return 'Anfrage öffnen'
     case 'handwerker_update':
-      return 'Bautagebuch öffnen'
+      return 'Leistungen öffnen'
     case 'handwerker_angenommen':
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
@@ -173,7 +173,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'hm_befund_freigabe':
       return 'Der Hausmeister hat die Prüfung abgeschlossen und an Bärenwald übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.'
     case 'handwerker_update':
-      return 'Eintrag vom Partner im Bautagebuch. Im Auftrag siehst du den vollständigen Eintrag.'
+      return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen siehst du den Eintrag.'
     case 'handwerker_angenommen':
       return 'Der Partner hat die Angebots-Anfrage im Portal angenommen.'
     case 'handwerker_abgelehnt':
@@ -438,6 +438,7 @@ async function collectCrmNotificationItems(opts?: {
         'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
       )
       .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
+      .neq('typ', 'weitere_arbeit')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
@@ -698,7 +699,7 @@ async function collectCrmNotificationItems(opts?: {
     }
   }
 
-  // ── Bautagebuch (Partner-App) ────────────────────────────────
+  // ── Leistungs-Updates (Partner-App) ─────────────────────────
   if (!peRes.error) {
     for (const row of peRes.data ?? []) {
       const pos = one(
@@ -725,9 +726,11 @@ async function collectCrmNotificationItems(opts?: {
       items.push({
         sourceKey: `handwerker_update:${row.id}`,
         typ: 'handwerker_update',
-        title: leistung ? `${hwName}: Update zu ${leistung}` : `${hwName}: Update`,
+        title: leistung
+          ? `${hwName}: Update zu Leistung „${leistung}“`
+          : `${hwName}: Update zu Leistung`,
         subtitle: desc || null,
-        href: `/auftraege/${auftragId}?tab=bautagebuch${
+        href: `/auftraege/${auftragId}?tab=leistungen${
           row.position_id ? `&position=${encodeURIComponent(String(row.position_id))}` : ''
         }`,
         createdAt: row.created_at as string,

@@ -40,18 +40,18 @@ function slotButtonClass(slot: DetailActionSlot, mobile = false): string {
   if (slot === 'primary') {
     return cn(
       'btn primary inline-flex items-center justify-center gap-1.5',
-      mobile ? '' : 'sm'
+      mobile ? '' : null
     )
   }
   if (slot === 'danger') {
     return cn(
       'btn danger-outline inline-flex items-center justify-center gap-1.5',
-      mobile ? 'detail-mobile-action-bar__danger' : 'sm'
+      mobile ? 'detail-mobile-action-bar__danger' : null
     )
   }
   return cn(
     'btn secondary inline-flex items-center justify-center gap-1.5',
-    mobile ? 'detail-mobile-action-bar__secondary' : 'sm shrink-0 gap-1.5'
+    mobile ? 'detail-mobile-action-bar__secondary' : 'shrink-0 gap-1.5'
   )
 }
 
@@ -81,7 +81,9 @@ function InlineActionButton({
 
   const btnClass = cn(
     slotButtonClass(slot, Boolean(className?.includes('detail-mobile-action-bar'))),
-    size === 'md' && slot === 'primary'
+    size === 'md' &&
+      slot === 'primary' &&
+      className?.includes('detail-mobile-action-bar')
       ? 'h-11 px-4 text-[length:var(--fs-title)] font-semibold'
       : null,
     className
@@ -193,7 +195,11 @@ export function DetailActionsBar({
       )}
     >
       {resolved.visible.map((item) => (
-        <InlineActionButton key={`${item.slot}-${item.action.label}`} item={item} />
+        <InlineActionButton
+          key={`${item.slot}-${item.action.label}`}
+          item={item}
+          size="md"
+        />
       ))}
       {resolved.hasMenu ? (
         <MenuTrigger items={resolved.overflowMenu} sheetTitle={sheetTitle} />

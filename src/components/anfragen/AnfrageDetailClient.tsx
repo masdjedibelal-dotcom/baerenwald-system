@@ -820,7 +820,7 @@ export function AnfrageDetailClient({
   )
 
   const headMeta = useMemo(() => {
-    const parts = [vorhabenTitel]
+    const parts = [kundeTitel]
     const kanal = kanalLabel(lead.kanal)
     if (kanal) parts.push(kanal)
     if (lead.created_at) {
@@ -839,7 +839,7 @@ export function AnfrageDetailClient({
       `Freigabe: ${ORG_FREIGABE_LABELS[freigabeStatus] ?? freigabeStatus}`
     )
     return parts.filter(Boolean).join(' · ')
-  }, [vorhabenTitel, lead.created_at, lead.kanal, lead.org_freigabe_status])
+  }, [kundeTitel, lead.created_at, lead.kanal, lead.org_freigabe_status])
 
   const stammdatenInhalt = (
     <>
@@ -974,7 +974,7 @@ export function AnfrageDetailClient({
       crumbBackHref="/vorgaenge?tab=anfrage"
       crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Anfragen"
-      breadcrumbTitle={kundeTitel}
+      breadcrumbTitle={vorhabenTitel}
       wiedervorlageDatum={lead.wiedervorlage_datum}
       wiedervorlageNotiz={lead.wiedervorlage_notiz}
       wiedervorlageEntity="lead"
@@ -984,7 +984,7 @@ export function AnfrageDetailClient({
       onWiedervorlageOpenChange={setWvOpen}
       quickBar={quickBar}
       head={{
-        title: kundeTitel,
+        title: vorhabenTitel,
         titleBadges: isMobile ? (
           <>
             <PipelineKontextBadge lead={lead} />

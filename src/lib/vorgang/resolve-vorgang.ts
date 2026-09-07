@@ -1,6 +1,9 @@
 import { leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
-import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import {
+  isPlaceholderVorgangTitel,
+  resolveAkteVorgangTitel,
+} from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type {
   ResolveVorgangInput,
@@ -297,15 +300,32 @@ function buildTitel(
   const angebote = input.angebote ?? []
   const angebot =
     angebotAktiv ??
-    angebote.find((a) => Boolean(a.leistungsumfang?.trim() || a.notizen?.trim() || a.titel?.trim())) ??
+    angebote.find((a) =>
+      Boolean(a.leistungsumfang?.trim() || a.notizen?.trim() || a.titel?.trim())
+    ) ??
     angebote[0] ??
     null
 
-  return angebotTitelOderSituationBereich({
-    angebot,
+  const auftragTitel =
+    input.auftraege?.find(
+      (a) => a.titel?.trim() && !isPlaceholderVorgangTitel(a.titel)
+    )?.titel ??
+    input.auftraege?.find((a) => a.titel?.trim())?.titel ??
+    null
+
+  return resolveAkteVorgangTitel({
+    angebot: angebot
+      ? {
+          leistungsumfang: angebot.leistungsumfang,
+          notizen: angebot.notizen,
+          titel: angebot.titel,
+        }
+      : null,
+    auftragTitel,
     situation: input.lead.situation,
     bereiche: input.lead.bereiche,
-    fallback: input.titel?.trim() || input.lead.kontakt_name?.trim() || 'Vorgang',
+    // Nie Kundenname — nur expliziter Vorgangs-Titel falls gesetzt
+    fallback: input.titel?.trim() || null,
   })
 }
 

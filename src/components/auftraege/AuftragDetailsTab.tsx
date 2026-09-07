@@ -208,15 +208,28 @@ export function AuftragLeistungenTab({
 
   const rows = useMemo(() => {
     return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [], {
-      eintraege: bautagebuchEintraege.map((e) => ({
-        position_id: e.position_id,
-        typ: e.typ,
-        beschreibung: e.beschreibung,
-        zeit_minuten: e.zeit_minuten,
-        created_at: e.created_at,
-        erfasst_von: e.erfasst_von,
-        fotoCount: e.eintrag_fotos?.length ?? 0,
-      })),
+      eintraege: bautagebuchEintraege.map((e) => {
+        const fotoUrls = (e.eintrag_fotos ?? [])
+          .map((f) => f.display_url)
+          .filter((u): u is string => Boolean(u?.trim()))
+        return {
+          id: e.id,
+          position_id: e.position_id,
+          position_ids:
+            e.leistung_position_ids?.length
+              ? e.leistung_position_ids
+              : e.position_id
+                ? [e.position_id]
+                : [],
+          typ: e.typ,
+          beschreibung: e.beschreibung,
+          zeit_minuten: e.zeit_minuten,
+          created_at: e.ereignis_zeit || e.created_at,
+          erfasst_von: e.erfasst_von,
+          fotoCount: fotoUrls.length || (e.eintrag_fotos?.length ?? 0),
+          fotoUrls,
+        }
+      }),
     })
   }, [detail.auftrag_positionen, bautagebuchEintraege])
 

@@ -6,6 +6,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
+import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
 import type { LeistungDrawerAction, LeistungRow } from '@/components/leistungen/types'
 
 function Section({
@@ -219,25 +220,7 @@ export function LeistungDrawer({
           {(row.handwerkerUpdates ?? []).length === 0 ? (
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Keine Einträge.</p>
           ) : (
-            <ul className="space-y-2">
-              {(row.handwerkerUpdates ?? []).map((u, i) => (
-                <li
-                  key={`${u.at ?? i}-${i}`}
-                  className="rounded-md border border-bw-border bg-bw-card px-3 py-2 text-[length:var(--fs-text)]"
-                >
-                  <div className="font-medium text-bw-text">{u.text}</div>
-                  <div className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {[
-                      u.at ? formatDatumKurz(u.at) : null,
-                      u.zeitLabel ? `${u.zeitLabel} Std.` : null,
-                      u.fotoCount && u.fotoCount > 0 ? `${u.fotoCount} Foto(s)` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <LeistungHandwerkerUpdatesAccordion updates={row.handwerkerUpdates ?? []} />
           )}
         </Section>
       ) : null}
@@ -245,9 +228,3 @@ export function LeistungDrawer({
   )
 }
 
-function formatDatumKurz(iso: string): string {
-  const d = iso.slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return iso.slice(0, 16)
-  const [y, m, day] = d.split('-')
-  return `${day}.${m}.${y}`
-}

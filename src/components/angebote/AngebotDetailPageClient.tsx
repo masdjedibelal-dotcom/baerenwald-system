@@ -393,14 +393,14 @@ export function AngebotDetailPageClient({
   )
   const headMeta = useMemo(() => {
     const parts = [
-      projektTitel && projektTitel !== '—' ? projektTitel : null,
+      kundeName?.trim() || null,
       formatEurBetrag(summenMail.bruttoMin),
       gueltigBisYmd
         ? `gültig bis ${formatDatum(gueltigBisYmd) || gueltigBisYmd}`
         : null,
     ].filter(Boolean)
     return parts.join(' · ')
-  }, [projektTitel, summenMail.bruttoMin, gueltigBisYmd])
+  }, [kundeName, summenMail.bruttoMin, gueltigBisYmd])
   const gesendetAm = gesendetAmWert(detail)
   const inhaltGeaendertNachVersand =
     (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
@@ -721,7 +721,7 @@ export function AngebotDetailPageClient({
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
       crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Angebote"
-      breadcrumbTitle={kundeName}
+      breadcrumbTitle={projektTitel}
       className="space-y-4 pb-0"
       wiedervorlageDatum={detail.wiedervorlage_datum}
       wiedervorlageNotiz={detail.wiedervorlage_notiz}
@@ -730,7 +730,7 @@ export function AngebotDetailPageClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: kundeName,
+        title: projektTitel,
         sub: headSub,
         badges: (
           <StatusBadge

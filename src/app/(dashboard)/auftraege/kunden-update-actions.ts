@@ -169,6 +169,18 @@ export async function createKundenUpdateAndSend(input: {
     }
   }
 
+  try {
+    const { notifyPortalBautagebuchFromCrm } = await import(
+      '@/lib/portal/notify-portal-bautagebuch'
+    )
+    await notifyPortalBautagebuchFromCrm({
+      auftragId: input.auftragId,
+      eintragTitel: titel,
+    })
+  } catch (e) {
+    console.warn('[createKundenUpdateAndSend] Portal-Notify:', e)
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true, timelineId }
 }

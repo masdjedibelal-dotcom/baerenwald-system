@@ -665,10 +665,10 @@ export function AuftragDetailClient({
   })
   const headMeta = useMemo(() => {
     const parts: string[] = []
-    if (projektName) parts.push(projektName)
+    if (name && name !== 'Auftrag') parts.push(name)
     if (detail.created_at) parts.push(`erstellt ${formatDatum(detail.created_at)}`)
     return parts.filter(Boolean).join(' · ')
-  }, [projektName, detail.created_at])
+  }, [name, detail.created_at])
 
   const freigabeStatus = (_leadDetail?.org_freigabe_status ?? '').trim()
   const freigabeAusstehend =
@@ -1029,6 +1029,21 @@ export function AuftragDetailClient({
       q.delete('segment')
       router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
     }
+    // Deep-Link Abnahme / Abschließen → Sheet öffnen (kein Navigations-Hop mehr)
+    const vorOrt = vorOrtAbschnittFromQuery(rawTab)
+    const wantsAbschliessen =
+      searchParams.get('abschliessen') === '1' ||
+      vorOrt === 'abnahme' ||
+      vorOrt === 'abschluss'
+    if (wantsAbschliessen && detail.status !== 'storniert' && detail.status !== 'abgeschlossen') {
+      setAbschliessenOpen(true)
+      if (vorOrt === 'abnahme' || vorOrt === 'abschluss' || searchParams.get('abschliessen') === '1') {
+        const q = new URLSearchParams(searchParams.toString())
+        if (vorOrt === 'abnahme' || vorOrt === 'abschluss') q.set('tab', 'leistungen')
+        q.delete('abschliessen')
+        router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+      }
+    }
   }, [searchParams, detail.status, detail.id, zahlungOffen, router])
 
   const finanzenInhalt = (
@@ -1153,7 +1168,7 @@ export function AuftragDetailClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: name,
+        title: projektName,
         titleBadges: freigabeAusstehend ? (
           <StatusBadge
             status="termin"
@@ -1255,7 +1270,7 @@ export function AuftragDetailClient({
                 return {
                   label: 'Abnahme',
                   icon: 'clipboard-list',
-                  onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+                  onClick: () => openAuftragAbschliessen(),
                   disabled: pending,
                   title: 'Abnahmeprotokoll erstellen (optional)',
                 }

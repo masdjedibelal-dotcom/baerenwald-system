@@ -550,6 +550,18 @@ export async function sendBautagebuchAnKunde(input: {
     email_log_id: sent.emailLogId ?? null,
   })
 
+  try {
+    const { notifyPortalBautagebuchFromCrm } = await import(
+      '@/lib/portal/notify-portal-bautagebuch'
+    )
+    await notifyPortalBautagebuchFromCrm({
+      auftragId: input.auftragId,
+      eintragTitel: eintrag.titel,
+    })
+  } catch (e) {
+    console.warn('[sendBautagebuchAnKunde] Portal-Notify:', e)
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }
 }
@@ -593,6 +605,18 @@ export async function freigebenBautagebuchEintrag(input: {
     sichtbar_fuer_kunde: false,
     erstellt_von: gate.userId,
   })
+
+  try {
+    const { notifyPortalBautagebuchFromCrm } = await import(
+      '@/lib/portal/notify-portal-bautagebuch'
+    )
+    await notifyPortalBautagebuchFromCrm({
+      auftragId: input.auftragId,
+      eintragTitel: eintrag.titel,
+    })
+  } catch (e) {
+    console.warn('[freigebenBautagebuchEintrag] Portal-Notify:', e)
+  }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
   return { ok: true }

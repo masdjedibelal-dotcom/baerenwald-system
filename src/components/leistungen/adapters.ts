@@ -27,13 +27,17 @@ import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 import type { LeistungMangelAnzeige, LeistungRow } from '@/components/leistungen/types'
 
 export type LeistungEintragLite = {
+  id?: string
   position_id?: string | null
+  /** Junction + Primary — Eintrag an mehreren Leistungen */
+  position_ids?: string[]
   typ?: string | null
   beschreibung?: string | null
   zeit_minuten?: number | null
   created_at?: string | null
   erfasst_von?: string | null
   fotoCount?: number
+  fotoUrls?: string[]
 }
 
 function mengeLabel(menge: number | null | undefined, einheit: string | null | undefined): string {
@@ -194,11 +198,20 @@ export function leistungenFromAuftragPositionen(
 ): LeistungRow[] {
   const eintraegeByPos = new Map<string, LeistungEintragLite[]>()
   for (const e of opts?.eintraege ?? []) {
-    const pid = e.position_id?.trim()
-    if (!pid) continue
-    const list = eintraegeByPos.get(pid) ?? []
-    list.push(e)
-    eintraegeByPos.set(pid, list)
+    const ids = Array.from(
+      new Set(
+        [
+          ...(e.position_ids ?? []),
+          e.position_id?.trim() || null,
+        ].filter((id): id is string => Boolean(id?.trim()))
+      )
+    )
+    if (ids.length === 0) continue
+    for (const pid of ids) {
+      const list = eintraegeByPos.get(pid) ?? []
+      list.push(e)
+      eintraegeByPos.set(pid, list)
+    }
   }
 
   return [...positionen]
@@ -253,7 +266,7 @@ export function leistungenFromAuftragPositionen(
         : anerkennung === 'abgelehnt'
           ? 'Abgelehnt'
           : st === 'erledigt'
-            ? 'Abgenommen'
+            ? 'Erledigt von HW'
             : leistungStatusLabel(st)
       const statusForBadge = brauchtFreigabe
         ? 'offen'
@@ -274,18 +287,24 @@ export function leistungenFromAuftragPositionen(
             von.includes('partner') ||
             von.includes('eigenbetrieb') ||
             Boolean(e.beschreibung?.trim()) ||
-            (Number(e.zeit_minuten) || 0) > 0
+            (Number(e.zeit_minuten) || 0) > 0 ||
+            (e.fotoCount ?? 0) > 0 ||
+            (e.fotoUrls?.length ?? 0) > 0
           )
         })
         .map((e) => {
           const zeit = Number(e.zeit_minuten) || 0
           const typ = eintragTypLabel(e.typ)
           const text = e.beschreibung?.trim() || typ || 'Update'
+          const fotoUrls = (e.fotoUrls ?? []).filter(Boolean)
           return {
+            id: e.id,
+            typ: e.typ ?? null,
             at: e.created_at ?? null,
             text,
             zeitLabel: zeit > 0 ? formatStundenColon(zeit) : null,
-            fotoCount: e.fotoCount ?? 0,
+            fotoCount: fotoUrls.length || e.fotoCount || 0,
+            fotoUrls,
           }
         })
 
@@ -309,7 +328,7 @@ export function leistungenFromAuftragPositionen(
       if (!brauchtFreigabe && st === 'in_arbeit' && p.gestartet_am) {
         subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
       } else if (!brauchtFreigabe && st === 'erledigt') {
-        subParts.push('dokumentiert · abgenommen')
+        subParts.push('dokumentiert · erledigt von HW')
       }
 
       const preisLabel =
@@ -368,7 +387,7 @@ export function leistungenFromAuftragPositionen(
         dokumentationEintraege: notizen,
         abnahmeLabel:
           st === 'erledigt'
-            ? 'Abgenommen'
+            ? 'Erledigt von HW'
             : 'Noch nicht abgenommen — Ergebnis und Notiz fließen ins Abnahmedokument.',
         istRegie: isRegie,
         handwerkerUpdates,

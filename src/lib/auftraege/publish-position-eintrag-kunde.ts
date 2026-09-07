@@ -60,4 +60,19 @@ export async function publishPositionEintragFuerKunde(input: {
     erstellt_von: input.erstelltVon ?? null,
     handwerker_id: input.handwerkerId ?? null,
   })
+
+  try {
+    const { notifyPortalBautagebuchFromCrm } = await import(
+      '@/lib/portal/notify-portal-bautagebuch'
+    )
+    await notifyPortalBautagebuchFromCrm({
+      auftragId: input.auftragId,
+      eintragTitel: titelParts.join(' · ') || 'Bautagebuch-Update',
+    })
+  } catch (e) {
+    console.warn(
+      '[publishPositionEintragFuerKunde] Portal-Notify:',
+      e instanceof Error ? e.message : e
+    )
+  }
 }

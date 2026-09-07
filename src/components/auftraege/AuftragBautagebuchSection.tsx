@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Camera, X } from 'lucide-react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { eintragTypLabel, type PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
+import type { PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +13,11 @@ export type BautagebuchListenEintrag = PositionEintrag & {
   /** Mehrere Leistungen (Junction), Anzeige mit Komma. */
   leistungNames?: string[]
   handwerkerName?: string | null
+}
+
+function isPartnerEintrag(e: BautagebuchListenEintrag): boolean {
+  const von = String(e.erfasst_von ?? '')
+  return von.includes('partner') || von.includes('eigenbetrieb')
 }
 
 function eintragZeit(e: BautagebuchListenEintrag): string {
@@ -36,7 +41,7 @@ function eintragTitel(e: BautagebuchListenEintrag): string {
     if (first.length > 0 && first.length <= 72) return first
     if (first.length > 72) return `${first.slice(0, 69)}…`
   }
-  return eintragTypLabel(e.typ)
+  return 'Tagebuch-Eintrag'
 }
 
 function eintragText(e: BautagebuchListenEintrag): string {
@@ -44,24 +49,15 @@ function eintragText(e: BautagebuchListenEintrag): string {
   if (!body) return ''
   const lines = body.split(/\n+/).map((l) => l.trim()).filter(Boolean)
   if (lines.length <= 1) {
-    // Lange Einzeiler: Vorschau kürzen, Detail im Sheet
     return body.length > 160 ? `${body.slice(0, 157)}…` : ''
   }
   return lines.slice(1).join(' ').slice(0, 220)
 }
 
-function typChipClass(typ: string): string {
-  const t = typ.toLowerCase()
-  if (t === 'start') return 'bt-inserat__typ--start'
-  if (t === 'ergebnis') return 'bt-inserat__typ--ende'
-  if (t === 'fortschritt') return 'bt-inserat__typ--fort'
-  if (t === 'weitere_arbeit') return 'bt-inserat__typ--nachtrag'
-  return 'bt-inserat__typ--notiz'
-}
-
 /**
- * Bautagebuch = Portal-Updates als Inserat-Cards.
- * Klick öffnet Sheet mit vollem Text + Fotos (Zoom).
+ * Bautagebuch = CRM-Tagebuch-Einträge.
+ * HW-Leistungs-Updates gehören unter Leistungen — hier ausgeblendet.
+ * Keine Start/Fortschritt-Status-Pills.
  */
 export function AuftragBautagebuchSection({
   eintraege,
@@ -76,7 +72,12 @@ export function AuftragBautagebuchSection({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const sorted = [...eintraege]
-    .filter((e) => String(e.typ).toLowerCase() !== 'weitere_arbeit')
+    .filter((e) => {
+      const typ = String(e.typ).toLowerCase()
+      if (typ === 'weitere_arbeit') return false
+      if (isPartnerEintrag(e)) return false
+      return true
+    })
     .sort((a, b) => {
       const ta = a.ereignis_zeit || a.created_at || ''
       const tb = b.ereignis_zeit || b.created_at || ''
@@ -129,9 +130,6 @@ export function AuftragBautagebuchSection({
               e.zeit_minuten != null && e.zeit_minuten > 0
                 ? `${Math.floor(e.zeit_minuten / 60)}:${String(e.zeit_minuten % 60).padStart(2, '0')} Std.`
                 : null
-            const vonPartner =
-              String(e.erfasst_von ?? '').includes('partner') ||
-              String(e.erfasst_von ?? '').includes('eigenbetrieb')
             return (
               <li key={e.id}>
                 <button
@@ -163,26 +161,15 @@ export function AuftragBautagebuchSection({
                     </div>
                   ) : null}
                   <div className="bt-inserat__body">
-                    <div className="bt-inserat__head">
-                      <span className={cn('bt-inserat__typ', typChipClass(e.typ))}>
-                        {eintragTypLabel(e.typ)}
-                      </span>
-                      {vonPartner ? (
-                        <span className="bt-inserat__src">Handwerker</span>
-                      ) : (
-                        <span className="bt-inserat__src">CRM</span>
-                      )}
-                    </div>
                     <div className="bt-inserat__title">{eintragTitel(e)}</div>
                     {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
                     <div className="bt-inserat__meta">
                       <span>{eintragZeit(e)}</span>
-                      {e.handwerkerName?.trim() ? (
-                        <span className="bt-inserat__chip">{e.handwerkerName.trim()}</span>
-                      ) : null}
-                      {(e.leistungNames?.length ? e.leistungNames : e.leistungName?.trim()
-                        ? [e.leistungName.trim()]
-                        : []
+                      {(e.leistungNames?.length
+                        ? e.leistungNames
+                        : e.leistungName?.trim()
+                          ? [e.leistungName.trim()]
+                          : []
                       ).length > 0 ? (
                         <span className="bt-inserat__chip bt-inserat__chip--muted">
                           {(e.leistungNames?.length
@@ -213,22 +200,13 @@ export function AuftragBautagebuchSection({
           setLightboxUrl(null)
           setOpenId(null)
         }}
-        title={active ? eintragTypLabel(active.typ) : 'Eintrag'}
+        title={active ? eintragTitel(active) : 'Tagebuch-Eintrag'}
         subtitle={active ? eintragZeit(active) : null}
         size="md"
       >
         {active ? (
           <div className="bt-eintrag-sheet">
             <div className="bt-eintrag-sheet__meta">
-              {String(active.erfasst_von ?? '').includes('partner') ||
-              String(active.erfasst_von ?? '').includes('eigenbetrieb') ? (
-                <span className="bt-inserat__src">Handwerker</span>
-              ) : (
-                <span className="bt-inserat__src">CRM</span>
-              )}
-              {active.handwerkerName?.trim() ? (
-                <span className="bt-inserat__chip">{active.handwerkerName.trim()}</span>
-              ) : null}
               {active.leistungName?.trim() || active.leistungNames?.length ? (
                 <span className="bt-inserat__chip bt-inserat__chip--muted">
                   {(active.leistungNames?.length

@@ -643,11 +643,11 @@ export function RechnungDetailClient({
   })
   const headMeta = useMemo(() => {
     const parts: string[] = []
-    if (projektTitelAnzeige && projektTitelAnzeige !== '—') parts.push(projektTitelAnzeige)
+    if (kundeName?.trim()) parts.push(kundeName.trim())
     if (detail.brutto != null) parts.push(formatEurBetrag(detail.brutto))
     if (detail.faellig_am) parts.push(`fällig ${formatDatum(detail.faellig_am)}`)
     return parts.join(' · ')
-  }, [projektTitelAnzeige, detail.brutto, detail.faellig_am])
+  }, [kundeName, detail.brutto, detail.faellig_am])
   const headSub =
     detail.status === 'gesendet'
       ? isEingehend
@@ -873,7 +873,7 @@ export function RechnungDetailClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: kundeName,
+        title: projektTitelAnzeige,
         sub: headSub,
         badges: korrekturUi.dualBadges ? (
           <span className="inline-flex flex-wrap items-center gap-1.5">

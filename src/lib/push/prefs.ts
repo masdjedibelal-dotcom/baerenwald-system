@@ -38,7 +38,7 @@ export const CRM_PUSH_SWITCHES: {
   {
     key: 'handwerker_updates',
     label: 'Handwerker-Updates',
-    desc: 'Annahme, Ablehnung, Einreichung, Positionsmeldungen',
+    desc: 'Leistungs-Updates, Annahme, Ablehnung, Einreichung, Positionsmeldungen',
   },
   {
     key: 'angebot_entscheidungen',

@@ -70,7 +70,6 @@ export function ConfirmActionProvider({ children }: { children: ReactNode }) {
     const run = state.onConfirm
     const busy = state.busyLabel
     setPending(true)
-    setState(null)
     try {
       if (busy === null) {
         await Promise.resolve(run())
@@ -81,8 +80,9 @@ export function ConfirmActionProvider({ children }: { children: ReactNode }) {
       } else {
         await Promise.resolve(run())
       }
+      setState(null)
     } catch {
-      // Toast vom Aufrufer
+      // Toast vom Aufrufer — Dialog bleibt offen zum erneuten Versuch
     } finally {
       setPending(false)
     }
@@ -97,9 +97,10 @@ export function ConfirmActionProvider({ children }: { children: ReactNode }) {
           if (!pending) setState(null)
         }}
         title={state?.title ?? ''}
-        confirmLabel={state?.confirmLabel}
+        confirmLabel={pending ? 'Wird gespeichert…' : state?.confirmLabel}
         cancelLabel={state?.cancelLabel}
         danger={state?.danger}
+        busy={pending}
         onConfirm={() => {
           void handleConfirm()
         }}
