@@ -10,7 +10,7 @@ import {
   leistungenFromAuftragPositionen,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
-import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
+import { CrmPositionEintragModal, type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
@@ -164,7 +164,9 @@ export function AuftragLeistungenTab({
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
+  const [tagebuchEdit, setTagebuchEdit] = useState<CrmTagebuchEditSeed | null>(null)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
+  const [btRefreshKey, setBtRefreshKey] = useState(0)
   const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
     initialLeistungenView
   )
@@ -262,11 +264,23 @@ export function AuftragLeistungenTab({
     return () => {
       cancelled = true
     }
-  }, [detail.id, detail.updated_at, posMetaById])
+  }, [detail.id, detail.updated_at, posMetaById, btRefreshKey])
 
   function openTagebuch(positionId?: string | null) {
+    setTagebuchEdit(null)
     setTagebuchPositionId(positionId ?? null)
     setTagebuchOpen(true)
+  }
+
+  function openTagebuchEdit(seed: CrmTagebuchEditSeed) {
+    setTagebuchPositionId(null)
+    setTagebuchEdit(seed)
+    setTagebuchOpen(true)
+  }
+
+  function refreshBautagebuch() {
+    setBtRefreshKey((n) => n + 1)
+    onSaved?.()
   }
 
   function markErledigt(ids: string[]) {
@@ -452,8 +466,11 @@ export function AuftragLeistungenTab({
       ) : (
         <AuftragBautagebuchSection
           eintraege={bautagebuchEintraege}
+          auftragId={detail.id}
           disabled={disabled}
           onAdd={() => openTagebuch(null)}
+          onEdit={openTagebuchEdit}
+          onChanged={refreshBautagebuch}
         />
       )}
 
@@ -476,11 +493,15 @@ export function AuftragLeistungenTab({
 
       <CrmPositionEintragModal
         open={tagebuchOpen}
-        onClose={() => setTagebuchOpen(false)}
+        onClose={() => {
+          setTagebuchOpen(false)
+          setTagebuchEdit(null)
+        }}
         auftragId={detail.id}
         positionen={detail.auftrag_positionen ?? []}
-        initialPositionId={tagebuchPositionId}
-        onSaved={() => onSaved?.()}
+        initialPositionId={tagebuchEdit ? null : tagebuchPositionId}
+        editEintrag={tagebuchEdit}
+        onSaved={refreshBautagebuch}
       />
     </div>
   )

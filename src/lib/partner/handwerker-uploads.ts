@@ -1,6 +1,28 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { PARTNER_UPLOAD_BUCKET, storagePathFromHwPdfStored } from '@/lib/partner/handwerker-einreichung'
 
+/**
+ * Anzeige-URL für gespeicherte Eintrag-Fotos.
+ * HTTPS (z. B. öffentlicher Bucket `protokolle`) sofort zurück — kein Storage-Roundtrip.
+ * Relativpfade → Signed URL aus `handwerker-uploads`.
+ */
+export async function resolveEintragFotoDisplayUrl(
+  stored: string | null | undefined,
+  expiresIn = 3600
+): Promise<string | null> {
+  const raw = String(stored ?? '').trim()
+  if (!raw) return null
+  if (/^https?:\/\//i.test(raw)) return raw
+  return signedHandwerkerUploadUrl(raw, expiresIn)
+}
+
+export async function resolveEintragFotoDisplayUrls(
+  storedList: Array<string | null | undefined>,
+  expiresIn = 3600
+): Promise<(string | null)[]> {
+  return Promise.all(storedList.map((s) => resolveEintragFotoDisplayUrl(s, expiresIn)))
+}
+
 export async function signedHandwerkerUploadUrl(
   stored: string | null | undefined,
   expiresIn = 3600

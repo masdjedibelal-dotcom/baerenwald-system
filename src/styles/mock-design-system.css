@@ -2307,6 +2307,186 @@ button.wv-chip:hover {
   line-height: 1.2;
 }
 
+/* Phasenverlauf — Tabellen-Layout (aktuell in VorgangPhasenVerlauf) */
+.vgp-table-wrap {
+  margin: 14px 0 6px;
+  min-width: 0;
+}
+.vgp-table-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 0 10px;
+  padding: 0 2px;
+}
+.vgp-table-title {
+  font-size: var(--fs-text);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.vgp-table-hint {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text-3);
+}
+.vgp-table {
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #fff);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+}
+.vgp-table-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.85fr) minmax(0, 1.55fr) minmax(64px, auto) 28px;
+  gap: 6px 10px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 12px 12px;
+  border: 0;
+  border-bottom: 0.5px solid var(--border);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.vgp-table-row:last-child {
+  border-bottom: 0;
+}
+.vgp-table-row--head {
+  padding: 8px 12px;
+  background: var(--bg-soft, #f6f7f5);
+  cursor: default;
+  pointer-events: none;
+}
+.vgp-table-row--head > span {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.vgp-table-row:not(.vgp-table-row--head):not(:disabled):hover {
+  background: var(--bg-soft, #f6f7f5);
+}
+.vgp-table-row.current {
+  background: color-mix(in srgb, var(--green) 7%, #fff);
+}
+.vgp-table-row--here {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+.vgp-table-row--static,
+.vgp-table-row:disabled {
+  cursor: default;
+}
+.vgp-table-row.open {
+  opacity: 0.78;
+}
+.vgp-table-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text);
+}
+.vgp-table-row.open .vgp-table-phase {
+  color: var(--text-4);
+}
+.vgp-table-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--border-strong, #c9cec6);
+}
+.vgp-table-dot.done {
+  background: var(--green);
+}
+.vgp-table-dot.current {
+  background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+}
+.vgp-table-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.vgp-table-kopf {
+  font-size: var(--fs-meta);
+  font-weight: 550;
+  color: var(--text-2);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vgp-table-kopf.vgp-leer {
+  color: var(--text-4);
+  font-weight: 400;
+}
+.vgp-table-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vgp-table-num {
+  font-size: var(--fs-meta);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+.vgp-table-row--head .vgp-table-num {
+  font-weight: 650;
+  color: var(--text-3);
+}
+.vgp-table-go {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text-4);
+}
+.vgp-table-row:not(:disabled):hover .vgp-table-go {
+  color: var(--green);
+}
+.vgp-table-here {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+@media (max-width: 640px) {
+  .vgp-table-row {
+    grid-template-columns: minmax(76px, 0.75fr) minmax(0, 1fr) minmax(56px, auto) 22px;
+    padding: 11px 10px;
+    gap: 4px 8px;
+  }
+  .vgp-table-phase {
+    font-size: 12px;
+  }
+  .vgp-table-kopf,
+  .vgp-table-num {
+    font-size: 12px;
+  }
+  .vgp-table-sub {
+    font-size: 10px;
+  }
+}
+
 /* Phase-Sheet Prop-Liste + Stack-Ebenen */
 .phase-sheet-props .prop {
   display: flex;

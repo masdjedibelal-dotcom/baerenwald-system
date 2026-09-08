@@ -1,10 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Camera, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Button } from '@/components/ui/Button'
+import { SwipeRow } from '@/components/ui/SwipeRow'
+import { confirmAction } from '@/components/ui/confirm-action'
+import { toast } from '@/components/ui/app-toast'
+import { actionBusy } from '@/components/ui/action-busy'
+import { deleteCrmTagebuchEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import type { CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import type { PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -54,22 +62,46 @@ function eintragText(e: BautagebuchListenEintrag): string {
   return lines.slice(1).join(' ').slice(0, 220)
 }
 
+function toEditSeed(e: BautagebuchListenEintrag): CrmTagebuchEditSeed {
+  const ids =
+    e.leistung_position_ids?.length
+      ? e.leistung_position_ids
+      : e.position_id
+        ? [e.position_id]
+        : []
+  return {
+    id: e.id,
+    positionIds: ids,
+    beschreibungRaw: e.beschreibung ?? e.beschreibung_roh ?? null,
+    fotoPaths: (e.eintrag_fotos ?? [])
+      .map((f) => String(f.storage_path ?? '').trim())
+      .filter(Boolean),
+  }
+}
+
 /**
  * Bautagebuch = CRM-Tagebuch-Einträge.
  * HW-Leistungs-Updates gehören unter Leistungen — hier ausgeblendet.
- * Keine Start/Fortschritt-Status-Pills.
  */
 export function AuftragBautagebuchSection({
   eintraege,
+  auftragId,
   disabled,
   onAdd,
+  onEdit,
+  onChanged,
 }: {
   eintraege: BautagebuchListenEintrag[]
+  auftragId: string
   disabled?: boolean
   onAdd: () => void
+  onEdit: (seed: CrmTagebuchEditSeed) => void
+  onChanged?: () => void
 }) {
+  const isMobile = useIsMobile()
   const [openId, setOpenId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   const sorted = [...eintraege]
     .filter((e) => {
@@ -85,12 +117,52 @@ export function AuftragBautagebuchSection({
     })
 
   const active = openId ? sorted.find((e) => e.id === openId) ?? null : null
-  const activeFotos = (active?.eintrag_fotos ?? []).filter((f) => f.display_url)
+  const activeFotos = (active?.eintrag_fotos ?? []).filter((f) => f.display_url || f.storage_path)
   const activeText = active ? eintragVolltext(active) : ''
   const activeStunden =
     active?.zeit_minuten != null && active.zeit_minuten > 0
       ? `${Math.floor(active.zeit_minuten / 60)}:${String(active.zeit_minuten % 60).padStart(2, '0')} Std.`
       : null
+
+  function closeDetail() {
+    setLightboxUrl(null)
+    setOpenId(null)
+  }
+
+  function startEdit(e: BautagebuchListenEintrag) {
+    closeDetail()
+    onEdit(toEditSeed(e))
+  }
+
+  function askDelete(e: BautagebuchListenEintrag) {
+    confirmAction({
+      title: 'Eintrag löschen?',
+      body: 'Der Tagebuch-Eintrag und zugehörige Fotos werden unwiderruflich gelöscht.',
+      confirmLabel: 'Löschen',
+      danger: true,
+      busyLabel: 'Eintrag wird gelöscht…',
+      onConfirm: async () => {
+        setDeletePending(true)
+        try {
+          await actionBusy.run('Eintrag wird gelöscht…', async () => {
+            const r = await deleteCrmTagebuchEintrag({
+              eintragId: e.id,
+              auftragId,
+            })
+            if (!r.ok) {
+              toast.error(r.message)
+              throw new Error(r.message)
+            }
+            toast.success('Eintrag gelöscht')
+            closeDetail()
+            onChanged?.()
+          })
+        } finally {
+          setDeletePending(false)
+        }
+      },
+    })
+  }
 
   return (
     <section className="bt-feed" aria-label="Bautagebuch">
@@ -121,73 +193,88 @@ export function AuftragBautagebuchSection({
       ) : (
         <ul className="bt-inserat-list">
           {sorted.map((e) => {
-            const fotos = e.eintrag_fotos ?? []
-            const visibleFotos = fotos.filter((f) => f.display_url)
+            const visibleFotos = (e.eintrag_fotos ?? []).filter((f) => f.display_url)
             const cover = visibleFotos[0]?.display_url
-            const hasFotoSlot = fotos.length > 0
+            const hasFotoSlot = (e.eintrag_fotos?.length ?? 0) > 0
             const desc = eintragText(e)
-            const stunden =
-              e.zeit_minuten != null && e.zeit_minuten > 0
-                ? `${Math.floor(e.zeit_minuten / 60)}:${String(e.zeit_minuten % 60).padStart(2, '0')} Std.`
-                : null
+            const card = (
+              <button
+                type="button"
+                className={cn(
+                  'bt-inserat',
+                  'bt-inserat--clickable',
+                  !hasFotoSlot && 'bt-inserat--text-only'
+                )}
+                onClick={() => setOpenId(e.id)}
+              >
+                {hasFotoSlot ? (
+                  <div className="bt-inserat__media" aria-hidden>
+                    {cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cover} alt="" />
+                    ) : (
+                      <div className="bt-inserat__media-empty">
+                        <MockIcon ctx="empty" n="camera" size={20} />
+                        <span className="bt-inserat__media-hint">Foto nicht ladbar</span>
+                      </div>
+                    )}
+                    {visibleFotos.length > 1 ? (
+                      <span className="bt-inserat__count">+{visibleFotos.length - 1}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="bt-inserat__body">
+                  <div className="bt-inserat__title">{eintragTitel(e)}</div>
+                  {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
+                  <div className="bt-inserat__meta">
+                    <span>{eintragZeit(e)}</span>
+                    {e.leistungName?.trim() || e.leistungNames?.length ? (
+                      <span className="bt-inserat__chip bt-inserat__chip--muted">
+                        {(e.leistungNames?.length
+                          ? e.leistungNames
+                          : [e.leistungName!.trim()]
+                        ).join(', ')}
+                      </span>
+                    ) : (
+                      <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
+                    )}
+                    {e.zeit_minuten != null && e.zeit_minuten > 0 ? (
+                      <span className="bt-inserat__zeit" title="Erfasste Zeit">
+                        {Math.floor(e.zeit_minuten / 60)}:
+                        {String(e.zeit_minuten % 60).padStart(2, '0')} Std.
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </button>
+            )
+
             return (
               <li key={e.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    'bt-inserat',
-                    'bt-inserat--clickable',
-                    !hasFotoSlot && 'bt-inserat--text-only'
-                  )}
-                  onClick={() => {
-                    setLightboxUrl(null)
-                    setOpenId(e.id)
-                  }}
-                >
-                  {hasFotoSlot ? (
-                    <div className="bt-inserat__media" aria-hidden>
-                      {cover ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={cover} alt="" />
-                      ) : (
-                        <div className="bt-inserat__media-empty">
-                          <Camera className="h-7 w-7 opacity-35" />
-                          <span className="bt-inserat__media-hint">Foto nicht ladbar</span>
-                        </div>
-                      )}
-                      {visibleFotos.length > 1 ? (
-                        <span className="bt-inserat__count">+{visibleFotos.length - 1}</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <div className="bt-inserat__body">
-                    <div className="bt-inserat__title">{eintragTitel(e)}</div>
-                    {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
-                    <div className="bt-inserat__meta">
-                      <span>{eintragZeit(e)}</span>
-                      {(e.leistungNames?.length
-                        ? e.leistungNames
-                        : e.leistungName?.trim()
-                          ? [e.leistungName.trim()]
-                          : []
-                      ).length > 0 ? (
-                        <span className="bt-inserat__chip bt-inserat__chip--muted">
-                          {(e.leistungNames?.length
-                            ? e.leistungNames
-                            : [e.leistungName!.trim()]
-                          ).join(', ')}
-                        </span>
-                      ) : (
-                        <span className="bt-inserat__chip bt-inserat__chip--muted">ohne Bezug</span>
-                      )}
-                      {stunden ? (
-                        <span className="bt-inserat__zeit" title="Erfasste Zeit">
-                          {stunden}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
+                {!disabled && isMobile ? (
+                  <SwipeRow
+                    leftActions={[
+                      {
+                        icon: 'trash',
+                        label: 'Löschen',
+                        onClick: () => askDelete(e),
+                        tone: 'danger',
+                      },
+                    ]}
+                    rightActions={[
+                      {
+                        icon: 'pencil',
+                        label: 'Bearbeiten',
+                        onClick: () => startEdit(e),
+                        tone: 'primary',
+                      },
+                    ]}
+                  >
+                    {card}
+                  </SwipeRow>
+                ) : (
+                  card
+                )}
               </li>
             )
           })}
@@ -196,13 +283,32 @@ export function AuftragBautagebuchSection({
 
       <EditorSheet
         open={Boolean(active)}
-        onClose={() => {
-          setLightboxUrl(null)
-          setOpenId(null)
-        }}
+        onClose={closeDetail}
         title={active ? eintragTitel(active) : 'Tagebuch-Eintrag'}
         subtitle={active ? eintragZeit(active) : null}
         size="md"
+        footer={
+          active && !disabled ? (
+            <div className="sheet-footer-actions ldr-cta">
+              <Button
+                type="button"
+                variant="danger"
+                disabled={deletePending}
+                onClick={() => askDelete(active)}
+              >
+                Löschen
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={deletePending}
+                onClick={() => startEdit(active)}
+              >
+                Bearbeiten
+              </Button>
+            </div>
+          ) : null
+        }
       >
         {active ? (
           <div className="bt-eintrag-sheet">
@@ -228,18 +334,22 @@ export function AuftragBautagebuchSection({
 
             {activeFotos.length > 0 ? (
               <div className="bt-eintrag-sheet__fotos" aria-label="Fotos">
-                {activeFotos.map((f) => (
-                  <button
-                    key={f.id ?? f.display_url}
-                    type="button"
-                    className="bt-eintrag-sheet__foto"
-                    onClick={() => setLightboxUrl(f.display_url!)}
-                    aria-label="Foto vergrößern"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.display_url!} alt="" />
-                  </button>
-                ))}
+                {activeFotos.map((f) => {
+                  const src = f.display_url || f.storage_path
+                  if (!src) return null
+                  return (
+                    <button
+                      key={f.id ?? src}
+                      type="button"
+                      className="bt-eintrag-sheet__foto"
+                      onClick={() => setLightboxUrl(src)}
+                      aria-label="Foto vergrößern"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" />
+                    </button>
+                  )
+                })}
               </div>
             ) : null}
           </div>

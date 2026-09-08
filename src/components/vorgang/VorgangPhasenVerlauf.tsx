@@ -1,12 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { hideRouteBusy, showRouteBusy } from '@/components/ui/action-busy'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
   angebotNrAnzeige,
@@ -67,8 +65,7 @@ function hasRealAngebotNummer(a: ProjektKontext['angebote'][number] | undefined)
 }
 
 /**
- * Mock „Verlauf des Vorgangs“ —
- * Desktop: vertikale Timeline · Mobil: horizontale Strip-Karten (aktuell zuerst sichtbar).
+ * Verlauf des Vorgangs — flache Phasen-Tabelle (kein Card-in-Card).
  */
 export function VorgangPhasenVerlauf({
   kontext,
@@ -88,12 +85,7 @@ export function VorgangPhasenVerlauf({
   void _onSaved
   const router = useRouter()
   const pathname = usePathname() ?? ''
-  const isMobile = useIsMobile()
-  const [readKind, setReadKind] = useState<PhaseKind | null>(null)
-  const [showEarlier, setShowEarlier] = useState(false)
   const [navBusy, setNavBusy] = useState(false)
-  const stripRef = useRef<HTMLDivElement>(null)
-  const currentCardRef = useRef<HTMLDivElement>(null)
 
   const withFrom = (pathname: string, extra?: Record<string, string>) => {
     if (fromRef) return hrefWithAkteFrom(pathname, fromRef, extra)
@@ -109,39 +101,10 @@ export function VorgangPhasenVerlauf({
     [kontext, lead, fromRef, extras]
   )
 
-  const currentIdx = rows.findIndex((r) => r.state === 'current')
-  const collapseFrom =
-    !isMobile && (fromRef?.kind === 'auftrag' || fromRef?.kind === 'rechnung')
-      ? Math.max(0, currentIdx)
-      : 0
-  const earlierCount = collapseFrom
-  const visibleRows =
-    showEarlier || earlierCount <= 0 ? rows : rows.slice(collapseFrom)
-
-  const active = rows.find((r) => r.kind === readKind) ?? null
-
-  /* Mobil: aktuelle Phase als erstes im Strip sichtbar (Timeline-Reihenfolge bleibt) */
-  useEffect(() => {
-    if (!isMobile || currentIdx < 0) return
-    const scroller = stripRef.current
-    const card = currentCardRef.current
-    if (!scroller || !card) return
-    const frame = window.requestAnimationFrame(() => {
-      const left = Math.max(0, card.offsetLeft - 14)
-      scroller.scrollTo({ left, behavior: 'smooth' })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [isMobile, currentIdx, rows])
-
   function openRow(row: PhaseRowModel) {
     if (row.state === 'open') return
-    // Direkt zur Phase — kein Zwischen-Sheet (Card-in-Card).
     if (fromRef?.kind === row.kind) return
     navigateFromPhaseSheet(row.href, row.label)
-  }
-
-  function closeRead() {
-    setReadKind(null)
   }
 
   function navigateFromPhaseSheet(href: string | null | undefined, label: string) {
@@ -151,7 +114,6 @@ export function VorgangPhasenVerlauf({
       toast.error(`${label} ist noch nicht verfügbar.`)
       return
     }
-    setReadKind(null)
 
     const targetPath = target.split('?')[0] || target
     const alreadyOnTarget =
@@ -173,7 +135,6 @@ export function VorgangPhasenVerlauf({
     }
   }
 
-  /* Overlay/Button-Busy zurücksetzen, sobald die Route gewechselt hat */
   useEffect(() => {
     if (!navBusy) return
     setNavBusy(false)

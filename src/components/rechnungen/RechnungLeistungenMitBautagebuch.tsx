@@ -150,8 +150,10 @@ export function RechnungLeistungenMitBautagebuch({
       {view === 'bautagebuch' && hasAuftrag ? (
         <AuftragBautagebuchSection
           eintraege={bautagebuchEintraege}
+          auftragId={auftragId!}
           disabled
           onAdd={() => undefined}
+          onEdit={() => undefined}
         />
       ) : (
         <LeistungenTab

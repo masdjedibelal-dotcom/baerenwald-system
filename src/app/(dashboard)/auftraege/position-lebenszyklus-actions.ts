@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
-import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+import { resolveEintragFotoDisplayUrl } from '@/lib/partner/handwerker-uploads'
 import {
   type AnerkennungStatus,
   type AuftragTagesspanne,
@@ -188,30 +188,40 @@ export async function listAuftragPositionEintraege(
     }
   }
 
-  const out: PositionEintrag[] = []
-  for (const row of data ?? []) {
+  const rows = data ?? []
+  const allFotoPaths: string[] = []
+  const fotoIndexByRow: number[][] = []
+  for (const row of rows) {
     const fotosRaw = Array.isArray(row.eintrag_fotos) ? row.eintrag_fotos : []
-    const fotos = []
+    const idxs: number[] = []
     for (const f of fotosRaw) {
-      const path = String(f.storage_path ?? '')
-      const display = path
-        ? (await signedHandwerkerUploadUrl(path)) ??
-          (/^https?:\/\//i.test(path) ? path : null)
-        : null
-      fotos.push({
-        id: String(f.id),
-        eintrag_id: String(f.eintrag_id),
-        storage_path: path,
-        exif_aufnahme: f.exif_aufnahme ?? null,
-        server_eingang: f.server_eingang ?? null,
-        exif_gps_lat: f.exif_gps_lat != null ? Number(f.exif_gps_lat) : null,
-        exif_gps_lng: f.exif_gps_lng != null ? Number(f.exif_gps_lng) : null,
-        aufnahmeart: f.aufnahmeart ?? 'direkt',
-        nachreich_grund: f.nachreich_grund ?? null,
-        created_at: f.created_at ?? null,
-        display_url: display,
-      })
+      idxs.push(allFotoPaths.length)
+      allFotoPaths.push(String(f.storage_path ?? ''))
     }
+    fotoIndexByRow.push(idxs)
+  }
+  const allDisplayUrls = await Promise.all(
+    allFotoPaths.map((path) => resolveEintragFotoDisplayUrl(path))
+  )
+
+  const out: PositionEintrag[] = []
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri]!
+    const fotosRaw = Array.isArray(row.eintrag_fotos) ? row.eintrag_fotos : []
+    const idxs = fotoIndexByRow[ri] ?? []
+    const fotos = fotosRaw.map((f: Record<string, unknown>, i: number) => ({
+      id: String(f.id),
+      eintrag_id: String(f.eintrag_id),
+      storage_path: String(f.storage_path ?? ''),
+      exif_aufnahme: (f.exif_aufnahme as string | null) ?? null,
+      server_eingang: (f.server_eingang as string | null) ?? null,
+      exif_gps_lat: f.exif_gps_lat != null ? Number(f.exif_gps_lat) : null,
+      exif_gps_lng: f.exif_gps_lng != null ? Number(f.exif_gps_lng) : null,
+      aufnahmeart: (f.aufnahmeart as string | null) ?? 'direkt',
+      nachreich_grund: (f.nachreich_grund as string | null) ?? null,
+      created_at: (f.created_at as string | null) ?? null,
+      display_url: allDisplayUrls[idxs[i] ?? -1] ?? null,
+    }))
     const eid = String(row.id)
     const junctionIds = junctionByEintrag.get(eid) ?? []
     const primaryPos = row.position_id != null ? String(row.position_id) : null
@@ -614,6 +624,190 @@ export async function createCrmTagebuchEintrag(
 
   revalidateAuftrag(auftragId)
   return { ok: true, eintragId: eintrag.id, positionId: primaryPos }
+}
+
+function istCrmTagebuchEintragEditierbar(erfasstVon: string | null | undefined): boolean {
+  const von = String(erfasstVon ?? '').toLowerCase()
+  if (!von || von === 'crm_intern' || von.startsWith('crm')) return true
+  if (von.includes('partner') || von.includes('eigenbetrieb')) return false
+  return true
+}
+
+/** CRM-Tagebuch-Eintrag aktualisieren (Text, Leistungen, Fotos). */
+export async function updateCrmTagebuchEintrag(
+  input: CrmTagebuchEintragInput & { eintragId: string }
+): Promise<TagebuchResult> {
+  const auth = await crmAuth()
+  if (!auth.ok) return auth
+
+  const eintragId = input.eintragId?.trim()
+  const auftragId = input.auftragId?.trim()
+  if (!eintragId) return { ok: false, message: 'Eintrag fehlt.' }
+  if (!auftragId) return { ok: false, message: 'Auftrag fehlt.' }
+
+  const { data: existing, error: loadErr } = await supabaseAdmin
+    .from('position_eintraege')
+    .select('id, auftrag_id, position_id, erfasst_von')
+    .eq('id', eintragId)
+    .maybeSingle()
+  if (loadErr) return { ok: false, message: migrationHint(loadErr.message) }
+  if (!existing) return { ok: false, message: 'Eintrag nicht gefunden.' }
+  if (!istCrmTagebuchEintragEditierbar(existing.erfasst_von as string | null)) {
+    return { ok: false, message: 'Partner-Einträge können hier nicht bearbeitet werden.' }
+  }
+
+  const existingAuftrag =
+    (existing.auftrag_id as string | null)?.trim() ||
+    (existing.position_id
+      ? (
+          await supabaseAdmin
+            .from('auftrag_positionen')
+            .select('auftrag_id')
+            .eq('id', existing.position_id)
+            .maybeSingle()
+        ).data?.auftrag_id
+      : null)
+  if (String(existingAuftrag ?? '') !== auftragId) {
+    return { ok: false, message: 'Eintrag gehört nicht zu diesem Auftrag.' }
+  }
+
+  const positionIds = Array.from(
+    new Set((input.positionIds ?? []).map((id) => id.trim()).filter(Boolean))
+  )
+  const titel = input.titel?.trim() || ''
+  const beschreibungRaw = input.beschreibung?.trim() || ''
+  const text = [titel, beschreibungRaw].filter(Boolean).join('\n\n')
+  const fotoPaths = Array.from(
+    new Set(
+      [
+        ...(input.fotoStoragePaths ?? []),
+        ...(input.fotoStoragePath ? [input.fotoStoragePath] : []),
+      ]
+        .map((p) => p.trim())
+        .filter(Boolean)
+    )
+  )
+  if (!text && !fotoPaths.length) {
+    return { ok: false, message: 'Titel, Text oder Foto angeben.' }
+  }
+
+  if (positionIds.length > 0) {
+    const { data: posRows, error: posErr } = await supabaseAdmin
+      .from('auftrag_positionen')
+      .select('id')
+      .eq('auftrag_id', auftragId)
+      .in('id', positionIds)
+    if (posErr) return { ok: false, message: migrationHint(posErr.message) }
+    if ((posRows ?? []).length !== positionIds.length) {
+      return { ok: false, message: 'Eine oder mehrere Leistungen gehören nicht zum Auftrag.' }
+    }
+  }
+
+  const typ: EintragTyp = positionIds.length > 0 ? 'fortschritt' : 'notiz'
+  const primaryPos = positionIds[0] ?? null
+
+  const { error: updErr } = await supabaseAdmin
+    .from('position_eintraege')
+    .update({
+      position_id: primaryPos,
+      auftrag_id: auftragId,
+      typ,
+      beschreibung: text || (fotoPaths.length ? 'Foto-Update' : null),
+      quelle: input.quelle ?? 'vor_ort',
+    })
+    .eq('id', eintragId)
+  if (updErr) return { ok: false, message: migrationHint(updErr.message) }
+
+  const linked = await linkEintragLeistungen(eintragId, positionIds)
+  if (!linked.ok) return linked
+
+  const { data: fotoRows } = await supabaseAdmin
+    .from('eintrag_fotos')
+    .select('id, storage_path')
+    .eq('eintrag_id', eintragId)
+
+  const keep = new Set(fotoPaths)
+  const existingPaths = new Set<string>()
+  for (const f of fotoRows ?? []) {
+    const path = String(f.storage_path ?? '').trim()
+    if (!path) continue
+    existingPaths.add(path)
+    if (!keep.has(path)) {
+      await supabaseAdmin.from('eintrag_fotos').delete().eq('id', f.id)
+    }
+  }
+  for (const path of fotoPaths) {
+    if (existingPaths.has(path)) continue
+    const attached = await attachCrmFoto({ eintragId, storagePath: path })
+    if (!attached.ok) return attached
+  }
+
+  await writeAuditEvent({
+    entityType: 'auftrag',
+    entityId: auftragId,
+    aktion: 'crm_tagebuch_eintrag_update',
+    actorId: auth.userId,
+    actorRolle: 'crm',
+    payload: { eintrag_id: eintragId, position_ids: positionIds, foto_count: fotoPaths.length, typ },
+  })
+
+  revalidateAuftrag(auftragId)
+  return { ok: true, eintragId, positionId: primaryPos }
+}
+
+/** CRM-Tagebuch-Eintrag löschen (Fotos/Junction per CASCADE). */
+export async function deleteCrmTagebuchEintrag(input: {
+  eintragId: string
+  auftragId: string
+}): Promise<ActionResult> {
+  const auth = await crmAuth()
+  if (!auth.ok) return auth
+
+  const eintragId = input.eintragId?.trim()
+  const auftragId = input.auftragId?.trim()
+  if (!eintragId || !auftragId) return { ok: false, message: 'Eintrag oder Auftrag fehlt.' }
+
+  const { data: existing, error: loadErr } = await supabaseAdmin
+    .from('position_eintraege')
+    .select('id, auftrag_id, position_id, erfasst_von')
+    .eq('id', eintragId)
+    .maybeSingle()
+  if (loadErr) return { ok: false, message: migrationHint(loadErr.message) }
+  if (!existing) return { ok: false, message: 'Eintrag nicht gefunden.' }
+  if (!istCrmTagebuchEintragEditierbar(existing.erfasst_von as string | null)) {
+    return { ok: false, message: 'Partner-Einträge können hier nicht gelöscht werden.' }
+  }
+
+  let rowAuftrag = (existing.auftrag_id as string | null)?.trim() || ''
+  if (!rowAuftrag && existing.position_id) {
+    const { data: pos } = await supabaseAdmin
+      .from('auftrag_positionen')
+      .select('auftrag_id')
+      .eq('id', existing.position_id)
+      .maybeSingle()
+    rowAuftrag = String(pos?.auftrag_id ?? '').trim()
+  }
+  if (rowAuftrag && rowAuftrag !== auftragId) {
+    return { ok: false, message: 'Eintrag gehört nicht zu diesem Auftrag.' }
+  }
+
+  const { error: delErr } = await supabaseAdmin
+    .from('position_eintraege')
+    .delete()
+    .eq('id', eintragId)
+  if (delErr) return { ok: false, message: migrationHint(delErr.message) }
+
+  await writeAuditEvent({
+    entityType: 'auftrag',
+    entityId: auftragId,
+    aktion: 'crm_tagebuch_eintrag_delete',
+    actorId: auth.userId,
+    actorRolle: 'crm',
+    payload: { eintrag_id: eintragId },
+  })
+
+  revalidateAuftrag(auftragId)
+  return { ok: true }
 }
 
 /** Prüfschritt weitere_arbeit: Anerkennen / Rückfrage / Ablehnen. */

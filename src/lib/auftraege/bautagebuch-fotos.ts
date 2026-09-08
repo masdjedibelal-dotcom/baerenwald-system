@@ -1,3 +1,5 @@
+import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+
 export const BAUTAGEBUCH_MAX_FOTOS = 5
 
 export function bautagebuchFotoUrls(raw: string[] | null | undefined): string[] {
@@ -5,23 +7,20 @@ export function bautagebuchFotoUrls(raw: string[] | null | undefined): string[] 
   return raw.filter(Boolean).slice(0, BAUTAGEBUCH_MAX_FOTOS)
 }
 
-/** Anzeige-URLs für CRM (HTTP oder signiert aus handwerker-uploads). */
+/** Anzeige-URLs für CRM (HTTP oder signiert aus handwerker-uploads) — parallel. */
 export async function resolveBautagebuchFotosForCrm(
   raw: string[] | null | undefined,
-  signUrl: (stored: string, expiresIn?: number) => Promise<string | null>,
+  signUrl: (stored: string, expiresIn?: number) => Promise<string | null> = signedHandwerkerUploadUrl,
   expiresIn = 3600
 ): Promise<string[]> {
   const stored = bautagebuchFotoUrls(raw)
-  const out: string[] = []
-  for (const item of stored) {
-    if (/^https?:\/\//i.test(item)) {
-      out.push(item)
-      continue
-    }
-    const signed = await signUrl(item, expiresIn)
-    if (signed) out.push(signed)
-  }
-  return out
+  const resolved = await Promise.all(
+    stored.map(async (item) => {
+      if (/^https?:\/\//i.test(item)) return item
+      return signUrl(item, expiresIn)
+    })
+  )
+  return resolved.filter((u): u is string => Boolean(u))
 }
 
 export function mergeBautagebuchFotoUrls(existing: string[], added: string[]): string[] {

@@ -3,7 +3,7 @@ import 'server-only'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+import { resolveEintragFotoDisplayUrl } from '@/lib/partner/handwerker-uploads'
 
 /**
  * Bautagebuch-/Positions-Eintrag sofort fürs Kundenportal freigeben
@@ -40,12 +40,11 @@ export async function publishPositionEintragFuerKunde(input: {
     .limit(12)
 
   const fotoUrls: string[] = []
-  for (const f of fotos ?? []) {
-    const path = String(f.storage_path ?? '').trim()
-    if (!path) continue
-    const url =
-      (await signedHandwerkerUploadUrl(path)) ??
-      (/^https?:\/\//i.test(path) ? path : null)
+  const paths = (fotos ?? [])
+    .map((f) => String(f.storage_path ?? '').trim())
+    .filter(Boolean)
+  const resolved = await Promise.all(paths.map((path) => resolveEintragFotoDisplayUrl(path)))
+  for (const url of resolved) {
     if (url) fotoUrls.push(url)
   }
 
@@ -61,18 +60,18 @@ export async function publishPositionEintragFuerKunde(input: {
     handwerker_id: input.handwerkerId ?? null,
   })
 
-  try {
-    const { notifyPortalBautagebuchFromCrm } = await import(
-      '@/lib/portal/notify-portal-bautagebuch'
+  // Notify nicht blockierend — Speichern soll nicht auf Portal-Push warten
+  void import('@/lib/portal/notify-portal-bautagebuch')
+    .then(({ notifyPortalBautagebuchFromCrm }) =>
+      notifyPortalBautagebuchFromCrm({
+        auftragId: input.auftragId,
+        eintragTitel: titelParts.join(' · ') || 'Bautagebuch-Update',
+      })
     )
-    await notifyPortalBautagebuchFromCrm({
-      auftragId: input.auftragId,
-      eintragTitel: titelParts.join(' · ') || 'Bautagebuch-Update',
+    .catch((e) => {
+      console.warn(
+        '[publishPositionEintragFuerKunde] Portal-Notify:',
+        e instanceof Error ? e.message : e
+      )
     })
-  } catch (e) {
-    console.warn(
-      '[publishPositionEintragFuerKunde] Portal-Notify:',
-      e instanceof Error ? e.message : e
-    )
-  }
 }

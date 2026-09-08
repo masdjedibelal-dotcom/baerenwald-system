@@ -8,19 +8,32 @@ import { Button } from '@/components/ui/Button'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-import { createCrmTagebuchEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import {
+  createCrmTagebuchEintrag,
+  updateCrmTagebuchEintrag,
+} from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
+import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
 import type { AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const MAX_FOTOS = 12
 
-/** Bautagebuch-Eintrag: 0..n Leistungen · Titel · Beschreibung · mehrere Fotos. */
+export type CrmTagebuchEditSeed = {
+  id: string
+  positionIds: string[]
+  beschreibungRaw: string | null
+  fotoPaths: string[]
+}
+
+/** Bautagebuch-Eintrag: anlegen oder bearbeiten. */
 export function CrmPositionEintragModal({
   open,
   onClose,
   auftragId,
   positionen,
   initialPositionId = null,
+  editEintrag = null,
   onSaved,
 }: {
   open: boolean
@@ -28,6 +41,8 @@ export function CrmPositionEintragModal({
   auftragId: string
   positionen: AuftragPosition[]
   initialPositionId?: string | null
+  /** Vorhandener Eintrag — öffnet im Bearbeiten-Modus */
+  editEintrag?: CrmTagebuchEditSeed | null
   onSaved?: () => void
 }) {
   const [pending, setPending] = useState(false)
@@ -37,6 +52,8 @@ export function CrmPositionEintragModal({
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotoPaths, setFotoPaths] = useState<string[]>([])
+
+  const isEdit = Boolean(editEintrag?.id)
 
   const sortedPos = useMemo(
     () =>
@@ -52,13 +69,22 @@ export function CrmPositionEintragModal({
 
   useEffect(() => {
     if (!open) return
+    if (editEintrag?.id) {
+      const split = splitTagebuchBeschreibung(editEintrag.beschreibungRaw)
+      setSelectedIds(editEintrag.positionIds.filter(Boolean))
+      setErledigtIds([])
+      setTitel(split.titel)
+      setBeschreibung(split.beschreibung)
+      setFotoPaths(editEintrag.fotoPaths.filter(Boolean))
+      return
+    }
     const initial = initialPositionId?.trim()
     setSelectedIds(initial ? [initial] : [])
     setErledigtIds([])
     setTitel('')
     setBeschreibung('')
     setFotoPaths([])
-  }, [open, initialPositionId])
+  }, [open, initialPositionId, editEintrag])
 
   function toggleLeistung(id: string) {
     setSelectedIds((prev) => {
@@ -94,23 +120,39 @@ export function CrmPositionEintragModal({
       return
     }
     const batch = files.slice(0, room)
+
     setUploading(true)
     try {
-      const added: string[] = []
-      for (const file of batch) {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('filename', file.name)
-        const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
-          method: 'POST',
-          body: fd,
+      const results = await Promise.all(
+        batch.map(async (file) => {
+          let uploadFile = file
+          try {
+            uploadFile = await optimizeImageForUpload(file)
+          } catch {
+            uploadFile = file
+          }
+          const fd = new FormData()
+          fd.append('file', uploadFile)
+          fd.append('filename', uploadFile.name)
+          const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+            method: 'POST',
+            body: fd,
+          })
+          const json = (await res.json()) as { url?: string; error?: string }
+          if (!res.ok || !json.url) {
+            return {
+              ok: false as const,
+              name: file.name,
+              error: json.error || 'Upload fehlgeschlagen',
+            }
+          }
+          return { ok: true as const, url: json.url }
         })
-        const json = (await res.json()) as { url?: string; error?: string }
-        if (!res.ok || !json.url) {
-          toast.error(json.error || `Upload fehlgeschlagen: ${file.name}`)
-          continue
-        }
-        added.push(json.url)
+      )
+      const added = results.filter((r): r is { ok: true; url: string } => r.ok).map((r) => r.url)
+      const failed = results.filter((r): r is { ok: false; name: string; error: string } => !r.ok)
+      for (const f of failed) {
+        toast.error(`${f.name}: ${f.error}`)
       }
       if (added.length) {
         setFotoPaths((prev) => [...prev, ...added])
@@ -135,24 +177,30 @@ export function CrmPositionEintragModal({
 
     setPending(true)
     void actionBusy
-      .run('Tagebuch-Eintrag wird gespeichert…', async () => {
-        const r = await createCrmTagebuchEintrag({
-          auftragId,
-          positionIds: selectedIds,
-          erledigtPositionIds: erledigtIds,
-          titel: titel.trim() || null,
-          beschreibung: beschreibung.trim() || null,
-          quelle: 'vor_ort',
-          fotoStoragePaths: fotoPaths,
-        })
-        if (!r.ok) {
-          toast.error(r.message)
-          throw new Error(r.message)
+      .run(
+        isEdit ? 'Tagebuch-Eintrag wird aktualisiert…' : 'Tagebuch-Eintrag wird gespeichert…',
+        async () => {
+          const payload = {
+            auftragId,
+            positionIds: selectedIds,
+            erledigtPositionIds: isEdit ? [] : erledigtIds,
+            titel: titel.trim() || null,
+            beschreibung: beschreibung.trim() || null,
+            quelle: 'vor_ort' as const,
+            fotoStoragePaths: fotoPaths,
+          }
+          const r = isEdit
+            ? await updateCrmTagebuchEintrag({ ...payload, eintragId: editEintrag!.id })
+            : await createCrmTagebuchEintrag(payload)
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+          toast.success(isEdit ? 'Eintrag aktualisiert' : 'Eintrag gespeichert')
+          onSaved?.()
+          onClose()
         }
-        toast.success('Eintrag gespeichert')
-        onSaved?.()
-        onClose()
-      })
+      )
       .finally(() => setPending(false))
   }
 
@@ -169,7 +217,7 @@ export function CrmPositionEintragModal({
     <EditorSheet
       open={open}
       onClose={onClose}
-      title="Tagebuch-Eintrag"
+      title={isEdit ? 'Eintrag bearbeiten' : 'Tagebuch-Eintrag'}
       size="lg"
       dirty={dirty && !busy}
       footer={
@@ -251,7 +299,7 @@ export function CrmPositionEintragModal({
                           ) : null}
                         </span>
                       </label>
-                      {checked && !alreadyDone ? (
+                      {checked && !alreadyDone && !isEdit ? (
                         <label className="mt-1.5 ml-6 flex cursor-pointer items-center gap-2 text-xs">
                           <input
                             type="checkbox"
