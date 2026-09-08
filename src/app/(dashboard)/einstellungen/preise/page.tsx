@@ -25,7 +25,7 @@ export default async function EinstellungenPreisePage() {
       .select('*, gewerke(id, name, slug, aktiv)')
       .eq('aktiv', true)
       .order('leistung', { ascending: true }),
-    supabase.from('gewerke').select('id, name, slug, aktiv').order('name', { ascending: true }),
+    supabase.from('gewerke').select('id, name, slug, aktiv').order('sort_order', { ascending: true }).order('name', { ascending: true }),
   ])
 
   const gw = (gewerke ?? []) as Gewerk[]

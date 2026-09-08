@@ -23,6 +23,10 @@ import { listSortDirNum } from '@/lib/list-mock-sort'
 import type { KundeListeZeile } from '@/lib/kunden/load-kunden-liste'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { TypBadge } from '@/components/kunden/TypBadge'
+import {
+  istPortalRegistriert,
+  PortalRegistriertDot,
+} from '@/components/crm/PortalRegistriertDot'
 import { cn } from '@/lib/utils'
 import { deleteKunde, mergeKunden } from '@/app/actions/kunden'
 import { KundenMergeAssistentSheet } from '@/components/kunden/KundenMergeAssistentSheet'
@@ -55,6 +59,7 @@ const KUNDEN_COLS: ResizableColDef[] = [
   { id: 'typ', defaultWidth: 130, minWidth: 90, maxWidth: 200 },
   { id: 'telefon', defaultWidth: 150, minWidth: 110, maxWidth: 220 },
   { id: 'email', defaultWidth: 220, minWidth: 140, maxWidth: 360 },
+  { id: 'portal', defaultWidth: 72, minWidth: 56, maxWidth: 100 },
   { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
@@ -251,7 +256,7 @@ export function KundenListeClient({
   }, [router, selectedRows])
 
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    'crm.cols.kunden.select.v2',
+    'crm.cols.kunden.select.v3',
     KUNDEN_COLS
   )
   const resizeOffset = 1
@@ -586,6 +591,12 @@ export function KundenListeClient({
           >
             Email
           </MockSortHead>
+          <div
+            className="lc-desk"
+            style={{ textAlign: 'center', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
+          >
+            Portal
+          </div>
           <div />
         </div>
 
@@ -656,6 +667,7 @@ export function KundenListeClient({
                   <div className="t" title={kundeListenName(k)}>
                     {kundeListenName(k)}
                   </div>
+                  <PortalRegistriertDot registered={istPortalRegistriert(k.auth_user_id)} />
                 </div>
                 <div className="vg-status">
                   <TypBadge typ={k.typ ?? 'privat'} />
@@ -702,6 +714,12 @@ export function KundenListeClient({
                   }}
                 >
                   {mail || '—'}
+                </div>
+                <div
+                  className="lc-desk"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <PortalRegistriertDot registered={istPortalRegistriert(k.auth_user_id)} />
                 </div>
                 {menuCell}
               </div>

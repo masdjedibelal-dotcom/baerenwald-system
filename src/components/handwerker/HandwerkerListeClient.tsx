@@ -34,6 +34,10 @@ import { toast } from '@/components/ui/app-toast'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { gewerkPillClass } from '@/lib/gewerk-pill-tone'
+import {
+  istPortalRegistriert,
+  PortalRegistriertDot,
+} from '@/components/crm/PortalRegistriertDot'
 
 export type HandwerkerZeile = {
   id: string
@@ -50,6 +54,7 @@ export type HandwerkerZeile = {
   ist_fachbetrieb?: boolean | null
   created_at: string | null
   aktiver_einsatz?: boolean
+  auth_user_id?: string | null
 }
 
 export type GewerkOption = { slug: string; name: string }
@@ -62,7 +67,8 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'compliance_status', label: 'Compliance' },
 ]
 
-const MOCK_GEWERK_NAMES = ['Sanitär', 'Elektrik', 'Fliesen', 'Maler', 'Boden'] as const
+/** Schnellfilter: bekannte Slugs, Labels aus DB (Variante B-Namen). */
+const LISTE_FILTER_GEWERK_SLUGS = ['bad', 'elektrik', 'fliesen', 'maler', 'boden'] as const
 
 const HW_COLS: ResizableColDef[] = [
   { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
@@ -71,6 +77,7 @@ const HW_COLS: ResizableColDef[] = [
   { id: 'telefon', defaultWidth: 130, minWidth: 100, maxWidth: 200 },
   { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
   { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
+  { id: 'portal', defaultWidth: 72, minWidth: 56, maxWidth: 100 },
   { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
@@ -111,13 +118,6 @@ function handwerkerExportRow(h: HandwerkerZeile): Record<string, unknown> {
     gewerke: gewerkeStr(h),
     compliance_status: h.compliance_status ?? '',
   }
-}
-
-function resolveGewerkChipValue(name: string, gewerkeOptionen: GewerkOption[]): string {
-  const opt = gewerkeOptionen.find(
-    (g) => g.name.toLowerCase() === name.toLowerCase() || g.slug === name.toLowerCase()
-  )
-  return opt?.slug ?? name.toLowerCase()
 }
 
 function matchesGewerk(h: HandwerkerZeile, gewerkChip: string, gewerkeOptionen: GewerkOption[]): boolean {
@@ -162,8 +162,9 @@ export function HandwerkerListeClient({
     const opts: { label: string; value: string; count?: number }[] = [
       { label: 'Alle Gewerke', value: 'alle', count: rows.length },
     ]
-    for (const name of MOCK_GEWERK_NAMES) {
-      opts.push({ label: name, value: resolveGewerkChipValue(name, gewerkeOptionen) })
+    for (const slug of LISTE_FILTER_GEWERK_SLUGS) {
+      const g = gewerkeOptionen.find((o) => o.slug === slug)
+      opts.push({ label: g?.name ?? slug, value: slug })
     }
     return opts
   }, [gewerkeOptionen, rows.length])
@@ -274,7 +275,7 @@ export function HandwerkerListeClient({
   }, [router, selectedRows])
 
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    'crm.cols.handwerker.select.v3',
+    'crm.cols.handwerker.select.v4',
     HW_COLS
   )
   const resizeOffset = 1
@@ -356,14 +357,15 @@ export function HandwerkerListeClient({
       </div>
       <div className="form-section-h">Gewerk</div>
       <div className="chiprow">
-        {(['alle', ...MOCK_GEWERK_NAMES] as const).map((g) => {
-          const value = g === 'alle' ? 'alle' : resolveGewerkChipValue(g, gewerkeOptionen)
-          return (
-            <MockChip key={g} active={gewerkChip === value} onClick={() => setGewerkChip(value)}>
-              {g === 'alle' ? 'Alle' : g}
-            </MockChip>
-          )
-        })}
+        {gewerkChipOptions.map((o) => (
+          <MockChip
+            key={o.value}
+            active={gewerkChip === o.value}
+            onClick={() => setGewerkChip(o.value)}
+          >
+            {o.value === 'alle' ? 'Alle' : o.label}
+          </MockChip>
+        ))}
       </div>
     </>
   )
@@ -588,6 +590,12 @@ export function HandwerkerListeClient({
           >
             Bewertung
           </MockSortHead>
+          <div
+            className="lc-desk"
+            style={{ textAlign: 'center', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
+          >
+            Portal
+          </div>
           <div />
         </div>
 
@@ -667,6 +675,7 @@ export function HandwerkerListeClient({
                   <div className="t" title={handwerkerDisplayName(h)}>
                     {handwerkerDisplayName(h)}
                   </div>
+                  <PortalRegistriertDot registered={istPortalRegistriert(h.auth_user_id)} />
                 </div>
                 <div className="vg-status">
                   {primaryGewerk ? (
@@ -730,6 +739,12 @@ export function HandwerkerListeClient({
                     <MockIcon ctx="default" n="star-filled" size={12} />
                     —
                   </span>
+                </div>
+                <div
+                  className="lc-desk"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <PortalRegistriertDot registered={istPortalRegistriert(h.auth_user_id)} />
                 </div>
                 {menuCell}
               </div>

@@ -1131,6 +1131,7 @@ export type Gewerk = {
   fachbetrieb_hinweis?: string | null
   /** false = Facility/Reinigung — kein Bau-Stamm-Paket */
   ist_bauleistung?: boolean
+  sort_order?: number | null
 }
 
 export type Preisliste = {

@@ -36,11 +36,11 @@ export async function loadHandwerkerListe(): Promise<HandwerkerListeData> {
 
   const [{ data: gewData }, { data: hwData, error }, { data: docRows }, { data: zu }] =
     await Promise.all([
-      supabase.from('gewerke').select('slug, name').eq('aktiv', true).order('name'),
+      supabase.from('gewerke').select('slug, name').eq('aktiv', true).order('sort_order').order('name'),
       supabase
         .from('handwerker')
         .select(
-          'id, name, firma, vorname, nachname, email, telefon, gewerke, compliance_status, ist_fachbetrieb, aktiv, created_at'
+          'id, name, firma, vorname, nachname, email, telefon, gewerke, compliance_status, ist_fachbetrieb, aktiv, created_at, auth_user_id'
         )
         .eq('aktiv', true)
         .order('name', { ascending: true }),

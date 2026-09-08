@@ -23,6 +23,7 @@ export async function listGewerkeFuerFab(): Promise<
     .from('gewerke')
     .select('id, name, slug')
     .eq('aktiv', true)
+    .order('sort_order')
     .order('name')
   if (error) return { ok: false, message: error.message }
   return {

@@ -7,6 +7,7 @@ export default async function NeuPage() {
     .from('gewerke')
     .select('id, name, slug')
     .eq('aktiv', true)
+    .order('sort_order')
     .order('name')
 
   return (
