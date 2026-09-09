@@ -176,6 +176,10 @@ async function loadAngebotDetail(id: string): Promise<AngebotDetail | null> {
   return {
     ...row,
     positionen: parsePositionen(row.positionen),
+    positionen_portal:
+      (row as { positionen_portal?: unknown }).positionen_portal != null
+        ? parsePositionen((row as { positionen_portal?: unknown }).positionen_portal)
+        : null,
   }
 }
 
@@ -206,6 +210,10 @@ export async function loadAngebotDetailAdmin(id: string): Promise<AngebotDetail 
   return {
     ...row,
     positionen: parsePositionen(row.positionen),
+    positionen_portal:
+      (row as { positionen_portal?: unknown }).positionen_portal != null
+        ? parsePositionen((row as { positionen_portal?: unknown }).positionen_portal)
+        : null,
   }
 }
 
@@ -1008,23 +1016,39 @@ export async function persistPdfForAngebot(
   const shouldPromote = hasNummer && !terminal && (wasEntwurf || !hadTimestamps)
   const now = new Date().toISOString()
 
-  const { error: dbErr } = await supabaseAdmin
+  const pdfUpdateBase = {
+    pdf_url: publicUrl,
+    updated_at: now,
+  }
+  const pdfUpdatePromote = shouldPromote
+    ? {
+        status_einfach: 'gesendet' as const,
+        status: 'gesendet_kunde' as const,
+        positionen_portal: detail.positionen ?? [],
+        ...(!hadTimestamps
+          ? { gesendet_am: now, gesendet_kunde_at: now }
+          : {}),
+      }
+    : {}
+
+  let { error: dbErr } = await supabaseAdmin
     .from('angebote')
-    .update({
-      pdf_url: publicUrl,
-      updated_at: now,
-      ...(shouldPromote
-        ? {
-            status_einfach: 'gesendet' as const,
-            status: 'gesendet_kunde' as const,
-            positionen_portal: detail.positionen ?? [],
-            ...(!hadTimestamps
-              ? { gesendet_am: now, gesendet_kunde_at: now }
-              : {}),
-          }
-        : {}),
-    })
+    .update({ ...pdfUpdateBase, ...pdfUpdatePromote })
     .eq('id', angebotId)
+
+  if (dbErr && /positionen_portal/i.test(dbErr.message) && shouldPromote) {
+    const { positionen_portal: _drop, ...promoteWithoutPortal } = pdfUpdatePromote as {
+      positionen_portal?: unknown
+      status_einfach: 'gesendet'
+      status: 'gesendet_kunde'
+      gesendet_am?: string
+      gesendet_kunde_at?: string
+    }
+    ;({ error: dbErr } = await supabaseAdmin
+      .from('angebote')
+      .update({ ...pdfUpdateBase, ...promoteWithoutPortal })
+      .eq('id', angebotId))
+  }
 
   if (dbErr) return { ok: false, message: dbErr.message }
 
@@ -1867,29 +1891,37 @@ export async function sendAngebotToKunde(
   }
 
   const now = new Date().toISOString()
+  async function updateNachVersand(payload: Record<string, unknown>) {
+    let { error } = await supabase.from('angebote').update(payload).eq('id', angebotId)
+    if (error && /positionen_portal/i.test(error.message)) {
+      const { positionen_portal: _drop, ...rest } = payload
+      ;({ error } = await supabase.from('angebote').update(rest).eq('id', angebotId))
+    }
+    if (error) {
+      return { ok: false as const, message: error.message }
+    }
+    return { ok: true as const }
+  }
+
   if (options?.statusBeibehalten) {
-    await supabase
-      .from('angebote')
-      .update({
-        gesendet_kunde_at: now,
-        gesendet_am: now,
-        status: 'kunde_akzeptiert',
-        status_einfach: 'angenommen',
-        positionen_portal: detail.positionen ?? [],
-        updated_at: now,
-      })
-      .eq('id', angebotId)
+    const up = await updateNachVersand({
+      gesendet_kunde_at: now,
+      gesendet_am: now,
+      status: 'kunde_akzeptiert',
+      status_einfach: 'angenommen',
+      positionen_portal: detail.positionen ?? [],
+      updated_at: now,
+    })
+    if (!up.ok) return up
   } else {
-    await supabase
-      .from('angebote')
-      .update({
-        gesendet_kunde_at: now,
-        gesendet_am: now,
-        status_einfach: 'gesendet',
-        positionen_portal: detail.positionen ?? [],
-        updated_at: now,
-      })
-      .eq('id', angebotId)
+    const up = await updateNachVersand({
+      gesendet_kunde_at: now,
+      gesendet_am: now,
+      status_einfach: 'gesendet',
+      positionen_portal: detail.positionen ?? [],
+      updated_at: now,
+    })
+    if (!up.ok) return up
   }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)

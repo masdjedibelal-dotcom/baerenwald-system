@@ -14,6 +14,7 @@ import {
 } from '@/lib/status/status-map'
 import { formatDatum } from '@/lib/utils'
 import type { StatusDisplayVariant } from '@/lib/status/mock-badge-kind'
+import { angebotPortalSnapshotWeichtAb } from '@/lib/angebote/angebot-portal-positionen'
 
 export type StatusDisplay = {
   label: string
@@ -166,8 +167,16 @@ export function rechnungStatusDisplay(
 /** True wenn Inhalt nach dem Kundenversand erneut gespeichert wurde (ohne erneuten Versand). */
 export function angebotInhaltGeaendertNachVersand(
   sentAt: string | null | undefined,
-  updatedAt: string | null | undefined
+  updatedAt: string | null | undefined,
+  opts?: {
+    positionen?: unknown
+    positionen_portal?: unknown | null
+  }
 ): boolean {
+  // Primär: Abweichung CRM ↔ zuletzt versendete Portal-Fassung (Banner weg nach Versenden)
+  if (opts && opts.positionen_portal != null) {
+    return angebotPortalSnapshotWeichtAb(opts.positionen, opts.positionen_portal)
+  }
   const sent = (sentAt ?? '').trim()
   const upd = (updatedAt ?? '').trim()
   if (!sent || !upd) return false

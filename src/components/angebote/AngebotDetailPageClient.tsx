@@ -418,7 +418,10 @@ export function AngebotDetailPageClient({
   const gesendetAm = gesendetAmWert(detail)
   const inhaltGeaendertNachVersand =
     (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
-    angebotInhaltGeaendertNachVersand(gesendetAm, detail.updated_at)
+    angebotInhaltGeaendertNachVersand(gesendetAm, detail.updated_at, {
+      positionen: detail.positionen,
+      positionen_portal: detail.positionen_portal,
+    })
   const headSub =
     statusEinfach === 'gesendet'
       ? gesendetDetailSubline(gesendetAm, detail.updated_at, {
