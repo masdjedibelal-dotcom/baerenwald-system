@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
@@ -924,7 +925,7 @@ export async function setAngebotStatus(
   status: AngebotStatus,
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  let supabase
+  let supabase: SupabaseClient
   if (opts?.asSystem) {
     supabase = supabaseAdmin
   } else {
@@ -1823,7 +1824,7 @@ export async function sendAngebotToKunde(
     skipHandwerkerGate?: boolean
   }
 ) {
-  let supabase
+  let supabase: SupabaseClient
   if (options?.asSystem) {
     supabase = supabaseAdmin
   } else {
