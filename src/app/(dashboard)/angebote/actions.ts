@@ -1017,6 +1017,7 @@ export async function persistPdfForAngebot(
         ? {
             status_einfach: 'gesendet' as const,
             status: 'gesendet_kunde' as const,
+            positionen_portal: detail.positionen ?? [],
             ...(!hadTimestamps
               ? { gesendet_am: now, gesendet_kunde_at: now }
               : {}),
@@ -1874,6 +1875,7 @@ export async function sendAngebotToKunde(
         gesendet_am: now,
         status: 'kunde_akzeptiert',
         status_einfach: 'angenommen',
+        positionen_portal: detail.positionen ?? [],
         updated_at: now,
       })
       .eq('id', angebotId)
@@ -1884,6 +1886,7 @@ export async function sendAngebotToKunde(
         gesendet_kunde_at: now,
         gesendet_am: now,
         status_einfach: 'gesendet',
+        positionen_portal: detail.positionen ?? [],
         updated_at: now,
       })
       .eq('id', angebotId)

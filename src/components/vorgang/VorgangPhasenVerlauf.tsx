@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { hideRouteBusy, showRouteBusy } from '@/components/ui/action-busy'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
@@ -65,7 +66,8 @@ function hasRealAngebotNummer(a: ProjektKontext['angebote'][number] | undefined)
 }
 
 /**
- * Verlauf des Vorgangs — flache Phasen-Tabelle (kein Card-in-Card).
+ * Verlauf des Vorgangs — Tabelle; Klick öffnet Detail-Sheet,
+ * Navigation zur Phase erst über „Zur Phase“ im Sheet.
  */
 export function VorgangPhasenVerlauf({
   kontext,
@@ -85,6 +87,7 @@ export function VorgangPhasenVerlauf({
   void _onSaved
   const router = useRouter()
   const pathname = usePathname() ?? ''
+  const [readKind, setReadKind] = useState<PhaseKind | null>(null)
   const [navBusy, setNavBusy] = useState(false)
 
   const withFrom = (pathname: string, extra?: Record<string, string>) => {
@@ -101,10 +104,16 @@ export function VorgangPhasenVerlauf({
     [kontext, lead, fromRef, extras]
   )
 
+  const active = rows.find((r) => r.kind === readKind) ?? null
+  const canGoToPhase = Boolean(active?.href && fromRef?.kind !== active.kind)
+
   function openRow(row: PhaseRowModel) {
     if (row.state === 'open') return
-    if (fromRef?.kind === row.kind) return
-    navigateFromPhaseSheet(row.href, row.label)
+    setReadKind(row.kind)
+  }
+
+  function closeRead() {
+    setReadKind(null)
   }
 
   function navigateFromPhaseSheet(href: string | null | undefined, label: string) {
@@ -114,6 +123,7 @@ export function VorgangPhasenVerlauf({
       toast.error(`${label} ist noch nicht verfügbar.`)
       return
     }
+    setReadKind(null)
 
     const targetPath = target.split('?')[0] || target
     const alreadyOnTarget =
@@ -140,74 +150,114 @@ export function VorgangPhasenVerlauf({
     setNavBusy(false)
   }, [pathname])
 
+  function onZurPhase() {
+    navigateFromPhaseSheet(active?.href, active?.label ?? 'Phase')
+  }
+
   return (
-    <div className={cn('vgp-table-wrap', className)}>
-      <div className="vgp-table-head">
-        <span className="vgp-table-title">Verlauf</span>
-        <span className="vgp-table-hint">Phasen des Vorgangs</span>
-      </div>
-      <div className="vgp-table" role="table" aria-label="Phasenverlauf">
-        <div className="vgp-table-row vgp-table-row--head" role="row">
-          <span role="columnheader">Phase</span>
-          <span role="columnheader">Status</span>
-          <span role="columnheader" className="vgp-table-num">
-            Betrag
-          </span>
-          <span role="columnheader" className="vgp-table-go" />
+    <>
+      <div className={cn('vgp-table-wrap', className)}>
+        <div className="vgp-table-head">
+          <span className="vgp-table-title">Verlauf</span>
+          <span className="vgp-table-hint">Phasen des Vorgangs</span>
         </div>
-        {rows.map((row) => {
-          const clickable = row.state !== 'open' && fromRef?.kind !== row.kind
-          const onCurrent = fromRef?.kind === row.kind
-          return (
-            <button
-              key={row.kind}
-              type="button"
-              role="row"
-              className={cn(
-                'vgp-table-row',
-                row.state,
-                onCurrent && 'vgp-table-row--here',
-                !clickable && 'vgp-table-row--static'
-              )}
-              disabled={!clickable || navBusy}
-              onClick={() => openRow(row)}
-              aria-current={row.state === 'current' ? 'step' : undefined}
-              aria-label={
-                clickable
-                  ? `${row.label} öffnen: ${row.kopf}`
-                  : `${row.label}: ${row.kopf}`
-              }
-            >
-              <span className="vgp-table-phase" role="cell">
-                <span className={cn('vgp-table-dot', row.state)} aria-hidden />
-                {row.label}
-              </span>
-              <span className="vgp-table-status" role="cell">
-                <span
-                  className={cn(
-                    'vgp-table-kopf',
-                    row.state === 'open' && 'vgp-leer'
-                  )}
-                >
-                  {row.kopf}
+        <div className="vgp-table" role="table" aria-label="Phasenverlauf">
+          <div className="vgp-table-row vgp-table-row--head" role="row">
+            <span role="columnheader">Phase</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader" className="vgp-table-num">
+              Betrag
+            </span>
+            <span role="columnheader" className="vgp-table-go" />
+          </div>
+          {rows.map((row) => {
+            const clickable = row.state !== 'open'
+            const onCurrent = fromRef?.kind === row.kind
+            return (
+              <button
+                key={row.kind}
+                type="button"
+                role="row"
+                className={cn(
+                  'vgp-table-row',
+                  row.state,
+                  onCurrent && 'vgp-table-row--here',
+                  !clickable && 'vgp-table-row--static'
+                )}
+                disabled={!clickable || navBusy}
+                onClick={() => openRow(row)}
+                aria-current={row.state === 'current' ? 'step' : undefined}
+                aria-label={
+                  clickable
+                    ? `${row.label} Details: ${row.kopf}`
+                    : `${row.label}: ${row.kopf}`
+                }
+              >
+                <span className="vgp-table-phase" role="cell">
+                  <span className={cn('vgp-table-dot', row.state)} aria-hidden />
+                  {row.label}
                 </span>
-                {row.sub ? <span className="vgp-table-sub">{row.sub}</span> : null}
-              </span>
-              <span className="vgp-table-num" role="cell">
-                {row.betrag ?? '—'}
-              </span>
-              <span className="vgp-table-go" role="cell">
-                {clickable ? (
-                  <ChevronRight size={15} aria-hidden />
-                ) : onCurrent ? (
-                  <span className="vgp-table-here">hier</span>
-                ) : null}
-              </span>
-            </button>
-          )
-        })}
+                <span className="vgp-table-status" role="cell">
+                  <span
+                    className={cn(
+                      'vgp-table-kopf',
+                      row.state === 'open' && 'vgp-leer'
+                    )}
+                  >
+                    {row.kopf}
+                  </span>
+                  {row.sub ? <span className="vgp-table-sub">{row.sub}</span> : null}
+                </span>
+                <span className="vgp-table-num" role="cell">
+                  {row.betrag ?? '—'}
+                </span>
+                <span className="vgp-table-go" role="cell">
+                  {clickable && !onCurrent ? (
+                    <ChevronRight size={15} aria-hidden />
+                  ) : onCurrent ? (
+                    <span className="vgp-table-here">hier</span>
+                  ) : null}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
-    </div>
+
+      <EditorSheet
+        open={Boolean(active)}
+        onClose={closeRead}
+        title={active?.sheetTitle ?? ''}
+        crumb={active?.sheetCrumb ?? null}
+        size="lg"
+        manageHistory={false}
+        headerEnd={
+          canGoToPhase ? (
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={onZurPhase}
+              disabled={navBusy}
+            >
+              {navBusy ? 'Laden…' : 'Zur Phase'}
+            </button>
+          ) : null
+        }
+      >
+        {active ? (
+          <div className="phase-sheet-props props">
+            {active.props.map((p) => (
+              <div key={p.k} className="prop">
+                <span className="k">{p.k}</span>
+                <span className="v" style={{ whiteSpace: 'pre-wrap' }}>
+                  {p.v}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </EditorSheet>
+    </>
   )
 }
 

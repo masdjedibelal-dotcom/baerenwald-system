@@ -437,18 +437,23 @@ export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
 /**
  * Status, in denen das Angebot im Wizard geladen und gespeichert werden darf.
  *
- * Nicht `gesendet_kunde`: solange HV/Kunde nicht reagiert hat, keine Positions-/Preis-
- * Änderungen (sonst landet der neue Betrag sofort im Portal).
+ * Inkl. `gesendet_kunde`: Korrektur solange HV/Kunde noch nicht reagiert hat.
+ * Portal behält die letzte versendete Fassung (`positionen_portal` / PDF) bis
+ * erneut „Versenden“ (Mail + Snapshot-Update).
  * Nicht `kunde_akzeptiert` / `angenommen`: nur über AG-Korrektur (`forAuftragKorrektur`).
  */
 const ANGEBOT_WIZARD_BEARBEITBAR: readonly AngebotStatus[] = [
   'entwurf',
   'gesendet_handwerker',
   'handwerker_akzeptiert',
+  'gesendet_kunde',
 ]
 
 export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
-  return (ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(status)
+  const s = String(status ?? '').toLowerCase()
+  if ((ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(s)) return true
+  // status_einfach-Aliases (Portal/CRM-Listen)
+  return s === 'gesendet' || s === 'abgelaufen'
 }
 
 /** Angebot liegt beim Kunden/HV und wartet auf Annahme oder Ablehnung. */
@@ -489,9 +494,6 @@ export function angebotWizardBearbeitenSperrgrund(status: string): string | null
   }
   if (s === 'abgelehnt') {
     return 'Abgelehnt — neues Angebot über die Anfrage anlegen'
-  }
-  if (angebotWartetAufKundenentscheidung(s)) {
-    return 'Wartet auf Annahme oder Ablehnung — Bearbeiten erst danach möglich'
   }
   return 'Dieses Angebot kann nicht mehr im Wizard bearbeitet werden.'
 }

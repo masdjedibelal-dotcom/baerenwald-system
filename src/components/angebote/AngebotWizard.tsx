@@ -941,7 +941,7 @@ export function AngebotWizard({
                   ? 'Korrektur gespeichert — Abschläge unverändert. Zum Kunden: Versenden.'
                   : 'Korrektur gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
                 : bereitsGesendet
-                  ? 'Änderungen gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
+                  ? 'Gespeichert — Portal bleibt bei der letzten Fassung. Zum Aktualisieren und Benachrichtigen: Versenden.'
                   : res.angebotsnr?.trim()
                     ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
                     : 'Entwurf gespeichert'

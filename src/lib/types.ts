@@ -474,6 +474,8 @@ export type Angebot = {
   ansprechpartner_id?: string | null
   status: AngebotStatus
   positionen: AngebotPosition[]
+  /** Zuletzt versendete Fassung fürs Portal — bis erneut Versenden */
+  positionen_portal?: AngebotPosition[] | null
   gesamt_fix?: number | null
   gesamt_min: number | null
   gesamt_max: number | null

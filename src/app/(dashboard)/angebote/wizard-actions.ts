@@ -82,6 +82,31 @@ async function persistAngebotPdfNachEntwurfSpeichern(
   leadId: string | null,
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  // Bereits versendet: PDF + Portal-Snapshot bleiben bis erneut „Versenden“
+  const { data: stRow } = await supabaseAdmin
+    .from('angebote')
+    .select('gesendet_kunde_at, gesendet_am, status, status_einfach')
+    .eq('id', angebotId)
+    .maybeSingle()
+  const alreadySent = Boolean(
+    String(
+      (stRow as { gesendet_kunde_at?: string | null } | null)?.gesendet_kunde_at ??
+        (stRow as { gesendet_am?: string | null } | null)?.gesendet_am ??
+        ''
+    ).trim()
+  )
+  if (alreadySent) {
+    if (!opts?.asSystem) {
+      revalidatePath('/angebote')
+      revalidatePath(`/angebote/${angebotId}`)
+      if (leadId) {
+        revalidatePath(`/anfragen/${leadId}`)
+        revalidatePath('/anfragen')
+      }
+    }
+    return { ok: true }
+  }
+
   const pdf = await persistPdfForAngebot(angebotId, { skipRevalidate: true })
   if (!opts?.asSystem) {
     revalidatePath('/angebote')
@@ -589,7 +614,11 @@ export async function loadAngebotWizardBootstrap(
   return { ok: true, bootstrap }
 }
 
-/** 1:1-Kopie für neuen Wizard-Entwurf: gleiche Inhalte, Titel mit (2), (3), … — keine Angebots-ID. */
+/**
+ * 1:1-Kopie für neuen Wizard-Entwurf: gleiche Inhalte, Titel mit (2), (3), … — keine Angebots-ID.
+ * Positionen inkl. Preise (vk/lohn/material/gesamt) unverändert übernehmen —
+ * nicht wie Partner-LV-Vorgabe auf 0 setzen.
+ */
 export async function loadAngebotWizardBootstrapKopie(
   quelleAngebotId: string,
   leadId: string,
@@ -712,6 +741,7 @@ export async function loadAngebotWizardBootstrapKopie(
   const variantenPersist =
     dokumentTyp === 'projekt' ? normalizeVariantenFromDb(ang.varianten) : null
 
+  // Preise 1:1 aus Quelle — repair füllt fehlendes vk nur aus lohn/gesamt, setzt nie alles auf 0
   const posNorm = repairAngebotPositionen(
     rebindLooseAnfahrtPositionen(normalizeAngebotPositionen(ang.positionen))
   )

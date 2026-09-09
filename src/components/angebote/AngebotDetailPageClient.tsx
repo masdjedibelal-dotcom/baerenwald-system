@@ -217,9 +217,8 @@ export function AngebotDetailPageClient({
     [detail.positionen]
   )
 
-  /** Nur vor Kundenversand — nach Gesendet keine Preis-Edits (Portal würde sofort den neuen Betrag sehen). */
-  const kannBearbeiten =
-    statusEinfach === 'entwurf' && angebotDarfImWizardBearbeitetWerden(detail.status)
+  /** Entwurf + gesendet (vor Annahme/Ablehnung); angenommen nur über AG-Korrektur. */
+  const kannBearbeiten = angebotDarfImWizardBearbeitetWerden(detail.status)
   const bearbeitenSperrgrund = angebotWizardBearbeitenSperrgrund(detail.status)
 
   const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
