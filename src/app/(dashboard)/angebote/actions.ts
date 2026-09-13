@@ -566,15 +566,6 @@ export async function createAngebot(
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
-      leadId: input.lead_id,
-      angebotId: id,
-      betragEur: summen.nettoMax,
-    })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
-
     const { data: leadRow } = await supabase
       .from('leads')
       .select('status')
@@ -888,14 +879,6 @@ export async function updateAngebot(
     await reparentPartnerEinholungenZuKundenangebot(leadId, angebotId)
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
-      leadId,
-      angebotId,
-      betragEur: summen.nettoMax,
-    })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
   }
 
   if (!opts?.asSystem) {
@@ -1923,6 +1906,43 @@ export async function sendAngebotToKunde(
       updated_at: now,
     })
     if (!up.ok) return up
+  }
+
+  // Org-Freigabe erst nach Speichern/Status „gesendet“ — nicht beim Entwurfs-Speichern.
+  // Über Schwelle → ausstehend (HV kann freigeben); unter Schwelle → Bypass für Mail-CTA.
+  if (detail.lead_id) {
+    try {
+      const posForFreigabe = normalizeAngebotPositionen(detail.positionen)
+      const summenFreigabe = summenAusPositionen(posForFreigabe, 19)
+      const freigabeSync = await syncAngebotMitOrgFreigabe({
+        leadId: detail.lead_id,
+        angebotId,
+        betragEur: summenFreigabe.nettoMax,
+        gesamtFix: detail.gesamt_fix,
+        gesamtMax: detail.gesamt_max,
+      })
+      if (!freigabeSync.ok) {
+        console.warn('[sendAngebotToKunde] syncAngebotMitOrgFreigabe:', freigabeSync.message)
+      } else {
+        const { data: leadFresh } = await supabaseAdmin
+          .from('leads')
+          .select('org_freigabe_status, freigabe_bypass_grund')
+          .eq('id', detail.lead_id)
+          .maybeSingle()
+        if (detail.leads && typeof detail.leads === 'object' && leadFresh) {
+          const leadPatch = detail.leads as {
+            org_freigabe_status?: string | null
+            freigabe_bypass_grund?: string | null
+          }
+          leadPatch.org_freigabe_status =
+            (leadFresh.org_freigabe_status as string | null) ?? leadPatch.org_freigabe_status
+          leadPatch.freigabe_bypass_grund =
+            (leadFresh.freigabe_bypass_grund as string | null) ?? null
+        }
+      }
+    } catch (e) {
+      console.warn('[sendAngebotToKunde] org freigabe sync', e)
+    }
   }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)

@@ -69,7 +69,7 @@ import {
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import {
   berechneHinweis35aAnteil,
   berechneRechnung,
@@ -514,6 +514,11 @@ export function RechnungWizard({
         defaultMwstSatz: defaultMwst,
       }),
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
+  )
+
+  const nachlassSummen = useMemo(
+    () => summenAusPositionen(positionenBerechnet, berechnung.mwst_satz || defaultMwst),
+    [positionenBerechnet, berechnung.mwst_satz, defaultMwst]
   )
 
   const netto = berechnung.netto
@@ -1311,6 +1316,21 @@ export function RechnungWizard({
           schlussAbrechnung
             ? `MwSt ${schlussAbrechnung.mwst_prozent}%`
             : ustLabel
+        }
+        nachlassNetto={
+          !schlussAbrechnung &&
+          !(hasPlan && selBerechnet) &&
+          nachlassSummen.nachlassNetto > 0
+            ? nachlassSummen.nachlassNetto
+            : null
+        }
+        nachlassLabel={nachlassSummen.nachlassLabel}
+        nettoVorNachlass={
+          !schlussAbrechnung &&
+          !(hasPlan && selBerechnet) &&
+          nachlassSummen.nachlassNetto > 0
+            ? nachlassSummen.nettoVorNachlass
+            : null
         }
         bereitsGezahlt={
           schlussAbrechnung?.bereits_gezahlt_brutto

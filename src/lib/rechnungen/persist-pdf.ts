@@ -94,16 +94,30 @@ export async function buildRechnungPdfBuffer(
   }
 }
 
+/**
+ * @param options.allocateNummer — Nummer vergeben (Versand / Storno-Gutschrift).
+ *   Default: nur wenn Status nicht Entwurf. Entwürfe ohne Nummer bekommen keine RE-Nr.
+ *   (Sonst Lücken/Kollisionen — Abschlag-PDF-Refresh darf keine Nummern belegen.)
+ */
 export async function persistPdfForRechnung(
-  rechnungId: string
+  rechnungId: string,
+  options?: { allocateNummer?: boolean }
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
   const { data: recMeta } = await supabaseAdmin
     .from('rechnungen')
-    .select('rechnungsnummer, beleg_typ, richtung')
+    .select('rechnungsnummer, beleg_typ, richtung, status')
     .eq('id', rechnungId)
     .maybeSingle()
 
-  if (String(recMeta?.richtung ?? '') !== 'eingehend') {
+  const isEingehend = String(recMeta?.richtung ?? '') === 'eingehend'
+  const isEntwurf =
+    String(recMeta?.status ?? '')
+      .trim()
+      .toLowerCase() === 'entwurf'
+  const allocate =
+    !isEingehend && (options?.allocateNummer === true || (!isEntwurf && options?.allocateNummer !== false))
+
+  if (allocate) {
     const numRes = await ensureRechnungsnummerFuerVersand(
       supabaseAdmin,
       rechnungId,

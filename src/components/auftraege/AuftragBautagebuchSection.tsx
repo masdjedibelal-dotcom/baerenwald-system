@@ -80,8 +80,8 @@ function toEditSeed(e: BautagebuchListenEintrag): CrmTagebuchEditSeed {
 }
 
 /**
- * Bautagebuch = CRM-Tagebuch-Einträge.
- * HW-Leistungs-Updates gehören unter Leistungen — hier ausgeblendet.
+ * Bautagebuch = CRM- + Partner-Tagebuch-Einträge (sichtbar fürs Team).
+ * Nur „weitere Arbeit“ bleibt ausgeblendet (läuft über Leistungs-Prüfung).
  */
 export function AuftragBautagebuchSection({
   eintraege,
@@ -104,12 +104,7 @@ export function AuftragBautagebuchSection({
   const [deletePending, setDeletePending] = useState(false)
 
   const sorted = [...eintraege]
-    .filter((e) => {
-      const typ = String(e.typ).toLowerCase()
-      if (typ === 'weitere_arbeit') return false
-      if (isPartnerEintrag(e)) return false
-      return true
-    })
+    .filter((e) => String(e.typ).toLowerCase() !== 'weitere_arbeit')
     .sort((a, b) => {
       const ta = a.ereignis_zeit || a.created_at || ''
       const tb = b.ereignis_zeit || b.created_at || ''
@@ -228,6 +223,9 @@ export function AuftragBautagebuchSection({
                   {desc ? <p className="bt-inserat__desc">{desc}</p> : null}
                   <div className="bt-inserat__meta">
                     <span>{eintragZeit(e)}</span>
+                    {isPartnerEintrag(e) ? (
+                      <span className="bt-inserat__chip">Partner-Update</span>
+                    ) : null}
                     {e.leistungName?.trim() || e.leistungNames?.length ? (
                       <span className="bt-inserat__chip bt-inserat__chip--muted">
                         {(e.leistungNames?.length
@@ -251,7 +249,7 @@ export function AuftragBautagebuchSection({
 
             return (
               <li key={e.id}>
-                {!disabled && isMobile ? (
+                {!disabled && isMobile && !isPartnerEintrag(e) ? (
                   <SwipeRow
                     leftActions={[
                       {
@@ -288,7 +286,7 @@ export function AuftragBautagebuchSection({
         subtitle={active ? eintragZeit(active) : null}
         size="md"
         footer={
-          active && !disabled ? (
+          active && !disabled && !isPartnerEintrag(active) ? (
             <div className="sheet-footer-actions ldr-cta">
               <Button
                 type="button"

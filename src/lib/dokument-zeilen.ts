@@ -215,9 +215,11 @@ export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
   const colon = besch.indexOf(':')
   const modusRaw = colon >= 0 ? besch.slice(0, colon).trim() : ''
   const wertRaw = colon >= 0 ? besch.slice(colon + 1).trim() : ''
-  const modus = parseGesamtrabattModus(modusRaw)
+  const hatModusInBeschreibung = Boolean(modusRaw)
+  const modus = hatModusInBeschreibung ? parseGesamtrabattModus(modusRaw) : 'betrag'
   let wert = Math.abs(Number(String(wertRaw).replace(',', '.')))
   if (!Number.isFinite(wert) || (wert <= 0 && !isGesamtrabattZielModus(modus))) {
+    // Ohne Meta: gespeicherter Negativbetrag = Abzug in € (nie als Prozent missverstehen).
     wert =
       Math.abs(Number(p.gesamt_min) || 0) ||
       Math.abs(Number(p.lohn_netto) || 0) ||
@@ -230,11 +232,32 @@ export function parseGesamtrabattMetaFromPosition(p: AngebotPosition): {
   }
 }
 
+/** Brutto der Preispositionen (je Zeile mit eigenem MwSt-Satz) — für Ziel-Brutto-Nachlass. */
+export function summeArtikelBruttoAusAngebotPositionen(
+  positionen: AngebotPosition[],
+  fallbackMwstSatz = 19
+): number {
+  return (
+    Math.round(
+      positionen.filter(istPreisPosition).reduce((s, p) => {
+        const m = Math.max(Number(p.menge) || 1, 0.0001)
+        const netto = (Number(p.lohn_netto) || 0) + (Number(p.material_netto) || 0)
+        const zeile = netto * m
+        const satz =
+          p.mwst_satz === 0 || p.mwst_satz === 7 || p.mwst_satz === 19
+            ? p.mwst_satz
+            : fallbackMwstSatz
+        return s + zeile * (1 + satz / 100)
+      }, 0) * 100
+    ) / 100
+  )
+}
+
 /** Nachlass-Abzug (positiv) aus Angebots-Positionen — auch wenn Beträge beim Laden auf 0 gesetzt wurden. */
 export function gesamtrabattAbzugAusAngebotPositionen(
   positionen: AngebotPosition[],
   artikelNetto: number,
-  /** Dokument-USt für Ziel-Brutto (Fallback 19). */
+  /** Dokument-USt für Ziel-Brutto, falls Positionen keinen Satz haben (Fallback 19). */
   mwstSatz = 19
 ): number {
   const r = positionen.find(istGesamtrabattPosition)
@@ -242,7 +265,7 @@ export function gesamtrabattAbzugAusAngebotPositionen(
   const { modus, wert } = parseGesamtrabattMetaFromPosition(r)
   const artikelBrutto =
     modus === 'ziel_brutto'
-      ? Math.round(Math.max(0, artikelNetto) * (1 + Math.max(0, mwstSatz) / 100) * 100) / 100
+      ? summeArtikelBruttoAusAngebotPositionen(positionen, mwstSatz)
       : undefined
   return gesamtrabattAbzugFromModus(modus, wert, artikelNetto, artikelBrutto)
 }

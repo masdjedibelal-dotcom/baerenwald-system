@@ -40,14 +40,25 @@ export function orgFreigabeKundenversandBlockMessage(
   status: OrgFreigabeStatus | null | undefined,
   hvMeldungStatus?: string | null
 ): string | null {
-  if (!orgFreigabeBlockiertPartner(status, hvMeldungStatus)) return null
+  // ausstehend/beschluss: Angebot muss erst an HV — Versand ist der Freigabe-Einstieg.
+  if ((hvMeldungStatus ?? '').trim() === 'notmassnahme') return null
   if (status === 'abgelehnt') {
     return 'Organisation hat die Freigabe abgelehnt — Versand an den Kunden ist blockiert.'
   }
-  if (status === 'beschluss_ausstehend') {
-    return 'Wartet auf Eigentümerbeschluss — Versand an den Kunden erst nach Freigabe.'
-  }
-  return 'Wartet auf HV-Freigabe — Versand an den Kunden erst nach Freigabe erteilen.'
+  return null
+}
+
+/**
+ * Kunden-/HV-Versand blockieren?
+ * Nur bei Ablehnung — „ausstehend“ darf den Versand nicht blockieren
+ * (sonst sieht die HV das Angebot nie und kann nicht freigeben).
+ */
+export function orgFreigabeBlockiertKundenversandStatus(
+  status: OrgFreigabeStatus | null | undefined,
+  hvMeldungStatus?: string | null
+): boolean {
+  if ((hvMeldungStatus ?? '').trim() === 'notmassnahme') return false
+  return status === 'abgelehnt'
 }
 
 export const ANLASS_LABELS: Record<string, string> = {

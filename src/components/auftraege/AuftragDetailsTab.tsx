@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
@@ -162,6 +162,7 @@ export function AuftragLeistungenTab({
 }) {
   const [pendingNachtrag, setPendingNachtrag] = useState(false)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
+  const clearBulkSelAfterZuweisung = useRef<(() => void) | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
   const [tagebuchEdit, setTagebuchEdit] = useState<CrmTagebuchEditSeed | null>(null)
@@ -283,7 +284,7 @@ export function AuftragLeistungenTab({
     onSaved?.()
   }
 
-  function markErledigt(ids: string[]) {
+  function markErledigt(ids: string[], clearSelection?: () => void) {
     if (disabled || !ids.length) return
     void actionBusy.run('Leistungen werden aktualisiert…', async () => {
       for (const positionId of ids) {
@@ -298,11 +299,12 @@ export function AuftragLeistungenTab({
         }
       }
       toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
+      clearSelection?.()
       onSaved?.()
     })
   }
 
-  function abwaehlenZuweisung(ids: string[]) {
+  function abwaehlenZuweisung(ids: string[], clearSelection?: () => void) {
     if (disabled || !ids.length) return
     void actionBusy.run('Zuweisung wird zurückgezogen…', async () => {
       const r = await clearAuftragHandwerkerPositionen({
@@ -318,6 +320,7 @@ export function AuftragLeistungenTab({
           ? 'Zuweisung zurückgezogen — Partner sieht die Leistung nicht mehr.'
           : `${r.cleared} Zuweisungen zurückgezogen.`
       )
+      clearSelection?.()
       onSaved?.()
     })
   }
@@ -361,9 +364,12 @@ export function AuftragLeistungenTab({
           onClick={() => setLeistungenView('bautagebuch')}
         >
           Bautagebuch
-          {bautagebuchEintraege.length > 0 ? (
-            <span className="lt-view-seg__count">{bautagebuchEintraege.length}</span>
-          ) : null}
+          {(() => {
+            const n = bautagebuchEintraege.filter(
+              (e) => String(e.typ).toLowerCase() !== 'weitere_arbeit'
+            ).length
+            return n > 0 ? <span className="lt-view-seg__count">{n}</span> : null
+          })()}
         </button>
       </div>
 
@@ -425,13 +431,24 @@ export function AuftragLeistungenTab({
               disabled
                 ? undefined
                 : [
-                    { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
+                    {
+                      id: 'zuweisen',
+                      label: 'Zuweisen',
+                      onClick: (ids, clearSelection) => {
+                        clearBulkSelAfterZuweisung.current = clearSelection
+                        setZuweisungIds(ids)
+                      },
+                    },
                     {
                       id: 'abwaehlen',
                       label: 'Abwählen',
-                      onClick: (ids) => abwaehlenZuweisung(ids),
+                      onClick: (ids, clearSelection) => abwaehlenZuweisung(ids, clearSelection),
                     },
-                    { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
+                    {
+                      id: 'erledigt',
+                      label: 'Erledigt',
+                      onClick: (ids, clearSelection) => markErledigt(ids, clearSelection),
+                    },
                   ]
             }
             drawerActionsForRow={
@@ -477,7 +494,10 @@ export function AuftragLeistungenTab({
       {zuweisungIds ? (
         <AuftragLeistungZuweisungModal
           open
-          onClose={() => setZuweisungIds(null)}
+          onClose={() => {
+            clearBulkSelAfterZuweisung.current = null
+            setZuweisungIds(null)
+          }}
           auftragId={detail.id}
           angebotId={detail.angebot_id}
           projektName={angebotTitel}
@@ -485,6 +505,8 @@ export function AuftragLeistungenTab({
           positionen={detail.auftrag_positionen ?? []}
           gewerke={[]}
           onDone={() => {
+            clearBulkSelAfterZuweisung.current?.()
+            clearBulkSelAfterZuweisung.current = null
             setZuweisungIds(null)
             onSaved?.()
           }}

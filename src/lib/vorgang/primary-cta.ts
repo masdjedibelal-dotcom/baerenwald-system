@@ -125,6 +125,9 @@ export function primaryCta(
 
   if (phase === 'auftrag') {
     if (ui === 'geplant' || ui === 'aktiv') {
+      if (ctx.abnahmeFaellig) {
+        return { id: 'abnahme_starten', label: 'Abnahme starten', icon: 'clipboard-list' }
+      }
       return { id: 'auftrag_abschliessen', label: 'Auftrag abschließen', icon: 'check' }
     }
     if (ui === 'fertig') {

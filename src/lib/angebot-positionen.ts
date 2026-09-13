@@ -142,8 +142,25 @@ export function normalizeAngebotPosition(
       einheit: 'Stk.',
       vk_netto: num(r.vk_netto),
     })
+    /**
+     * `meta.wert` ist je nach Modus Prozent / Abzug € / Ziel-Gesamtbetrag — nie blind
+     * als Negativzeile speichern. Abzug wird in `normalizeAngebotPositionen` aus Meta
+     * + Positionssumme neu berechnet; hier nur vorhandenen Negativbetrag durchreichen.
+     */
+    const existingSigned =
+      num(r.lohn_netto) < 0
+        ? num(r.lohn_netto)
+        : num(r.gesamt_min) < 0
+          ? num(r.gesamt_min)
+          : num(r.vk_netto) < 0
+            ? num(r.vk_netto)
+            : 0
     const signed =
-      meta.wert > 0 ? -Math.abs(meta.wert) : num(r.gesamt_min) < 0 ? num(r.gesamt_min) : 0
+      meta.modus === 'betrag' && meta.wert > 0
+        ? -Math.abs(meta.wert)
+        : existingSigned < 0
+          ? existingSigned
+          : 0
     const bezeichnung = (leistung || 'Nachlass').trim() || 'Nachlass'
     const beschreibung =
       beschRaw ||
@@ -356,7 +373,27 @@ export function normalizeAngebotPositionen(raw: unknown): AngebotPosition[] {
     const p = normalizeAngebotPosition(item)
     if (p) out.push(p)
   }
-  return out
+  /** Nachlass-Negativzeile = echter Netto-Abzug (nicht %-Satz / nicht Zielbetrag). */
+  const artikelNetto = out.reduce((s, p) => {
+    if (!istPreisPosition(p)) return s
+    const m = p.menge || 1
+    return s + (Number(p.lohn_netto) || 0) * m + (Number(p.material_netto) || 0) * m
+  }, 0)
+  const abzug = gesamtrabattAbzugAusAngebotPositionen(out, artikelNetto, 19)
+  if (abzug <= 0) return out
+  const signed = -abzug
+  return out.map((p) =>
+    istGesamtrabattPosition(p)
+      ? {
+          ...p,
+          lohn_netto: signed,
+          material_netto: 0,
+          vk_netto: signed,
+          gesamt_min: signed,
+          gesamt_max: signed,
+        }
+      : p
+  )
 }
 
 /** Queues aus alter angebot_handwerker-Liste in Positionen einsortieren (Reihenfolge pro Gewerk). */

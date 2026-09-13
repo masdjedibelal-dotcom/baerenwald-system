@@ -751,6 +751,35 @@ export async function updateCrmTagebuchEintrag(
     payload: { eintrag_id: eintragId, position_ids: positionIds, foto_count: fotoPaths.length, typ },
   })
 
+  // Wie beim Anlegen: Portal-Glocke / Push (ohne zweite Timeline-Zeile)
+  try {
+    const leistungNames =
+      positionIds.length > 0
+        ? (
+            await supabaseAdmin
+              .from('auftrag_positionen')
+              .select('id, leistung_name')
+              .in('id', positionIds)
+          ).data?.map((p) => String(p.leistung_name ?? '').trim()).filter(Boolean) ?? []
+        : []
+    const eintragTitel =
+      [titel || (typ === 'notiz' ? 'Notiz' : 'Fortschritt'), leistungNames.join(', ')]
+        .filter(Boolean)
+        .join(' · ') || 'Bautagebuch-Update'
+    const { notifyPortalBautagebuchFromCrm } = await import(
+      '@/lib/portal/notify-portal-bautagebuch'
+    )
+    await notifyPortalBautagebuchFromCrm({
+      auftragId,
+      eintragTitel,
+    })
+  } catch (e) {
+    console.warn(
+      '[updateCrmTagebuchEintrag] Portal-Notify fehlgeschlagen',
+      e instanceof Error ? e.message : e
+    )
+  }
+
   revalidateAuftrag(auftragId)
   return { ok: true, eintragId, positionId: primaryPos }
 }

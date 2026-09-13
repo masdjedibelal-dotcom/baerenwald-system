@@ -75,6 +75,9 @@ export function TotBand({
   showUst = true,
   bereitsGezahlt,
   restBrutto,
+  nachlassNetto,
+  nachlassLabel,
+  nettoVorNachlass,
   className,
 }: {
   netto: number
@@ -85,13 +88,32 @@ export function TotBand({
   /** Schlussrechnung: Abschläge abziehen */
   bereitsGezahlt?: Array<{ label: string; brutto: number }> | null
   restBrutto?: number | null
+  /** Dokumentweiter Nachlass (netto-Abzug) */
+  nachlassNetto?: number | null
+  nachlassLabel?: string | null
+  /** Summe Positionen vor Nachlass */
+  nettoVorNachlass?: number | null
   className?: string
 }) {
   const hatAbzug = Boolean(bereitsGezahlt?.length && (restBrutto == null || restBrutto >= 0))
+  const hatNachlass = Boolean(nachlassNetto != null && nachlassNetto > 0)
+  const nachlassName = (nachlassLabel || 'Nachlass').trim() || 'Nachlass'
   return (
     <div className={cn('totband', className)}>
       {showUst ? (
         <>
+          {hatNachlass && nettoVorNachlass != null && nettoVorNachlass > 0 ? (
+            <div className="totband-r">
+              <span>Summe Positionen</span>
+              <span>{formatEurBetrag(nettoVorNachlass)}</span>
+            </div>
+          ) : null}
+          {hatNachlass ? (
+            <div className="totband-r totband-r--nachlass">
+              <span>{nachlassName}</span>
+              <span>−{formatEurBetrag(nachlassNetto!)}</span>
+            </div>
+          ) : null}
           <div className="totband-r">
             <span>Netto</span>
             <span>{formatEurBetrag(netto)}</span>
@@ -103,7 +125,7 @@ export function TotBand({
         </>
       ) : null}
       <div className={hatAbzug ? 'totband-r' : 'totband-t'}>
-        <span>{showUst ? (hatAbzug ? 'Brutto' : 'Brutto') : 'Gesamt'}</span>
+        <span>{showUst ? 'Brutto' : 'Gesamt'}</span>
         <span>{formatEurBetrag(brutto)}</span>
       </div>
       {hatAbzug

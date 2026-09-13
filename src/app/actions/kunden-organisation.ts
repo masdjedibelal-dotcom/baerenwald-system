@@ -244,16 +244,19 @@ export async function saveKundeFreigabeRegeln(
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {
     const msg = error.message ?? ''
+    // akut_fall_ids nie still droppen — sonst Toast „ok“, Liste nach Reload leer
+    if (/akut_fall_ids/i.test(msg)) {
+      return {
+        ok: false,
+        message:
+          'Sofortmaßnahme-Fälle konnten nicht gespeichert werden (Spalte akut_fall_ids fehlt oder Schema-Cache). Bitte Migration anwenden bzw. API neu laden.',
+      }
+    }
     let nextPayload = payload
     if (/hm_auto_zuweisen/i.test(msg)) {
       const { hm_auto_zuweisen: _drop, ...withoutHm } = nextPayload
       void _drop
       nextPayload = withoutHm
-    }
-    if (/akut_fall_ids/i.test(msg)) {
-      const { akut_fall_ids: _dropAkut, ...withoutAkut } = nextPayload
-      void _dropAkut
-      nextPayload = withoutAkut
     }
     if (nextPayload !== payload) {
       const retry = await withCrmReadFallback(async (db) =>

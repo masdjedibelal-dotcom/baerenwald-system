@@ -1281,6 +1281,11 @@ export function AngebotWizard({
         ust={mailSummen.mwstBetragMin}
         brutto={mailSummen.bruttoMin}
         ustLabel={ustLabel}
+        nachlassNetto={mailSummen.nachlassNetto > 0 ? mailSummen.nachlassNetto : null}
+        nachlassLabel={mailSummen.nachlassLabel}
+        nettoVorNachlass={
+          mailSummen.nachlassNetto > 0 ? mailSummen.nettoVorNachlass : null
+        }
       />
     </div>
   )

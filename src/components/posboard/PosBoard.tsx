@@ -500,7 +500,20 @@ export function PosBoard({
     const from = positionen.findIndex((p) => p.id === draggedId)
     const targetPos = positionen.find((p) => p.id === targetId)
     if (from < 0 || !targetPos) return
-    const moved = { ...positionen[from], gewerk: gewerkOf(targetPos) }
+    const src = positionen[from]
+    // Nachlass bleibt dokumentweit — kein Gewerk-Wechsel
+    if (src.kind === 'nachlass') {
+      const arr = positionen.filter((p) => p.id !== draggedId)
+      const to = arr.findIndex((p) => p.id === targetId)
+      arr.splice(to < 0 ? arr.length : to, 0, src)
+      onChange(arr)
+      return
+    }
+    const targetGewerk = gewerkOf(targetPos)
+    const moved =
+      gewerkOf(src) === targetGewerk
+        ? src
+        : { ...src, gewerk: targetGewerk, gewerk_id: null, gewerk_slug: null }
     const arr = positionen.filter((p) => p.id !== draggedId)
     const to = arr.findIndex((p) => p.id === targetId)
     arr.splice(to < 0 ? arr.length : to, 0, moved)
@@ -511,8 +524,13 @@ export function PosBoard({
     if (!onChange) return
     const from = positionen.findIndex((p) => p.id === draggedId)
     if (from < 0) return
+    const src = positionen[from]
+    if (src.kind === 'nachlass') return
     claimPendingGewerk(gewerk)
-    const moved = { ...positionen[from], gewerk }
+    const moved =
+      gewerkOf(src) === gewerk
+        ? src
+        : { ...src, gewerk, gewerk_id: null, gewerk_slug: null }
     const arr = positionen.filter((p) => p.id !== draggedId)
     let lastIdx = -1
     arr.forEach((p, i) => {
@@ -524,7 +542,7 @@ export function PosBoard({
 
   /** Gewerk-Abschnitte als Blöcke umsortieren (Flat-Array-Reihenfolge). */
   const reorderGroups = (draggedGewerk: string, targetGewerk: string) => {
-    if (!onChange || draggedGewerk === targetGewerk) return
+    if ((!onChange && pendingGewerke.length === 0) || draggedGewerk === targetGewerk) return
     const map = new Map<string, PosBoardLine[]>()
     const order: string[] = []
     for (const p of positionen) {
@@ -535,13 +553,21 @@ export function PosBoard({
       }
       map.get(g)!.push(p)
     }
+    for (const g of pendingGewerke) {
+      const name = g.trim()
+      if (!name || map.has(name) || order.includes(name)) continue
+      map.set(name, [])
+      order.push(name)
+    }
     const fromIdx = order.indexOf(draggedGewerk)
     if (fromIdx < 0 || !order.includes(targetGewerk)) return
     order.splice(fromIdx, 1)
     const insertAt = order.indexOf(targetGewerk)
     if (insertAt < 0) return
     order.splice(insertAt, 0, draggedGewerk)
-    onChange(order.flatMap((g) => map.get(g) ?? []))
+    const nextPending = order.filter((g) => (map.get(g)?.length ?? 0) === 0)
+    setPendingGewerke(nextPending)
+    if (onChange) onChange(order.flatMap((g) => map.get(g) ?? []))
   }
 
   const netto = positionen.reduce((s, p) => s + _line(p), 0)
@@ -813,8 +839,8 @@ export function PosBoard({
         onToggleGroup={toggleGroup}
         dnd={editable}
         onReorder={reorder}
-        onDropToGroup={dropToGroup}
-        onReorderGroup={reorderGroups}
+        onDropToGroup={hideAddGewerk ? undefined : dropToGroup}
+        onReorderGroup={hideAddGewerk ? undefined : reorderGroups}
         onCopyItem={editable ? dup : undefined}
         onDeleteItem={editable ? requestRemove : undefined}
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}

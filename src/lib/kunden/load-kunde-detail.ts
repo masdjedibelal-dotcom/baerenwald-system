@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import { kundeAuftraggeberLeadsEmbed, kundeLeadsEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { Kunde, KundenDokumentRow, KundenNotizRow, Lead, AuftragStatus } from '@/lib/types'
 
@@ -461,6 +462,9 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
 
   return {
     ...kundeBase,
+    akut_fall_ids: normalizeAkutFallIds(
+      (kundeBase as { akut_fall_ids?: unknown }).akut_fall_ids
+    ),
     kunden_ansprechpartner: ansprechpartnerSorted,
     leads: leadsMerged,
     auftraege: auftraegeMerged,

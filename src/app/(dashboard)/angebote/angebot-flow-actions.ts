@@ -328,6 +328,20 @@ export async function acceptAngebotAndCreateAuftrag(
   })
   if (!res.ok) return res
 
+  if (direktOhneHv && leadId) {
+    try {
+      const { notifyPortalAuftragBestaetigtFromCrm } = await import(
+        '@/lib/portal/notify-portal-auftrag-bestaetigt'
+      )
+      await notifyPortalAuftragBestaetigtFromCrm({
+        leadId,
+        auftragId: res.auftragId,
+      })
+    } catch (e) {
+      console.warn('[acceptAngebotAndCreateAuftrag] Portal-Notify Direktauftrag:', e)
+    }
+  }
+
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)
     const timelineTitel = nachtragLink

@@ -26,6 +26,7 @@ import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpar
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
+import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
@@ -228,6 +229,22 @@ export function KundeDetailClient({
   }, [kunde, rechnungen])
 
   const zeigtOrganisationTab = istKundeHausverwaltungTyp(kunde.typ)
+
+  const freigabeSettingsValue = useMemo(
+    () => ({
+      notfall_direkt: kunde.notfall_direkt ?? true,
+      freigabe_schwelle_eur:
+        kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
+      hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
+      akut_fall_ids: normalizeAkutFallIds(kunde.akut_fall_ids),
+    }),
+    [
+      kunde.notfall_direkt,
+      kunde.freigabe_schwelle_eur,
+      kunde.hm_auto_zuweisen,
+      kunde.akut_fall_ids,
+    ]
+  )
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
@@ -471,22 +488,27 @@ export function KundeDetailClient({
         <FreigabeSettingsCard
           showHmAuto
           showAkutFaelle
-          value={{
-            notfall_direkt: kunde.notfall_direkt ?? true,
-            freigabe_schwelle_eur:
-              kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
-            hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
-            akut_fall_ids: kunde.akut_fall_ids ?? [],
-          }}
-          onSave={async (next) =>
-            saveKundeFreigabeRegeln(kunde.id, {
+          value={freigabeSettingsValue}
+          onSave={async (next) => {
+            const akutIds = normalizeAkutFallIds(next.akut_fall_ids)
+            const r = await saveKundeFreigabeRegeln(kunde.id, {
               notfall_direkt: Boolean(next.notfall_direkt),
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
               freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
               hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
-              akut_fall_ids: next.akut_fall_ids ?? [],
+              akut_fall_ids: akutIds,
             })
-          }
+            if (r.ok) {
+              setKunde((prev) => ({
+                ...prev,
+                notfall_direkt: Boolean(next.notfall_direkt),
+                freigabe_schwelle_eur: next.freigabe_schwelle_eur ?? null,
+                hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
+                akut_fall_ids: akutIds,
+              }))
+            }
+            return r
+          }}
           onSaved={() => refresh()}
         />
       ) : null}

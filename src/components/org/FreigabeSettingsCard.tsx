@@ -93,6 +93,12 @@ export function FreigabeSettingsCard({
   const [hmAuto, setHmAuto] = useState(Boolean(value.hm_auto_zuweisen))
   const [akutFaelle, setAkutFaelle] = useState<AkutFallId[]>(parsed.akutFaelle)
 
+  // Inhalt vergleichen — nicht Array-Referenz (Parent liefert oft `?? []` neu).
+  const akutFaelleSyncKey = normalizeAkutFallIds(editSource.akut_fall_ids)
+    .slice()
+    .sort()
+    .join('\0')
+
   useEffect(() => {
     if (skipSyncRef.current) {
       skipSyncRef.current = false
@@ -103,7 +109,8 @@ export function FreigabeSettingsCard({
     setSchwelleAn(next.schwelleAn)
     setSchwelle(next.schwelle)
     setAkutFaelle(next.akutFaelle)
-  }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, editSource.akut_fall_ids, erben])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Sync nur bei Wertänderung, nicht bei neuer []-Referenz
+  }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, akutFaelleSyncKey, erben])
 
   useEffect(() => {
     setHmAuto(Boolean(value.hm_auto_zuweisen))

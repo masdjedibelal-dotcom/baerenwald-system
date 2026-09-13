@@ -72,7 +72,10 @@ export async function createKundenUpdateAndSend(input: {
   /** Schlicht = weniger Inhalt in Mail, Details auf Status-Seite */
   mailModus: 'voll' | 'schlicht'
   kundeBenachrichtigen: boolean
-}): Promise<{ ok: true; timelineId: string } | { ok: false; message: string }> {
+}): Promise<
+  | { ok: true; timelineId: string; warning?: string }
+  | { ok: false; message: string }
+> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
@@ -98,7 +101,7 @@ export async function createKundenUpdateAndSend(input: {
 
   const tl = await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
-    typ: 'handwerker_update',
+    typ: 'bautagebuch',
     titel,
     beschreibung: beschreibung || null,
     foto_urls: fotos,
@@ -110,62 +113,67 @@ export async function createKundenUpdateAndSend(input: {
 
   const timelineId = tl.id ?? ''
 
+  let mailWarning: string | null = null
   if (input.kundeBenachrichtigen) {
     const kunden = auf.kunden as { name?: string; email?: string | null; typ?: string | null } | null
     const email = kunden?.email?.trim()
-    if (!email) return { ok: false, message: 'Keine Kunden-E-Mail — Update gespeichert, Mail nicht gesendet.' }
+    if (!email) {
+      mailWarning = 'Update gespeichert — keine Kunden-E-Mail, Mail nicht gesendet.'
+    } else {
+      let token = (auf.kunden_token as string | null)?.trim()
+      if (!token) token = (await ensureKundenTokenForAuftrag(input.auftragId)) ?? undefined
+      if (!token) {
+        mailWarning = 'Update gespeichert — kein Kunden-Link, Mail nicht gesendet.'
+      } else {
+        const leadRaw = auf.leads as { status?: LeadStatus } | { status?: LeadStatus }[] | null
+        const leadStatus = (Array.isArray(leadRaw) ? leadRaw[0]?.status : leadRaw?.status) ?? null
+        const aufStatus = auf.status as AuftragStatus
+        const phaseIdx = aktuellePhaseIndexFromEntities({
+          aufStatus,
+          hasAuftrag: true,
+          hasAngebot: true,
+          leadStatus,
+        })
+        const link = projektUrlFromToken(token)
+        const branding = await getMailBranding(supabaseAdmin)
+        const minimal = input.mailModus === 'schlicht'
+        const kundeTyp = kunden?.typ ?? null
 
-    let token = (auf.kunden_token as string | null)?.trim()
-    if (!token) token = (await ensureKundenTokenForAuftrag(input.auftragId)) ?? undefined
-    if (!token) return { ok: false, message: 'Kein Kunden-Link' }
+        const tpl = mailProjektStatusUpdate(
+          {
+            name: (kunden?.name ?? 'Kundin/Kunde').trim(),
+            statusLink: link,
+            kundeTyp,
+            projektTitel: (auf.titel as string | null)?.trim() || 'Ihr Projekt',
+            statusLabel: auftragStatusLabelDe(aufStatus),
+            phaseStepsHtml: mailPhasenStepsHtml(phaseIdx),
+            updateTitel: titel,
+            updateText: beschreibung || titel,
+            naechsterSchritt: (auf.naechster_schritt as string | null) ?? null,
+            minimalBody: minimal,
+            fotoLinks: fotos,
+          },
+          branding
+        )
 
-    const leadRaw = auf.leads as { status?: LeadStatus } | { status?: LeadStatus }[] | null
-    const leadStatus = (Array.isArray(leadRaw) ? leadRaw[0]?.status : leadRaw?.status) ?? null
-    const aufStatus = auf.status as AuftragStatus
-    const phaseIdx = aktuellePhaseIndexFromEntities({
-      aufStatus,
-      hasAuftrag: true,
-      hasAngebot: true,
-      leadStatus,
-    })
-    const link = projektUrlFromToken(token)
-    const branding = await getMailBranding(supabaseAdmin)
-    const minimal = input.mailModus === 'schlicht'
-    const kundeTyp = kunden?.typ ?? null
-
-    const tpl = mailProjektStatusUpdate(
-      {
-        name: (kunden?.name ?? 'Kundin/Kunde').trim(),
-        statusLink: link,
-        kundeTyp,
-        projektTitel: (auf.titel as string | null)?.trim() || 'Ihr Projekt',
-        statusLabel: auftragStatusLabelDe(aufStatus),
-        phaseStepsHtml: mailPhasenStepsHtml(phaseIdx),
-        updateTitel: titel,
-        updateText: beschreibung || titel,
-        naechsterSchritt: (auf.naechster_schritt as string | null) ?? null,
-        minimalBody: minimal,
-        fotoLinks: fotos,
-      },
-      branding
-    )
-
-    const sent = await sendMail({
-      typ: 'update_hinweis',
-      an: email,
-      anName: kunden?.name ?? null,
-      betreff: tpl.betreff,
-      html: tpl.html,
-      kundeId: (auf.kunde_id as string | null) ?? null,
-      auftragId: input.auftragId,
-    })
-    if (!sent.success) return { ok: false, message: sent.error ?? 'Mail fehlgeschlagen' }
-
-    if (timelineId && sent.emailLogId) {
-      await supabaseAdmin
-        .from('auftrag_timeline')
-        .update({ email_log_id: sent.emailLogId })
-        .eq('id', timelineId)
+        const sent = await sendMail({
+          typ: 'update_hinweis',
+          an: email,
+          anName: kunden?.name ?? null,
+          betreff: tpl.betreff,
+          html: tpl.html,
+          kundeId: (auf.kunde_id as string | null) ?? null,
+          auftragId: input.auftragId,
+        })
+        if (!sent.success) {
+          mailWarning = sent.error ?? 'Update gespeichert — Mail fehlgeschlagen.'
+        } else if (timelineId && sent.emailLogId) {
+          await supabaseAdmin
+            .from('auftrag_timeline')
+            .update({ email_log_id: sent.emailLogId })
+            .eq('id', timelineId)
+        }
+      }
     }
   }
 
@@ -182,5 +190,9 @@ export async function createKundenUpdateAndSend(input: {
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true, timelineId }
+  return {
+    ok: true,
+    timelineId,
+    ...(mailWarning ? { warning: mailWarning } : {}),
+  }
 }

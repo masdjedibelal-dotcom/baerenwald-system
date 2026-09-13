@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-/** Vor-Ort-Abnahme läuft über AuftragAbschliessenSheet im Auftrag. */
+/** Abnahme → Canvas (Create-Wizard), nicht mehr nur Abschluss-Sheet. */
 export default function AuftragAbnahmePage({ params }: { params: { id: string } }) {
-  redirect(`/auftraege/${params.id}?tab=abnahme&abschliessen=1`)
+  redirect(`/auftraege/${params.id}/abnahme/erstellen`)
 }

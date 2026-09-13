@@ -1,6 +1,7 @@
 import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import {
+  orgFreigabeBlockiertKundenversandStatus,
   orgFreigabeBlockiertPartner,
   orgFreigabeKundenversandBlockMessage,
   orgFreigabePartnerBlockMessage,
@@ -40,14 +41,16 @@ export function orgFreigabeKundenversandOptsFromLead(
   }
 }
 
-/** HV-Freigabe fehlt — außer Akut / Notmaßnahme. */
+/** HV-Freigabe fehlt — außer Akut / Notmaßnahme.
+ * Kundenversand: nur Ablehnung blockiert (ausstehend = Angebot muss erst an HV).
+ */
 export function orgFreigabeBlockiertKundenversand(
   opts: OrgFreigabeKundenversandOpts | null | undefined
 ): boolean {
   if (!opts) return false
   const bypass = (opts.freigabeBypassGrund ?? '').trim().toLowerCase()
   if (bypass === 'akut' || opts.funnelDirektauftrag === true) return false
-  return orgFreigabeBlockiertPartner(opts.orgStatus, opts.hvMeldungStatus)
+  return orgFreigabeBlockiertKundenversandStatus(opts.orgStatus, opts.hvMeldungStatus)
 }
 
 export function hatAngebotHandwerker(rows: AngebotHandwerkerRow[] | null | undefined): boolean {
@@ -133,22 +136,19 @@ export function handwerkerSendenBlockierHinweis(
       ? { orgStatus, hvMeldungStatus }
       : undefined)
   const list = zuweisungenMitLv(rows)
+  if (orgFreigabeBlockiertKundenversand(orgOpts)) {
+    const kundenMsg = orgFreigabeKundenversandBlockMessage(
+      orgOpts?.orgStatus,
+      orgOpts?.hvMeldungStatus
+    )
+    if (kundenMsg) return kundenMsg
+  }
   if (orgFreigabeBlockiertPartner(orgOpts?.orgStatus, orgOpts?.hvMeldungStatus)) {
-    if (
-      !list.length &&
-      orgFreigabeBlockiertKundenversand(orgOpts)
-    ) {
-      const kundenMsg = orgFreigabeKundenversandBlockMessage(
-        orgOpts?.orgStatus,
-        orgOpts?.hvMeldungStatus
-      )
-      if (kundenMsg) return kundenMsg
-    }
     const partnerMsg = orgFreigabePartnerBlockMessage(
       orgOpts?.orgStatus,
       orgOpts?.hvMeldungStatus
     )
-    if (partnerMsg) return partnerMsg
+    if (partnerMsg && list.length > 0) return partnerMsg
   }
   if (!list.length) {
     return 'Bitte zuerst Handwerker zuweisen und Partner-Angebot einholen.'

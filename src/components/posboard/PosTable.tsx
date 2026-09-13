@@ -5,6 +5,8 @@ import {
   DndContext,
   PointerSensor,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
   useSensor,
   useSensors,
@@ -85,6 +87,28 @@ function groupSortId(gewerk: string) {
 
 function parseGroupSortId(id: string): string | null {
   return id.startsWith('group:') ? id.slice(6) : null
+}
+
+/** Items bevorzugen; Gruppen nur wenn kein Item getroffen (leeres Gewerk). */
+const posTableCollision: CollisionDetection = (args) => {
+  const activeId = String(args.active.id)
+  const draggingGroup = activeId.startsWith('group:')
+  const pointer = pointerWithin(args)
+  const center = closestCenter(args)
+
+  if (draggingGroup) {
+    const groupHits = (pointer.length ? pointer : center).filter((c) =>
+      String(c.id).startsWith('group:')
+    )
+    if (groupHits.length) return groupHits
+    return center
+  }
+
+  const itemPointer = pointer.filter((c) => !String(c.id).startsWith('group:'))
+  if (itemPointer.length) return itemPointer
+  const itemCenter = center.filter((c) => !String(c.id).startsWith('group:'))
+  if (itemCenter.length) return itemCenter
+  return pointer.length ? pointer : center
 }
 
 function SortableGroupHeader({
@@ -531,26 +555,21 @@ export function PosTable({
     const activeGroup = parseGroupSortId(activeId)
     const overGroup = parseGroupSortId(overId)
 
-    if (activeGroup && overGroup && onReorderGroup) {
-      onReorderGroup(activeGroup, overGroup)
-      return
-    }
-    if (activeGroup) return
-
-    const overAsGroup = overGroup
-    if (overAsGroup && onDropToGroup) {
-      onDropToGroup(activeId, overAsGroup)
+    // Gewerk-Blöcke verschieben (Drop auf Header oder Position im Ziel-Gewerk)
+    if (activeGroup) {
+      const targetGewerk = overGroup ?? itemGroupById.get(overId) ?? null
+      if (targetGewerk && onReorderGroup) onReorderGroup(activeGroup, targetGewerk)
       return
     }
 
+    // Position auf leeres / anderes Gewerk (Header)
+    if (overGroup && onDropToGroup) {
+      onDropToGroup(activeId, overGroup)
+      return
+    }
+
+    // Position vor/nach anderer Position (inkl. Gewerk-Wechsel — ein atomarer onReorder)
     if (onReorder && itemIds.includes(overId)) {
-      const fromGewerk = itemGroupById.get(activeId)
-      const toGewerk = itemGroupById.get(overId)
-      if (fromGewerk && toGewerk && fromGewerk !== toGewerk && onDropToGroup) {
-        onDropToGroup(activeId, toGewerk)
-        queueMicrotask(() => onReorder(activeId, overId))
-        return
-      }
       onReorder(activeId, overId)
     }
   }
@@ -743,7 +762,7 @@ export function PosTable({
   return (
     <div className={unifiedAdd ? 'postable2 postable2--unified-add' : 'postable2'}>
       {enableDnd ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={posTableCollision} onDragEnd={onDragEnd}>
           <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             {body}
           </SortableContext>

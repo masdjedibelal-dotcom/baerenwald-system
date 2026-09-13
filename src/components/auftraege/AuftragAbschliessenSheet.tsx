@@ -91,7 +91,8 @@ export function AuftragAbschliessenSheet({
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
   function openAbnahmeWizard() {
-    onClose()
+    // Kein onClose() vor push: EditorSheet-Cleanup macht sonst history.back()
+    // und frisst die neue URL (wirkt mobil wie „Abnahme starten tut nichts“).
     router.push(`/auftraege/${auftragId}/abnahme/erstellen`)
   }
 
@@ -208,7 +209,13 @@ export function AuftragAbschliessenSheet({
 
   if (step === 'loading') {
     return (
-      <EditorSheet open={open} onClose={onClose} title="Auftrag abschließen" size="md">
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title="Auftrag abschließen"
+        size="md"
+        manageHistory={false}
+      >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] m-0">Wird geladen…</p>
       </EditorSheet>
     )
@@ -221,6 +228,7 @@ export function AuftragAbschliessenSheet({
         onClose={onClose}
         title="Auftrag abschließen"
         size="lg"
+        manageHistory={false}
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
             <Button
@@ -275,6 +283,7 @@ export function AuftragAbschliessenSheet({
         onClose={onClose}
         title="Auftrag abschließen"
         size="md"
+        manageHistory={false}
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
             <Button
@@ -305,6 +314,7 @@ export function AuftragAbschliessenSheet({
       onClose={onClose}
       title="Abnahmeprotokoll"
       size="lg"
+      manageHistory={false}
       dirty={!pending}
       footer={
         <div className="sheet-footer-actions zahlplan-editor-footer">

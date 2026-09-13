@@ -192,7 +192,13 @@ export function AngebotLeistungenTab({
         emptyHint="Noch keine Positionen — über „Angebot bearbeiten“ anlegen."
         bulkActions={
           kannZuweisen
-            ? [{ id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) }]
+            ? [
+                {
+                  id: 'zuweisen',
+                  label: 'Zuweisen',
+                  onClick: (ids) => setZuweisungIds(ids),
+                },
+              ]
             : undefined
         }
         drawerActionsForRow={

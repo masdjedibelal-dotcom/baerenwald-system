@@ -345,7 +345,9 @@ export function AngebotVersandSection({
         <div className="mb-3">
           <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Versand</h2>
           <p className="m-0 text-[length:var(--fs-text)] text-muted">
-            Speichern legt das Angebot im Portal vor. Hier nur noch die E-Mail an den Kunden.
+            Speichern hält den Entwurf im CRM. Versenden legt das Angebot im Portal vor und
+            startet bei Bedarf die HV-Freigabe (über Schwelle) bzw. den Direkt-Auftrag-Pfad
+            (unter Schwelle).
           </p>
         </div>
       ) : null}

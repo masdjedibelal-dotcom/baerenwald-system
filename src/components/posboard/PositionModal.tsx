@@ -67,49 +67,13 @@ export function PositionModal({
   const isFreitext = kind === 'freitext'
   const gewerkOptions = ['', ...Array.from(new Set([...gewerke, p.gewerk, 'Allgemein'].filter(Boolean)))]
 
-  /** Freitext → freie Position, sobald Kalkulationsfelder genutzt werden. */
-  function patch(next: Partial<PosBoardLine>) {
-    const commercialKeys: (keyof PosBoardLine)[] = [
-      'menge',
-      'preis',
-      'einheit',
-      'ust',
-      'gewerk',
-      'kostenverteilung',
-      'regieSchein',
-    ]
-    const touchesCommercial = commercialKeys.some((k) => k in next)
-    if (isFreitext && touchesCommercial) {
-      onChange({
-        kind: 'position',
-        position_quelle: 'frei',
-        menge: p.menge > 0 ? p.menge : 1,
-        einheit: p.einheit?.trim() || 'Stück',
-        ust: p.ust != null ? p.ust : 19,
-        preis: Number(p.preis) || 0,
-        ...next,
-      })
-      return
-    }
-    onChange(next)
-  }
-
-  const editLine: PosBoardLine = isFreitext
-    ? {
-        ...p,
-        menge: p.menge > 0 ? p.menge : 1,
-        einheit: p.einheit?.trim() || 'Stück',
-        ust: p.ust != null ? p.ust : 19,
-        preis: Number(p.preis) || 0,
-      }
-    : p
-  const line = posBoardLineNetto(editLine)
+  const line = posBoardLineNetto(p)
 
   const title =
     kind === 'nachlass'
       ? p.name || 'Nachlass'
       : isFreitext
-        ? p.name || 'Freie Position'
+        ? p.name || 'Freitext'
         : p.name || 'Position'
 
   return (
@@ -140,13 +104,49 @@ export function PositionModal({
             }}
           />
         </div>
+      ) : isFreitext ? (
+        <div className="form-grid">
+          <Field label="Gewerk">
+            <select
+              className="sel"
+              value={p.gewerk || ''}
+              onChange={(e) => onChange({ gewerk: e.target.value })}
+            >
+              <option value="">Gewerk wählen…</option>
+              {gewerkOptions.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div />
+          <Field label="Überschrift" full>
+            <input
+              className="txt"
+              value={p.name}
+              onChange={(e) => onChange({ name: e.target.value })}
+              placeholder="z. B. Wichtiger Hinweis"
+              autoFocus={!p.name}
+            />
+          </Field>
+          <SheetEditableField
+            label="Text"
+            value={richTextToEditablePlain(p.beschreibung)}
+            onSave={(beschreibung) => onChange({ beschreibung })}
+            multiline
+            rows={4}
+            placeholder="Hinweis ohne Preis — z. B. Ablauf oder Garantie"
+            sheetContext="detail"
+          />
+        </div>
       ) : (
         <div className="form-grid">
           <Field label="Gewerk">
             <select
               className="sel"
-              value={editLine.gewerk || ''}
-              onChange={(e) => patch({ gewerk: e.target.value })}
+              value={p.gewerk || ''}
+              onChange={(e) => onChange({ gewerk: e.target.value })}
             >
               <option value="">Gewerk wählen…</option>
               {gewerkOptions.map((g) => (
@@ -161,7 +161,7 @@ export function PositionModal({
             <input
               className="txt"
               value={p.name}
-              onChange={(e) => patch({ name: e.target.value })}
+              onChange={(e) => onChange({ name: e.target.value })}
               placeholder="z.B. Wandfliesen verlegen"
               autoFocus={!p.name}
             />
@@ -169,7 +169,7 @@ export function PositionModal({
           <SheetEditableField
             label="Beschreibung"
             value={richTextToEditablePlain(p.beschreibung)}
-            onSave={(beschreibung) => patch({ beschreibung })}
+            onSave={(beschreibung) => onChange({ beschreibung })}
             multiline
             rows={3}
             placeholder="Details zur Leistung…"
@@ -178,13 +178,13 @@ export function PositionModal({
           <Field label="Kostenart" full>
             <div className="seg" role="group" aria-label="Kostenart">
               {KOSTENART_OPTIONS.map((opt) => {
-                const active = (editLine.kostenverteilung ?? 'allgemein') === opt.value
+                const active = (p.kostenverteilung ?? 'allgemein') === opt.value
                 return (
                   <button
                     key={opt.value}
                     type="button"
                     className={active ? 'on' : undefined}
-                    onClick={() => patch({ kostenverteilung: opt.value })}
+                    onClick={() => onChange({ kostenverteilung: opt.value })}
                   >
                     {opt.label}
                   </button>
@@ -194,39 +194,37 @@ export function PositionModal({
           </Field>
           <Field label="Vergütung" full>
             <Toggle
-              checked={Boolean(editLine.regieSchein)}
+              checked={Boolean(p.regieSchein)}
               label={REGIE_BADGE_LABEL}
               onChange={(on) => {
                 if (on) {
                   const einheit =
-                    editLine.einheit === 'h' || editLine.einheit === 'Std.'
-                      ? editLine.einheit
-                      : 'h'
-                  patch({
+                    p.einheit === 'h' || p.einheit === 'Std.' ? p.einheit : 'h'
+                  onChange({
                     regieSchein: true,
                     einheit,
-                    notizExtern: editLine.notizExtern?.trim() || 'nach Aufwand',
+                    notizExtern: p.notizExtern?.trim() || 'nach Aufwand',
                   })
                 } else {
-                  patch({ regieSchein: false })
+                  onChange({ regieSchein: false })
                 }
               }}
             />
           </Field>
-          <Field label={editLine.regieSchein ? 'Geschätzte Stunden' : 'Menge'}>
+          <Field label={p.regieSchein ? 'Geschätzte Stunden' : 'Menge'}>
             <div style={{ display: 'flex', gap: 4 }}>
               <ClearableNumberInput
                 className="txt"
-                value={editLine.menge}
-                onValueChange={(menge) => patch({ menge })}
+                value={p.menge}
+                onValueChange={(menge) => onChange({ menge })}
                 style={{ flex: 1 }}
               />
               <select
                 className="sel"
-                value={editLine.einheit}
-                onChange={(e) => patch({ einheit: e.target.value })}
+                value={p.einheit}
+                onChange={(e) => onChange({ einheit: e.target.value })}
                 style={{ width: 100 }}
-                disabled={Boolean(editLine.regieSchein)}
+                disabled={Boolean(p.regieSchein)}
               >
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
@@ -237,41 +235,37 @@ export function PositionModal({
             </div>
           </Field>
           <div className="field pos-add-preis-ust">
-            <div className="pos-add-preis-ust__labels">
-              <div className="field-label">
-                {editLine.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
-              </div>
-              {showUst !== false ? <div className="field-label">USt.</div> : null}
+            <div className="field-label">
+              {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
             </div>
             <div className="pos-add-preis-ust__row">
-              <div className="txt-prefix pos-add-preis-ust__preis">
-                <span className="prefix">{editLine.regieSchein ? '€/h' : '€'}</span>
+              <div className="input-prefix">
+                <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
                 <ClearableNumberInput
                   className="txt"
-                  value={editLine.preis}
-                  onValueChange={(preis) => patch({ preis })}
-                  min={0}
+                  value={p.preis}
+                  onValueChange={(preis) => onChange({ preis })}
                 />
               </div>
-              {showUst !== false ? (
+              {showUst ? (
                 <select
-                  className="sel pos-add-preis-ust__ust"
-                  value={String(editLine.ust != null ? editLine.ust : 19)}
-                  onChange={(e) => patch({ ust: Number(e.target.value) })}
-                  aria-label="USt."
+                  className="sel"
+                  value={String(p.ust ?? 19)}
+                  onChange={(e) => onChange({ ust: Number(e.target.value) })}
+                  aria-label="USt %"
                 >
-                  <option value="19">19%</option>
-                  <option value="7">7%</option>
-                  <option value="0">0%</option>
+                  <option value="19">19 %</option>
+                  <option value="7">7 %</option>
+                  <option value="0">0 %</option>
                 </select>
               ) : null}
             </div>
           </div>
-          <Field label="Zeilensumme">
-            <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
-              {formatEurBetrag(line)}
+          <div className="field full">
+            <div className="field-hint">
+              Zeilensumme netto: <strong>{formatEurBetrag(line)}</strong>
             </div>
-          </Field>
+          </div>
         </div>
       )}
     </EditorSheet>

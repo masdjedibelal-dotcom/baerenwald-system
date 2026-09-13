@@ -384,6 +384,21 @@ export async function notfallDirektBeauftragen(
     }
   }
 
+  if (leadId) {
+    try {
+      const { notifyPortalAuftragBestaetigtFromCrm } = await import(
+        '@/lib/portal/notify-portal-auftrag-bestaetigt'
+      )
+      await notifyPortalAuftragBestaetigtFromCrm({
+        leadId,
+        auftragId,
+        titel,
+      })
+    } catch (e) {
+      console.warn('[notfallDirektBeauftragen] Portal-Notify:', e)
+    }
+  }
+
   revalidatePath(`/auftraege/${auftragId}`)
   if (leadId) revalidatePath(`/anfragen/${leadId}`)
 

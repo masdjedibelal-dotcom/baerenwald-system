@@ -15,7 +15,7 @@ import {
   type DokumentZeile,
   type MwstSatzOption,
 } from '@/lib/dokument-zeilen'
-import { withResolvedGewerkMeta } from '@/lib/angebote/resolve-position-gewerk'
+import { withResolvedGewerkMeta, resolveGewerkFromHints } from '@/lib/angebote/resolve-position-gewerk'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
 
 export type PosBoardLineKind = 'position' | 'freitext' | 'nachlass'
@@ -122,11 +122,41 @@ function resolvePosBoardGewerkFields(
   base: Partial<AngebotPosition> | undefined,
   gewerke: Gewerk[]
 ): Pick<AngebotPosition, 'gewerk_id' | 'gewerk_name' | 'gewerk_slug'> {
+  const name = line.gewerk?.trim() || base?.gewerk_name?.trim() || POS_BOARD_DEFAULT_GEWERK
+  const nameChanged =
+    Boolean(line.gewerk?.trim()) &&
+    Boolean(base?.gewerk_name?.trim()) &&
+    line.gewerk!.trim().toLowerCase() !== base!.gewerk_name!.trim().toLowerCase()
+  // Nach Gewerk-Wechsel (DnD) keine alte ID/Slug aus der Basis übernehmen
+  const id = nameChanged
+    ? line.gewerk_id?.trim() || ''
+    : line.gewerk_id?.trim() || base?.gewerk_id?.trim() || ''
+  const slug = nameChanged
+    ? line.gewerk_slug?.trim()
+    : line.gewerk_slug?.trim() || base?.gewerk_slug?.trim()
+
+  const byName = resolveGewerkFromHints(gewerke, { gewerk_name: name })
+  const byId = id ? resolveGewerkFromHints(gewerke, { gewerk_id: id }) : undefined
+  if (byName && byId && byName.id !== byId.id) {
+    return {
+      gewerk_id: byName.id,
+      gewerk_name: byName.name,
+      gewerk_slug: byName.slug,
+    }
+  }
+  if (byName && (!id || nameChanged)) {
+    return {
+      gewerk_id: byName.id,
+      gewerk_name: byName.name,
+      gewerk_slug: byName.slug,
+    }
+  }
+
   return withResolvedGewerkMeta(
     {
-      gewerk_id: line.gewerk_id?.trim() || base?.gewerk_id?.trim() || '',
-      gewerk_slug: line.gewerk_slug?.trim() || base?.gewerk_slug?.trim(),
-      gewerk_name: line.gewerk?.trim() || base?.gewerk_name?.trim() || POS_BOARD_DEFAULT_GEWERK,
+      gewerk_id: id,
+      gewerk_slug: slug,
+      gewerk_name: name,
     },
     gewerke
   )
@@ -156,7 +186,7 @@ export function posBoardLineToAngebotPosition(
     gewerk_id: gewerkFields.gewerk_id,
     gewerk_name: gewerkFields.gewerk_name,
     gewerk_slug: gewerkFields.gewerk_slug,
-    gewerk_block_key: base?.gewerk_block_key,
+    gewerk_block_key: line.gewerk?.trim() || base?.gewerk_block_key,
     leistung: line.name,
     leistung_name: line.name,
     leistung_id: line.variante_id || line.preisliste_id || base?.leistung_id,
@@ -268,7 +298,7 @@ export function posBoardLineToDokumentArtikel(
       gewerkName: gewerkFields.gewerk_name,
       gewerk_id: gewerkFields.gewerk_id,
       gewerk_slug: gewerkFields.gewerk_slug,
-      gewerk_block_key: base?.gewerk_block_key,
+      gewerk_block_key: line.gewerk?.trim() || base?.gewerk_block_key,
       preisliste_id: line.variante_id || line.preisliste_id || base?.preisliste_id,
       variante_id: line.variante_id || line.preisliste_id || base?.variante_id,
       position_quelle:
@@ -293,7 +323,7 @@ export function dokumentZeilenToPosBoardLines(zeilen: DokumentZeile[]): PosBoard
     if (z.typ === 'freitext') {
       out.push({
         id: z.id,
-        gewerk: GEWERK_NAME_ALLGEMEIN,
+        gewerk: z.gewerk_block_key?.trim() || GEWERK_NAME_ALLGEMEIN,
         name: z.titel ?? '',
         beschreibung: z.text ?? '',
         menge: 0,
@@ -351,6 +381,7 @@ export function posBoardLinesToDokumentZeilen(
         // Kein Fallback auf prev — sonst lassen sich Titel/Text nicht leeren / Leerzeichen tippen
         titel: line.name ?? '',
         text: line.beschreibung ?? '',
+        gewerk_block_key: line.gewerk?.trim() || undefined,
       })
       continue
     }

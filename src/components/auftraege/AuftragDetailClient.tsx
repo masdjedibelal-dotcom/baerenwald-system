@@ -1029,17 +1029,26 @@ export function AuftragDetailClient({
       q.delete('segment')
       router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
     }
-    // Deep-Link Abnahme / Abschließen → Sheet öffnen (kein Navigations-Hop mehr)
+    // Deep-Link Abnahme → Canvas; Abschließen → Sheet
     const vorOrt = vorOrtAbschnittFromQuery(rawTab)
+    if (
+      vorOrt === 'abnahme' &&
+      detail.status !== 'storniert' &&
+      detail.status !== 'abgeschlossen'
+    ) {
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', 'leistungen')
+      q.delete('abschliessen')
+      router.replace(`/auftraege/${detail.id}/abnahme/erstellen`)
+      return
+    }
     const wantsAbschliessen =
-      searchParams.get('abschliessen') === '1' ||
-      vorOrt === 'abnahme' ||
-      vorOrt === 'abschluss'
+      searchParams.get('abschliessen') === '1' || vorOrt === 'abschluss'
     if (wantsAbschliessen && detail.status !== 'storniert' && detail.status !== 'abgeschlossen') {
       setAbschliessenOpen(true)
-      if (vorOrt === 'abnahme' || vorOrt === 'abschluss' || searchParams.get('abschliessen') === '1') {
+      if (vorOrt === 'abschluss' || searchParams.get('abschliessen') === '1') {
         const q = new URLSearchParams(searchParams.toString())
-        if (vorOrt === 'abnahme' || vorOrt === 'abschluss') q.set('tab', 'leistungen')
+        if (vorOrt === 'abschluss') q.set('tab', 'leistungen')
         q.delete('abschliessen')
         router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
       }
@@ -1221,7 +1230,11 @@ export function AuftragDetailClient({
                     ? 'Abschlag versenden'
                     : 'Rechnung versenden'
               const onClick = () => {
-                if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
+                if (cta.id === 'abnahme_starten') {
+                  router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+                  return
+                }
+                if (cta.id === 'auftrag_abschliessen') {
                   openAuftragAbschliessen()
                   return
                 }
@@ -1256,21 +1269,29 @@ export function AuftragDetailClient({
                   cta.id === 'rechnung_versenden' ? versandLabel : cta.label,
                 icon: cta.icon,
                 onClick,
+                href:
+                  cta.id === 'abnahme_starten'
+                    ? `/auftraege/${detail.id}/abnahme/erstellen`
+                    : undefined,
                 disabled: pending,
               }
             })()}
             secondary={(() => {
               if (istStorniert) return null
-              // Primary = Abschließen → Secondary = optionale Abnahme
+              // Primary = Abschließen → Secondary = Abnahme-Canvas (direkt, kein Sheet-Hop)
               if (
                 detail.status === 'offen' ||
                 detail.status === 'in_arbeit' ||
                 detail.status === 'abnahme'
               ) {
+                // Bei Status Abnahme ist Primary schon „Abnahme starten“ — kein Doppel-CTA
+                if (detail.status === 'abnahme') return null
                 return {
-                  label: 'Abnahme',
+                  label: 'Abnahme starten',
                   icon: 'clipboard-list',
-                  onClick: () => openAuftragAbschliessen(),
+                  onClick: () =>
+                    router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+                  href: `/auftraege/${detail.id}/abnahme/erstellen`,
                   disabled: pending,
                   title: 'Abnahmeprotokoll erstellen (optional)',
                 }

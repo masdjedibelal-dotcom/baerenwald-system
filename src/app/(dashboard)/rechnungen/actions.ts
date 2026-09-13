@@ -56,7 +56,10 @@ import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
-import { ensureRechnungsnummerFuerVersand } from '@/lib/rechnungen/next-rechnungsnummer'
+import {
+  ensureRechnungsnummerFuerVersand,
+  releaseRechnungsnummerWennEntwurf,
+} from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
   positionen: AngebotPosition[]
@@ -1091,6 +1094,12 @@ export async function sendRechnung(
 
   if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
 
+  /** Nach erfolgreicher Mail keine Nummer mehr freigeben (Kunde hat den Beleg). */
+  let nummerFreigabeErlaubt = true
+  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
+  let stornoAnhang: StornoAnhang | null = null
+
+  try {
   const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
@@ -1132,8 +1141,6 @@ export async function sendRechnung(
   if (!pdf.ok) return pdf
 
   /** Storno-Gutschrift zur gleichen Planzeile (nach „Stornieren & neu stellen“) mitversenden. */
-  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
-  let stornoAnhang: StornoAnhang | null = null
   const belegTyp = String(rec.beleg_typ ?? 'rechnung')
   if (belegTyp !== 'gutschrift') {
     const { data: neuMeta } = await supabase
@@ -1194,7 +1201,7 @@ export async function sendRechnung(
         }
       }
 
-      const gsPdf = await persistPdfForRechnung(String(gs.id))
+      const gsPdf = await persistPdfForRechnung(String(gs.id), { allocateNummer: true })
       if (!gsPdf.ok) return null
       const { data: gsAfter } = await supabase
         .from('rechnungen')
@@ -1459,7 +1466,7 @@ export async function sendRechnung(
       .limit(1)
       .maybeSingle()
     if (gs?.id) {
-      const gsPdf = await persistPdfForRechnung(String(gs.id))
+      const gsPdf = await persistPdfForRechnung(String(gs.id), { allocateNummer: true })
       if (gsPdf.ok) {
         const { data: gsAfter } = await supabase
           .from('rechnungen')
@@ -1555,6 +1562,9 @@ export async function sendRechnung(
     rechnungId,
   })
   if (!mail.success) return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen' }
+
+  /** Ab hier: Kunde hat die Mail — Nummer nicht mehr zurücksetzen. */
+  nummerFreigabeErlaubt = false
 
   if (stornoAnhang) {
     const nowGs = new Date().toISOString()
@@ -1652,6 +1662,14 @@ export async function sendRechnung(
   revalidatePath('/vorgaenge')
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
+  } finally {
+    if (nummerFreigabeErlaubt) {
+      await releaseRechnungsnummerWennEntwurf(rechnungId)
+      if (stornoAnhang?.id) {
+        await releaseRechnungsnummerWennEntwurf(stornoAnhang.id)
+      }
+    }
+  }
 }
 
 /** Echte Kunden-Mail-HTML wie beim Versand (ohne PDF / Statusänderung). */

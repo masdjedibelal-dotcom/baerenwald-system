@@ -106,9 +106,37 @@ export async function allocateRechnungsnummer(
 }
 
 /**
+ * Nach fehlgeschlagenem Versand (vor erfolgreicher Mail): Nummer wieder freigeben.
+ * Status bleibt Entwurf — so entstehen keine Lücken und keine Unique-Kollisionen.
+ */
+export async function releaseRechnungsnummerWennEntwurf(
+  rechnungId: string,
+  supabase: SupabaseClient = supabaseAdmin
+): Promise<void> {
+  const id = rechnungId.trim()
+  if (!id) return
+  const { data } = await supabase
+    .from('rechnungen')
+    .select('status, rechnungsnummer')
+    .eq('id', id)
+    .maybeSingle()
+  if (!data) return
+  if (String(data.status ?? '').trim().toLowerCase() !== 'entwurf') return
+  if (!String(data.rechnungsnummer ?? '').trim()) return
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({ rechnungsnummer: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'entwurf')
+  if (error) {
+    console.warn('[releaseRechnungsnummerWennEntwurf]', id, error.message)
+  }
+}
+
+/**
  * Offizielle Belegnummer erst beim Versand / PDF-Ausstellung.
  * Entwürfe bleiben ohne Nummer, damit ungesendete Entwürfe keine Lücken erzeugen.
- * Bei Unique-Konflikt: nächste freie Nummer erneut vergeben.
+ * Bei Unique-Konflikt: nächste freie Nummer erneut vergeben (inkl. belegter Entwürfe).
  */
 export async function ensureRechnungsnummerFuerVersand(
   _supabase: SupabaseClient,
@@ -124,15 +152,23 @@ export async function ensureRechnungsnummerFuerVersand(
   }
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
-    if (!numRes.ok) return numRes
+    // Erster Versuch: RPC (ignoriert Entwürfe — korrekt, solange Entwürfe null sind).
+    // Nach Unique-Konflikt: JS-Pfad zählt alle belegten Nummern mit (hängende Entwürfe).
+    let nummer: string
+    if (attempt === 0) {
+      const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
+      if (!numRes.ok) return numRes
+      nummer = numRes.nummer
+    } else {
+      nummer = await nextRechnungsnummerAusDb(supabaseAdmin, belegTyp)
+    }
 
     const { error } = await supabaseAdmin
       .from('rechnungen')
-      .update({ rechnungsnummer: numRes.nummer, updated_at: new Date().toISOString() })
+      .update({ rechnungsnummer: nummer, updated_at: new Date().toISOString() })
       .eq('id', rechnungId)
 
-    if (!error) return { ok: true, nummer: numRes.nummer }
+    if (!error) return { ok: true, nummer }
 
     const msg = error.message ?? ''
     if (

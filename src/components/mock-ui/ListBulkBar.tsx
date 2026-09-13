@@ -47,32 +47,40 @@ export function ListBulkBar({
       <span className="bulkbar-count">
         <b>{selectedCount}</b> ausgewählt
       </span>
-      {onToggleAll ? (
-        <MockBtn kind="ghost" sm onClick={onToggleAll} title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}>
-          {allSelected ? 'Keine' : 'Alle'}
-        </MockBtn>
-      ) : null}
-      {selectAllFilteredLabel && onSelectAllFiltered ? (
-        <MockBtn kind="ghost" sm onClick={onSelectAllFiltered}>
-          {selectAllFilteredLabel}
-        </MockBtn>
-      ) : null}
-      <div style={{ flex: 1 }} />
-      {onEdit && selectedCount === 1 ? (
-        <MockBtn kind="ghost" sm icon="pencil" onClick={onEdit} disabled={deletePending}>
-          Bearbeiten
-        </MockBtn>
-      ) : null}
-      {onExport ? (
-        <MockBtn kind="ghost" sm icon="download" onClick={onExport} disabled={deletePending}>
-          Export
-        </MockBtn>
-      ) : null}
-      {extraActions}
+      <div className="bulkbar-scroll">
+        {onToggleAll ? (
+          <MockBtn
+            kind="ghost"
+            sm
+            onClick={onToggleAll}
+            title={allSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
+          >
+            {allSelected ? 'Keine' : 'Alle'}
+          </MockBtn>
+        ) : null}
+        {selectAllFilteredLabel && onSelectAllFiltered ? (
+          <MockBtn kind="ghost" sm onClick={onSelectAllFiltered}>
+            {selectAllFilteredLabel}
+          </MockBtn>
+        ) : null}
+        <div className="bulkbar-spacer" aria-hidden />
+        {onEdit && selectedCount === 1 ? (
+          <MockBtn kind="ghost" sm icon="pencil" onClick={onEdit} disabled={deletePending}>
+            Bearbeiten
+          </MockBtn>
+        ) : null}
+        {onExport ? (
+          <MockBtn kind="ghost" sm icon="download" onClick={onExport} disabled={deletePending}>
+            Export
+          </MockBtn>
+        ) : null}
+        {extraActions}
+      </div>
       <MockBtn
         kind="danger"
         sm
         icon="trash"
+        className="bulkbar-delete"
         onClick={onDelete}
         disabled={deleteDisabled || deletePending}
       >

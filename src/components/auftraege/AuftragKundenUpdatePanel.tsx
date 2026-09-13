@@ -82,7 +82,12 @@ export function AuftragKundenUpdatePanel({
         toast.error(r.message)
         return
       }
-      toast.success(sendMail ? 'Update veröffentlicht und Kunde benachrichtigt' : 'Update veröffentlicht')
+      toast.success(
+        sendMail && !r.warning
+          ? 'Update veröffentlicht und Kunde benachrichtigt'
+          : 'Update veröffentlicht'
+      )
+      if (r.warning) toast.error(r.warning)
       setTitel('')
       setBeschreibung('')
       setFotos([])

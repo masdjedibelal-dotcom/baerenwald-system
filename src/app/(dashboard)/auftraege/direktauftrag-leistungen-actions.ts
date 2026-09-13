@@ -189,6 +189,19 @@ export async function createDirektauftragMitLeistungen(input: {
     }
   }
 
+  try {
+    const { notifyPortalAuftragBestaetigtFromCrm } = await import(
+      '@/lib/portal/notify-portal-auftrag-bestaetigt'
+    )
+    await notifyPortalAuftragBestaetigtFromCrm({
+      leadId,
+      auftragId,
+      titel,
+    })
+  } catch (e) {
+    console.warn('[createDirektauftragMitLeistungen] Portal-Notify:', e)
+  }
+
   revalidatePath(`/auftraege/${auftragId}`)
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/auftraege')
