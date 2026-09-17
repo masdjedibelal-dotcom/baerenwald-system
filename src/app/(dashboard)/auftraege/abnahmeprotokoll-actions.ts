@@ -274,6 +274,71 @@ export async function downloadAbnahmeprotokollPdf(input: {
   }
 }
 
+/**
+ * PDF-Vorschau ohne riesiges Base64 in der Server-Action-Antwort
+ * (vermeidet „Exceed Maximum“ + Remount mit Datenverlust).
+ * Speichert Signaturen/Meta/Punkte als Entwurf und liefert eine Storage-URL.
+ */
+export async function previewAbnahmeprotokollPdf(input: {
+  auftragId: string
+  abnahmeDatum: string
+  punkte: AbnahmePunkt[]
+  maengel: AbnahmeMangel[]
+  notizen: string | null
+  meta?: AbnahmeProtokollMeta | null
+  protokollId?: string | null
+}): Promise<
+  | { ok: true; url: string; protokollId: string; filename: string }
+  | { ok: false; message: string }
+> {
+  const draft = await saveAbnahmeprotokollDraft({
+    auftragId: input.auftragId,
+    abnahmeDatum: input.abnahmeDatum,
+    punkte: input.punkte,
+    maengel: input.maengel,
+    notizen: input.notizen,
+    meta: input.meta,
+    protokollId: input.protokollId,
+  })
+  if (!draft.ok) return draft
+
+  const built = await buildPdfBuffer({
+    auftragId: input.auftragId,
+    abnahmeDatum: input.abnahmeDatum,
+    punkte: input.punkte,
+    maengel: input.maengel,
+    notizen: input.notizen,
+    meta: input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null,
+  })
+  if (!built.ok) return built
+
+  const stored = await persistPdf(input.auftragId, built.buffer)
+  if (!stored.ok) return stored
+
+  // Entwurf mit Storage-Signaturen + PDF-URL aktualisieren (kein Status-Bump)
+  const metaPersisted = built.meta
+    ? normalizeAbnahmeProtokollMeta(built.meta)
+    : input.meta
+      ? normalizeAbnahmeProtokollMeta(input.meta)
+      : null
+  const { error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .update({
+      ...(metaPersisted ? { meta: metaPersisted } : {}),
+      pdf_url: stored.publicUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', draft.protokollId)
+  if (error) return { ok: false, message: error.message }
+
+  return {
+    ok: true,
+    url: stored.publicUrl,
+    protokollId: draft.protokollId,
+    filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
+  }
+}
+
 function defaultAbnahmeprotokollNachricht(
   anrede: MailAnrede,
   opts?: { bitteZurueckUnterschreiben?: boolean }

@@ -28,7 +28,7 @@ import {
   type AbnahmePunkt,
   type AbnahmePunktStatus,
 } from '@/lib/auftraege/abnahme-protokoll-types'
-import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
+import { optimizeImageForAbnahmePdf } from '@/lib/media/optimize-image-for-upload'
 import type { AuftragPosition } from '@/lib/types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
@@ -578,7 +578,7 @@ export function AbnahmeMaengelCheckliste({
         batch.map(async (file) => {
           let uploadFile = file
           try {
-            uploadFile = await optimizeImageForUpload(file)
+            uploadFile = await optimizeImageForAbnahmePdf(file)
           } catch {
             uploadFile = file
           }

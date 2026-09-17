@@ -22,8 +22,8 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
 import {
   deleteAbnahmeprotokoll,
-  downloadAbnahmeprotokollPdf,
   getAbnahmeprotokollMailDefaults,
+  previewAbnahmeprotokollPdf,
   saveAbnahmeAndAbschliessen,
   saveAbnahmeprotokollDraft,
   saveAbnahmeprotokollPdfOnly,
@@ -47,7 +47,8 @@ import {
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AbnahmeFreigabeStatus } from '@/lib/auftraege/abnahme-freigabe'
-import { downloadPdfFromBase64, openPdfFromBase64, openPreviewTab } from '@/lib/download-pdf-base64'
+import { downloadPdfFromBase64, openPreviewTab } from '@/lib/download-pdf-base64'
+import { optimizeImageForAbnahmePdf } from '@/lib/media/optimize-image-for-upload'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
@@ -348,7 +349,23 @@ export function AbnahmeprotokollCreateWizard({
         setActiveSection('angaben')
         return
       }
-      setMeta((m) => ensureUnterschriftOrtDatum(m))
+      const ready = ensureUnterschriftOrtDatum(meta)
+      setMeta(ready)
+      // Entwurf sichern bevor Prüfen — Vorschau/Remount darf nichts verlieren
+      void saveAbnahmeprotokollDraft({
+        auftragId,
+        abnahmeDatum,
+        punkte,
+        maengel: buildSaveMaengel(),
+        notizen: notizen.trim() || null,
+        meta: ready,
+        protokollId: sessionProtokollId,
+      }).then((r) => {
+        if (r.ok) {
+          setSessionProtokollId(r.protokollId)
+          setDraftDirty(false)
+        }
+      })
     }
     setActiveSection(id)
   }
@@ -360,9 +377,15 @@ export function AbnahmeprotokollCreateWizard({
       const urls: string[] = []
       const room = Math.max(0, 8 - meta.uebergabe_foto_urls.length)
       for (const file of Array.from(files).slice(0, room)) {
+        let uploadFile = file
+        try {
+          uploadFile = await optimizeImageForAbnahmePdf(file)
+        } catch {
+          uploadFile = file
+        }
         const fd = new FormData()
-        fd.set('file', file)
-        fd.set('filename', file.name)
+        fd.set('file', uploadFile)
+        fd.set('filename', uploadFile.name)
         const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
           method: 'POST',
           body: fd,
@@ -415,20 +438,29 @@ export function AbnahmeprotokollCreateWizard({
     const previewTab = openPreviewTab()
     setPreviewBusy(true)
     try {
-      const r = await downloadAbnahmeprotokollPdf({
+      // Zuerst Entwurf speichern: Remount/Fehler nach Vorschau darf Daten nicht vernichten.
+      // PDF als Storage-URL öffnen (kein riesiges Base64 → kein „Exceed Maximum“).
+      const r = await previewAbnahmeprotokollPdf({
         auftragId,
         abnahmeDatum,
         punkte,
         maengel: buildSaveMaengel(),
         notizen: notizen.trim() || null,
         meta: metaReady,
+        protokollId: sessionProtokollId,
       })
       if (!r.ok) {
         previewTab?.close()
         toast.error(r.message)
         return
       }
-      openPdfFromBase64(r.pdfBase64, previewTab)
+      setSessionProtokollId(r.protokollId)
+      setDraftDirty(false)
+      if (previewTab && !previewTab.closed) {
+        previewTab.location.href = r.url
+      } else {
+        window.open(r.url, '_blank', 'noopener,noreferrer')
+      }
       toast.success('Vorschau geöffnet')
     } catch {
       previewTab?.close()
@@ -879,7 +911,7 @@ export function AbnahmeprotokollCreateWizard({
           {uploading ? 'Lädt…' : 'Fotos hinzufügen'}
         </Button>
         <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          Max. 8 Fotos · erscheinen im PDF unter „Örtliche Situation“
+          Max. 8 Fotos · erscheinen im PDF unter „Vor-Ort“
         </p>
         {meta.uebergabe_foto_urls.length > 0 ? (
           <div className="mt-3 space-y-3">

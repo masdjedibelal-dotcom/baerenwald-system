@@ -17,6 +17,7 @@ import {
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
+import { compressPageImagesForPdf } from '@/lib/pdf/compress-page-images-for-pdf'
 
 const MAC_FULL_BROWSER_MARKERS = [
   'Google Chrome.app',
@@ -502,6 +503,11 @@ export async function renderHtmlToPdfBuffer(
           )
         )
       })
+      .catch(() => undefined)
+
+    // Fotos still verkleinern — sonst bläht Chromium das PDF mit Originalauflösung auf
+    await page
+      .evaluate(compressPageImagesForPdf, { maxEdge: 960, quality: 0.72 })
       .catch(() => undefined)
 
     const pdf = await page.pdf(puppeteerPdfOptions(pdfOptions))

@@ -139,23 +139,25 @@ function partyBox(
 
 function fotosHtml(urls: string[], captions: string[] = []): string {
   if (!urls.length) return ''
-  const imgs = urls
+  const cells = urls
     .slice(0, 8)
     .map((u, i) => {
       const cap = (captions[i] ?? '').trim()
-      return `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
-          <img src="${esc(u)}" alt="" style="display:block;width:100%;height:54px;object-fit:cover;" />
+      return `<div style="border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
+          <div style="position:relative;width:100%;padding-bottom:100%;background:#f3f4f6;">
+            <img src="${esc(u)}" alt="" style="position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;" />
+          </div>
           ${
             cap
-              ? `<div style="padding:4px 6px;font-size:7pt;color:${MUTED};line-height:1.3;">${esc(cap)}</div>`
+              ? `<div style="padding:5px 7px;font-size:7.5pt;color:${MUTED};line-height:1.3;">${esc(cap)}</div>`
               : ''
           }
         </div>`
     })
     .join('')
-  return `<div style="border:1px solid ${BORDER};border-radius:4px;padding:8px;page-break-inside:avoid;">
-    <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Örtliche Situation</div>
-    ${imgs}
+  return `<div style="margin:0 0 14px;page-break-inside:avoid;">
+    <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Vor-Ort</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${cells}</div>
   </div>`
 }
 
@@ -174,16 +176,10 @@ function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
     { label: 'Anwesend bei Übergabe', value: p.meta.anwesend_uebergabe },
   ])
   const fotos = fotosHtml(p.meta.uebergabe_foto_urls, p.meta.uebergabe_foto_captions)
-  if (fotos) {
-    return `<div style="display:flex;gap:10px;margin:0 0 14px;align-items:stretch;">
-      <div style="flex:1.1;min-width:0;">${an}<div style="height:8px;"></div>${ag}</div>
-      <div style="flex:0.7;min-width:0;">${fotos}</div>
-    </div>`
-  }
   return `<div style="display:flex;gap:10px;margin:0 0 14px;">
     <div style="flex:1;">${an}</div>
     <div style="flex:1;">${ag}</div>
-  </div>`
+  </div>${fotos}`
 }
 
 function bauvorhabenHtml(p: AbnahmeProtokollHtmlInput): string {

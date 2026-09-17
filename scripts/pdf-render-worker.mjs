@@ -126,6 +126,57 @@ async function runPuppeteer() {
       })
       .catch(() => undefined)
 
+    // Fotos still als JPEG verkleinern (kleinere PDF-/Mail-Anhänge)
+    await page
+      .evaluate(
+        async ({ maxEdge, quality }) => {
+          let compressed = 0
+          for (const img of Array.from(document.images)) {
+            try {
+              if (!img.naturalWidth || !img.naturalHeight) continue
+              if (img.naturalWidth <= 48 && img.naturalHeight <= 48) continue
+              const scale = Math.min(
+                1,
+                maxEdge / Math.max(img.naturalWidth, img.naturalHeight, 1)
+              )
+              const w = Math.max(1, Math.round(img.naturalWidth * scale))
+              const h = Math.max(1, Math.round(img.naturalHeight * scale))
+              const needsShrink =
+                scale < 0.999 || img.naturalWidth * img.naturalHeight > 400_000
+              if (
+                !needsShrink &&
+                (img.src.startsWith('data:image/jpeg') ||
+                  img.src.startsWith('data:image/jpg'))
+              ) {
+                continue
+              }
+              const canvas = document.createElement('canvas')
+              canvas.width = w
+              canvas.height = h
+              const ctx = canvas.getContext('2d')
+              if (!ctx) continue
+              ctx.drawImage(img, 0, 0, w, h)
+              const dataUrl = canvas.toDataURL('image/jpeg', quality)
+              if (!dataUrl.startsWith('data:image/jpeg')) continue
+              await new Promise((resolve) => {
+                const done = () => resolve(undefined)
+                img.addEventListener('load', done, { once: true })
+                img.addEventListener('error', done, { once: true })
+                img.src = dataUrl
+                if (img.complete) resolve(undefined)
+                else setTimeout(resolve, 3_000)
+              })
+              compressed += 1
+            } catch {
+              /* ignore */
+            }
+          }
+          return compressed
+        },
+        { maxEdge: 960, quality: 0.72 }
+      )
+      .catch(() => undefined)
+
     const useFooter = Boolean(footerTemplate)
     const pdf = await page.pdf({
       format: 'A4',
