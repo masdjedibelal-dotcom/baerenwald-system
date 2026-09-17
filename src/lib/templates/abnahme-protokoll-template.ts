@@ -199,6 +199,35 @@ function checkOkHtml(): string {
   return `<span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${ACCENT}"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
 }
 
+/** ISO / beliebig → TT.MM.JJJJ (ohne Locale — Node-ICU kann sonst en-US liefern). */
+function formatDatumDePdf(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim()
+  if (!s) return ''
+  const ymd = s.includes('T') ? s.slice(0, 10) : s.slice(0, 10)
+  const mIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
+  if (mIso) return `${mIso[3]}.${mIso[2]}.${mIso[1]}`
+  const mUs = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
+  if (mUs) {
+    const dd = mUs[2]!.padStart(2, '0')
+    const mm = mUs[1]!.padStart(2, '0')
+    return `${dd}.${mm}.${mUs[3]}`
+  }
+  return s
+}
+
+/** „Ort, 2026-09-18“ / „Ort, 9/18/2026“ → deutsches Datum. */
+function formatOrtDatumZeile(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim()
+  if (!s) return ''
+  return s
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => `${d}.${m}.${y}`)
+    .replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (_, a, b, y) => {
+      const dd = String(b).padStart(2, '0')
+      const mm = String(a).padStart(2, '0')
+      return `${dd}.${mm}.${y}`
+    })
+}
+
 function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
   if (!gewerke.length) {
     return `${sectionHeading('2', 'Ausgeführte Leistungen')}<p style="font-size:9pt;color:${MUTED};">Keine Leistungen ausgewählt.</p>`
@@ -214,15 +243,14 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
           const notes = notizenFuerLeistung(l.punkte)
             .map((n) => n.trim())
             .filter(Boolean)
-          // Beschreibung: Notiz, sonst Bullet-Texte die ≠ Titel
           const descParts = notes.length
             ? notes
             : l.punkte
                 .map((p: AbnahmePunkt) => p.beschreibung?.trim())
                 .filter((t): t is string => Boolean(t) && t !== titel)
           const desc = descParts.join(' · ')
-          return `<li style="margin:0 0 10px;list-style:none;page-break-inside:avoid;">
-              <table style="width:100%;border-collapse:collapse;"><tr>
+          return `<li style="margin:0 0 10px;list-style:none;page-break-inside:avoid;break-inside:avoid;">
+              <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;break-inside:avoid;"><tr>
                 <td style="width:18px;vertical-align:top;padding:2px 0 0;line-height:0;">${checkOkHtml()}</td>
                 <td style="vertical-align:top;padding:0 0 0 6px;">
                   <div style="font-size:9.5pt;font-weight:700;line-height:1.35;color:${TEXT};">${esc(titel)}</div>
@@ -237,10 +265,10 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
         })
         .join('')
       const showGewerk = g.gewerk.trim() && g.gewerk !== 'Ohne Gewerk'
-      return `<div style="margin:0 0 10px;page-break-inside:avoid;">
+      return `<div style="margin:0 0 10px;">
         ${
           showGewerk
-            ? `<p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:${TEXT};">${esc(g.gewerk)}</p>`
+            ? `<p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:${TEXT};page-break-after:avoid;break-after:avoid;">${esc(g.gewerk)}</p>`
             : ''
         }
         <ul style="margin:0;padding:0;">${items}</ul>
@@ -248,7 +276,7 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
     })
     .join('')
   return `${sectionHeading('2', 'Ausgeführte Leistungen')}
-    <p style="margin:0 0 8px;font-size:8pt;color:${MUTED};">Alle unten genannten Leistungen wurden nach den anerkannten Regeln der Technik ausgeführt.</p>
+    <p style="margin:0 0 8px;font-size:8pt;color:${MUTED};page-break-after:avoid;break-after:avoid;">Alle unten genannten Leistungen wurden nach den anerkannten Regeln der Technik ausgeführt.</p>
     ${blocks}`
 }
 
@@ -271,7 +299,7 @@ function isMangelOffenPdf(m: AbnahmeMangel): boolean {
   return s === 'offen' || s === 'in_bearbeitung'
 }
 
-/** Kleine Fotogalerie pro Mangel (wie Angebot-Fotodoku, kompakter). */
+/** Quadratische Mangel-Fotos — voll sichtbar (contain), nicht abgeschnitten. */
 function mangelFotosHtml(urls: string[] | undefined): string {
   const list = (urls ?? [])
     .map((u) => safeImgSrc(u))
@@ -279,12 +307,12 @@ function mangelFotosHtml(urls: string[] | undefined): string {
     .slice(0, 4)
   if (!list.length) return ''
   const cols = list.length === 1 ? '1fr' : 'repeat(2, 1fr)'
-  return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin:6px 0 0;page-break-inside:avoid;">
+  return `<div style="display:grid;grid-template-columns:${cols};gap:8px;margin:8px 0 0;page-break-inside:avoid;break-inside:avoid;">
     ${list
       .map(
         (src) =>
-          `<div style="margin:0;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;background:#fff;">
-            <img src="${src}" alt="" style="display:block;width:100%;height:96px;object-fit:cover;" />
+          `<div style="margin:0;aspect-ratio:1/1;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#F9FAFB;page-break-inside:avoid;break-inside:avoid;">
+            <img src="${src}" alt="" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center;" />
           </div>`
       )
       .join('')}
@@ -308,10 +336,10 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
             const detail = (m.beschreibung ?? '').trim()
             const head = titel || detail
             const sub = titel && detail && detail !== titel ? detail : ''
-            return `<li style="margin:0 0 10px;">
+            return `<li style="margin:0 0 10px;page-break-inside:avoid;break-inside:avoid;">
               <div style="font-weight:700;color:${TEXT};">${esc(head)}${
                 m.frist
-                  ? ` <span style="font-weight:400;color:#991B1B;">(Beseitigung bis: ${esc(m.frist.slice(0, 10))})</span>`
+                  ? ` <span style="font-weight:400;color:#991B1B;">(Beseitigung bis: ${esc(formatDatumDePdf(m.frist))})</span>`
                   : ''
               }</div>
               ${
@@ -393,12 +421,12 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
 
   return `${sectionHeading('6', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
-      ${block('Auftragnehmer', hwName, p.meta.unterschrift_ort_datum_an, hwSig)}
-      ${block('Auftraggeber', kundeName, p.meta.unterschrift_ort_datum_ag, kundeSig)}
+      ${block('Auftragnehmer', hwName, formatOrtDatumZeile(p.meta.unterschrift_ort_datum_an), hwSig)}
+      ${block('Auftraggeber', kundeName, formatOrtDatumZeile(p.meta.unterschrift_ort_datum_ag), kundeSig)}
       ${block(
         'Anwesend bei Übergabe',
         p.meta.anwesend_uebergabe,
-        p.meta.unterschrift_ort_datum_anwesend,
+        formatOrtDatumZeile(p.meta.unterschrift_ort_datum_anwesend),
         null
       )}
     </div>`

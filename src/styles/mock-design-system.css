@@ -20654,24 +20654,64 @@ body.has-blocking-overlay .app {
 .doccv-foot {
   display: none;
 }
-/* Abnahme: Footer mit Zurück/Weiter/Senden — Desktop + Mobil */
+/* Abnahme: Footer wie wizard-mobile-footer — Zurück links, Primary rechts */
 .document-canvas.abnahme-canvas .document-canvas__footer-cta,
 .document-canvas.abnahme-canvas .doccv-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: block;
   flex-shrink: 0;
   border-top: 0.5px solid var(--app-separator, var(--border));
-  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  padding: 0;
   background-color: var(--bw-material-bar, var(--card));
   z-index: 25;
 }
-.document-canvas.abnahme-canvas .document-canvas__footer-cta .btn,
-.document-canvas.abnahme-canvas .doccv-foot .btn {
-  min-height: 44px;
-  font-size: var(--fs-text);
+.abnahme-canvas-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px max(12px, calc(env(safe-area-inset-bottom, 0px)));
+  box-sizing: border-box;
+}
+.abnahme-canvas-footer__start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.abnahme-canvas-footer__end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.abnahme-canvas-footer .btn {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: var(--fs-text);
+  flex: 0 0 auto;
+}
+.abnahme-canvas-footer__primary {
+  min-width: 7.5rem;
+}
+@media (max-width: 480px) {
+  .abnahme-canvas-footer {
+    flex-wrap: wrap;
+  }
+  .abnahme-canvas-footer__end {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .abnahme-canvas-footer__end .btn {
+    flex: 1 1 auto;
+  }
+  .abnahme-canvas-footer__primary {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 @media (max-width: 768px) {
   /*
@@ -20762,21 +20802,12 @@ body.has-blocking-overlay .app {
   /* Abnahme: Footer-CTA (Zurück/Weiter/Speichern) muss sichtbar bleiben */
   .document-canvas.wizard-flow.abnahme-canvas .document-canvas__footer-cta,
   .document-canvas.wizard-flow.abnahme-canvas .doccv-foot {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    display: block !important;
     flex-shrink: 0;
     border-top: 0.5px solid var(--app-separator, var(--border));
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    padding: 0;
     background-color: var(--bw-material-bar, var(--card));
     z-index: 25;
-  }
-  .document-canvas.wizard-flow.abnahme-canvas .document-canvas__footer-cta .btn,
-  .document-canvas.wizard-flow.abnahme-canvas .doccv-foot .btn {
-    min-height: 46px;
-    font-size: var(--fs-text);
-    flex: 1 1 auto;
   }
 
   /* Kein Speichern-CTA unter dem Wizard — Speichern ist DocBar-Icon */

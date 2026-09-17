@@ -45,11 +45,12 @@ function kundeAdresseZeilen(k: Kunde): string {
 }
 
 function formatDe(iso: string): string {
-  try {
-    return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE')
-  } catch {
-    return iso
-  }
+  const s = iso.trim()
+  if (!s) return '—'
+  const ymd = s.includes('T') ? s.slice(0, 10) : s.slice(0, 10)
+  const [y, m, d] = ymd.split('-')
+  if (y && m && d && y.length === 4) return `${d}.${m}.${y}`
+  return s
 }
 
 export function buildDefaultAbnahmeMetaFromAuftrag(

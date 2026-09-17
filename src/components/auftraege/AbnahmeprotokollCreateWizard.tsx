@@ -66,12 +66,14 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id']
 
-/** Standard „Ort, Datum“ aus Übergabe-Feldern. */
+/** Standard „Ort, Datum“ aus Übergabe-Feldern (Datum immer TT.MM.JJJJ). */
 function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
   const o = ort.trim()
-  const d = datum.trim().slice(0, 10)
-  if (o && d) return `${o}, ${d}`
-  return o || d
+  const raw = datum.trim().slice(0, 10)
+  const [y, m, d] = raw.split('-')
+  const de = y && m && d && y.length === 4 ? `${d}.${m}.${y}` : raw
+  if (o && de) return `${o}, ${de}`
+  return o || de
 }
 
 function FieldCard({ title, children }: { title: string; children: ReactNode }) {
@@ -1067,79 +1069,44 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const footerActions = (
-    <div className="flex flex-wrap gap-2">
-      {activeSection !== 'checkliste' ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={pending || draftSaving}
-          onClick={() =>
-            goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
-          }
-        >
-          Zurück
-        </Button>
-      ) : null}
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={pending || draftSaving || !draftDirty}
-        loading={draftSaving}
-        onClick={() => void handleSaveDraftOnly()}
-      >
-        Entwurf
-      </Button>
-      {activeSection !== 'pruefen' ? (
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={pending || draftSaving}
-          onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
-        >
-          Weiter
-        </Button>
-      ) : (
-        <>
-          <Button
+    <div className="abnahme-canvas-footer">
+      <div className="abnahme-canvas-footer__start">
+        {activeSection !== 'checkliste' ? (
+          <button
             type="button"
-            variant="secondary"
-            size="sm"
-            className="gap-1.5"
-            loading={previewBusy}
+            className="btn ghost"
             disabled={pending || draftSaving}
-            onClick={() => void vorschauPdf()}
+            onClick={() =>
+              goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
+            }
           >
-            <Eye className="h-4 w-4" />
-            Vorschau
-          </Button>
-          <Button
+            Zurück
+          </button>
+        ) : (
+          <span className="abnahme-canvas-footer__spacer" aria-hidden />
+        )}
+      </div>
+      <div className="abnahme-canvas-footer__end">
+        {activeSection !== 'pruefen' ? (
+          <button
             type="button"
-            variant="secondary"
-            size="sm"
-            className="gap-1.5"
-            loading={pending}
-            disabled={previewBusy || draftSaving}
-            onClick={() => erstellen({ abschliessen: false, send: false })}
+            className="btn primary abnahme-canvas-footer__primary"
+            disabled={pending || draftSaving}
+            onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
           >
-            PDF speichern
-          </Button>
-          <Button
+            Weiter
+          </button>
+        ) : (
+          <button
             type="button"
-            variant="primary"
-            size="sm"
-            className="gap-1.5"
-            loading={pending}
-            disabled={previewBusy || draftSaving}
+            className="btn primary abnahme-canvas-footer__primary"
+            disabled={pending || draftSaving || previewBusy}
             onClick={() => erstellen({ abschliessen: true, send: true })}
           >
-            <Check className="h-4 w-4" />
-            An Kunden senden &amp; abschließen
-          </Button>
-        </>
-      )}
+            {pending ? '…' : 'An Kunden senden'}
+          </button>
+        )}
+      </div>
     </div>
   )
 
@@ -1147,10 +1114,10 @@ export function AbnahmeprotokollCreateWizard({
     <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-5">
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         {meta.ohne_unterschrift
-          ? 'Ohne Unterschrift: „PDF speichern“ legt das Protokoll in CRM-Dokumenten und Kunden-Unterlagen ab. „An Kunden senden & abschließen“ verschickt per E-Mail und schließt den Auftrag.'
+          ? 'Ohne Unterschrift möglich. „An Kunden senden“ verschickt das PDF und schließt den Auftrag. Entwurf bleibt beim Schließen (X) gespeichert.'
           : hasSignatur
-            ? 'Vorschau prüfen — „An Kunden senden & abschließen“ verschickt das PDF und schließt den Auftrag. „PDF speichern“ nur ablegen ohne Mail.'
-            : 'Unterschriften setzen oder unter Angaben „PDF ohne Unterschrift“ anhaken. Danach PDF speichern oder an den Kunden senden & abschließen.'}
+            ? 'Vorschau über das Auge oben — „An Kunden senden“ verschickt das PDF und schließt den Auftrag.'
+            : 'Unterschriften setzen oder „PDF ohne Unterschrift“ anhaken. Danach an den Kunden senden.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
@@ -1197,7 +1164,31 @@ export function AbnahmeprotokollCreateWizard({
           placeholder="Rechtshinweise…"
         />
       </FieldCard>
-      <div className="sm:hidden">{footerActions}</div>
+    </div>
+  )
+
+  const headerEnd = (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        className="editor-sheet__confirm"
+        disabled={pending || draftSaving || previewBusy}
+        onClick={() => void vorschauPdf()}
+        aria-label="PDF-Vorschau"
+        title="PDF-Vorschau"
+      >
+        <Eye className="h-5 w-5" aria-hidden />
+      </button>
+      <button
+        type="button"
+        className="editor-sheet__confirm"
+        disabled={pending || draftSaving}
+        onClick={() => void handleSaveDraftOnly()}
+        aria-label="Entwurf speichern"
+        title="Entwurf speichern"
+      >
+        <Check className="h-5 w-5" aria-hidden />
+      </button>
     </div>
   )
 
@@ -1209,7 +1200,7 @@ export function AbnahmeprotokollCreateWizard({
       title="Abnahme"
       subtitle={subtitle || undefined}
       onClose={() => void handleClose()}
-      onSave={() => void handleSaveDraftOnly()}
+      headerEnd={headerEnd}
       onDiscard={canDiscardEntwurf ? () => void handleDiscard() : undefined}
       draftDirty={draftDirty}
       saveBusy={pending || draftSaving}
