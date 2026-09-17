@@ -319,7 +319,7 @@ export function AbnahmeBegehListe({
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Leistung hinzufügen"
-        context="detail"
+        context="canvas"
         size="md"
         headerEnd={
           <div className="flex items-center gap-1">
@@ -415,7 +415,7 @@ export function AbnahmeBegehListe({
         open={Boolean(editId)}
         onClose={() => setEditId(null)}
         title="Leistung bearbeiten"
-        context="detail"
+        context="canvas"
         size="md"
         headerEnd={
           <div className="flex items-center gap-1">
@@ -604,7 +604,7 @@ export function AbnahmeMaengelCheckliste({
         open={editIdx != null}
         onClose={() => setEditIdx(null)}
         title={isNew || editIdx === -1 ? 'Mangel hinzufügen' : 'Mangel bearbeiten'}
-        context="detail"
+        context="canvas"
         size="md"
         headerEnd={
           <div className="flex items-center gap-1">

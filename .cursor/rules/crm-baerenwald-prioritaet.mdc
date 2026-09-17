@@ -1,0 +1,12 @@
+---
+description: Dieses Repo ist das kanonische Bärenwald-CRM (Vorrang vor teo-crm)
+alwaysApply: true
+---
+
+# Kanonisches Bärenwald-CRM
+
+Dieses Repository (`baerenwald-system`) ist die **primäre** CRM-Codebasis.
+
+- CRM-Fixes hier umsetzen (nicht nur in `teo-crm`).
+- `teo-crm` ist eine Parallel-/Arbeitskopie — Änderungen dort ggf. spiegeln, aber Bärenwald hat Vorrang.
+- Portal-Logik liegt im Repo `baerenwald` (Portale).

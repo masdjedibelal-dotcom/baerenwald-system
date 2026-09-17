@@ -1,0 +1,26 @@
+---
+description: Kein Git durch den Agenten — nur Dateien + Commit-Vorlage
+alwaysApply: true
+---
+
+# Kein Git — Versionierung nur über GitHub Desktop
+
+## Absolute Verbote
+
+- **Keine Git-Befehle** unter keinen Umständen: kein `git status`, `diff`, `log`, `add`, `commit`, `push`, `pull`, `checkout`, `branch`, `merge`, `rebase`, `stash`, `fetch`, `remote`, `show`, `rev-parse`, nothing.
+- Keine Git-Wrapper, keine Git-Libraries, kein `gh` für Commits/Pushes (Issues/PR-Lesen nur wenn Belal ausdrücklich drum bittet — und auch dann ohne Commit/Push).
+
+## Stattdessen
+
+1. Nur Dateien im Arbeitsordner bearbeiten (`~/code/baerenwald-system` bzw. den vom User genannten Pfad).
+2. Nach **jedem abgeschlossenen Block/Phase**: eine **Commit-Vorlage** liefern — Liste aller geänderten / neuen / gelöschten Dateien, jeweils **ein Satz** was darin passiert ist.
+3. Belal versioniert selbst über **GitHub Desktop**.
+
+## Design-Reparatur (Mock-Parität)
+
+Wenn Design/CSS/Primitives anstehen, Reihenfolge einhalten und nach jeder Phase Build-Guards + Dateiliste:
+
+1. `mock-design-system.css` existiert und ist in `layout.tsx` importiert.
+2. Phase 1: `mock-design-system.css` = einzige Komponenten-CSS; `globals.css` = nur Tokens + Basis; keine Klasse in zwei Dateien (`docs/DESIGN-CSS.md`).
+3. Phase 2: Mock-Primitives (`.btn.primary`, `.chip.active`, `.card`, `.badge`); Alt-Klassen weg; Guard `scripts/check-mock-primitives.mjs`.
+4. Phase 3: Detail-Seiten auf MockBadge / flache Mock-Cards.

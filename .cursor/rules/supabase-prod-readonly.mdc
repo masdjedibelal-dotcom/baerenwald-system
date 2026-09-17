@@ -1,0 +1,13 @@
+---
+description: Prod-Schreibzugriff bei explizitem Auftrag; Staging Default für Schema
+alwaysApply: true
+---
+
+# Supabase Prod / Staging
+
+- Prod-Projekt-Ref: `wnotlydvhsmfkhexgeol` — **Schreiben erlaubt**, wenn Belal es ausdrücklich verlangt (Daten-Fix, Recovery, MCP `execute_sql` Writes ok).
+- Staging-Project-Ref: `soqownnkxmtfgvsbrgsl` (Dashboard-UUID: `2503565e-8a02-4af4-bed6-e240a544235d`) — Default für Migrationen, Seeds, Experimente.
+- Ohne expliziten Prod-Auftrag: Schreib-Skripte und Schema-Änderungen gegen Staging, nie „still“ gegen Prod.
+- `apply_migration` / Schema-DDL auf Prod nur mit klarem Auftrag; Daten-Fixes (UPDATE/DELETE gezielt) auf Prod ok nach Auftrag.
+- Skripte mit Ziel-Ref: bei Unklarheit Staging; Prod nur wenn Auftrag oder Flag es verlangt (`scripts/lib/prod-guard.*` anpassen/übersteuern dürfen).
+- Neue Migrationen nur in `baerenwald-system/supabase/migrations`. Website-Ordner eingefroren — siehe `docs/STAGING.md`.
