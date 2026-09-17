@@ -1,11 +1,15 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { AbnahmeprotokollCreateWizard } from '@/components/auftraege/AbnahmeprotokollCreateWizard'
-import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
+import {
+  loadAbnahmeprotokollSummary,
+  loadOffenenAbnahmeEntwurf,
+} from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { buildDefaultAbnahmeMetaFromAuftrag } from '@/lib/auftraege/abnahme-protokoll-html-payload'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
+import { maengelCheckItemsFromStored } from '@/lib/auftraege/abnahme-protokoll-types'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadWizardContext } from '@/lib/wizard-context'
 
@@ -25,7 +29,10 @@ export default async function AuftragAbnahmeErstellenPage({
   const [wizardCtx, firm, existing] = await Promise.all([
     loadWizardContext(supabase),
     fetchFirmenEinstellungen(supabase),
-    loadAbnahmeprotokollSummary(params.id, protokollId),
+    // Mit ID: genau dieses Protokoll. Ohne: nur offenen Entwurf — nie blind freigegebene laden.
+    protokollId
+      ? loadAbnahmeprotokollSummary(params.id, protokollId)
+      : loadOffenenAbnahmeEntwurf(params.id),
   ])
 
   const angebot = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
@@ -37,6 +44,10 @@ export default async function AuftragAbnahmeErstellenPage({
     detail.kunden?.name?.trim() ||
     [detail.kunden?.vorname, detail.kunden?.nachname].filter(Boolean).join(' ').trim() ||
     'Kunde'
+
+  const initialMaengelItems = existing
+    ? maengelCheckItemsFromStored(existing.maengel, existing.punkte)
+    : []
 
   return (
     <AbnahmeprotokollCreateWizard
@@ -50,6 +61,8 @@ export default async function AuftragAbnahmeErstellenPage({
       initialPunkte={existing?.punkte}
       initialAbnahmeDatum={existing?.abnahme_datum}
       initialNotizen={existing?.notizen}
+      initialMaengelItems={initialMaengelItems}
+      initialFreigabeStatus={existing?.freigabe_status ?? null}
       isEdit={Boolean(existing)}
       protokollId={existing?.id ?? null}
     />

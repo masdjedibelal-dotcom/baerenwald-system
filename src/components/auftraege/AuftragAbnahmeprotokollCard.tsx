@@ -230,17 +230,27 @@ export function AuftragAbnahmeprotokollCard({
             sm
             kind="primary"
             icon="plus"
-            disabled={pending || (hwZeilen.length > 0 && !gesamtOk)}
-            title={hwZeilen.length > 0 && !gesamtOk ? gesamtMsg : undefined}
+            disabled={pending}
             onClick={() => {
-              if (hwZeilen.length > 0 && !gesamtOk) {
-                toast.error(gesamtMsg || 'Zuerst alle Partner-Teilabnahmen freigeben.')
+              // Offener Entwurf? Immer fortsetzen — Partner-Gate blockiert den Wiedereinstieg nicht.
+              const entwurf = liste.find(
+                (p) => p.freigabe_status === 'entwurf' || p.freigabe_status === 'abgelehnt'
+              )
+              if (entwurf) {
+                bearbeiten(entwurf.id)
                 return
               }
+              // Ohne Listen-Treffer trotzdem /erstellen — Page lädt offenen DB-Entwurf nach.
               erstellen()
             }}
           >
-            {hwZeilen.length > 0 ? 'Gesamtabnahme erzeugen' : 'Protokoll erstellen'}
+            {liste.some(
+              (p) => p.freigabe_status === 'entwurf' || p.freigabe_status === 'abgelehnt'
+            )
+              ? 'Entwurf fortsetzen'
+              : hwZeilen.length > 0
+                ? 'Gesamtabnahme erzeugen'
+                : 'Protokoll erstellen'}
           </MockBtn>
         </>
       }

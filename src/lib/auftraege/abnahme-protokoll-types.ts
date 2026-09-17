@@ -59,6 +59,8 @@ export type AbnahmeMangelCheckItem = {
   id: string
   titel: string
   notiz: string
+  /** Öffentliche Storage-URLs (Bucket protokolle), max. 4 im PDF. */
+  foto_urls?: string[]
 }
 
 export type AuftragAbnahmeprotokoll = {
@@ -468,8 +470,44 @@ export function abnahmePunktErbrachteLeistung(titel = '', notiz = ''): AbnahmePu
   }
 }
 
-export function neuerMangelCheckItem(titel = '', notiz = ''): AbnahmeMangelCheckItem {
-  return { id: neuePositionsId(), titel, notiz }
+export function neuerMangelCheckItem(
+  titel = '',
+  notiz = '',
+  fotoUrls: string[] = []
+): AbnahmeMangelCheckItem {
+  return {
+    id: neuePositionsId(),
+    titel,
+    notiz,
+    foto_urls: fotoUrls.filter(Boolean),
+  }
+}
+
+/**
+ * Freie Mangel-Checkliste aus gespeicherten `maengel` rehydrieren
+ * (alles, was nicht aus Leistungs-Punkten mit status=mangel kommt).
+ */
+export function maengelCheckItemsFromStored(
+  maengel: AbnahmeMangel[],
+  punkte: AbnahmePunkt[]
+): AbnahmeMangelCheckItem[] {
+  const punktMangelIds = new Set(
+    punkte.filter((p) => p.status === 'mangel').map((p) => p.id)
+  )
+  return maengel
+    .filter((m) => !punktMangelIds.has(m.punkt_id))
+    .map((m) => {
+      const titel = (m.titel ?? '').trim()
+      const beschreibung = (m.beschreibung ?? '').trim()
+      const notiz =
+        titel && beschreibung && beschreibung !== titel ? beschreibung : titel ? '' : beschreibung
+      return {
+        id: m.punkt_id || neuePositionsId(),
+        titel: titel || beschreibung || 'Mangel',
+        notiz,
+        foto_urls: [...(m.foto_urls ?? [])].filter(Boolean),
+      }
+    })
 }
 
 export function maengelFromCheckItems(
@@ -480,12 +518,13 @@ export function maengelFromCheckItems(
     .map((item) => {
       const titel = item.titel.trim()
       const notiz = item.notiz.trim()
-      if (!titel && !notiz) return null
+      const fotos = (item.foto_urls ?? []).map((u) => String(u ?? '').trim()).filter(Boolean)
+      if (!titel && !notiz && !fotos.length) return null
       return {
         punkt_id: item.id,
         titel: titel || null,
         beschreibung: notiz || titel || 'Mangel',
-        foto_urls: [] as string[],
+        foto_urls: fotos,
         frist: null as string | null,
         status: 'offen' as const,
         erfasst_at: erfasstAt,

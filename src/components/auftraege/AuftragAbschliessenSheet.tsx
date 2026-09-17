@@ -362,7 +362,11 @@ export function AuftragAbschliessenSheet({
           <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
             Mängel (optional)
           </h3>
-          <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
+          <AbnahmeMaengelCheckliste
+            items={maengelItems}
+            onChange={setMaengelItems}
+            auftragId={auftragId}
+          />
         </div>
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>

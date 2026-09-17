@@ -1,13 +1,15 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { FotoDropZone } from '@/components/ui/FotoDropZone'
+import { toast } from '@/components/ui/app-toast'
 import { confirmDelete } from '@/components/ui/confirm-delete'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
@@ -26,11 +28,14 @@ import {
   type AbnahmePunkt,
   type AbnahmePunktStatus,
 } from '@/lib/auftraege/abnahme-protokoll-types'
+import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
 import type { AuftragPosition } from '@/lib/types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 import type { KiAssistDraft } from '@/lib/copilot/ki-assist-scopes'
+
+const MAX_MANGEL_FOTOS = 4
 
 function applyTextDraftToTitelNotiz(
   d: Extract<KiAssistDraft, { type: 'text' }>,
@@ -496,17 +501,22 @@ export function AbnahmeProgressBar({
   )
 }
 
-/** Mängel als Checklisten-Punkte (Titel + optionale Notiz). */
+/** Mängel als Checklisten-Punkte (Titel + optionale Notiz + Fotos). */
 export function AbnahmeMaengelCheckliste({
   items,
   onChange,
+  auftragId,
 }: {
   items: AbnahmeMangelCheckItem[]
   onChange: (next: AbnahmeMangelCheckItem[]) => void
+  /** Für Storage-Upload (`timeline-foto`); ohne ID kein Upload. */
+  auftragId?: string
 }) {
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [draftTitel, setDraftTitel] = useState('')
   const [draftNotiz, setDraftNotiz] = useState('')
+  const [draftFotos, setDraftFotos] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
   const [isNew, setIsNew] = useState(false)
 
   function openNew() {
@@ -514,6 +524,7 @@ export function AbnahmeMaengelCheckliste({
     setEditIdx(-1)
     setDraftTitel('')
     setDraftNotiz('')
+    setDraftFotos([])
   }
 
   function openEdit(i: number) {
@@ -521,25 +532,88 @@ export function AbnahmeMaengelCheckliste({
     setEditIdx(i)
     setDraftTitel(items[i]?.titel ?? '')
     setDraftNotiz(items[i]?.notiz ?? '')
+    setDraftFotos([...(items[i]?.foto_urls ?? [])].filter(Boolean).slice(0, MAX_MANGEL_FOTOS))
   }
 
   function confirm() {
     const titel = draftTitel.trim()
     const notiz = draftNotiz.trim()
-    if (!titel && !notiz) {
+    const fotos = draftFotos.filter(Boolean).slice(0, MAX_MANGEL_FOTOS)
+    if (!titel && !notiz && !fotos.length) {
       setEditIdx(null)
       return
     }
     if (isNew || editIdx === -1) {
-      onChange([...items, neuerMangelCheckItem(titel || 'Mangel', notiz)])
+      onChange([
+        ...items,
+        neuerMangelCheckItem(titel || 'Mangel', notiz, fotos),
+      ])
     } else if (editIdx != null && editIdx >= 0) {
       onChange(
         items.map((it, i) =>
-          i === editIdx ? { ...it, titel: titel || 'Mangel', notiz } : it
+          i === editIdx
+            ? { ...it, titel: titel || 'Mangel', notiz, foto_urls: fotos }
+            : it
         )
       )
     }
     setEditIdx(null)
+  }
+
+  async function uploadFotos(files: File[]) {
+    if (!auftragId) {
+      toast.error('Auftrag fehlt — Fotos können nicht hochgeladen werden.')
+      return
+    }
+    if (!files.length || uploading) return
+    const room = MAX_MANGEL_FOTOS - draftFotos.length
+    if (room <= 0) {
+      toast.error(`Maximal ${MAX_MANGEL_FOTOS} Fotos pro Mangel.`)
+      return
+    }
+    const batch = files.slice(0, room)
+    setUploading(true)
+    try {
+      const results = await Promise.all(
+        batch.map(async (file) => {
+          let uploadFile = file
+          try {
+            uploadFile = await optimizeImageForUpload(file)
+          } catch {
+            uploadFile = file
+          }
+          const fd = new FormData()
+          fd.append('file', uploadFile)
+          fd.append('filename', uploadFile.name)
+          const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+            method: 'POST',
+            body: fd,
+          })
+          const json = (await res.json()) as { url?: string; error?: string }
+          if (!res.ok || !json.url) {
+            return {
+              ok: false as const,
+              name: file.name,
+              error: json.error || 'Upload fehlgeschlagen',
+            }
+          }
+          return { ok: true as const, url: json.url }
+        })
+      )
+      const added = results.filter((r): r is { ok: true; url: string } => r.ok).map((r) => r.url)
+      const failed = results.filter((r): r is { ok: false; name: string; error: string } => !r.ok)
+      for (const f of failed) {
+        toast.error(`${f.name}: ${f.error}`)
+      }
+      if (added.length) {
+        setDraftFotos((prev) => [...prev, ...added].slice(0, MAX_MANGEL_FOTOS))
+        toast.success(
+          added.length === 1 ? 'Foto hochgeladen' : `${added.length} Fotos hochgeladen`
+        )
+      }
+    } finally {
+      setUploading(false)
+    }
   }
 
   useKiAssistDraftConsumer(editIdx != null, ['maengel', 'text'], (d) => {
@@ -566,51 +640,67 @@ export function AbnahmeMaengelCheckliste({
         <p className="abnahme-begeh__empty">Keine Mängel — optional Punkte hinzufügen.</p>
       ) : (
         <ul className="abnahme-inline__items">
-          {items.map((item, i) => (
-            <li key={item.id} className="abnahme-inline__item abnahme-inline__item--mangel">
-              <span className="abnahme-inline__check is-mangel" aria-hidden>
-                <span className="text-[11px] font-bold text-amber-800">!</span>
-              </span>
-              <div className="abnahme-inline__item-body">
-                <p className="abnahme-inline__item-title">{item.titel.trim() || 'Mangel'}</p>
-                {item.notiz.trim() ? (
-                  <p className="abnahme-inline__item-sub">{item.notiz.trim()}</p>
-                ) : null}
-              </div>
-              <div className="abnahme-inline__item-actions">
-                <MockEntityRowMenu
-                  title="Mangel"
-                  items={
-                    [
-                      {
-                        icon: 'pencil',
-                        label: 'Bearbeiten',
-                        onClick: () => openEdit(i),
-                      },
-                      'sep',
-                      {
-                        icon: 'trash',
-                        label: 'Löschen',
-                        danger: true,
-                        onClick: () => {
-                          const preview =
-                            [item.titel.trim() || 'Mangel', item.notiz.trim()]
-                              .filter(Boolean)
-                              .join('\n')
-                              .slice(0, 240) || 'Mangel'
-                          confirmDelete(
-                            'Mangel löschen?',
-                            () => onChange(items.filter((_, j) => j !== i)),
-                            { body: preview }
-                          )
+          {items.map((item, i) => {
+            const fotos = (item.foto_urls ?? []).filter(Boolean)
+            return (
+              <li key={item.id} className="abnahme-inline__item abnahme-inline__item--mangel">
+                <span className="abnahme-inline__check is-mangel" aria-hidden>
+                  <span className="text-[11px] font-bold text-amber-800">!</span>
+                </span>
+                <div className="abnahme-inline__item-body">
+                  <p className="abnahme-inline__item-title">{item.titel.trim() || 'Mangel'}</p>
+                  {item.notiz.trim() ? (
+                    <p className="abnahme-inline__item-sub">{item.notiz.trim()}</p>
+                  ) : null}
+                  {fotos.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {fotos.slice(0, MAX_MANGEL_FOTOS).map((url, fi) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${url}-${fi}`}
+                          src={url}
+                          alt=""
+                          className="h-10 w-10 rounded border border-bw-border object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="abnahme-inline__item-actions">
+                  <MockEntityRowMenu
+                    title="Mangel"
+                    items={
+                      [
+                        {
+                          icon: 'pencil',
+                          label: 'Bearbeiten',
+                          onClick: () => openEdit(i),
                         },
-                      },
-                    ] satisfies EntityMenuItem[]
-                  }
-                />
-              </div>
-            </li>
-          ))}
+                        'sep',
+                        {
+                          icon: 'trash',
+                          label: 'Löschen',
+                          danger: true,
+                          onClick: () => {
+                            const preview =
+                              [item.titel.trim() || 'Mangel', item.notiz.trim()]
+                                .filter(Boolean)
+                                .join('\n')
+                                .slice(0, 240) || 'Mangel'
+                            confirmDelete(
+                              'Mangel löschen?',
+                              () => onChange(items.filter((_, j) => j !== i)),
+                              { body: preview }
+                            )
+                          },
+                        },
+                      ] satisfies EntityMenuItem[]
+                    }
+                  />
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
 
@@ -637,7 +727,10 @@ export function AbnahmeMaengelCheckliste({
             <button
               type="button"
               className="editor-sheet__confirm"
-              disabled={!draftTitel.trim() && !draftNotiz.trim()}
+              disabled={
+                uploading ||
+                (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)
+              }
               onClick={confirm}
               aria-label="Speichern"
               title="Speichern"
@@ -674,6 +767,54 @@ export function AbnahmeMaengelCheckliste({
               placeholder="Details zur Nacharbeit…"
             />
           </KiAssistFieldLabel>
+          <div>
+            <span className="lt-field-lbl">Fotos (optional)</span>
+            {draftFotos.length < MAX_MANGEL_FOTOS ? (
+              <FotoDropZone
+                disabled={uploading || !auftragId}
+                multiple
+                label={
+                  uploading
+                    ? 'Lädt…'
+                    : !auftragId
+                      ? 'Upload nicht verfügbar'
+                      : draftFotos.length
+                        ? 'Weitere Fotos hinzufügen'
+                        : 'Fotos tippen oder ablegen'
+                }
+                labelDragging="Fotos hier ablegen"
+                onFiles={(files) => void uploadFotos(files)}
+              />
+            ) : null}
+            {draftFotos.length > 0 ? (
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {draftFotos.map((url, i) => (
+                  <div key={`${url}-${i}`} className="relative aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Mangel-Foto ${i + 1}`}
+                      className="h-full w-full rounded-md border border-bw-border object-cover"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
+                      disabled={uploading}
+                      onClick={() =>
+                        setDraftFotos((prev) => prev.filter((_, j) => j !== i))
+                      }
+                      aria-label={`Foto ${i + 1} entfernen`}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+              Max. {MAX_MANGEL_FOTOS} Fotos · werden fürs Protokoll optimiert
+            </p>
+          </div>
         </div>
       </EditorSheet>
     </div>

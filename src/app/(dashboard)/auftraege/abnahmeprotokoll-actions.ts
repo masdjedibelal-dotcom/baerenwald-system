@@ -1032,7 +1032,7 @@ export async function loadAbnahmeprotokollSummary(
   }
 }
 
-/** Zwischenspeichern (digital vor Ort) — optional PDF neu erzeugen. */
+/** Zwischenspeichern als Entwurf — ohne Pflicht-PDF, ohne Auftrag-Status-Bump. */
 export async function saveAbnahmeprotokollDraft(input: {
   auftragId: string
   abnahmeDatum: string
@@ -1040,48 +1040,71 @@ export async function saveAbnahmeprotokollDraft(input: {
   maengel: AbnahmeMangel[]
   notizen: string | null
   meta?: AbnahmeProtokollMeta | null
+  /** Bestehende Entwurfs-Zeile; sonst neuer Insert bzw. offener Entwurf. */
+  protokollId?: string | null
   regeneratePdf?: boolean
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const existing = await loadAbnahmeprotokollSummary(input.auftragId)
-  const prevOffene = existing ? countOffeneMaengel(existing.maengel) : 0
+}): Promise<{ ok: true; protokollId: string } | { ok: false; message: string }> {
+  const wantedId = input.protokollId?.trim() || null
+  const existing = wantedId
+    ? await loadAbnahmeprotokollSummary(input.auftragId, wantedId)
+    : null
+
+  // Nie freigegebene / zur Freigabe stehende Protokolle überschreiben
+  if (
+    existing &&
+    existing.freigabe_status !== 'entwurf' &&
+    existing.freigabe_status !== 'abgelehnt'
+  ) {
+    return {
+      ok: false,
+      message: 'Dieses Protokoll ist kein Entwurf mehr — bitte über Speichern/Senden aktualisieren.',
+    }
+  }
+
+  // Ohne explizite ID: offenen Entwurf laden (nicht blind das neueste Protokoll)
+  const target = wantedId ? existing : await loadOffenenAbnahmeEntwurf(input.auftragId)
+
   const prepared = prepareAbnahmePayload({
     punkte: input.punkte,
     maengel:
       input.maengel.length > 0
         ? input.maengel
-        : mergeMaengelFromPunkte(input.punkte, existing?.maengel ?? []),
+        : mergeMaengelFromPunkte(input.punkte, target?.maengel ?? []),
   })
   const meta = input.meta
     ? normalizeAbnahmeProtokollMeta(input.meta)
-    : existing?.meta
+    : target?.meta ?? normalizeAbnahmeProtokollMeta({})
   const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
-  let protokollId = existing?.id ?? ''
+  const now = new Date().toISOString()
+  const rowPatch = {
+    abnahme_datum: input.abnahmeDatum.slice(0, 10),
+    notizen: input.notizen?.trim() || null,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    meta,
+    freigabe_status: 'entwurf' as const,
+    ebene: (target?.ebene ?? 'gesamt') as AbnahmeProtokollEbene,
+    updated_at: now,
+  }
 
-  if (existing) {
+  let protokollId = target?.id ?? ''
+
+  if (target) {
     const { error } = await supabaseAdmin
       .from('auftrag_abnahmeprotokolle')
-      .update({
-        abnahme_datum: input.abnahmeDatum.slice(0, 10),
-        notizen: input.notizen?.trim() || null,
-        punkte: prepared.punkte,
-        maengel: prepared.maengel,
-        ...(meta ? { meta } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id)
+      .update(rowPatch)
+      .eq('id', target.id)
     if (error) return { ok: false, message: error.message }
+    protokollId = target.id
   } else {
     const { data: inserted, error: insErr } = await supabaseAdmin
       .from('auftrag_abnahmeprotokolle')
       .insert({
         auftrag_id: input.auftragId,
-        abnahme_datum: input.abnahmeDatum.slice(0, 10),
-        notizen: input.notizen?.trim() || null,
-        punkte: prepared.punkte,
-        maengel: prepared.maengel,
-        ...(meta ? { meta } : {}),
+        ...rowPatch,
         pdf_url: null,
-        protokoll_typ: 'erstabnahme',
+        protokoll_typ: hatMaengel ? 'nachabnahme' : 'erstabnahme',
+        handwerker_id: null,
       })
       .select('id')
       .single()
@@ -1094,24 +1117,14 @@ export async function saveAbnahmeprotokollDraft(input: {
     protokollId = (inserted as { id: string }).id
   }
 
+  // Nur Datum merken — kein Status „abnahme“ / keine Punch-List beim reinen Entwurf
   await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_datum: input.abnahmeDatum.slice(0, 10),
-      updated_at: new Date().toISOString(),
-      ...(!hatMaengel ? { status: 'abnahme', fortschritt: 85 } : {}),
+      updated_at: now,
     })
     .eq('id', input.auftragId)
-
-  if (protokollId) {
-    await afterAbnahmePersist({
-      auftragId: input.auftragId,
-      protokollId,
-      punkte: prepared.punkte,
-      maengel: prepared.maengel,
-      prevOffeneMaengel: prevOffene,
-    })
-  }
 
   if (input.regeneratePdf && protokollId) {
     const pdf = await persistProtokollPdfForRow(input.auftragId, protokollId, {
@@ -1119,14 +1132,52 @@ export async function saveAbnahmeprotokollDraft(input: {
       punkte: prepared.punkte,
       maengel: prepared.maengel,
       notizen: input.notizen,
-      meta: meta ?? null,
+      meta,
       protokollTyp: hatMaengel ? 'nachabnahme' : 'erstabnahme',
     })
     if (!pdf.ok) return pdf
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true }
+  return { ok: true, protokollId }
+}
+
+/** Neuester bearbeitbarer Entwurf (Gesamt bevorzugt) — blockiert den Wiedereinstieg nicht. */
+export async function loadOffenenAbnahmeEntwurf(
+  auftragId: string
+): Promise<{
+  id: string
+  abnahme_datum: string
+  notizen: string | null
+  punkte: AbnahmePunkt[]
+  maengel: AbnahmeMangel[]
+  meta: AbnahmeProtokollMeta
+  pdf_url: string | null
+  an_kunde_gesendet_at: string | null
+  handwerker_id: string | null
+  ebene: AbnahmeProtokollEbene
+  freigabe_status: AbnahmeFreigabeStatus
+  statistik: ReturnType<typeof abnahmePunkteStatistik>
+} | null> {
+  const { data, error } = await supabaseAdmin
+    .from('auftrag_abnahmeprotokolle')
+    .select('id, ebene, freigabe_status, updated_at')
+    .eq('auftrag_id', auftragId)
+    .in('freigabe_status', ['entwurf', 'abgelehnt'])
+    .order('updated_at', { ascending: false })
+    .limit(10)
+
+  if (error || !data?.length) return null
+
+  const rows = data as Array<{ id: string; ebene: string | null }>
+  const preferred =
+    rows.find((r) => {
+      const e = normalizeAbnahmeEbene(r.ebene)
+      return e === 'gesamt'
+    }) ?? rows[0]
+
+  if (!preferred?.id) return null
+  return loadAbnahmeprotokollSummary(auftragId, preferred.id)
 }
 
 export async function updateAbnahmeMaengel(input: {

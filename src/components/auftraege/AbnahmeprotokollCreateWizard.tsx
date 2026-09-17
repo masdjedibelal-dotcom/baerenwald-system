@@ -1,7 +1,7 @@
 'use client'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Eye, Plus } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
@@ -17,11 +17,14 @@ import { Input } from '@/components/ui/Input'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
 import {
+  deleteAbnahmeprotokoll,
   downloadAbnahmeprotokollPdf,
   getAbnahmeprotokollMailDefaults,
   saveAbnahmeAndAbschliessen,
+  saveAbnahmeprotokollDraft,
   saveAbnahmeprotokollPdfOnly,
   saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
@@ -42,6 +45,7 @@ import {
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
+import type { AbnahmeFreigabeStatus } from '@/lib/auftraege/abnahme-freigabe'
 import { downloadPdfFromBase64, openPdfFromBase64 } from '@/lib/download-pdf-base64'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -90,6 +94,8 @@ export function AbnahmeprotokollCreateWizard({
   initialPunkte,
   initialAbnahmeDatum,
   initialNotizen,
+  initialMaengelItems,
+  initialFreigabeStatus = null,
   isEdit = false,
   protokollId = null,
 }: {
@@ -103,6 +109,8 @@ export function AbnahmeprotokollCreateWizard({
   initialPunkte?: AbnahmePunkt[]
   initialAbnahmeDatum?: string
   initialNotizen?: string | null
+  initialMaengelItems?: AbnahmeMangelCheckItem[]
+  initialFreigabeStatus?: AbnahmeFreigabeStatus | null
   isEdit?: boolean
   protokollId?: string | null
 }) {
@@ -112,6 +120,17 @@ export function AbnahmeprotokollCreateWizard({
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [sessionProtokollId, setSessionProtokollId] = useState<string | null>(
+    protokollId?.trim() || null
+  )
+  const [draftDirty, setDraftDirty] = useState(false)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [draftSaving, setDraftSaving] = useState(false)
+  const skipDirtyRef = useRef(true)
+  const canDiscardEntwurf =
+    !initialFreigabeStatus ||
+    initialFreigabeStatus === 'entwurf' ||
+    initialFreigabeStatus === 'abgelehnt'
 
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>(() => {
     if (initialPunkte?.length) return initialPunkte
@@ -122,19 +141,105 @@ export function AbnahmeprotokollCreateWizard({
       gewerke,
     }).map((p) => ({ ...p, status: 'ok' as const }))
   })
-  const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>([])
+  const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>(
+    () => initialMaengelItems ?? []
+  )
   const [abnahmeDatum, setAbnahmeDatum] = useState(initialAbnahmeDatum || heuteYmd())
   const [notizen, setNotizen] = useState(initialNotizen?.trim() || '')
   const [meta, setMeta] = useState<AbnahmeProtokollMeta>(() =>
     emptyAbnahmeProtokollMeta(initialMeta)
   )
 
-  const onClose = () => {
+  useEffect(() => {
+    if (skipDirtyRef.current) {
+      skipDirtyRef.current = false
+      return
+    }
+    setDraftDirty(true)
+  }, [punkte, maengelItems, meta, notizen, abnahmeDatum])
+
+  function leaveWizard() {
+    setDraftDirty(false)
+    setCloseConfirmOpen(false)
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return
     }
     router.push(`/auftraege/${auftragId}?tab=leistungen`)
+  }
+
+  async function persistDraft(opts?: { notify?: boolean }): Promise<string | null> {
+    const r = await saveAbnahmeprotokollDraft({
+      auftragId,
+      abnahmeDatum,
+      punkte,
+      maengel: buildSaveMaengel(),
+      notizen: notizen.trim() || null,
+      meta: ensureUnterschriftOrtDatum(meta),
+      protokollId: sessionProtokollId,
+    })
+    if (!r.ok) {
+      if (opts?.notify !== false) toast.error(r.message)
+      return null
+    }
+    setSessionProtokollId(r.protokollId)
+    setDraftDirty(false)
+    if (opts?.notify) toast.success('Entwurf gespeichert')
+    return r.protokollId
+  }
+
+  /** Schließen = Entwurf speichern (Fotos/Mängel bleiben). */
+  async function handleClose() {
+    if (draftSaving || pending) return
+    if (!draftDirty) {
+      leaveWizard()
+      return
+    }
+    setDraftSaving(true)
+    try {
+      const id = await persistDraft({ notify: true })
+      if (!id) {
+        setCloseConfirmOpen(true)
+        return
+      }
+      leaveWizard()
+      router.refresh()
+    } finally {
+      setDraftSaving(false)
+    }
+  }
+
+  /** Verwerfen = Entwurf löschen, Stand weg — Auftrag läuft ohne Abnahme weiter. */
+  async function handleDiscard() {
+    if (draftSaving || pending) return
+    setDraftSaving(true)
+    try {
+      if (sessionProtokollId && canDiscardEntwurf) {
+        const r = await deleteAbnahmeprotokoll(sessionProtokollId, auftragId)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success('Abnahme-Entwurf entfernt')
+      }
+      setSessionProtokollId(null)
+      setDraftDirty(false)
+      leaveWizard()
+      router.refresh()
+    } finally {
+      setDraftSaving(false)
+    }
+  }
+
+  async function handleSaveDraftOnly() {
+    if (draftSaving || pending) return
+    setDraftSaving(true)
+    try {
+      const id = await persistDraft({ notify: true })
+      if (id) router.refresh()
+    } finally {
+      setDraftSaving(false)
+    }
   }
 
   const ausgewaehlt = useMemo(
@@ -332,7 +437,7 @@ export function AbnahmeprotokollCreateWizard({
         maengel,
         notizen: notizen.trim() || null,
         meta: metaReady,
-        protokollId,
+        protokollId: sessionProtokollId,
       }
       if (abschliessen) {
         const r = await saveAbnahmeAndAbschliessen({
@@ -497,7 +602,11 @@ export function AbnahmeprotokollCreateWizard({
       />
 
       <FieldCard title="Mängel (optional)">
-        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
+        <AbnahmeMaengelCheckliste
+          items={maengelItems}
+          onChange={setMaengelItems}
+          auftragId={auftragId}
+        />
       </FieldCard>
 
       {maengelListe.length > 0 ? (
@@ -505,11 +614,25 @@ export function AbnahmeprotokollCreateWizard({
           <ul className="space-y-3">
             {maengelListe.map((m) => {
               const punkt = punkte.find((p) => p.id === m.punkt_id)
+              const fotos = (m.foto_urls ?? []).filter(Boolean)
               return (
                 <li key={m.punkt_id} className="abnahme-mangel-row space-y-2">
                   <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
                     {m.beschreibung}
                   </p>
+                  {fotos.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {fotos.slice(0, 4).map((url, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${url}-${i}`}
+                          src={url}
+                          alt=""
+                          className="h-14 w-14 rounded border border-bw-border object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                   {punkt ? (
                     <>
                       <SheetEditableField
@@ -903,7 +1026,7 @@ export function AbnahmeprotokollCreateWizard({
           type="button"
           variant="secondary"
           size="sm"
-          disabled={pending}
+          disabled={pending || draftSaving}
           onClick={() =>
             goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
           }
@@ -911,12 +1034,22 @@ export function AbnahmeprotokollCreateWizard({
           Zurück
         </Button>
       ) : null}
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={pending || draftSaving || !draftDirty}
+        loading={draftSaving}
+        onClick={() => void handleSaveDraftOnly()}
+      >
+        Entwurf speichern
+      </Button>
       {activeSection !== 'pruefen' ? (
         <Button
           type="button"
           variant="primary"
           size="sm"
-          disabled={pending}
+          disabled={pending || draftSaving}
           onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
         >
           Weiter
@@ -929,7 +1062,7 @@ export function AbnahmeprotokollCreateWizard({
             size="sm"
             className="gap-1.5"
             loading={previewBusy}
-            disabled={pending}
+            disabled={pending || draftSaving}
             onClick={() => void vorschauPdf()}
           >
             <Eye className="h-4 w-4" />
@@ -941,7 +1074,7 @@ export function AbnahmeprotokollCreateWizard({
             size="sm"
             className="gap-1.5"
             loading={pending}
-            disabled={previewBusy}
+            disabled={previewBusy || draftSaving}
             onClick={() => erstellen({ abschliessen: hasSignatur, send: false })}
           >
             Speichern
@@ -952,7 +1085,7 @@ export function AbnahmeprotokollCreateWizard({
             size="sm"
             className="gap-1.5"
             loading={pending}
-            disabled={previewBusy}
+            disabled={previewBusy || draftSaving}
             onClick={() => erstellen({ abschliessen: hasSignatur, send: true })}
           >
             <Check className="h-4 w-4" />
@@ -1020,14 +1153,17 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   return (
+    <>
     <DocumentCanvas
       portal
       manageHistory={false}
       title="Abnahme"
       subtitle={subtitle || undefined}
-      onClose={onClose}
-      onSave={() => erstellen({ abschliessen: hasSignatur })}
-      saveBusy={pending}
+      onClose={() => void handleClose()}
+      onSave={() => void handleSaveDraftOnly()}
+      onDiscard={canDiscardEntwurf ? () => void handleDiscard() : undefined}
+      draftDirty={draftDirty}
+      saveBusy={pending || draftSaving}
       footerCta={footerActions}
       className="wizard-flow abnahme-canvas"
     >
@@ -1055,7 +1191,9 @@ export function AbnahmeprotokollCreateWizard({
       <div className="abnahme-canvas-card">
         <div className="abnahme-canvas-card__head">
           <h2 className="abnahme-canvas-card__title">Abnahmeprotokoll</h2>
-          <span className="badge warten">{isEdit ? 'Entwurf' : 'Offen'}</span>
+          <span className="badge warten">
+            {sessionProtokollId || isEdit ? 'Entwurf' : 'Offen'}
+          </span>
         </div>
 
         <nav className="stepper abnahme-canvas-stepper" aria-label="Abnahme-Schritte">
@@ -1080,9 +1218,15 @@ export function AbnahmeprotokollCreateWizard({
 
         <AbnahmeProgressBar done={progress.done} total={progress.total} />
 
-        {pending || uploading || previewBusy ? (
+        {pending || uploading || previewBusy || draftSaving ? (
           <p className="abnahme-canvas-busy">
-            {pending ? 'Erzeugt PDF…' : previewBusy ? 'Vorschau…' : 'Lädt Fotos…'}
+            {draftSaving
+              ? 'Entwurf wird gespeichert…'
+              : pending
+                ? 'Erzeugt PDF…'
+                : previewBusy
+                  ? 'Vorschau…'
+                  : 'Lädt Fotos…'}
           </p>
         ) : null}
 
@@ -1093,5 +1237,26 @@ export function AbnahmeprotokollCreateWizard({
         </div>
       </div>
     </DocumentCanvas>
+
+    <ConfirmPopup
+      open={closeConfirmOpen}
+      onClose={() => setCloseConfirmOpen(false)}
+      title="Entwurf speichern?"
+      cancelLabel="Weiter bearbeiten"
+      discardLabel="Verwerfen & schließen"
+      saveDraftLabel="Erneut speichern"
+      danger
+      onConfirm={() => {
+        void handleDiscard()
+      }}
+      onSaveDraft={() => {
+        setCloseConfirmOpen(false)
+        void handleClose()
+      }}
+    >
+      Speichern ist fehlgeschlagen. Entwurf erneut speichern oder verwerfen (Fotos/Mängel gehen
+      dann verloren).
+    </ConfirmPopup>
+    </>
   )
 }

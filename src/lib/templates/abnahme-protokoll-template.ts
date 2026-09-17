@@ -271,6 +271,26 @@ function isMangelOffenPdf(m: AbnahmeMangel): boolean {
   return s === 'offen' || s === 'in_bearbeitung'
 }
 
+/** Kleine Fotogalerie pro Mangel (wie Angebot-Fotodoku, kompakter). */
+function mangelFotosHtml(urls: string[] | undefined): string {
+  const list = (urls ?? [])
+    .map((u) => safeImgSrc(u))
+    .filter((u): u is string => Boolean(u))
+    .slice(0, 4)
+  if (!list.length) return ''
+  const cols = list.length === 1 ? '1fr' : 'repeat(2, 1fr)'
+  return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin:6px 0 0;page-break-inside:avoid;">
+    ${list
+      .map(
+        (src) =>
+          `<div style="margin:0;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;background:#fff;">
+            <img src="${src}" alt="" style="display:block;width:100%;height:96px;object-fit:cover;" />
+          </div>`
+      )
+      .join('')}
+  </div>`
+}
+
 function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
   const offen = p.maengel.filter(isMangelOffenPdf)
   const sonst = p.meta.hinweis_sonstiges?.trim()
@@ -288,7 +308,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
             const detail = (m.beschreibung ?? '').trim()
             const head = titel || detail
             const sub = titel && detail && detail !== titel ? detail : ''
-            return `<li style="margin:0 0 8px;">
+            return `<li style="margin:0 0 10px;">
               <div style="font-weight:700;color:${TEXT};">${esc(head)}${
                 m.frist
                   ? ` <span style="font-weight:400;color:#991B1B;">(Beseitigung bis: ${esc(m.frist.slice(0, 10))})</span>`
@@ -299,6 +319,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
                   ? `<div style="margin:2px 0 0;font-size:8pt;font-weight:400;color:${MUTED};">${esc(sub)}</div>`
                   : ''
               }
+              ${mangelFotosHtml(m.foto_urls)}
             </li>`
           })
           .join('')}
