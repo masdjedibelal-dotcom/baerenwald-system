@@ -132,3 +132,13 @@ export async function optimizeImageForUpload(
     }
   }
 }
+
+/** Engeres Preset für Abnahme-PDF / Mail-Anhänge (weniger MB). */
+export const ABNAHME_PDF_IMAGE_OPTS = {
+  maxEdge: 1280,
+  maxBytes: 700 * 1024,
+} as const
+
+export async function optimizeImageForAbnahmePdf(file: File): Promise<File> {
+  return optimizeImageForUpload(file, ABNAHME_PDF_IMAGE_OPTS)
+}
