@@ -18534,6 +18534,18 @@ textarea.input:focus {
 /* Abnahme & Abschluss — DocumentCanvas (Mock 1:1) */
 .abnahme-canvas .document-canvas__paper {
   max-width: 720px;
+  /* Card-Bug: Höhe folgt dem Inhalt, Hintergrund nicht abschneiden */
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: flow-root;
+  box-sizing: border-box;
+  background: var(--bw-bg-paper, var(--card, #fff));
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--bw-paper-shadow, 0 1px 3px rgba(16, 24, 40, 0.08));
+  border: 0.5px solid var(--app-separator, var(--border));
+  padding: 14px 16px 28px;
 }
 .abnahme-canvas-warn {
   display: flex;
@@ -20697,20 +20709,49 @@ body.has-blocking-overlay .app {
 .abnahme-canvas-footer__primary {
   min-width: 7.5rem;
 }
-@media (max-width: 480px) {
+.abnahme-canvas-footer__discard {
+  color: var(--red, #c0392b) !important;
+}
+/* Keine zweite DocBar unter dem Footer — Verwerfen sitzt im Footer */
+.document-canvas.abnahme-canvas .document-canvas__docbar {
+  display: none !important;
+}
+.document-canvas.wizard-flow.abnahme-canvas .document-canvas__body {
+  padding-bottom: 28px;
+}
+.document-canvas.wizard-flow.abnahme-canvas .document-canvas__paper {
+  padding: 12px 14px 32px;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  /* overflow-x:hidden von .wizard-flow würde overflow-y auf auto setzen und den Card-Rand abschneiden */
+  overflow: visible !important;
+}
+/* Mobil: Zurück + Weiter/Senden immer nebeneinander (wie wizard-mobile-footer) */
+@media (max-width: 768px) {
   .abnahme-canvas-footer {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .abnahme-canvas-footer__start {
+    flex: 0 0 auto;
   }
   .abnahme-canvas-footer__end {
-    width: 100%;
-    justify-content: stretch;
-  }
-  .abnahme-canvas-footer__end .btn {
     flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
   }
+  .abnahme-canvas-footer__end .btn,
   .abnahme-canvas-footer__primary {
-    flex: 1 1 100%;
-    width: 100%;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+  .abnahme-canvas-footer .btn {
+    white-space: nowrap;
   }
 }
 @media (max-width: 768px) {
@@ -20770,6 +20811,15 @@ body.has-blocking-overlay .app {
     min-height: 0;
     width: 100%;
     overflow-x: hidden;
+  }
+  /* Abnahme/Abschluss: Card darf mit Inhalt mitwachsen (kein overflow-Clip) */
+  .document-canvas.wizard-flow.abnahme-canvas .document-canvas__paper,
+  .document-canvas.wizard-flow.abschluss-canvas .document-canvas__paper {
+    padding: 12px 14px 32px;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    background: var(--bw-bg-paper, var(--card, #fff));
   }
   .document-canvas.wizard-flow .document-canvas__meta {
     border-radius: 12px;
@@ -22645,6 +22695,17 @@ button.crow.crow--tap:hover {
 /* Abschlussbericht — DocumentCanvas (Mock 1:1) */
 .abschluss-canvas .document-canvas__paper {
   max-width: 720px;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: flow-root;
+  box-sizing: border-box;
+  background: var(--bw-bg-paper, var(--card, #fff));
+  border-radius: var(--r-lg, 16px);
+  box-shadow: var(--bw-paper-shadow, 0 1px 3px rgba(16, 24, 40, 0.08));
+  border: 0.5px solid var(--app-separator, var(--border));
+  padding: 14px 16px 28px;
 }
 .abschluss-canvas-card {
   display: flex;

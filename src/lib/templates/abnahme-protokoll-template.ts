@@ -12,7 +12,6 @@ import {
 } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
   ANGEBOT_PDF_BOTTOM_MARGIN_MM,
-  angebotLogoKopfHtml,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
@@ -52,6 +51,17 @@ function esc(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+/** Logo im Abnahme-PDF — halb so groß wie Angebots-Briefkopf (80→40). */
+function abnahmeLogoKopfHtml(logoUrl?: string | null): string {
+  const src = logoUrl?.trim()
+  if (!src || /^file:/i.test(src)) return ''
+  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
+  const safeSrc = src.replace(/"/g, '&quot;')
+  return `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${ACCENT};">
+    <img src="${safeSrc}" alt="" role="presentation" style="height:40px;width:auto;max-width:160px;object-fit:contain;display:block;" />
+  </div>`
 }
 
 function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput {
@@ -134,7 +144,7 @@ function fotosHtml(urls: string[], captions: string[] = []): string {
     .map((u, i) => {
       const cap = (captions[i] ?? '').trim()
       return `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
-          <img src="${esc(u)}" alt="" style="display:block;width:100%;height:72px;object-fit:cover;" />
+          <img src="${esc(u)}" alt="" style="display:block;width:100%;height:36px;object-fit:cover;" />
           ${
             cap
               ? `<div style="padding:4px 6px;font-size:7pt;color:${MUTED};line-height:1.3;">${esc(cap)}</div>`
@@ -299,7 +309,7 @@ function isMangelOffenPdf(m: AbnahmeMangel): boolean {
   return s === 'offen' || s === 'in_bearbeitung'
 }
 
-/** Quadratische Mangel-Fotos — voll sichtbar (contain), nicht abgeschnitten. */
+/** Quadratische Mangel-Fotos — ~50 % der vorherigen Kachelgröße, voll sichtbar (contain). */
 function mangelFotosHtml(urls: string[] | undefined): string {
   const list = (urls ?? [])
     .map((u) => safeImgSrc(u))
@@ -307,11 +317,11 @@ function mangelFotosHtml(urls: string[] | undefined): string {
     .slice(0, 4)
   if (!list.length) return ''
   const cols = list.length === 1 ? '1fr' : 'repeat(2, 1fr)'
-  return `<div style="display:grid;grid-template-columns:${cols};gap:8px;margin:8px 0 0;page-break-inside:avoid;break-inside:avoid;">
+  return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin:8px 0 0;max-width:50%;page-break-inside:avoid;break-inside:avoid;">
     ${list
       .map(
         (src) =>
-          `<div style="margin:0;aspect-ratio:1/1;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#F9FAFB;page-break-inside:avoid;break-inside:avoid;">
+          `<div style="margin:0;aspect-ratio:1/1;max-width:72px;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#F9FAFB;page-break-inside:avoid;break-inside:avoid;">
             <img src="${src}" alt="" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center;" />
           </div>`
       )
@@ -459,7 +469,7 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
   <div style="max-width:100%;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px;">
       <div style="flex:1;min-width:0;">
-        ${angebotLogoKopfHtml(footerProps)}
+        ${abnahmeLogoKopfHtml(p.firmen_logo_url)}
         <h1 style="font-size:16pt;font-weight:700;color:${ACCENT};margin:8px 0 2px;letter-spacing:0.02em;">ABNAHMEPROTOKOLL</h1>
       </div>
       ${firmKontaktKopf(p)}

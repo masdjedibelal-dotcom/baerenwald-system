@@ -46,9 +46,9 @@ import {
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AbnahmeFreigabeStatus } from '@/lib/auftraege/abnahme-freigabe'
-import { downloadPdfFromBase64, openPdfFromBase64 } from '@/lib/download-pdf-base64'
+import { downloadPdfFromBase64, openPdfFromBase64, openPreviewTab } from '@/lib/download-pdf-base64'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
 
 const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string }> = {
@@ -69,11 +69,18 @@ type SectionId = (typeof SECTIONS)[number]['id']
 /** Standard „Ort, Datum“ aus Übergabe-Feldern (Datum immer TT.MM.JJJJ). */
 function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
   const o = ort.trim()
-  const raw = datum.trim().slice(0, 10)
-  const [y, m, d] = raw.split('-')
-  const de = y && m && d && y.length === 4 ? `${d}.${m}.${y}` : raw
-  if (o && de) return `${o}, ${de}`
-  return o || de
+  const de = formatDatum(datum)
+  const deOk = de !== '—' ? de : ''
+  if (o && deOk) return `${o}, ${deOk}`
+  return o || deOk
+}
+
+/** Anzeige: eingebettete ISO-YMD → TT.MM.JJJJ. */
+function displayDeDatum(value: string): string {
+  const t = value.trim()
+  if (!t) return '—'
+  const replaced = t.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => `${d}.${m}.${y}`)
+  return replaced
 }
 
 function FieldCard({ title, children }: { title: string; children: ReactNode }) {
@@ -396,6 +403,8 @@ export function AbnahmeprotokollCreateWizard({
     }
     const metaReady = ensureUnterschriftOrtDatum(meta)
     setMeta(metaReady)
+    // Synchron im Tap öffnen — sonst blockiert Mobil den Tab nach dem await
+    const previewTab = openPreviewTab()
     setPreviewBusy(true)
     try {
       const r = await downloadAbnahmeprotokollPdf({
@@ -407,11 +416,15 @@ export function AbnahmeprotokollCreateWizard({
         meta: metaReady,
       })
       if (!r.ok) {
+        previewTab?.close()
         toast.error(r.message)
         return
       }
-      openPdfFromBase64(r.pdfBase64)
+      openPdfFromBase64(r.pdfBase64, previewTab)
       toast.success('Vorschau geöffnet')
+    } catch {
+      previewTab?.close()
+      toast.error('Vorschau fehlgeschlagen')
     } finally {
       setPreviewBusy(false)
     }
@@ -719,7 +732,7 @@ export function AbnahmeprotokollCreateWizard({
           sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
-              <MobileOverviewField label="Datum" value={abnahmeDatum || '—'} />
+              <MobileOverviewField label="Datum" value={displayDeDatum(abnahmeDatum)} />
               <MobileOverviewField
                 label="Uhrzeit"
                 value={meta.uebergabe_uhrzeit ? `${meta.uebergabe_uhrzeit} Uhr` : '—'}
@@ -924,9 +937,11 @@ export function AbnahmeprotokollCreateWizard({
               <MobileOverviewField
                 label="Ort/Datum"
                 value={
-                  meta.unterschrift_ort_datum_an.trim() ||
-                  meta.unterschrift_ort_datum_ag.trim() ||
-                  '—'
+                  displayDeDatum(
+                    meta.unterschrift_ort_datum_an.trim() ||
+                      meta.unterschrift_ort_datum_ag.trim() ||
+                      ''
+                  )
                 }
               />
               {meta.ohne_unterschrift ? (
@@ -947,18 +962,8 @@ export function AbnahmeprotokollCreateWizard({
                 <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">
                   PDF ohne Unterschrift erstellen
                 </span>
-                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                  Kunde nicht vor Ort — Protokoll speichern und später manuell zusenden. Felder
-                  unten bleiben optional.
-                </span>
               </span>
             </label>
-
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-              {meta.ohne_unterschrift
-                ? 'Unterschriften optional — PDF kann ohne Zeichnung erzeugt werden.'
-                : 'Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer / Auftraggeber. Ort/Datum leer = aus Übergabe.'}
-            </p>
 
             <div className="space-y-3">
               <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
@@ -1082,9 +1087,19 @@ export function AbnahmeprotokollCreateWizard({
           >
             Zurück
           </button>
-        ) : (
+        ) : null}
+        {canDiscardEntwurf && sessionProtokollId ? (
+          <button
+            type="button"
+            className="btn ghost abnahme-canvas-footer__discard"
+            disabled={pending || draftSaving}
+            onClick={() => void handleDiscard()}
+          >
+            Verwerfen
+          </button>
+        ) : activeSection === 'checkliste' ? (
           <span className="abnahme-canvas-footer__spacer" aria-hidden />
-        )}
+        ) : null}
       </div>
       <div className="abnahme-canvas-footer__end">
         {activeSection !== 'pruefen' ? (
@@ -1112,18 +1127,11 @@ export function AbnahmeprotokollCreateWizard({
 
   const phasePruefen = (
     <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-5">
-      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-        {meta.ohne_unterschrift
-          ? 'Ohne Unterschrift möglich. „An Kunden senden“ verschickt das PDF und schließt den Auftrag. Entwurf bleibt beim Schließen (X) gespeichert.'
-          : hasSignatur
-            ? 'Vorschau über das Auge oben — „An Kunden senden“ verschickt das PDF und schließt den Auftrag.'
-            : 'Unterschriften setzen oder „PDF ohne Unterschrift“ anhaken. Danach an den Kunden senden.'}
-      </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
           <MobileOverviewField
             label="Übergabe"
-            value={`${abnahmeDatum}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
+            value={`${displayDeDatum(abnahmeDatum)}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
           />
           <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an || '—'} />
           <MobileOverviewField label="Projekt" value={meta.projektbezeichnung || '—'} />
@@ -1137,7 +1145,11 @@ export function AbnahmeprotokollCreateWizard({
             label="Mängel"
             value={
               maengelListe.length
-                ? `${maengelListe.length}${meta.maengel_beseitigung_spaetestens.trim() ? ` · ${meta.maengel_beseitigung_spaetestens.trim()}` : ''}`
+                ? `${maengelListe.length}${
+                    meta.maengel_beseitigung_spaetestens.trim()
+                      ? ` · ${displayDeDatum(meta.maengel_beseitigung_spaetestens)}`
+                      : ''
+                  }`
                 : 'Keine'
             }
           />
@@ -1169,16 +1181,18 @@ export function AbnahmeprotokollCreateWizard({
 
   const headerEnd = (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        className="editor-sheet__confirm"
-        disabled={pending || draftSaving || previewBusy}
-        onClick={() => void vorschauPdf()}
-        aria-label="PDF-Vorschau"
-        title="PDF-Vorschau"
-      >
-        <Eye className="h-5 w-5" aria-hidden />
-      </button>
+      {activeSection === 'pruefen' ? (
+        <button
+          type="button"
+          className="editor-sheet__icon-btn"
+          disabled={pending || draftSaving || previewBusy}
+          onClick={() => void vorschauPdf()}
+          aria-label="PDF-Vorschau"
+          title="PDF-Vorschau"
+        >
+          <Eye className="h-5 w-5" aria-hidden />
+        </button>
+      ) : null}
       <button
         type="button"
         className="editor-sheet__confirm"
@@ -1201,7 +1215,6 @@ export function AbnahmeprotokollCreateWizard({
       subtitle={subtitle || undefined}
       onClose={() => void handleClose()}
       headerEnd={headerEnd}
-      onDiscard={canDiscardEntwurf ? () => void handleDiscard() : undefined}
       draftDirty={draftDirty}
       saveBusy={pending || draftSaving}
       footerCta={footerActions}
