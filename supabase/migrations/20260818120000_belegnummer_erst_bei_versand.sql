@@ -17,7 +17,7 @@ where lower(coalesce(status, '')) = 'entwurf'
 update public.angebote
 set angebotsnr = null,
     updated_at = now()
-where lower(coalesce(status_einfach, status, '')) = 'entwurf'
+where lower(coalesce(status_einfach, status::text, '')) = 'entwurf'
   and angebotsnr is not null;
 
 create or replace function public.generate_beleg_nummer(p_typ text default 'rechnung')
