@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
 import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import {
   deleteRechnungEntwurf,
   loadRechnungWizardBootstrap,
@@ -53,6 +54,11 @@ export function RechnungAuswahlPanel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    status: string
+    label: string
+  } | null>(null)
 
   const rows = useMemo(
     () =>
@@ -90,18 +96,17 @@ export function RechnungAuswahlPanel({
     router.push(`/rechnungen/${r.id}`)
   }
 
-  function handleLoeschen(rechnungId: string, status: string) {
-    const st = String(status ?? '').toLowerCase()
-    const msg =
-      st === 'entwurf'
-        ? 'Rechnungs-Entwurf wirklich löschen?'
-        : st === 'bezahlt' || st === 'storniert'
-          ? 'Erledigte Rechnung wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.'
-          : 'Rechnung wirklich endgültig löschen?'
-    if (!window.confirm(msg)) return
-    setLoadingId(rechnungId)
+  function handleLoeschen(rechnungId: string, status: string, label: string) {
+    setDeleteTarget({ id: rechnungId, status, label })
+  }
+
+  function confirmLoeschen() {
+    const target = deleteTarget
+    if (!target) return
+    setDeleteTarget(null)
+    setLoadingId(target.id)
     startTransition(async () => {
-      const r = await deleteRechnungEntwurf(rechnungId)
+      const r = await deleteRechnungEntwurf(target.id)
       setLoadingId(null)
       if (!r.ok) {
         toast.error(r.message)
@@ -139,7 +144,12 @@ export function RechnungAuswahlPanel({
         label: 'Löschen',
         icon: <MockIcon ctx="btn" n="trash" size={15} />,
         danger: true,
-        onClick: () => handleLoeschen(r.id, r.status),
+        onClick: () =>
+          handleLoeschen(
+            r.id,
+            r.status,
+            r.rechnungsnummer?.trim() || rechnungListenTitel(r)
+          ),
       })
     }
 
@@ -213,6 +223,40 @@ export function RechnungAuswahlPanel({
       <MockBtn kind="primary" icon="plus" onClick={onNeueRechnung} disabled={pending} className="w-full">
         Neu
       </MockBtn>
+
+      <ConfirmPopup
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="Rechnung löschen?"
+        confirmLabel="Löschen"
+        cancelLabel="Abbrechen"
+        danger
+        onConfirm={confirmLoeschen}
+      >
+        {(() => {
+          const st = String(deleteTarget?.status ?? '').toLowerCase()
+          if (st === 'entwurf') {
+            return (
+              <p>
+                Entwurf „{deleteTarget?.label ?? 'Rechnung'}“ wirklich löschen?
+              </p>
+            )
+          }
+          if (st === 'bezahlt' || st === 'storniert') {
+            return (
+              <p>
+                Erledigte Rechnung „{deleteTarget?.label ?? 'Rechnung'}“ wirklich endgültig löschen?
+                Das kann nicht rückgängig gemacht werden.
+              </p>
+            )
+          }
+          return (
+            <p>
+              „{deleteTarget?.label ?? 'Rechnung'}“ wirklich endgültig löschen?
+            </p>
+          )
+        })()}
+      </ConfirmPopup>
     </div>
   )
 }

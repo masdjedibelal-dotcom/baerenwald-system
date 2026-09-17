@@ -1,0 +1,10 @@
+{
+  "kundeId": null,
+  "leadId": "8abb24da-77b3-499b-8de4-8f82ef43da2b",
+  "created": [
+    "lead:8abb24da-77b3-499b-8de4-8f82ef43da2b"
+  ],
+  "cleanup": [
+    "lead:8abb24da-77b3-499b-8de4-8f82ef43da2b:NO_DELETE_UI"
+  ]
+}

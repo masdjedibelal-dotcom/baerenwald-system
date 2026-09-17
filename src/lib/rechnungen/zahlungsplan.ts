@@ -26,6 +26,11 @@ export type ZahlungsplanZeile = {
   faellig_am?: string | null
   /** Auftragspositionen, die dieser Abschlagsrechnung zugeordnet sind (Schluss = Rest automatisch) */
   position_ids?: string[]
+  /**
+   * Gebundene Rechnung (wenn gesetzt, aber RE fehlt → tote Verknüpfung).
+   * Wird beim Erstellen/Verknüpfen gesetzt; bleibt nach Hard-Delete der RE stehen.
+   */
+  rechnung_id?: string | null
   pdf_einleitung_vorlage?: string | null
   mail_einleitung_vorlage?: string | null
   mail_betreff_vorlage?: string | null
@@ -67,6 +72,10 @@ export type RechnungAbschlagLink = {
   rechnungsnummer?: string | null
   faellig_am?: string | null
   beleg_typ?: string | null
+  /** Korrektur-Kette: Original zeigt auf Nachfolger-Entwurf */
+  ersetzt_durch?: string | null
+  /** Korrektur-Kette: Nachfolger zeigt auf Original */
+  korrektur_von?: string | null
 }
 
 export function emptyZahlungsplan(): Zahlungsplan {
@@ -81,10 +90,58 @@ export function neueZahlungsplanZeile(partial?: Partial<ZahlungsplanZeile>): Zah
     wert: partial?.wert ?? 50,
     faellig_am: partial?.faellig_am?.trim() || null,
     position_ids: partial?.position_ids?.length ? [...partial.position_ids] : [],
+    rechnung_id: partial?.rechnung_id?.trim() || null,
     pdf_einleitung_vorlage: partial?.pdf_einleitung_vorlage ?? null,
     mail_einleitung_vorlage: partial?.mail_einleitung_vorlage ?? null,
     mail_betreff_vorlage: partial?.mail_betreff_vorlage ?? null,
   }
+}
+
+function titelSiehtAusWieSchluss(titel: string): boolean {
+  const t = titel.trim().toLowerCase()
+  return t === 'schlussrechnung' || t.startsWith('schluss')
+}
+
+/** Index der Schluss-Zeile: typ rest, sonst letzte Zeile. */
+export function abschlagsplanSchlussIndex(plan: Zahlungsplan): number {
+  const restIdx = plan.zeilen.findIndex((z) => z.typ === 'rest')
+  if (restIdx >= 0) return restIdx
+  return Math.max(0, plan.zeilen.length - 1)
+}
+
+/**
+ * Nach Plan-Änderung: letzte Rate = Schlussrechnung, frühere „Schlussrechnung“-Titel → Abschlag N.
+ * Beträge/Typen bleiben (außer fälschlichem rest in der Mitte → prozent).
+ */
+export function normalizeAbschlagsplanSchluss(plan: Zahlungsplan): Zahlungsplan {
+  if (!plan.zeilen.length) return plan
+  const schlussIdx = abschlagsplanSchlussIndex(plan)
+  let abschlagNr = 0
+  const zeilen = plan.zeilen.map((z, i) => {
+    const istSchluss = i === schlussIdx
+    if (istSchluss) {
+      return {
+        ...z,
+        titel: titelSiehtAusWieSchluss(z.titel) || !z.titel.trim() ? 'Schlussrechnung' : z.titel.trim(),
+      }
+    }
+    abschlagNr += 1
+    const titel = z.titel.trim()
+    if (titelSiehtAusWieSchluss(titel) || !titel) {
+      return {
+        ...z,
+        typ: z.typ === 'rest' ? 'prozent' : z.typ,
+        titel: abschlagNr === 1 ? 'Anzahlung' : `${abschlagNr}. Abschlag`,
+        wert: z.typ === 'rest' ? 0 : z.wert,
+      }
+    }
+    if (z.typ === 'rest') {
+      // Nur eine Rest-Zeile — mittlere rest → prozent behalten Betrag 0 bis User setzt
+      return { ...z, typ: 'prozent' as const, wert: Number(z.wert) || 0 }
+    }
+    return z
+  })
+  return { ...plan, modus: 'abschlagsplan', zeilen }
 }
 
 function plusDaysIso(days: number): string {
@@ -115,6 +172,11 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
       position_ids: Array.isArray(z.position_ids)
         ? z.position_ids.map((id) => String(id)).filter(Boolean)
         : [],
+      rechnung_id:
+        typeof (z as ZahlungsplanZeile).rechnung_id === 'string' &&
+        (z as ZahlungsplanZeile).rechnung_id!.trim()
+          ? (z as ZahlungsplanZeile).rechnung_id!.trim()
+          : null,
       pdf_einleitung_vorlage: z.pdf_einleitung_vorlage?.trim() || null,
       mail_einleitung_vorlage: z.mail_einleitung_vorlage?.trim() || null,
       mail_betreff_vorlage: z.mail_betreff_vorlage?.trim() || null,
@@ -258,23 +320,48 @@ export function zahlplanRateStatus(
   return 'gestellt'
 }
 
+/**
+ * Rate hatte eine Rechnung-ID (Plan oder Link), aber die RE fehlt in der geladenen Liste
+ * (Hard-Delete) → UI-Hinweis „vorherige Rechnung gelöscht“.
+ */
+export function zahlplanZeileVorherigeRechnungGeloescht(
+  zeile: Pick<ZahlungsplanZeile, 'id' | 'rechnung_id'>,
+  rechnungen: Array<{ id?: string | null; zahlungsplan_abschlag_id?: string | null }>
+): boolean {
+  const expectedId = zeile.rechnung_id?.trim() || null
+  if (expectedId) {
+    return !rechnungen.some((r) => String(r.id ?? '') === expectedId)
+  }
+  return false
+}
+
 /** Gestellte/bezahlte Raten → Ist-Brutto für Rest-Berechnung der Schlussrate.
- * Schlussrechnungen und Entwürfe fließen nicht ein (Brutto oft = volle Leistungssumme). */
+ * Schlussrechnungen und Entwürfe fließen nicht ein (Brutto oft = volle Leistungssumme).
+ * Pro Planzeile nur der aktuelle offizielle Beleg (Korrektur-Original auslassen). */
 export function zahlplanAbgerechnetAusLinks(
   rechnungen: RechnungAbschlagLink[]
 ): Array<{ zeileId: string; brutto: number }> {
-  const out: Array<{ zeileId: string; brutto: number }> = []
+  const byZeile = new Map<string, number>()
   for (const r of rechnungen) {
     if (String(r.status) === 'storniert' || String(r.status) === 'entwurf') continue
     if (String(r.beleg_typ ?? '') === 'gutschrift') continue
     if (String(r.rechnung_art ?? '') === 'schluss') continue
+    if (!istRechnungGestelltOderBezahlt(r.status)) continue
+    const ersetztDurch = String(r.ersetzt_durch ?? '').trim()
+    if (ersetztDurch) {
+      const nachfolger = rechnungen.find((x) => x.id === ersetztDurch)
+      if (nachfolger && istRechnungGestelltOderBezahlt(nachfolger.status)) {
+        continue
+      }
+    }
     const id = r.zahlungsplan_abschlag_id?.trim()
     if (!id) continue
     const b = Number(r.brutto)
     if (!Number.isFinite(b) || b <= 0) continue
-    out.push({ zeileId: id, brutto: b })
+    // Eine Rate = ein Betrag (letzter/aktueller Beleg überschreibt)
+    byZeile.set(id, b)
   }
-  return out
+  return Array.from(byZeile.entries()).map(([zeileId, brutto]) => ({ zeileId, brutto }))
 }
 
 export function auftragSummenAusPositionen(
@@ -545,7 +632,10 @@ function roundGeld(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-/** Klartext-Abrechnung Schluss: Leistungen → bereits gezahlt → Rest. */
+/** Klartext-Abrechnung Schluss: Leistungen → bereits gezahlt → Rest.
+ * Pro Plan-Rate (oder Abschlag-Index) nur die letzte offiziell gestellte RE —
+ * Korrektur-Originale / Entwürfe / Gutschriften zählen nicht.
+ */
 export function berechneSchlussAbrechnung(
   leistungen: AngebotPosition[],
   vorherigeAbschlaege: RechnungAbschlagLink[],
@@ -569,21 +659,70 @@ export function berechneSchlussAbrechnung(
     defaultMwstSatz: opts?.defaultMwstSatz ?? 19,
   })
 
-  const bereits_gezahlt: SchlussAbrechnungZeile[] = []
-  const gesehen = new Set<string>()
-  for (const r of vorherigeAbschlaege) {
-    if (r.id === opts?.ausserRechnungId) continue
-    if (r.status === 'storniert') continue
-    if (r.rechnung_art !== 'abschlag' && r.rechnung_art !== 'schluss') continue
+  const ausser = opts?.ausserRechnungId?.trim() || null
+  const kandidaten = vorherigeAbschlaege.filter((r) => {
+    if (ausser && r.id === ausser) return false
+    if (String(r.beleg_typ ?? 'rechnung').toLowerCase() === 'gutschrift') return false
+    if (String(r.status ?? '').toLowerCase() === 'storniert') return false
+    if (!istRechnungGestelltOderBezahlt(r.status)) return false
+    if (r.rechnung_art !== 'abschlag') return false
     if (
       opts?.ausserZeileId &&
       r.zahlungsplan_abschlag_id &&
       r.zahlungsplan_abschlag_id === opts.ausserZeileId
     ) {
+      return false
+    }
+    if (rechnungErsetztDurchKorrekturEntwurf(r, vorherigeAbschlaege, ausser)) {
+      return false
+    }
+    // Nur auslassen, wenn der Nachfolger bereits offiziell gestellt/bezahlt ist
+    const ersetztDurch = String(r.ersetzt_durch ?? '').trim()
+    if (ersetztDurch) {
+      const nachfolger = vorherigeAbschlaege.find((x) => x.id === ersetztDurch)
+      if (nachfolger && istRechnungGestelltOderBezahlt(nachfolger.status)) {
+        return false
+      }
+    }
+    return true
+  })
+
+  /** Pro Rate nur ein Beleg — bevorzuge bezahlt, sonst neueste gestellte. */
+  const byRate = new Map<string, RechnungAbschlagLink>()
+  for (const r of kandidaten) {
+    const key =
+      r.zahlungsplan_abschlag_id?.trim() ||
+      (r.abschlag_index && r.abschlag_index > 0
+        ? `idx:${r.abschlag_index}`
+        : `id:${r.id}`)
+    const prev = byRate.get(key)
+    if (!prev) {
+      byRate.set(key, r)
       continue
     }
-    if (gesehen.has(r.id)) continue
-    gesehen.add(r.id)
+    const prevBezahlt = String(prev.status).toLowerCase() === 'bezahlt'
+    const curBezahlt = String(r.status).toLowerCase() === 'bezahlt'
+    if (curBezahlt && !prevBezahlt) {
+      byRate.set(key, r)
+      continue
+    }
+    if (prevBezahlt && !curBezahlt) continue
+    const prevNr = prev.rechnungsnummer?.trim() || ''
+    const curNr = r.rechnungsnummer?.trim() || ''
+    if (curNr && (!prevNr || curNr.localeCompare(prevNr, 'de') > 0)) {
+      byRate.set(key, r)
+    }
+  }
+
+  const bereits_gezahlt: SchlussAbrechnungZeile[] = []
+  const sorted = Array.from(byRate.values()).sort((a, b) => {
+    const ia = a.abschlag_index && a.abschlag_index > 0 ? a.abschlag_index : 999
+    const ib = b.abschlag_index && b.abschlag_index > 0 ? b.abschlag_index : 999
+    if (ia !== ib) return ia - ib
+    return String(a.rechnungsnummer ?? '').localeCompare(String(b.rechnungsnummer ?? ''), 'de')
+  })
+
+  for (const r of sorted) {
     const netto = abschlagAbzugNetto(r)
     const bruttoRaw = Number(r.brutto)
     const brutto =
@@ -596,7 +735,10 @@ export function berechneSchlussAbrechnung(
       Number.isFinite(mwstRaw) && Math.abs(mwstRaw) > 0.0001
         ? roundGeld(Math.abs(mwstRaw))
         : roundGeld(Math.max(0, brutto - netto))
-    const idx = r.abschlag_index && r.abschlag_index > 0 ? r.abschlag_index : bereits_gezahlt.length + 1
+    const idx =
+      r.abschlag_index && r.abschlag_index > 0
+        ? r.abschlag_index
+        : bereits_gezahlt.length + 1
     const nr = r.rechnungsnummer?.trim()
     bereits_gezahlt.push({
       label: `Abschlag ${idx}${nr ? ` (${nr})` : ''}`,
@@ -738,25 +880,47 @@ export function istRechnungGestelltOderBezahlt(status: string | null | undefined
   return st === 'gesendet' || st === 'versendet' || st === 'bezahlt'
 }
 
+/**
+ * Original noch „gesendet“, aber bereits durch Korrektur-Entwurf ersetzt
+ * (`deferOriginalStorno` bis Versand) — darf Abschlag-Gate / VK-Summe nicht blockieren.
+ */
+export function rechnungErsetztDurchKorrekturEntwurf(
+  r: Pick<RechnungAbschlagLink, 'id' | 'ersetzt_durch'>,
+  rechnungen: Array<Pick<RechnungAbschlagLink, 'id' | 'korrektur_von'>>,
+  ausserRechnungId?: string | null
+): boolean {
+  const ausser = ausserRechnungId?.trim() || null
+  if (!ausser) return false
+  if (String(r.ersetzt_durch ?? '').trim() === ausser) return true
+  const neu = rechnungen.find((x) => x.id === ausser)
+  return Boolean(neu && String(neu.korrektur_von ?? '').trim() === r.id)
+}
+
 export function abschlagBereitsAbgerechnet(
   zeileId: string,
   rechnungen: RechnungAbschlagLink[],
   ausserRechnungId?: string | null
 ): boolean {
-  return rechnungen.some(
-    (r) =>
-      r.id !== ausserRechnungId &&
-      r.zahlungsplan_abschlag_id === zeileId &&
-      istRechnungGestelltOderBezahlt(r.status) &&
-      (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss')
-  )
+  const ausser = ausserRechnungId?.trim() || null
+  return rechnungen.some((r) => {
+    if (r.id === ausser) return false
+    if (r.zahlungsplan_abschlag_id !== zeileId) return false
+    if (!istRechnungGestelltOderBezahlt(r.status)) return false
+    if (r.rechnung_art !== 'abschlag' && r.rechnung_art !== 'schluss') return false
+    if (rechnungErsetztDurchKorrekturEntwurf(r, rechnungen, ausser)) return false
+    return true
+  })
 }
 
 export function berechneBereitsGestellt(
-  rechnungen: RechnungAbschlagLink[]
+  rechnungen: RechnungAbschlagLink[],
+  ausserRechnungId?: string | null
 ): { nettoGeschaetzt: number; brutto: number } {
+  const ausser = ausserRechnungId?.trim() || null
   let brutto = 0
   for (const r of rechnungen) {
+    if (ausser && r.id === ausser) continue
+    if (rechnungErsetztDurchKorrekturEntwurf(r, rechnungen, ausser)) continue
     if (!istRechnungGestelltOderBezahlt(r.status)) continue
     if (r.rechnung_art === 'abschlag' || r.rechnung_art === 'schluss') {
       brutto += Number(r.brutto ?? 0)
@@ -782,6 +946,7 @@ export function summeGestellteRechnungenBrutto(
   let sum = 0
   for (const r of bestehende) {
     if (ausserRechnungId && r.id === ausserRechnungId) continue
+    if (rechnungErsetztDurchKorrekturEntwurf(r, bestehende, ausserRechnungId)) continue
     if (!istGestellteAbrechnungRelevant(r)) continue
     const b = Number(r.brutto ?? 0)
     if (Number.isFinite(b) && b > 0) sum += b

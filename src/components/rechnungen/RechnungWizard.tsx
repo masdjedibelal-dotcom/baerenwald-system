@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check, FileText } from 'lucide-react'
+import { Check, FileText, Send } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
@@ -18,17 +18,35 @@ import { PosBoard } from '@/components/posboard/PosBoard'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { DateInput } from '@/components/ui/DateInput'
-import { ActionsMenu } from '@/components/ui/actions-menu'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { confirmAction } from '@/components/ui/confirm-action'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
+import {
+  MelderLeistungsortFields,
+  type MelderLeistungsortDraft,
+} from '@/components/crm/MelderLeistungsortFields'
+import {
+  KundenVersandEmailField,
+  versandFolgtKontakt,
+} from '@/components/crm/KundenVersandEmailField'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
+import {
+  Ustg13bHilfeSheet,
+  Ustg13bHilfeTrigger,
+} from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { toast } from '@/components/ui/app-toast'
+import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen } from '@/lib/kunde-namen'
+import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
+  istKundeGewerbeTyp,
   kundeStrasseHausnummerZeile,
 } from '@/lib/kunde-stammdaten'
+import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import {
   createAllAbschlagRechnungenFromWizard,
   finalizeRechnungWizardWithoutMail,
@@ -37,6 +55,7 @@ import {
   sendRechnungWizard,
   syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { abbrecheRechnungKorrekturSession } from '@/app/(dashboard)/rechnungen/actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
   createAbschlussberichtPdf,
@@ -50,7 +69,7 @@ import {
   type DokumentArtikelZeile,
   type DokumentZeile,
 } from '@/lib/dokument-zeilen'
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import {
   berechneHinweis35aAnteil,
   berechneRechnung,
@@ -58,7 +77,10 @@ import {
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
-import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
+import {
+  defaultRechnungKorrekturMitStornoMailEinleitung,
+  defaultRechnungMailEinleitung,
+} from '@/lib/mail/rechnung-mail'
 import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
@@ -83,7 +105,7 @@ import {
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Kunde, Preisliste } from '@/lib/types'
+import type { Gewerk, Kunde, KundeAnsprechpartner, KundenObjekt, Preisliste } from '@/lib/types'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -168,7 +190,33 @@ export function RechnungWizard({
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [kunde, setKunde] = useState(bootstrap.kunde)
   const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
+  const [ansprechpartnerId, setAnsprechpartnerId] = useState<string | null>(
+    () => bootstrap.ansprechpartnerId?.trim() || null
+  )
+  const [kundeObjektId, setKundeObjektId] = useState<string | null>(
+    () => bootstrap.kundeObjektId?.trim() || null
+  )
+  const [objektAnlageId, setObjektAnlageId] = useState<string | null>(
+    () => bootstrap.objektAnlageId?.trim() || null
+  )
+  const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
+  const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [kundeEditOpen, setKundeEditOpen] = useState(false)
+  const isHvOderGewerbe = istKundeGewerbeTyp(kunde?.typ)
+  const leistungsortDraft: MelderLeistungsortDraft = {
+    melder_name: '',
+    melder_telefon: '',
+    melder_email: '',
+    melder_einheit: '',
+    kunde_objekt_id: kundeObjektId,
+    objekt_anlage_id: objektAnlageId,
+  }
+  const gewaehltesObjekt =
+    (kundeObjektId ? hvObjekte.find((o) => o.id === kundeObjektId) : null) ?? null
+  const leistungsortCrowHint = gewaehltesObjekt
+    ? kundenObjektKurzlabel(gewaehltesObjekt)
+    : null
   const kundeNamen = normalizeKundeNamen({
     typ: kunde?.typ,
     name: kunde?.name,
@@ -183,13 +231,36 @@ export function RechnungWizard({
     [kundeNamen.vorname, kundeNamen.nachname].filter(Boolean).join(' ') ||
     kunde?.name?.trim() ||
     'Kunde wählen'
-  const kundeEmail = (kunde?.email || '').trim()
-  const kundeTelefon = (kunde?.telefon || '').trim()
+  /** Gewählter AP, sonst Primär — steuert Anzeige & Anrede (nicht zwingend Versand-Mail). */
+  const effektivAp =
+    (ansprechpartnerId
+      ? apRows.find((a) => a.id === ansprechpartnerId)
+      : null) ??
+    apRows.find((a) => a.ist_primaer) ??
+    null
+  const apNamen = effektivAp
+    ? splitDeutscherVollname(String(effektivAp.name ?? '').trim())
+    : null
+  const displayVorname = apNamen?.vorname || kundeNamen.vorname
+  const displayNachname = apNamen?.nachname || kundeNamen.nachname
+  /** Kontakt-Mail des Ansprechpartners (Anzeige / Default-Versand). */
+  const kundeEmail =
+    (effektivAp?.email?.trim() || kunde?.email || '').trim()
+  const kundeTelefon =
+    (effektivAp?.telefon?.trim() || kunde?.telefon || '').trim()
   const kundeAnschrift = kunde
     ? kundeStrasseHausnummerZeile(kunde) || kunde.adresse?.trim() || null
     : null
   const kundeStadt = [kunde?.plz?.trim(), kunde?.ort?.trim()].filter(Boolean).join(' ')
   const kundeTypLabel = kundentypLabel(kunde?.typ)
+  const kundeCrowValue = (() => {
+    const ap = effektivAp?.name?.trim()
+    const ort = leistungsortCrowHint
+    if (ap && ort) return `${kundeName} · ${ap} · ${ort}`
+    if (ap) return `${kundeName} · ${ap}`
+    if (ort) return `${kundeName} · ${ort}`
+    return kundeName
+  })()
   const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
   const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
   /** Neu: Art der Leistung vor dem Wizard (nicht im Dokument-Sheet). */
@@ -283,13 +354,22 @@ export function RechnungWizard({
   const [zahlfristDatum, setZahlfristDatum] = useState(() => zahlfristInit.datum)
   const [rechnungId, setRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [korrekturKontext, setKorrekturKontext] = useState(bootstrap.korrekturKontext ?? null)
+  const korrekturSession = bootstrap.korrekturSession ?? null
+  /** true = Nutzer hat Entwurf bewusst behalten (Speichern/Versand) — kein Rollback. */
+  const korrekturSessionKeptRef = useRef(false)
   const [abschlagRechnungen, setAbschlagRechnungen] = useState<AbschlagRechnungEntwurf[]>([])
   const [versandRechnungId, setVersandRechnungId] = useState<string | null>(bootstrap.rechnungId)
   const [rechnungsnummer, setRechnungsnummer] = useState(
     bootstrap.rechnungsnummer?.trim() || ''
   )
   const [saving, setSaving] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewRechnungId, setPreviewRechnungId] = useState<string | null>(
+    bootstrap.rechnungId
+  )
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
   const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
@@ -345,6 +425,59 @@ export function RechnungWizard({
   }, [bootstrap.auftragId, istDirektrechnung])
 
   useEffect(() => {
+    const kid = kundeId.trim()
+    if (!kid) {
+      setApRows([])
+      return
+    }
+    let cancelled = false
+    void listKundenAnsprechpartner(kid).then((rows) => {
+      if (cancelled) return
+      setApRows(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [kundeId])
+
+  useEffect(() => {
+    if (!isHvOderGewerbe || !kundeId.trim()) {
+      setHvObjekte([])
+      if (!isHvOderGewerbe && kundeObjektId) {
+        setKundeObjektId(null)
+        setDraftDirty(true)
+      }
+      return
+    }
+    let cancelled = false
+    void fetchKundenObjekte(kundeId).then((rows) => {
+      if (cancelled) return
+      setHvObjekte(rows)
+      if (kundeObjektId && !rows.some((o) => o.id === kundeObjektId)) {
+        setKundeObjektId(null)
+        setDraftDirty(true)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Objekt nur bei Kundenwechsel prüfen
+  }, [kundeId, isHvOderGewerbe])
+
+  /** Bootstrap: Mail an gewählten AP, sobald die Liste da ist. */
+  useEffect(() => {
+    const sid = bootstrap.ansprechpartnerId?.trim()
+    if (!sid || !apRows.length) return
+    const ap = apRows.find((a) => a.id === sid)
+    const mail = ap?.email?.trim() || ''
+    if (mail && isValidEmail(mail)) {
+      setMailTo((prev) => (prev.length === 1 && prev[0] === (kunde?.email || '').trim() ? [mail] : prev.length ? prev : [mail]))
+    }
+    // nur einmal nach Laden der AP-Liste für den Bootstrap-Wert
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apRows])
+
+  useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
     const sync = () => setHintsOpen(!mq.matches)
     sync()
@@ -381,6 +514,11 @@ export function RechnungWizard({
         defaultMwstSatz: defaultMwst,
       }),
     [positionenBerechnet, kleinunternehmer, meta.reverse_charge_13b, defaultMwst]
+  )
+
+  const nachlassSummen = useMemo(
+    () => summenAusPositionen(positionenBerechnet, berechnung.mwst_satz || defaultMwst),
+    [positionenBerechnet, berechnung.mwst_satz, defaultMwst]
   )
 
   const netto = berechnung.netto
@@ -442,7 +580,19 @@ export function RechnungWizard({
   /** Rechnung versendet immer nur die Rechnung — kein Abschluss-/Dokumentpaket-Frage. */
   const previewNr = rechnungsnummer.trim() || 'Rechnung'
   const activeVersandId = versandRechnungId ?? rechnungId
-  const defaultBetreff = `${previewNr} · ${rTitel}`
+  const vorschauRechnungId = previewRechnungId ?? activeVersandId
+  const istKorrekturVersand = Boolean(korrekturKontext)
+  /** Materielle Korrektur an gesendeter RE → Storno-Gutschrift + neue RE. */
+  const istKorrekturMitStorno = istKorrekturVersand
+  const defaultBetreff = istKorrekturVersand
+    ? `Korrektur · ${previewNr} · ${rTitel}`
+    : `${previewNr} · ${rTitel}`
+  const defaultMailEinleitung = istKorrekturMitStorno
+    ? defaultRechnungKorrekturMitStornoMailEinleitung('sie', {
+        originalNr: korrekturKontext?.originalNr,
+        neueNr: previewNr !== 'Rechnung' ? previewNr : null,
+      })
+    : defaultRechnungMailEinleitung('sie')
 
   function scrollToSection(sec: number) {
     requestAnimationFrame(() => {
@@ -466,28 +616,22 @@ export function RechnungWizard({
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Noch keine Position — Erstellen/Senden erst mit mindestens einer Position.')
+        toast.error('Noch keine Position')
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Abschlagsplan noch nicht 100 % — vor Versand anpassen.')
+      toast.error('Plan anpassen (100 %)')
     }
     const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
     if (enteringVersand) {
       const id = await persistDraft()
       if (!id) {
-        toast.error(
-          'Entwurf noch nicht gespeichert — Mail-Vorschau ggf. unvollständig. Pflichtfelder vor Erstellen prüfen.'
-        )
+        toast.error('Entwurf prüfen')
       }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
-        setEinleitung(
-          defaultRechnungMailEinleitung(
-            'sie'
-          )
-        )
+        setEinleitung(defaultMailEinleitung)
       }
     }
     goToSection(next)
@@ -524,8 +668,24 @@ export function RechnungWizard({
         rechnungsnummer,
         zahlfrist,
         zahlfristDatum,
+        ansprechpartnerId,
+        kundeObjektId,
+        objektAnlageId,
       }),
-    [zeilen, meta, rechnungsart, plan, einleitung, mailBetreff, rechnungsnummer, zahlfrist, zahlfristDatum]
+    [
+      zeilen,
+      meta,
+      rechnungsart,
+      plan,
+      einleitung,
+      mailBetreff,
+      rechnungsnummer,
+      zahlfrist,
+      zahlfristDatum,
+      ansprechpartnerId,
+      kundeObjektId,
+      objektAnlageId,
+    ]
   )
   useEffect(() => {
     if (savedSnapshotRef.current === null) {
@@ -536,7 +696,7 @@ export function RechnungWizard({
   }, [draftSnapshot])
 
   function onPosBoardChange(next: PosBoardLine[]) {
-    setZeilen(posBoardLinesToDokumentZeilen(next, zeilen))
+    setZeilen(posBoardLinesToDokumentZeilen(next, zeilen, gewerke))
   }
 
   function patchPlanZeile(id: string, patch: Partial<ZahlungsplanZeile>) {
@@ -594,19 +754,25 @@ export function RechnungWizard({
   }
 
   const persistEinzel = useCallback(
-    async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
+    async (opts?: {
+      manageBusy?: boolean
+      /** false = keine Validierungs-Toasts (stiller Close-Save) */
+      silent?: boolean
+      notify?: boolean
+    }): Promise<string | null> => {
       const planAktiv = hatAuftrag && hasPlan && Boolean(aktivRate)
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
+      const silent = opts?.silent === true
       if (!artikel.length) {
-        toast.error('Mindestens eine Position erforderlich.')
+        if (!silent) toast.error('Mindestens eine Position erforderlich.')
         return null
       }
       if (artikel.some((z) => !z.bezeichnung.trim())) {
-        toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
+        if (!silent) toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
         return null
       }
       if (!kundeId?.trim()) {
-        toast.error('Kein Kunde verknüpft.')
+        if (!silent) toast.error('Kein Kunde verknüpft.')
         return null
       }
       const nextMeta = buildMetaForSave()
@@ -619,9 +785,11 @@ export function RechnungWizard({
           auftrag_id: bootstrap.auftragId,
           angebot_id: bootstrap.angebotId,
           kunde_id: kundeId,
+          ansprechpartner_id: ansprechpartnerId,
+          kunde_objekt_id: kundeObjektId,
+          objekt_anlage_id: objektAnlageId,
           positionen: positionenBerechnet,
           meta: nextMeta,
-          rechnungsnummer: rechnungsnummer.trim() || null,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
           abschlag:
             planAktiv && sel
@@ -637,23 +805,36 @@ export function RechnungWizard({
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
         if (!res.ok) {
-          toast.error(res.message)
+          if (!silent) toast.error(res.message)
           return null
         }
-        const switched = Boolean(korrekturKontext && res.rechnungId !== rechnungId)
+        const switched = Boolean(
+          korrekturKontext && !korrekturKontext.istErsatzEntwurf && res.rechnungId !== rechnungId
+        )
         setRechnungId(res.rechnungId)
         setVersandRechnungId(res.rechnungId)
+        setPreviewRechnungId(res.rechnungId)
         if (res.rechnungsnummer?.trim()) setRechnungsnummer(res.rechnungsnummer.trim())
         if (switched) {
-          setKorrekturKontext(null)
-          toast.success('Storno angelegt — Korrektur als neue Rechnung gespeichert')
+          setKorrekturKontext({
+            originalStatus: korrekturKontext!.originalStatus,
+            originalNr: korrekturKontext!.originalNr,
+            materialFingerprint: '',
+            istErsatzEntwurf: true,
+          })
+          toast.success('Storno angelegt — Korrektur gespeichert (noch nicht versendet)')
+        } else if (opts?.notify) {
+          toast.autoSaved({ label: 'Entwurf' })
         }
+        if (korrekturSession) korrekturSessionKeptRef.current = true
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
         return res.rechnungId
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        if (!silent) {
+          toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        }
         return null
       } finally {
         if (manageBusy) setSaving(false)
@@ -663,6 +844,9 @@ export function RechnungWizard({
     [
       zeilen,
       kundeId,
+      ansprechpartnerId,
+      kundeObjektId,
+      objektAnlageId,
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
@@ -687,17 +871,24 @@ export function RechnungWizard({
     ]
   )
 
-  const persistPlan = useCallback(async (opts?: { manageBusy?: boolean }): Promise<string | null> => {
+  const persistPlan = useCallback(async (opts?: {
+    manageBusy?: boolean
+    silent?: boolean
+    notify?: boolean
+  }): Promise<string | null> => {
+    const silent = opts?.silent === true
     if (!bootstrap.auftragId?.trim()) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
+      if (!silent) toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
       return null
     }
     if (!kundeId?.trim()) {
-      toast.error('Kein Kunde verknüpft.')
+      if (!silent) toast.error('Kein Kunde verknüpft.')
       return null
     }
     if (!planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      if (!silent) {
+        toast.error('Plan anpassen (100 %)')
+      }
       return null
     }
     const nextMeta = buildMetaForSave()
@@ -706,13 +897,16 @@ export function RechnungWizard({
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
       if (!planSave.ok) {
-        toast.error(planSave.message)
+        if (!silent) toast.error(planSave.message)
         return null
       }
       const res = await createAllAbschlagRechnungenFromWizard({
         auftrag_id: bootstrap.auftragId,
         angebot_id: bootstrap.angebotId,
         kunde_id: kundeId,
+        ansprechpartner_id: ansprechpartnerId,
+        kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
         positionen: positionenBerechnet,
         meta: nextMeta,
         zahlungsplan: plan,
@@ -721,20 +915,25 @@ export function RechnungWizard({
         wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        if (!silent) toast.error(res.message)
         return null
       }
       setAbschlagRechnungen(res.rechnungen)
       setVersandRechnungId(res.versandRechnungId)
       setRechnungId(res.versandRechnungId)
+      setPreviewRechnungId(res.versandRechnungId)
       const nr = res.rechnungen.find((r) => r.id === res.versandRechnungId)?.rechnungsnummer
       if (nr?.trim()) setRechnungsnummer(nr.trim())
       setMeta(nextMeta)
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
+      if (opts?.notify) toast.autoSaved({ label: 'Entwurf' })
+      if (korrekturSession) korrekturSessionKeptRef.current = true
       return res.versandRechnungId
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      if (!silent) {
+        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+      }
       return null
     } finally {
       if (manageBusy) setSaving(false)
@@ -743,6 +942,9 @@ export function RechnungWizard({
     bootstrap.auftragId,
     bootstrap.angebotId,
     kundeId,
+    ansprechpartnerId,
+    kundeObjektId,
+    objektAnlageId,
     planOk,
     plan,
     positionenBerechnet,
@@ -754,11 +956,18 @@ export function RechnungWizard({
     hasPlan,
     rFaellig,
     defaultBetreff,
+    wiederkehr,
   ])
 
-  async function persistDraft(opts?: { manageBusy?: boolean }): Promise<string | null> {
+  async function persistDraft(opts?: {
+    manageBusy?: boolean
+    silent?: boolean
+    notify?: boolean
+  }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
-      toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich. Bitte Abschlagsplan entfernen.')
+      if (!opts?.silent) {
+        toast.error('Abschlag nur mit Auftrag')
+      }
       return null
     }
     // Eine gewählte Rate (Schluss/Abschlag) → nur diese Rechnung speichern, nicht alle Raten
@@ -769,9 +978,57 @@ export function RechnungWizard({
     return persistEinzel(opts)
   }
 
+  async function openVorschauSheet() {
+    setPreviewLoading(true)
+    setSheet('vorschau')
+    try {
+      const id = await persistDraft({ manageBusy: false, silent: false })
+      if (!id) {
+        setSheet(null)
+        return
+      }
+      setPreviewRechnungId(id)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  /** Nach Speichern/Versand: immer schließen. onDone zuerst (Navigation), danach onClose (Overlay zu). */
+  function finishAndLeave(id: string) {
+    if (korrekturSession) korrekturSessionKeptRef.current = true
+    onDone?.(id)
+    onClose()
+    router.refresh()
+  }
+
+  async function rollbackKorrekturSessionIfNeeded() {
+    if (!korrekturSession || korrekturSessionKeptRef.current) return
+    const r = await abbrecheRechnungKorrekturSession({
+      originalId: korrekturSession.originalId,
+      gutschriftId: korrekturSession.gutschriftId,
+      neuId: korrekturSession.neuId,
+      originalStatus: korrekturSession.originalStatus,
+    })
+    if (!r.ok) {
+      toast.error(r.message || 'Korrektur-Abbruch fehlgeschlagen')
+      return
+    }
+    toast.info('Korrektur verworfen — kein Entwurf gespeichert')
+  }
+
+  async function closeWizardClean() {
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setPlanEditorOpen(false)
+    setSheet(null)
+    await rollbackKorrekturSessionIfNeeded()
+    onClose()
+    router.refresh()
+  }
+
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Abschlagsplan bitte so anpassen, dass 100 % bzw. Rest abgedeckt sind.')
+      toast.error('Plan anpassen (100 %)')
       return
     }
     if (sendMail) {
@@ -795,6 +1052,9 @@ export function RechnungWizard({
 
       const sync = await syncRechnungWizardMetaToEntwurf(id, {
         kunde_id: kundeId,
+        ansprechpartner_id: ansprechpartnerId,
+        kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
         meta: nextMeta,
       })
       if (!sync.ok) {
@@ -809,14 +1069,12 @@ export function RechnungWizard({
           return
         }
         toast.success(
-          `Rechnung ${res.rechnungsnummer?.trim() || nrLabel()} erstellt · ${formatEurBetrag(rBrutto)} brutto`
+          `Entwurf gespeichert${res.rechnungsnummer?.trim() ? ` · ${res.rechnungsnummer.trim()}` : ''} · ${formatEurBetrag(rBrutto)} brutto`
         )
         setSheet(null)
         setKundeEditOpen(false)
         setPlanEditorOpen(false)
-        onDone?.(id)
-        onClose()
-        router.refresh()
+        finishAndLeave(id)
         return
       }
 
@@ -834,14 +1092,14 @@ export function RechnungWizard({
         return
       }
       toast.success(
-        `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
+        istKorrekturVersand
+          ? `Korrektur ${nrLabel()} versendet · ${formatEurBetrag(rBrutto)} brutto`
+          : `Rechnung ${nrLabel()} erstellt & versendet · ${formatEurBetrag(rBrutto)} brutto`
       )
       setSheet(null)
       setKundeEditOpen(false)
       setPlanEditorOpen(false)
-      onDone?.(id)
-      onClose()
-      router.refresh()
+      finishAndLeave(id)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
     } finally {
@@ -849,15 +1107,28 @@ export function RechnungWizard({
     }
   }
 
-  async function handleCanvasClose() {
-    if (draftDirty && !saving) {
-      /* S9: Auto-Entwurf best-effort — RE speichert oft über goNextStep */
+  async function handleSaveDraftAndClose() {
+    if (saving) return
+    if (hasPlan && !planOk) {
+      toast.error('Plan anpassen (100 %)')
+      return
     }
-    onClose()
+    const id = await persistDraft({ manageBusy: true, notify: true })
+    if (!id) return
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setPlanEditorOpen(false)
+    setSheet(null)
+    finishAndLeave(id)
   }
 
   function handleRequestClose() {
-    void handleCanvasClose()
+    if (saving || previewLoading) return
+    if (!draftDirty) {
+      void closeWizardClean()
+      return
+    }
+    setCloseConfirmOpen(true)
   }
 
   async function handleWeiter() {
@@ -950,8 +1221,12 @@ export function RechnungWizard({
     if (!saved) return
     setKunde((prev) => ({ ...(prev ?? {}), ...saved, id: saved.id || prev?.id || kundeId } as typeof kunde))
     if (saved.id) setKundeId(saved.id)
+    const kid = (saved.id || kundeId).trim()
+    if (kid) {
+      void listKundenAnsprechpartner(kid).then(setApRows)
+    }
     const email = saved.email?.trim()
-    if (email && isValidEmail(email)) setMailTo([email])
+    if (email && isValidEmail(email) && !ansprechpartnerId) setMailTo([email])
     setDraftDirty(true)
   }
 
@@ -961,42 +1236,47 @@ export function RechnungWizard({
         Steuerliche Hinweise
       </div>
       <div className="rw-tax__list">
-        {(
-          [
-            {
-              on: meta.hinweis_35a,
-              set: (v: boolean) => setMeta((m) => ({ ...m, hinweis_35a: v })),
-              label: '§35a EStG-Hinweis ausweisen',
-              sub:
-                anteil35a.lohn_netto > 0
-                  ? anteil35a.hat_materialausweis
-                    ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
-                    : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
-                  : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen',
-            },
-            {
-              on: meta.reverse_charge_13b,
-              set: (v: boolean) => setMeta((m) => ({ ...m, reverse_charge_13b: v })),
-              label: 'Reverse-Charge (§13b UStG)',
-              sub: 'Steuerschuldnerschaft des Leistungsempfängers',
-            },
-          ] as const
-        ).map((c) => (
-          <button
-            key={c.label}
-            type="button"
-            className={cn('rw-tax__opt', c.on && 'on')}
-            onClick={() => c.set(!c.on)}
-          >
-            <span className="rw-tax__check" aria-hidden>
-              {c.on ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+        <button
+          type="button"
+          className={cn('rw-tax__opt', meta.hinweis_35a && 'on')}
+          onClick={() => setMeta((m) => ({ ...m, hinweis_35a: !m.hinweis_35a }))}
+        >
+          <span className="rw-tax__check" aria-hidden>
+            {meta.hinweis_35a ? <MockIcon ctx="btn" n="check" size={12} /> : null}
+          </span>
+          <span className="rw-tax__txt">
+            <span className="rw-tax__lab">§35a EStG-Hinweis ausweisen</span>
+            <span className="rw-tax__sub">
+              {anteil35a.lohn_netto > 0
+                ? anteil35a.hat_materialausweis
+                  ? `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)} (Rechnungsnetto abzgl. Material ${formatEurBetrag(anteil35a.material_netto)}) — steuerlich begünstigt`
+                  : `Lohnkostenanteil ${formatEurBetrag(anteil35a.lohn_netto)}${anteil35a.ist_brutto ? ' brutto' : ''} — steuerlich begünstigt`
+                : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen'}
             </span>
-            <span className="rw-tax__txt">
-              <span className="rw-tax__lab">{c.label}</span>
-              <span className="rw-tax__sub">{c.sub}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={cn('rw-tax__opt', meta.reverse_charge_13b && 'on')}
+          onClick={() =>
+            setMeta((m) => ({ ...m, reverse_charge_13b: !m.reverse_charge_13b }))
+          }
+        >
+          <span className="rw-tax__check" aria-hidden>
+            {meta.reverse_charge_13b ? (
+              <MockIcon ctx="btn" n="check" size={12} />
+            ) : null}
+          </span>
+          <span className="rw-tax__txt">
+            <span className="rw-tax__lab" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              Reverse-Charge (§13b UStG)
+              <Ustg13bHilfeTrigger onOpen={() => setUstg13bHilfeOpen(true)} />
             </span>
-          </button>
-        ))}
+            <span className="rw-tax__sub">
+              Steuerschuldnerschaft des Leistungsempfängers
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   )
@@ -1019,7 +1299,11 @@ export function RechnungWizard({
         badgeOf={(p) =>
           p.regieSchein
             ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
-            : null
+            : p.kind === 'freitext'
+              ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
+              : p.kind === 'nachlass'
+                ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
+                : null
         }
       />
 
@@ -1032,6 +1316,21 @@ export function RechnungWizard({
           schlussAbrechnung
             ? `MwSt ${schlussAbrechnung.mwst_prozent}%`
             : ustLabel
+        }
+        nachlassNetto={
+          !schlussAbrechnung &&
+          !(hasPlan && selBerechnet) &&
+          nachlassSummen.nachlassNetto > 0
+            ? nachlassSummen.nachlassNetto
+            : null
+        }
+        nachlassLabel={nachlassSummen.nachlassLabel}
+        nettoVorNachlass={
+          !schlussAbrechnung &&
+          !(hasPlan && selBerechnet) &&
+          nachlassSummen.nachlassNetto > 0
+            ? nachlassSummen.nettoVorNachlass
+            : null
         }
         bereitsGezahlt={
           schlussAbrechnung?.bereits_gezahlt_brutto
@@ -1054,7 +1353,7 @@ export function RechnungWizard({
       </div>
       <MetaCrowButton
         label="Kunde"
-        value={kundeName}
+        value={kundeCrowValue}
         onClick={() => setSheet('kunde')}
       />
       <MetaCrowButton
@@ -1082,51 +1381,67 @@ export function RechnungWizard({
     </div>
   )
 
+  function requestVersenden() {
+    if (saving) return
+    confirmAction({
+      title: istKorrekturMitStorno
+        ? 'Korrektur mit Storno wirklich versenden?'
+        : istKorrekturVersand
+          ? 'Korrektur wirklich versenden?'
+          : 'Rechnung wirklich versenden?',
+      body: istKorrekturMitStorno
+        ? 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs per E-Mail an den Kunden.'
+        : istKorrekturVersand
+          ? 'Die korrigierte Rechnung geht per E-Mail an den Kunden.'
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      confirmLabel: istKorrekturVersand
+        ? 'Korrektur jetzt versenden'
+        : 'Jetzt versenden',
+      cancelLabel: 'Abbrechen',
+      busyLabel: null,
+      onConfirm: () => {
+        void handleFinish(true)
+      },
+    })
+  }
+
   const headerEnd = (
     <>
       <button
         type="button"
         className="editor-sheet__icon-btn"
-        disabled={saving}
+        disabled={saving || previewLoading}
         onClick={() => {
-          void persistDraft().then(() => setSheet('vorschau'))
+          void openVorschauSheet()
         }}
         aria-label="Vorschau"
         title="Vorschau"
       >
         <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
       </button>
-      <ActionsMenu
-        sheetTitle="Rechnung"
-        align="right"
-        trigger={
-          <span
-            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Speichern oder senden"
-            title="Speichern oder senden"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </span>
-        }
-        items={[
-          {
-            label: saving ? 'Speichern…' : 'Speichern',
-            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            onClick: () => {
-              if (saving || (hasPlan && !planOk)) return
-              void handleFinish(false)
-            },
-          },
-          {
-            label: saving ? 'Senden…' : 'Senden',
-            icon: <MockIcon ctx="btn" n="send" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinish(true)
-            },
-          },
-        ]}
-      />
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={requestVersenden}
+        aria-label={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
+        title={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
+      >
+        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+        disabled={saving}
+        onClick={() => {
+          if (saving || (hasPlan && !planOk)) return
+          void handleFinish(false)
+        }}
+        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+      >
+        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
     </>
   )
 
@@ -1148,6 +1463,7 @@ export function RechnungWizard({
         meta={metaColumn}
         className="wizard-flow"
         manageHistory={false}
+        draftDirty={draftDirty}
       />
 
       <EditorSheet
@@ -1155,6 +1471,9 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Kunde"
         context="canvas"
+        overlayClassName={
+          objektNeuOpen || kundeEditOpen ? 'editor-sheet-overlay--recessed' : undefined
+        }
         headerEnd={
           kunde ? (
             <button
@@ -1166,6 +1485,8 @@ export function RechnungWizard({
             </button>
           ) : null
         }
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1178,13 +1499,59 @@ export function RechnungWizard({
               <span className="gfc-v">{kundeFirma}</span>
             </div>
           ) : null}
+          <MockField label="Ansprechpartner" full>
+            <select
+              className="sel sel--choice"
+              value={ansprechpartnerId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value.trim() || null
+                const prevKontakt = kundeEmail
+                setAnsprechpartnerId(next)
+                const ap = next
+                  ? apRows.find((a) => a.id === next)
+                  : apRows.find((a) => a.ist_primaer)
+                const mail = (ap?.email?.trim() || kunde?.email || '').trim()
+                /* Nur nachziehen, wenn Versand noch dem alten Ansprechpartner folgt. */
+                setMailTo((prev) => {
+                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                  if (mail && isValidEmail(mail)) return [mail]
+                  return []
+                })
+                setDraftDirty(true)
+              }}
+              disabled={!kundeId}
+            >
+              <option value="">Hauptansprechpartner</option>
+              {apRows.map((ap) => (
+                <option key={ap.id} value={ap.id}>
+                  {ap.name.trim() || 'Ohne Name'}
+                  {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
+                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                </option>
+              ))}
+            </select>
+          </MockField>
+          <KundenVersandEmailField
+            apRows={apRows}
+            kontaktEmail={kundeEmail}
+            kundeStammEmail={kunde?.email}
+            versandEmail={mailTo[0] ?? ''}
+            disabled={!kundeId}
+            onChange={(next) => {
+              if (next && isValidEmail(next)) setMailTo([next])
+              else if (kundeEmail && isValidEmail(kundeEmail)) setMailTo([kundeEmail])
+              else setMailTo([])
+              setDraftDirty(true)
+            }}
+          />
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
-            <span className="gfc-v">{kundeNamen.vorname || '—'}</span>
+            <span className="gfc-v">{displayVorname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">{kundeFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
-            <span className="gfc-v">{kundeNamen.nachname || '—'}</span>
+            <span className="gfc-v">{displayNachname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Anschrift</span>
@@ -1195,7 +1562,7 @@ export function RechnungWizard({
             <span className="gfc-v">{kundeStadt || '—'}</span>
           </div>
           <div className="gfc-row">
-            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-l">E-Mail (Kontakt)</span>
             <span className="gfc-v">{kundeEmail || <em>fehlt</em>}</span>
           </div>
           <div className="gfc-row">
@@ -1203,6 +1570,31 @@ export function RechnungWizard({
             <span className="gfc-v">{kundeTelefon || <em>fehlt</em>}</span>
           </div>
         </div>
+        {isHvOderGewerbe && kundeId ? (
+          <div style={{ marginTop: 16 }}>
+            <MelderLeistungsortFields
+              draft={leistungsortDraft}
+              hideMelder
+              onChange={(patch) => {
+                if (patch.kunde_objekt_id !== undefined) {
+                  setKundeObjektId(patch.kunde_objekt_id)
+                  if (patch.objekt_anlage_id === undefined) {
+                    setObjektAnlageId(null)
+                  }
+                  setDraftDirty(true)
+                }
+                if (patch.objekt_anlage_id !== undefined) {
+                  setObjektAnlageId(patch.objekt_anlage_id)
+                  setDraftDirty(true)
+                }
+              }}
+              objekte={hvObjekte}
+              onNeuObjekt={() => setObjektNeuOpen(true)}
+              kundeId={kundeId}
+              gewerke={gewerke}
+            />
+          </div>
+        ) : null}
       </EditorSheet>
 
       <KundeModal
@@ -1214,11 +1606,33 @@ export function RechnungWizard({
         onSaved={onKundeSaved}
       />
 
+      {kundeId && isHvOderGewerbe ? (
+        <KundenObjektModal
+          open={objektNeuOpen}
+          onClose={() => setObjektNeuOpen(false)}
+          kundeId={kundeId}
+          verwaltungName={kundeName}
+          context="canvas"
+          onSaved={(objekt) => {
+            setHvObjekte((prev) => {
+              if (prev.some((o) => o.id === objekt.id)) return prev
+              return [...prev, objekt]
+            })
+            setKundeObjektId(objekt.id)
+            setObjektAnlageId(null)
+            setDraftDirty(true)
+            setObjektNeuOpen(false)
+          }}
+        />
+      ) : null}
+
       <EditorSheet
         open={sheet === 'dokument'}
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <SheetEditableField
@@ -1252,6 +1666,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Zahlung"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full">
@@ -1450,57 +1866,14 @@ export function RechnungWizard({
         title="Vorschau"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
-        {activeVersandId ? (
-          <RechnungWizardPdfPreview
-            rechnungId={activeVersandId}
-            kundeName={kundeName}
-          />
-        ) : (
-          <div className="rw-preview-card">
-            <div className="rw-preview-card__banner">
-              {(previewNr !== 'Rechnung' ? previewNr : 'Entwurf')}
-              {rTitel ? ` · ${rTitel}` : ''}
-            </div>
-            <div className="rw-preview-card__body">
-              <p style={{ whiteSpace: 'pre-wrap', margin: '0 0 14px' }}>
-                {einleitung.trim() || 'Sehr geehrte Damen und Herren,'}
-              </p>
-              <ul className="rw-preview-card__pos">
-                {positionenBerechnet.slice(0, 6).map((p, i) => (
-                  <li key={`${p.leistung}-${i}`}>
-                    <span>
-                      {p.leistung}
-                      {p.menge != null
-                        ? ` · ${p.menge} ${p.einheit || ''}`.trim()
-                        : ''}
-                    </span>
-                    <b>
-                      {formatEurBetrag(
-                        (p.vk_netto ??
-                          (Number(p.lohn_netto ?? 0) + Number(p.material_netto ?? 0))) *
-                          (p.menge ?? 1) *
-                          1.19
-                      )}
-                    </b>
-                  </li>
-                ))}
-              </ul>
-              <div className="rw-preview-card__sum">
-                <span>{schlussAbrechnung ? 'Restsumme' : 'Rechnungsbetrag'}</span>
-                <b>{formatEurBetrag(displayBrutto)}</b>
-              </div>
-              {rFaellig ? (
-                <div className="rw-preview-card__faellig">
-                  Fällig am {formatDateDe(rFaellig)}
-                </div>
-              ) : null}
-            </div>
-            <div className="rw-preview-card__foot">
-              Bärenwald · an {kundeName}
-            </div>
-          </div>
-        )}
+        <RechnungWizardPdfPreview
+          rechnungId={vorschauRechnungId}
+          loading={previewLoading || !vorschauRechnungId}
+          kundeName={kundeName}
+        />
       </EditorSheet>
 
       <EditorSheet
@@ -1508,6 +1881,8 @@ export function RechnungWizard({
         onClose={closeSheet}
         title="Abschlussbericht"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full" style={{ display: 'grid', gap: 12 }}>
@@ -1622,8 +1997,10 @@ export function RechnungWizard({
       <EditorSheet
         open={sheet === 'versand'}
         onClose={closeSheet}
-        title="Versand"
+        title={istKorrekturVersand ? 'Korrektur versenden' : 'Versand'}
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField
@@ -1664,16 +2041,43 @@ export function RechnungWizard({
               rechnungId={activeVersandId}
               kundeId={kundeId}
               betreff={mailBetreff || defaultBetreff}
-              einleitung={einleitung}
+              einleitung={einleitung.trim() || defaultMailEinleitung}
               rechnungsnummer={previewNr}
               brutto={displayBrutto}
               faelligAm={rFaellig}
               projektTitel={rechnungTitel || rTitel}
               empfaengerHint={mailTo[0] || kundeEmail || kundeName}
+              istKorrektur={istKorrekturVersand}
+              mitStornoAnhang={istKorrekturMitStorno}
+              korrekturOriginalNr={korrekturKontext?.originalNr ?? null}
             />
           </div>
         </div>
       </EditorSheet>
+
+      <ConfirmPopup
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title="Änderungen speichern?"
+        cancelLabel="Weiter bearbeiten"
+        discardLabel="Beenden ohne Speichern"
+        saveDraftLabel="Als Entwurf speichern"
+        danger
+        onConfirm={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraft={() => {
+          void handleSaveDraftAndClose()
+        }}
+      >
+        Ungespeicherte Eingaben gehen sonst verloren.
+      </ConfirmPopup>
+
+      <Ustg13bHilfeSheet
+        open={ustg13bHilfeOpen}
+        onClose={() => setUstg13bHilfeOpen(false)}
+        variant="ausgang"
+      />
     </>
   )
 

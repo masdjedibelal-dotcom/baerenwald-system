@@ -216,7 +216,7 @@ export function ProjektVertragWizard({
       setVertragsNr(res.vertrags_nr)
       setPdfUrl(res.pdf_url)
       if (acceptMode) {
-        toast.success('Vertrag erzeugt. Partner sieht ihn im Portal unter Vorgänge.')
+        toast.success('Vertrag erzeugt')
       } else if (nachtragMode) {
         const mailTeil =
           'mailGesendet' in res && res.mailGesendet

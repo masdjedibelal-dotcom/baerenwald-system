@@ -126,7 +126,7 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 |--|--|
 | **Markt** | Lexware / Field-Apps: „Neu“ öffnet Dokument-Canvas oder Sheet-Stack; ein Job, große Targets. |
 | **Wir heute** | Gemischt: Routes, Modals, Funnel, teils Desktop-Formulare auf dem Phone. |
-| **Wir wollen** | Jeder Create-Flow startet in **einer** App-Shell (`DocumentCanvas` / `WizardShell`). |
+| **Wir wollen** | Jeder Create-Flow startet in **einer** App-Shell (`DocumentCanvas``). |
 | **Vergleich** | Markt = App-Create; wir = Desktop-Form in Mobile-Viewport. |
 
 **FE:** Einstiege auf Shell/Canvas vereinheitlichen; FAB → gleicher Flow. **BE:** —.  
@@ -161,7 +161,7 @@ Eine Codebase, **zwei Nutzungsmodi**: Desktop wie CRM, Mobile wie App — Job-Pa
 | | |
 |--|--|
 | **Markt** | Gleiches Dokument; Sheets → Modal/Slide-over; kein Fake-Bottom-Sheet. |
-| **Wir heute** | Desktop oft besser; trotzdem uneven (AppFlow vs WizardShell). |
+| **Wir heute** | Desktop oft besser; trotzdem uneven (AppFlow vs DocumentCanvas). |
 | **Wir wollen** | Gleicher Canvas/Jobs wie Mobile; Darstellung = Cards + Modal/Slide-over. |
 | **Vergleich** | Parität der Jobs, nicht der Pixel. |
 

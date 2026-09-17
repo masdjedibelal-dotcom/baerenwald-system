@@ -1,0 +1,45 @@
+{
+  "at": "2026-08-26T09:40:00.000Z",
+  "note": "PII redacted — originals not retained",
+  "net_n": 0,
+  "build": { "title": "Bärenwald CRM", "url": "https://baerenwald-backend.netlify.app/login" },
+  "findings": [
+    {
+      "type": "projekt_token",
+      "auftrag_id": "bb0ac8f3-112c-412e-abf2-ca76cb1a67c1",
+      "status": "offen",
+      "token_prefix": "ca7c07d85eb0",
+      "bad": false,
+      "snip": "Ihr Projekt · Pipeline Anfrage→…· Fortschritt Offen · [PII redacted]"
+    },
+    {
+      "type": "pageerror",
+      "msg": "Minified React error #425 (hydration)"
+    },
+    {
+      "type": "pageerror",
+      "msg": "Minified React error #422 (hydration)"
+    },
+    {
+      "type": "projekt_token",
+      "auftrag_id": "8f5469e1-1ba6-4739-bb86-16ed019da04d",
+      "status": "offen",
+      "token_prefix": "122e1bd01200",
+      "bad": false,
+      "snip": "Ihr Projekt · Pipeline OK · [PII redacted]"
+    },
+    {
+      "type": "projekt_token",
+      "auftrag_id": "5855288d-6945-4c13-9025-cd389c54b211",
+      "status": "offen",
+      "token_prefix": "34cdab129d24",
+      "bad": false,
+      "snip": "Ihr Projekt · Pipeline OK · Timeline-Eintrag vorhanden · [PII redacted]"
+    },
+    {
+      "type": "website_home",
+      "bad": false,
+      "snip": "Marketing-Home lädt"
+    }
+  ]
+}

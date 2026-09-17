@@ -39,7 +39,7 @@ export function metaErstzuweisung(ekNetto?: number | null): Record<string, unkno
     aenderung_typ: 'neu',
     preis_alt: null,
   }
-  if (ekNetto != null && Number.isFinite(ekNetto) && ekNetto > 0) {
+  if (ekNetto != null && Number.isFinite(ekNetto) && ekNetto >= 0) {
     patch.preis_partner = roundPreis(ekNetto)
   }
   return patch
@@ -98,7 +98,7 @@ export function metaPartnerAenderung(
 
   if (input.preisPartner !== undefined) {
     patch.preis_partner =
-      nextPreis != null && Number.isFinite(nextPreis) && nextPreis > 0
+      nextPreis != null && Number.isFinite(nextPreis) && nextPreis >= 0
         ? roundPreis(nextPreis)
         : null
   }
@@ -119,7 +119,7 @@ export function metaNeueLeistungMitPartner(
     aenderung_typ: 'neu',
     preis_alt: null,
     handwerker_status: handwerkerStatus,
-    ...(preisPartner != null && Number.isFinite(preisPartner) && preisPartner > 0
+    ...(preisPartner != null && Number.isFinite(preisPartner) && preisPartner >= 0
       ? { preis_partner: roundPreis(preisPartner) }
       : {}),
   }

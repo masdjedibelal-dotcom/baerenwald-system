@@ -23,13 +23,11 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
       <p className="mx-auto mt-2 max-w-md text-[length:var(--fs-text)] text-bw-text-muted">
         {versendet ? (
           <>
-            Das Angebot für <strong className="font-medium text-bw-text">{kundeName}</strong> wurde
-            erstellt und per E-Mail verschickt.
+            Angebot für <strong className="font-medium text-bw-text">{kundeName}</strong> versendet.
           </>
         ) : (
           <>
-            Der Entwurf für <strong className="font-medium text-bw-text">{kundeName}</strong> ist
-            gespeichert. Als Nächstes Handwerker anfragen oder das Angebot prüfen.
+            Entwurf für <strong className="font-medium text-bw-text">{kundeName}</strong> gespeichert.
           </>
         )}
       </p>

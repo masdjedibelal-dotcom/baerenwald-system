@@ -5,7 +5,7 @@ import { sendMail } from '@/lib/mail-service'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotDetail } from '@/lib/types'
 import { buildPartnerAnfragePortalUrl, buildPartnerLoginLink } from '@/lib/portal-utils'
-import { orgFreigabeBlockiertPartner } from '@/lib/org/org-portal-helpers'
+import { orgFreigabePartnerBlockMessage } from '@/lib/org/org-portal-helpers'
 import { notifyPartnerHandwerkerAnfrage } from '@/lib/partner/notify-partner-anfrage'
 
 type ZuRow = {
@@ -64,12 +64,9 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   const lead = detail.leads
   const orgStatus = (lead as { org_freigabe_status?: string } | null | undefined)?.org_freigabe_status
   const hvStatus = (lead as { hv_meldung_status?: string } | null | undefined)?.hv_meldung_status
-  if (orgFreigabeBlockiertPartner(orgStatus as never, hvStatus)) {
-    const msg =
-      orgStatus === 'abgelehnt'
-        ? 'Organisation hat die Freigabe abgelehnt — Partner-Anfrage ist blockiert.'
-        : 'Wartet auf Org-Freigabe — Partner-Anfrage kann erst nach Freigabe gesendet werden.'
-    return { ok: false, message: msg, link }
+  const blockMsg = orgFreigabePartnerBlockMessage(orgStatus as never, hvStatus)
+  if (blockMsg) {
+    return { ok: false, message: blockMsg, link }
   }
 
   const posAll = normalizeAngebotPositionen(detail.positionen)

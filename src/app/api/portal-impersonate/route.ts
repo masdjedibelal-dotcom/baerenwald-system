@@ -72,6 +72,7 @@ export async function POST(request: Request) {
 
   let email = ''
   let roleLabel = ''
+  let redirectPath = '/portal'
 
   if (targetType === 'kunde') {
     const { data: kunde } = await supabaseAdmin
@@ -86,20 +87,34 @@ export async function POST(request: Request) {
       )
     }
     if (!kunde.auth_user_id) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Kunde hat noch kein Portal-Konto. Nutze „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
-        },
-        { status: 422 }
+      const { isBaerenwaldPrimaryStaffEmail } = await import(
+        '@/lib/auth/crm-access'
       )
+      const emailLower = kunde.email.trim().toLowerCase()
+      const isHmStaff =
+        kunde.portal_modus === 'hausmeister' &&
+        isBaerenwaldPrimaryStaffEmail(emailLower)
+      if (!isHmStaff) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              'Kunde hat noch kein Portal-Konto. Nutze „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
+          },
+          { status: 422 }
+        )
+      }
     }
     email = kunde.email.trim().toLowerCase()
     roleLabel =
       kunde.portal_modus === 'organisation'
         ? `Hausverwaltung: ${kunde.name}`
-        : `Kunde: ${kunde.name}`
+        : kunde.portal_modus === 'hausmeister'
+          ? `Hausmeister: ${kunde.name}`
+          : `Kunde: ${kunde.name}`
+    if (kunde.portal_modus === 'hausmeister') {
+      redirectPath = '/portal?view=hausmeister'
+    }
   } else {
     const { data: hw } = await supabaseAdmin
       .from('handwerker')
@@ -114,6 +129,7 @@ export async function POST(request: Request) {
     }
     email = hw.email.trim().toLowerCase()
     roleLabel = `Partner: ${hw.name}`
+    redirectPath = '/partner'
   }
 
   const token = createImpersonationToken({
@@ -132,7 +148,6 @@ export async function POST(request: Request) {
     )
   }
 
-  const redirectPath = targetType === 'handwerker' ? '/partner' : '/portal'
   const url = `${site}/auth/crm-enter?t=${encodeURIComponent(token)}&next=${encodeURIComponent(redirectPath)}`
 
   await writeAuditEvent({

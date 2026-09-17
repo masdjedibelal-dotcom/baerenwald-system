@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/app-toast'
 import { createDirektauftragMitLeistungen } from '@/app/(dashboard)/auftraege/direktauftrag-leistungen-actions'
 import { parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
 import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
+import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
 import {
   neuePosBoardLine,
   type PosBoardLine,
@@ -25,10 +26,63 @@ function vorhabenTitel(lead: LeadDetail): string {
   return lead.melder_einheit?.trim() || 'Direktauftrag'
 }
 
-function seedLinesFromLead(lead: LeadDetail): PosBoardLine[] {
+function normLeistung(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9äöüß]+/g, ' ')
+    .trim()
+}
+
+/** Fehlende Einzelpreise aus Preisliste nachziehen (nie vorhandene Preise überschreiben). */
+function enrichZeroPrices(
+  lines: PosBoardLine[],
+  preislisten: Preisliste[]
+): PosBoardLine[] {
+  if (!lines.length || !preislisten.length) return lines
+  const aktiv = preislisten.filter((p) => p.aktiv !== false)
+  if (!aktiv.length) return lines
+
+  return lines.map((line) => {
+    if (line.kind === 'freitext' || line.kind === 'nachlass') return line
+    if ((Number(line.preis) || 0) > 0) return line
+
+    if (line.preisliste_id) {
+      const byId = aktiv.find((p) => p.id === line.preisliste_id)
+      const v = byId ? preislisteEinzelpreis(byId) : 0
+      if (v > 0) return { ...line, preis: v, preisliste_id: byId!.id }
+    }
+
+    const hint = normLeistung(line.name)
+    if (!hint) return line
+    const exact = aktiv.find((p) => normLeistung(p.leistung) === hint)
+    const words = hint.split(/\s+/).filter(Boolean)
+    const partial =
+      exact ??
+      aktiv.find((p) => {
+        const n = normLeistung(p.leistung)
+        return words.some((w) => w.length > 2 && n.includes(w))
+      })
+    if (!partial) return line
+    const v = preislisteEinzelpreis(partial)
+    if (v <= 0) return line
+    return {
+      ...line,
+      preis: v,
+      preisliste_id: line.preisliste_id ?? partial.id,
+      einheit: line.einheit?.trim() || partial.einheit || line.einheit,
+    }
+  })
+}
+
+function seedLinesFromLead(
+  lead: LeadDetail,
+  preislisten: Preisliste[] = []
+): PosBoardLine[] {
   const funnel = parseFunnelPositionen(lead.funnel_daten)
   if (!funnel.length) return [neuePosBoardLine()]
-  return funnel.map((p) => {
+  const seeded = funnel.map((p) => {
     const mid =
       p.preis_min > 0 || p.preis_max > 0
         ? Math.round(((p.preis_min + p.preis_max) / 2) * 100) / 100
@@ -42,6 +96,36 @@ function seedLinesFromLead(lead: LeadDetail): PosBoardLine[] {
       beschreibung: '',
     })
   })
+  return enrichZeroPrices(seeded, preislisten)
+}
+
+/**
+ * Partner-LV (falls vorhanden) bevorzugen, aber 0-€-Preise aus Funnel/Preisliste füllen.
+ * Nie vorhandene Preise auf 0 setzen.
+ */
+function resolveInitialLines(
+  lead: LeadDetail,
+  preislisten: Preisliste[],
+  initialLines?: PosBoardLine[]
+): PosBoardLine[] {
+  const seed = seedLinesFromLead(lead, preislisten)
+  if (!initialLines?.length) return seed
+
+  const seedPreisByName = new Map(
+    seed
+      .filter((s) => (Number(s.preis) || 0) > 0)
+      .map((s) => [normLeistung(s.name), Number(s.preis)])
+  )
+
+  const merged = initialLines.map((line) => {
+    if (line.kind === 'freitext' || line.kind === 'nachlass') return line
+    if ((Number(line.preis) || 0) > 0) return line
+    const fromSeed = seedPreisByName.get(normLeistung(line.name))
+    if (fromSeed != null && fromSeed > 0) return { ...line, preis: fromSeed }
+    return line
+  })
+
+  return enrichZeroPrices(merged, preislisten)
 }
 
 /**
@@ -67,7 +151,7 @@ export function DirektBeauftragenWizard({
 }) {
   const [pending, startTransition] = useLocalTransition()
   const [lines, setLines] = useState<PosBoardLine[]>(() =>
-    initialLines && initialLines.length > 0 ? initialLines : seedLinesFromLead(lead)
+    resolveInitialLines(lead, preislisten, initialLines)
   )
   const istAkut = leadIstAkut(lead)
   const titel = useMemo(() => vorhabenTitel(lead), [lead])

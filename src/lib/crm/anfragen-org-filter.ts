@@ -43,7 +43,10 @@ export function leadMatchesOrgSpezialFilter(
   filter: AnfragenOrgSpezialFilter
 ): boolean {
   if (!filter) return true
-  if (filter === 'wartet_freigabe') return lead.org_freigabe_status === 'ausstehend'
+  if (filter === 'wartet_freigabe') {
+    const st = (lead.org_freigabe_status ?? '').trim()
+    return st === 'ausstehend' || st === 'beschluss_ausstehend'
+  }
   if (filter === 'wartet_melder') return lead.einladung_status === 'offen'
   return true
 }

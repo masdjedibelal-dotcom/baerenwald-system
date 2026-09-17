@@ -267,7 +267,9 @@ Format: **Frage** | Optionen | **gewählt** | Begründung
 | Angebot fine HW/Kunde | Resolver-Phasen | — | **Nr. 9b** |
 
 
-## Nr. 3 — WizardShell
+## Nr. 3 — DocumentCanvas
+
+> Historisch als „WizardShell“ geloggt; seit 2026-08-25 Docs-Name = **DocumentCanvas**.
 
 | Frage | Optionen | Gewählt | Begründung |
 |-------|----------|---------|------------|
@@ -359,11 +361,11 @@ Basis-Historie: **Desktop `008fb9e`** (`fa0f59d` + Nr. 1–7d). Funktionsbaum: *
 | ListToolbar.tsx | Behalten / Löschen | **Löschen** | OP-5 freigegeben, 0 Imports |
 | MasterDetailShell-Wrapper | Sofort löschen / Ersetzungsliste | **Ersetzungsliste** | Regel 4 — siehe `docs/LISTEN-ERSETZUNG.md` |
 
-## Nr. 3 — WizardShell verdrahten
+## Nr. 3 — DocumentCanvas verdrahten
 
 | Frage | Optionen | Gewählt | Begründung |
 |-------|----------|---------|------------|
-| Shell-Integration | AppFlowScreen behalten / WizardShell | **WizardShell** in Angebot- + Rechnungs-Wizard | Mock-Stepper + MockBtn-Header; `createPortal` bleibt |
+| Shell-Integration | AppFlowScreen behalten / DocumentCanvas | **DocumentCanvas** in Angebot- + Rechnungs-Wizard | Mock-Stepper + MockBtn-Header; `createPortal` bleibt |
 
 ## Mock-Only Sweep 2026-07-16
 

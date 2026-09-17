@@ -13,7 +13,7 @@
 |-----|--------|------------------------|------------------------|
 | **1** Listen Welle 1 | **fertig*** | im Batch vor `9915af7` (`v`-Commits) | `docs/paritaet/` — ggf. dataless; Live-Liste prüfen |
 | **2** Listen Welle 2 | **fertig*** | dto. | Toolbar/Chiprow/`/vorgaenge`-Grids |
-| **3** WizardShell-Optik | **fertig** | dto. | WizardShell Tokens in CSS |
+| **3** DocumentCanvas-Optik | **fertig** | dto. | DocumentCanvas Tokens in CSS |
 | **4** Status-Sync P0 | **fertig** | `src/lib/portal/sync-portal-lead-status.ts` | Aufrufe in Auftrag-/Angebot-Actions |
 | **5** Kanal-Fix P0 | **fertig** | `LeadKanal` + Labels + Badge | hv_direkt/katalog/manuell |
 | **6** SQL Cleanup | **übersprungen** | — | Belal in Supabase |
@@ -55,7 +55,7 @@ Format: **Frage** | Optionen | **gewählt** | Begründung
 | Weiterarbeit nach iCloud-Dataless | Warten / Neu aufbauen in ~/code | **~/code/baerenwald-system** | User-Wahl |
 
 ## Gap-Analyse ~/code (GitHub tip `9915af7`)
-| 1–3 Design | teilweise/fertig | Listen `/vorgaenge`; WizardShell + PosBoard |
+| 1–3 Design | teilweise/fertig | Listen `/vorgaenge`; DocumentCanvas + PosBoard |
 | 4–5 P0 | fertig | sync + hv_* |
 | 7 Impersonation | fertig | Token + Buttons + Admin Login |
 | 8b–c PosBoard | fertig | verdrahtet |

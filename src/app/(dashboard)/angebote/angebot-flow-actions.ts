@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { sendAngebotToKunde, createAuftragFromAngebot, sendAngebotNachfassManuell, markLeadAngeboteAbgelehnt } from '@/app/(dashboard)/angebote/actions'
 import { erledigeInterneNachfassTodos } from '@/lib/kalender-auto-termine'
 import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
@@ -151,8 +152,19 @@ export async function markAngebotAbgelehntEinfach(input: {
     await erledigeInterneNachfassTodos(row.lead_id)
     await supabaseAdmin
       .from('leads')
-      .update({ status: 'abgebrochen', updated_at: now })
+      .update({
+        status: 'abgebrochen',
+        updated_at: now,
+      })
       .eq('id', row.lead_id)
+    await supabaseAdmin
+      .from('leads')
+      .update({
+        org_freigabe_status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', row.lead_id)
+      .in('org_freigabe_status', ['ausstehend', 'beschluss_ausstehend', 'freigegeben'])
     await insertAngebotTimeline(
       row.lead_id,
       id,
@@ -190,16 +202,11 @@ export async function acceptAngebotAndCreateAuftrag(
 
   /*
    * Detail-Seite lädt oft über withCrmReadFallback (Admin bei RLS-Problemen).
-   * Annahme/Direktauftrag darf denselben Datensatz nicht per User-Client „nicht finden“ —
-   * besonders wenn mehrere Angebote (z. B. neues neben bereits gesendetem) existieren.
-   * Nach Auth-Check: Service-Role wie createAuftragFromAngebot.
+   * Annahme/Direktauftrag darf denselben Datensatz nicht per User-Client „nicht finden“.
    */
   if (!opts?.asSystem) {
-    const auth = createClient()
-    const {
-      data: { user },
-    } = await auth.auth.getUser()
-    if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+    const gate = await requireStaffAndServiceRole()
+    if (!gate.ok) return { ok: false, message: gate.message }
   }
 
   const { data: ang, error: angErr } = await supabaseAdmin
@@ -320,6 +327,20 @@ export async function acceptAngebotAndCreateAuftrag(
     cc: opts?.cc,
   })
   if (!res.ok) return res
+
+  if (direktOhneHv && leadId) {
+    try {
+      const { notifyPortalAuftragBestaetigtFromCrm } = await import(
+        '@/lib/portal/notify-portal-auftrag-bestaetigt'
+      )
+      await notifyPortalAuftragBestaetigtFromCrm({
+        leadId,
+        auftragId: res.auftragId,
+      })
+    } catch (e) {
+      console.warn('[acceptAngebotAndCreateAuftrag] Portal-Notify Direktauftrag:', e)
+    }
+  }
 
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)

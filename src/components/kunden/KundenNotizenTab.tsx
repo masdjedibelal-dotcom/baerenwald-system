@@ -4,11 +4,13 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useMemo, useState } from 'react'
 import { addKundenNotiz, deleteKundenNotiz } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { KundenNotizRow } from '@/lib/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatTimelineStamp } from '@/lib/utils'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 function notizAutor(n: KundenNotizRow): string {
@@ -79,22 +81,27 @@ export function KundenNotizenTab({
         toast.error(r.message)
         return
       }
+      toast.success('Notiz hinzugefügt')
       setVal('')
       onReload()
     })
   }
 
-  function loeschen(id: string) {
+  function loeschen(id: string, preview?: string) {
     if (id === 'legacy') return
-    if (!window.confirm('Notiz löschen?')) return
-    startTransition(async () => {
-      const r = await deleteKundenNotiz(id, kundeId)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      onReload()
-    })
+    confirmDelete(
+      'Notiz löschen?',
+      async () => {
+        const r = await deleteKundenNotiz(id, kundeId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Notiz gelöscht')
+        onReload()
+      },
+      { body: preview?.trim() || undefined }
+    )
   }
 
   return (
@@ -129,13 +136,20 @@ export function KundenNotizenTab({
               </div>
               {!isMobile && n.deletable ? (
                 <div style={{ position: 'absolute', top: 4, right: 4 }}>
-                  <MockBtn
-                    sm
-                    kind="ghost"
-                    icon="trash"
-                    title="Löschen"
-                    disabled={pending}
-                    onClick={() => loeschen(n.id)}
+                  <MockEntityRowMenu
+                    title="Notiz"
+                    items={
+                      [
+                        {
+                          icon: 'trash',
+                          label: 'Löschen',
+                          danger: true,
+                          disabled: pending,
+                          onClick: () =>
+                            loeschen(n.id, n.text.split('\n')[0] || 'Notiz'),
+                        },
+                      ] satisfies EntityMenuItem[]
+                    }
                   />
                 </div>
               ) : null}

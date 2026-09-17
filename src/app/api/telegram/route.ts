@@ -61,9 +61,9 @@ async function transcribeVoice(_fileId: string): Promise<string | null> {
   return null
 }
 
-const COPILOT_HELP_TEXT = `🤖 <b>Bärenwald Copilot</b>
+const COPILOT_HELP_TEXT = `🤖 <b>Bärenwald KI-Assistent</b> (Telegram-Copilot)
 
-Kurz schreiben, was du brauchst — Angebote, Kunden, Termine, CRM-Aktionen.
+Du schreibst mit einer <b>KI</b> — Kurz formulieren, was du brauchst: Angebote, Kunden, Termine, CRM-Aktionen.
 
 <b>Befehle</b>
 /reset — Chat-Verlauf löschen (wenn etwas hängt)
@@ -71,6 +71,10 @@ Kurz schreiben, was du brauchst — Angebote, Kunden, Termine, CRM-Aktionen.
 /start — Neustart (wie /reset)
 
 Bei Fehlern zuerst <code>/reset</code>, dann Anfrage neu formulieren.`
+
+const COPILOT_START_TEXT = `🤖 <b>Bärenwald KI-Assistent</b>
+
+Du schreibst mit einer <b>KI</b> fürs CRM. Kurz schreiben, was du brauchst — oder <code>/help</code> für Befehle.`
 
 async function runClaudeChat(userText: string): Promise<string> {
   const history = await loadHistory(COPILOT_HISTORY_TURNS)
@@ -192,7 +196,7 @@ export async function POST(req: Request) {
     if (isCopilotResetCommand(userText)) {
       await resetCopilotChat()
       await sendTelegram(
-        '🧹 <b>Chat zurückgesetzt.</b>\nVerlauf gelöscht — du kannst die Anfrage neu und kurz formulieren.\n\nTipp: Bei Kunden zuerst <code>search_crm</code> nutzen lassen (z. B. „Suche Kunde Müller").'
+        `${COPILOT_START_TEXT}\n\n🧹 <b>Chat zurückgesetzt.</b>\nVerlauf gelöscht — du kannst die Anfrage neu und kurz formulieren.\n\nTipp: Bei Kunden zuerst suchen lassen (z. B. „Suche Kunde Müller").`
       )
       return Response.json({ ok: true })
     }
@@ -209,6 +213,10 @@ export async function POST(req: Request) {
     }
 
     await sendTelegramTyping()
+    const historyBefore = await loadHistory(1)
+    if (historyBefore.length === 0) {
+      await sendTelegram(COPILOT_START_TEXT)
+    }
     const reply = await runClaudeChat(userText)
     await sendTelegramLong(reply)
   } catch (e) {

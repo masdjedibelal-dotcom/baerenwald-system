@@ -1,8 +1,14 @@
 import 'server-only'
 
+import { isStagingSupabase } from '@/lib/auth/staging-admin'
 import { splitTelegramChunks, TELEGRAM_MAX_MESSAGE_CHARS } from '@/lib/copilot/message-limits'
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN ?? ''}`
+
+function isTelegramCatcherActive(): boolean {
+  if (process.env.ALLOW_STAGING_REAL_MAIL === '1') return false
+  return isStagingSupabase() || process.env.MAIL_CATCHER === '1'
+}
 
 function requireTelegramConfig(): void {
   if (!process.env.TELEGRAM_BOT_TOKEN?.trim() || !process.env.TELEGRAM_CHAT_ID?.trim()) {
@@ -14,6 +20,15 @@ async function sendTelegramOnce(
   text: string,
   parseMode?: 'HTML' | 'Markdown'
 ): Promise<void> {
+  if (isTelegramCatcherActive()) {
+    console.info('[mail-catcher:telegram]', {
+      chars: text.length,
+      parseMode: parseMode ?? null,
+      preview: text.slice(0, 120),
+      at: new Date().toISOString(),
+    })
+    return
+  }
   requireTelegramConfig()
   const payload: Record<string, unknown> = {
     chat_id: process.env.TELEGRAM_CHAT_ID,

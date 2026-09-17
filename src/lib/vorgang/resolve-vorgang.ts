@@ -1,5 +1,10 @@
+import { leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { kanalMetaFromLead, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
-import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import {
+  isPlaceholderVorgangTitel,
+  resolveAkteVorgangTitel,
+} from '@/lib/vorgang/vorgang-anzeige-titel'
+import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import type {
   ResolveVorgangInput,
   ResolvedVorgang,
@@ -101,6 +106,7 @@ export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
   const st = (rechnung.status ?? '').trim().toLowerCase()
   if (!st || st === 'storniert' || st === 'entwurf') return false
+  if (String(rechnung.beleg_typ ?? '').toLowerCase() === 'gutschrift') return false
   if (isSatellitenRechnung(rechnung)) return false
   return true
 }
@@ -115,33 +121,32 @@ function pickNewestActive<T>(
   return null
 }
 
-function leadAnfrageUnterstatus(leadStatus: string, forceStorniert: boolean): string {
+function leadAnfrageUnterstatus(
+  leadStatus: string,
+  forceStorniert: boolean,
+  hvMeldungStatus?: string | null
+): string {
   if (forceStorniert) return 'storniert'
+  const hv = String(hvMeldungStatus ?? '')
+    .trim()
+    .toLowerCase()
+  // HM selbst erledigt — auch wenn lead.status noch „neu“ (Alt-/Inkonsistenz)
+  if (hv === 'hm_erledigt') return 'hm_erledigt'
+
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
   // Lead schon weiter (Angebot/Auftrag/…) — nicht als offene Anfrage „Neu“ anzeigen
-  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen') return 'abgeschlossen'
+  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen' || s === 'hm_erledigt') {
+    return s === 'hm_erledigt' ? 'hm_erledigt' : 'abgeschlossen'
+  }
   return 'neu'
 }
 
-function funnelKategorie(funnelDaten: unknown): string | null {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return null
-  const kat = (funnelDaten as { melde_kategorie?: unknown }).melde_kategorie
-  return typeof kat === 'string' ? kat : null
-}
-
-function funnelIstAkut(funnelDaten: unknown): boolean {
-  if (!funnelDaten || typeof funnelDaten !== 'object') return false
-  const fd = funnelDaten as { notfall?: unknown; havarie?: unknown }
-  return fd.notfall === true || fd.havarie === true
-}
 
 function isNotfall(input: ResolveVorgangInput): boolean {
   const lead = input.lead
   if ((lead.hv_meldung_status ?? '').trim() === 'notmassnahme') return true
-  if (lead.situation === 'notfall') return true
-  if (funnelIstAkut(lead.funnel_daten)) return true
-  return funnelKategorie(lead.funnel_daten) === 'notfall'
+  return leadIstHavarie(lead)
 }
 
 function isUeberfaellig(faellig: string | null | undefined, now = new Date()): boolean {
@@ -283,7 +288,7 @@ function resolvePhase(input: ResolveVorgangInput): PhasePick {
   return {
     phase: 'anfrage',
     entityId: lead.id,
-    unterstatus: leadAnfrageUnterstatus(lead.status, false),
+    unterstatus: leadAnfrageUnterstatus(lead.status, false, lead.hv_meldung_status),
     updatedAt: entityTs(lead),
   }
 }
@@ -295,15 +300,32 @@ function buildTitel(
   const angebote = input.angebote ?? []
   const angebot =
     angebotAktiv ??
-    angebote.find((a) => Boolean(a.leistungsumfang?.trim() || a.notizen?.trim() || a.titel?.trim())) ??
+    angebote.find((a) =>
+      Boolean(a.leistungsumfang?.trim() || a.notizen?.trim() || a.titel?.trim())
+    ) ??
     angebote[0] ??
     null
 
-  return angebotTitelOderSituationBereich({
-    angebot,
+  const auftragTitel =
+    input.auftraege?.find(
+      (a) => a.titel?.trim() && !isPlaceholderVorgangTitel(a.titel)
+    )?.titel ??
+    input.auftraege?.find((a) => a.titel?.trim())?.titel ??
+    null
+
+  return resolveAkteVorgangTitel({
+    angebot: angebot
+      ? {
+          leistungsumfang: angebot.leistungsumfang,
+          notizen: angebot.notizen,
+          titel: angebot.titel,
+        }
+      : null,
+    auftragTitel,
     situation: input.lead.situation,
     bereiche: input.lead.bereiche,
-    fallback: input.titel?.trim() || input.lead.kontakt_name?.trim() || 'Vorgang',
+    // Nie Kundenname — nur expliziter Vorgangs-Titel falls gesetzt
+    fallback: input.titel?.trim() || null,
   })
 }
 
@@ -318,7 +340,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   let unterstatus = pick.unterstatus
   if (pick.phase === 'anfrage' && unterstatus !== 'storniert') {
-    unterstatus = leadAnfrageUnterstatus(lead.status, false)
+    unterstatus = leadAnfrageUnterstatus(lead.status, false, lead.hv_meldung_status)
   }
 
   const angebotAktiv =
@@ -340,6 +362,7 @@ export function resolveVorgang(input: ResolveVorgangInput): ResolvedVorgang {
 
   const badges: ResolvedVorgangBadges = {}
   if (isNotfall(input)) badges.notfall = true
+  if (leadWartetAufHvStartFreigabe(input.lead)) badges.wartet_freigabe = true
   // org_freigabe_status bleibt Datenfeld; kein eigener Vorgangs-Status / Badge mehr
 
   const { actor, needsAction } = resolveActor(
@@ -378,6 +401,50 @@ export function resolveSatellitenRechnungVorgang(
   input: ResolveVorgangInput,
   rechnung: VorgangRechnungInput
 ): ResolvedVorgang {
+  const st = (rechnung.status ?? '').trim().toLowerCase()
+  const titelFallback = input.titel?.trim() || 'Rechnung'
+  const belegTyp = String(rechnung.beleg_typ ?? 'rechnung').toLowerCase()
+  const nr = rechnung.rechnungsnummer?.trim()
+
+  if (belegTyp === 'gutschrift') {
+    const unterstatus =
+      st === 'bezahlt' ? 'bezahlt' : st === 'storniert' ? 'storniert' : st === 'entwurf' ? 'entwurf' : 'gesendet'
+    return {
+      phase: 'rechnung',
+      unterstatus,
+      unterstatusLabel:
+        unterstatus === 'entwurf'
+          ? 'Storno-Gutschrift'
+          : unterstatusLabel('rechnung', unterstatus),
+      needsAction: false,
+      actor: null,
+      badges: {},
+      ueberfaellig: false,
+      kanalMeta: kanalMetaFromLead(input.lead.kanal) ?? null,
+      titel: nr ? `Storno-Gutschrift ${nr}` : 'Storno-Gutschrift',
+      entityId: rechnung.id,
+      entityType: 'rechnung',
+      updatedAt: entityTs(rechnung),
+    }
+  }
+
+  // Stornierte RE sind keine phase-winning Entities — direkt als Satellit „storniert“ ausweisen
+  if (st === 'storniert') {
+    return {
+      phase: 'rechnung',
+      unterstatus: 'storniert',
+      unterstatusLabel: unterstatusLabel('rechnung', 'storniert'),
+      needsAction: false,
+      actor: null,
+      badges: {},
+      ueberfaellig: false,
+      kanalMeta: kanalMetaFromLead(input.lead.kanal) ?? null,
+      titel: satellitenRechnungTitel(rechnung, titelFallback),
+      entityId: rechnung.id,
+      entityType: 'rechnung',
+      updatedAt: entityTs(rechnung),
+    }
+  }
   const forced: VorgangRechnungInput = { ...rechnung, rechnung_art: 'voll' }
   const resolved = resolveVorgang({
     lead: input.lead,

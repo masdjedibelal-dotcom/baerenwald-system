@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createAuftragBautagesbericht,
   deleteAuftragBautagesbericht,
@@ -251,12 +252,11 @@ export function AuftragBautagesberichtCard({
   }
 
   function removeBericht(id: string) {
-    if (!confirm('Bautagesbericht wirklich löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Bautagesbericht löschen?', async () => {
       const r = await deleteAuftragBautagesbericht(id)
       if (!r.ok) {
         toast.error(r.message)
-        return
+        throw new Error(r.message)
       }
       toast.success('Gelöscht')
       setRows((prev) => prev.filter((b) => b.id !== id))

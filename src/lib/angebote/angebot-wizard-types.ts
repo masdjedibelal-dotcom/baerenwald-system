@@ -206,8 +206,12 @@ export type AngebotWizardMeta = {
   hinweis_35a?: boolean
   hinweis_19?: boolean
   hinweis_13b?: boolean
-  /** Verwaltungsobjekt (Gewerbe/Hausverwaltung) — PDF „Durchführung in“ */
+  /** Verwaltungsobjekt (Gewerbe/Hausverwaltung) — PDF „Durchführung in“ / WEG-Kopf */
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort */
+  objekt_anlage_id?: string | null
+  /** Optionaler Ansprechpartner (Anrede / z. Hd. / Mail) */
+  ansprechpartner_id?: string | null
 }
 
 export function plusDaysYmd(days: number): string {
@@ -346,7 +350,7 @@ export function defaultWizardMeta(
   const leistungsumfang = leistungsumfangAusLead.trim() || projektLabel
   const recht = defaultAngebotRechtshinweise(kundeTyp, firm ?? defaultFirmenEinstellungen())
   return {
-    titel: `Angebot ${projektLabel} — ${kundenName}`,
+    titel: [projektLabel, kundenName].filter(Boolean).join(' — ') || 'Projekt',
     /** Mock: plusDaysISO(14) */
     gueltig_bis: plusDaysYmd(14),
     einleitung: defaultAngebotEinleitungText(effAnrede, leistungsumfang),
@@ -430,15 +434,66 @@ export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
   'Bärenwald München übernimmt Projektsteuerung, Koordination und Qualitätskontrolle. ' +
   'Endgültige Preise können sich nach exaktem Aufmaß anpassen.'
 
-/** Status, in denen das Angebot im Wizard geladen und gespeichert werden darf (auch nach Versand). */
+/**
+ * Status, in denen das Angebot im Wizard geladen und gespeichert werden darf.
+ *
+ * Inkl. `gesendet_kunde`: Korrektur solange HV/Kunde noch nicht reagiert hat.
+ * Portal behält die letzte versendete Fassung (`positionen_portal` / PDF) bis
+ * erneut „Versenden“ (Mail + Snapshot-Update).
+ * Nicht `kunde_akzeptiert` / `angenommen`: nur über AG-Korrektur (`forAuftragKorrektur`).
+ */
 const ANGEBOT_WIZARD_BEARBEITBAR: readonly AngebotStatus[] = [
   'entwurf',
   'gesendet_handwerker',
   'handwerker_akzeptiert',
   'gesendet_kunde',
-  'kunde_akzeptiert',
 ]
 
 export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
-  return (ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(status)
+  const s = String(status ?? '').toLowerCase()
+  if ((ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(s)) return true
+  // status_einfach-Aliases (Portal/CRM-Listen)
+  return s === 'gesendet' || s === 'abgelaufen'
+}
+
+/** Angebot liegt beim Kunden/HV und wartet auf Annahme oder Ablehnung. */
+export function angebotWartetAufKundenentscheidung(status: string): boolean {
+  const s = String(status ?? '').toLowerCase()
+  return (
+    s === 'gesendet_kunde' ||
+    s === 'gesendet' ||
+    s === 'abgelaufen' ||
+    (s.includes('gesendet') && !s.includes('handwerker'))
+  )
+}
+
+/**
+ * Auftrags-Korrektur („Auftrag bearbeiten“): nur angenommenes Angebot.
+ * Abgelehnt / ersetzt / storniert / noch offen beim Kunden → gesperrt.
+ */
+export function angebotDarfFuerAuftragKorrektur(status: string): boolean {
+  const st = String(status ?? '').toLowerCase()
+  return st === 'kunde_akzeptiert' || st === 'angenommen' || st === 'beauftragt'
+}
+
+/** Wizard-Load/Save: Entwurf… oder angenommen nur mit AG-Korrektur-Flag. */
+export function angebotStatusErlaubtImWizard(
+  status: string,
+  opts?: { forAuftragKorrektur?: boolean }
+): boolean {
+  if (opts?.forAuftragKorrektur) return angebotDarfFuerAuftragKorrektur(status)
+  return angebotDarfImWizardBearbeitetWerden(status)
+}
+
+/** Deaktiviert-mit-Grund für Detail-CTA „Angebot bearbeiten“. */
+export function angebotWizardBearbeitenSperrgrund(status: string): string | null {
+  if (angebotDarfImWizardBearbeitetWerden(status)) return null
+  const s = (status ?? '').toLowerCase()
+  if (s === 'kunde_akzeptiert' || s === 'angenommen') {
+    return 'Angenommen — Änderung über Auftrag bearbeiten (AG-Korrektur)'
+  }
+  if (s === 'abgelehnt') {
+    return 'Abgelehnt — neues Angebot über die Anfrage anlegen'
+  }
+  return 'Dieses Angebot kann nicht mehr im Wizard bearbeitet werden.'
 }

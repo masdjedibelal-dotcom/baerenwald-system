@@ -21,7 +21,6 @@ export const ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT = `
   hw_rechnung_status,
   hw_rechnung_bezahlt_at,
   hw_rechnung_betrag_brutto,
-  hw_rechnung_reverse_charge_13b,
   hw_eingereicht_at,
   handwerker(id, name, email, telefon, iban),
   gewerke(id, name, slug)

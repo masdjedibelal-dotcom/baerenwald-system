@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { createKundenUpdateAndSend } from '@/app/(dashboard)/auftraege/kunden-update-actions'
 import {
-  aktuellePhaseIndex,
+  aktuellePhaseIndexFromEntities,
   auftragStatusLabelDe,
   PROJEKT_PHASEN,
 } from '@/lib/auftraege/projekt-phasen'
@@ -34,7 +34,13 @@ export function AuftragKundenUpdatePanel({
   const [sendMail, setSendMail] = useState(true)
 
   const phaseIdx = useMemo(
-    () => aktuellePhaseIndex(leadStatus ?? null, detail.status as AuftragStatus),
+    () =>
+      aktuellePhaseIndexFromEntities({
+        aufStatus: detail.status as AuftragStatus,
+        hasAuftrag: true,
+        hasAngebot: true,
+        leadStatus: leadStatus ?? null,
+      }),
     [leadStatus, detail.status]
   )
 
@@ -76,7 +82,12 @@ export function AuftragKundenUpdatePanel({
         toast.error(r.message)
         return
       }
-      toast.success(sendMail ? 'Update veröffentlicht und Kunde benachrichtigt' : 'Update veröffentlicht')
+      toast.success(
+        sendMail && !r.warning
+          ? 'Update veröffentlicht und Kunde benachrichtigt'
+          : 'Update veröffentlicht'
+      )
+      if (r.warning) toast.error(r.warning)
       setTitel('')
       setBeschreibung('')
       setFotos([])
@@ -129,7 +140,8 @@ export function AuftragKundenUpdatePanel({
           label="Details für Kundin"
           value={beschreibung}
           onChange={(e) => setBeschreibung(e.target.value)}
-          rows={4}
+          long
+          plain
           placeholder="Was wurde gemacht, was folgt als Nächstes…"
         />
 

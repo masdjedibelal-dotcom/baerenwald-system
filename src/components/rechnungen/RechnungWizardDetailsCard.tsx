@@ -1,9 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
+import {
+  Ustg13bHilfeSheet,
+  Ustg13bHilfeTrigger,
+} from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { RechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
 import { formatDatum } from '@/lib/utils'
@@ -21,6 +26,7 @@ export function RechnungWizardDetailsCard({
   lohnNettoPdf: number
   showMailFields?: boolean
 }) {
+  const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
   const form = (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -81,7 +87,10 @@ export function RechnungWizardDetailsCard({
             onChange={(e) => onMetaChange({ reverse_charge_13b: e.target.checked })}
           />
           <span>
-            <span className="font-medium">§ 13b UStG (Reverse Charge)</span>
+            <span className="inline-flex items-center font-medium">
+              § 13b UStG (Reverse Charge)
+              <Ustg13bHilfeTrigger onOpen={() => setUstg13bHilfeOpen(true)} />
+            </span>
             <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
               Steuerschuldnerschaft Leistungsempfänger
             </span>
@@ -187,10 +196,17 @@ export function RechnungWizardDetailsCard({
   )
 
   return (
-    <Card title="Rechnungsdetails">
-      <MobileEditableBlock sheetTitle="Rechnungsdetails" overview={overview}>
-        {form}
-      </MobileEditableBlock>
-    </Card>
+    <>
+      <Card title="Rechnungsdetails">
+        <MobileEditableBlock sheetTitle="Rechnungsdetails" overview={overview}>
+          {form}
+        </MobileEditableBlock>
+      </Card>
+      <Ustg13bHilfeSheet
+        open={ustg13bHilfeOpen}
+        onClose={() => setUstg13bHilfeOpen(false)}
+        variant="ausgang"
+      />
+    </>
   )
 }

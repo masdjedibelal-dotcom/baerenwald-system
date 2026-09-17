@@ -110,10 +110,15 @@ export const FACHDETAILS_CONFIG: Record<string, FachdetailBlock> = {
   elektro_kaputt: {
     frage: 'Was ist das Problem?',
     optionen: [
-      { value: 'sicherung', label: 'Sicherung fliegt raus' },
-      { value: 'strom_weg', label: 'Strom weg' },
-      { value: 'steckdose', label: 'Steckdose defekt' },
-      { value: 'fehlersuche', label: 'Fehlersuche' },
+      { value: 'kein_strom', label: 'Kein Strom in der Wohnung / im Bereich' },
+      { value: 'fi_sicherung', label: 'Sicherung oder FI fliegt raus' },
+      {
+        value: 'einzelner_punkt',
+        label: 'Nur Steckdose, Licht oder Schalter defekt',
+      },
+      { value: 'klingel', label: 'Klingel / Türsprecher' },
+      { value: 'garagentor', label: 'Garagentor öffnet oder schließt nicht' },
+      { value: 'sonstiges', label: 'Etwas anderes' },
     ],
   },
   waende: {
@@ -171,6 +176,106 @@ export const FACHDETAILS_CONFIG: Record<string, FachdetailBlock> = {
       { value: 'leck', label: 'Leck / Rohrbruch' },
       { value: 'wc', label: 'WC Reparatur' },
       { value: 'armatur', label: 'Armatur defekt' },
+    ],
+  },
+  /** Reparatur/Notfall — gleiche Primary-Optionen wie Portal-Melde (wasser). */
+  sanitaer_kaputt: {
+    frage: 'Was ist das Problem?',
+    optionen: [
+      {
+        value: 'wasser_austritt',
+        label: 'Wasser tritt aus / läuft / tropft',
+      },
+      {
+        value: 'von_decke_wand',
+        label: 'Wasser aus Decke oder Wand',
+      },
+      {
+        value: 'verstopfung',
+        label: 'WC oder Abfluss verstopft',
+      },
+      {
+        value: 'feucht_ohne_lauf',
+        label: 'Nur feucht — kein laufendes Wasser',
+      },
+      { value: 'sonstiges', label: 'Etwas anderes' },
+    ],
+  },
+  /** Portal-Melde Folgefrage: immer nach Wasser-Problem. */
+  sanitaer_ort: {
+    frage: 'Wo befindet sich der Schaden?',
+    optionen: [
+      { value: 'kueche', label: 'Küche' },
+      { value: 'bad', label: 'Bad' },
+      { value: 'wc', label: 'WC' },
+      { value: 'keller', label: 'Keller' },
+      { value: 'sonstiges', label: 'Sonstiges' },
+    ],
+  },
+  /** Reparatur — Portal-Melde Heizung. */
+  heizung_kaputt: {
+    frage: 'Was ist das Problem?',
+    optionen: [
+      { value: 'wohnung_kalt', label: 'Wohnung / Heizung bleibt kalt' },
+      { value: 'kein_warmwasser', label: 'Kein Warmwasser (Dusche/Hahn kalt)' },
+      { value: 'wasser_am_hk', label: 'Wasser tropft oder läuft am Heizkörper' },
+      { value: 'geraeusche', label: 'Knacken / Gluckern / laute Geräusche' },
+      { value: 'sonstiges', label: 'Etwas anderes' },
+    ],
+  },
+  /** Reparatur — Portal-Melde Fenster/Tür. */
+  fenster_kaputt: {
+    frage: 'Was ist das Problem?',
+    optionen: [
+      {
+        value: 'fenster_klemmt_undicht',
+        label: 'Fenster klemmt oder schließt nicht dicht',
+      },
+      {
+        value: 'scheibe_kaputt',
+        label: 'Fensterscheibe ist kaputt oder gesprungen',
+      },
+      {
+        value: 'tuer_schloss',
+        label: 'Tür, Schloss oder Schlüssel-Problem',
+      },
+      { value: 'sonstiges', label: 'Etwas anderes' },
+    ],
+  },
+  /** Reparatur — Portal-Melde Dach. */
+  dach_kaputt: {
+    frage: 'Was ist das Problem?',
+    optionen: [
+      { value: 'regenrinne_ueber', label: 'Die Regenrinne läuft über' },
+      {
+        value: 'wasser_fassade',
+        label: 'Bei Regen kommt Wasser falsch an der Fassade runter',
+      },
+      {
+        value: 'ziegel_boden',
+        label: 'Dachziegel liegen am Boden oder fehlen',
+      },
+      { value: 'sonstiges', label: 'Etwas anderes' },
+    ],
+  },
+  /** Reparatur — Portal-Melde Schimmel. */
+  schimmel_kaputt: {
+    frage: 'Was ist das Problem?',
+    optionen: [
+      {
+        value: 'schimmel_feucht',
+        label: 'Schimmel oder feuchte Stellen an Wand / Decke',
+      },
+      { value: 'sonstiges', label: 'Etwas anderes (Feuchte)' },
+    ],
+  },
+  schimmel_ort: {
+    frage: 'Wo ist das?',
+    optionen: [
+      { value: 'bad', label: 'Bad' },
+      { value: 'wohnraum', label: 'Wohn- / Schlafzimmer' },
+      { value: 'keller', label: 'Keller' },
+      { value: 'sonstiges', label: 'Sonstiges' },
     ],
   },
   garten: {
@@ -239,10 +344,22 @@ export function fachdetailKeysForBereich(
 ): string[] {
   if (!situation) return []
   if (bereich === 'gewerbe') return []
-  if (bereich === 'bad') return ['bad', 'bad_ausstattung']
-  if (bereich === 'elektrik') {
-    return situation === 'kaputt' || situation === 'notfall' ? ['elektro_kaputt'] : ['elektrik']
+  const isKaputt = situation === 'kaputt' || situation === 'notfall'
+
+  if (isKaputt) {
+    if (bereich === 'sanitaer') return ['sanitaer_kaputt', 'sanitaer_ort']
+    if (bereich === 'heizung') return ['heizung_kaputt']
+    if (bereich === 'elektrik' || bereich === 'elektro' || bereich === 'strom') {
+      return ['elektro_kaputt']
+    }
+    if (bereich === 'fenster' || bereich === 'fenster_tuer') return ['fenster_kaputt']
+    if (bereich === 'dach') return ['dach_kaputt']
+    if (bereich === 'schimmel') return ['schimmel_kaputt', 'schimmel_ort']
+    return []
   }
+
+  if (bereich === 'bad') return ['bad', 'bad_ausstattung']
+  if (bereich === 'elektrik') return ['elektrik']
   if (FACHDETAILS_CONFIG[bereich]) return [bereich]
   return []
 }

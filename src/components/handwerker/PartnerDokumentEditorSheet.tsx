@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   ablehnenPartnerDokument,
   deletePartnerDokument,
@@ -273,18 +274,22 @@ export function PartnerDokumentEditorSheet({
 
   function removeDoc() {
     if (!existing || !effectiveTyp) return
-    if (!confirm(`„${existing.bezeichnung || effectiveTyp.bezeichnung}“ endgültig löschen? Das kann nicht rückgängig gemacht werden.`)) return
-    startTransition(async () => {
-      const r = await deletePartnerDokument(existing.id, handwerkerId)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Endgültig gelöscht')
-      setDirty(false)
-      onSaved?.()
-      onClose()
-    })
+    const label = existing.bezeichnung || effectiveTyp.bezeichnung
+    confirmDelete(
+      `„${label}“ löschen?`,
+      async () => {
+        const r = await deletePartnerDokument(existing.id, handwerkerId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Endgültig gelöscht')
+        setDirty(false)
+        onSaved?.()
+        onClose()
+      },
+      { body: 'Das kann nicht rückgängig gemacht werden.' }
+    )
   }
 
   function freigeben() {
@@ -295,7 +300,7 @@ export function PartnerDokumentEditorSheet({
         toast.error(r.message)
         return
       }
-      toast.success('Dokument angenommen — Partner sieht den Status im Portal.')
+      toast.success('Dokument angenommen')
       setDirty(false)
       onSaved?.()
       onClose()
@@ -315,7 +320,7 @@ export function PartnerDokumentEditorSheet({
         toast.error(r.message)
         return
       }
-      toast.success('Abgelehnt — Partner sieht den Grund im Portal und kann neu hochladen.')
+      toast.success('Abgelehnt — neu hochladen')
       setAblehnenOpen(false)
       setAblehnGrund('')
       onSaved?.()

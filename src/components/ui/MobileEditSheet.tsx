@@ -5,7 +5,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
-/** Bottom Sheet mit ✓ — nutzt EditorSheet (Surface B). */
+/** Bottom Sheet — Draft übernehmen (kein DB-Save). */
 export function MobileEditSheet({
   open,
   onClose,
@@ -25,6 +25,7 @@ export function MobileEditSheet({
   dirty?: boolean
   onConfirm?: () => void
 }) {
+  const isDraftTakeover = !onConfirm
   return (
     <EditorSheet
       open={open}
@@ -33,6 +34,7 @@ export function MobileEditSheet({
       context="detail"
       dirty={dirty}
       onConfirm={onConfirm ?? onClose}
+      confirmLabel={isDraftTakeover ? 'Übernehmen' : 'Speichern'}
       className={className}
     >
       {children}
@@ -97,6 +99,7 @@ export function MobileEditableBlock({
         title={sheetTitle}
         context="detail"
         onConfirm={() => setSheetOpen(false)}
+        confirmLabel="Übernehmen"
       >
         {children}
       </EditorSheet>

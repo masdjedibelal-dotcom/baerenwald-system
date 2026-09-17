@@ -50,11 +50,32 @@ function coreEmailLogRow(row: Record<string, unknown>): Record<string, unknown> 
   return out
 }
 
+/** Prod/Staging: ältere Pflichtspalten empfaenger/subject/sent_at neben an_email/betreff. */
+function enrichLegacyEmailLogRow(row: Record<string, unknown>): Record<string, unknown> {
+  const now = new Date().toISOString()
+  const anEmail = row.an_email ?? row.empfaenger
+  const betreff = row.betreff ?? row.subject
+  const fehler = row.fehler_nachricht ?? row.fehler_text
+  return {
+    ...row,
+    empfaenger: anEmail ?? '(unbekannt)',
+    subject: betreff ?? '(ohne Betreff)',
+    sent_at: row.sent_at ?? now,
+    ...(fehler && !row.fehler_text ? { fehler_text: fehler } : {}),
+  }
+}
+
 /** Schreibt in email_log; fällt auf ältere Schemas zurück, wenn Migrationen noch fehlen. */
 export async function insertEmailLogRow(
   row: Record<string, unknown>
 ): Promise<{ id: string | null; error: string | null }> {
-  const attempts: Record<string, unknown>[] = [row, legacyEmailLogRow(row), coreEmailLogRow(row)]
+  const enriched = enrichLegacyEmailLogRow(row)
+  const attempts: Record<string, unknown>[] = [
+    enriched,
+    row,
+    legacyEmailLogRow(enriched),
+    coreEmailLogRow(enriched),
+  ]
 
   let lastError: string | null = null
   for (const attempt of attempts) {

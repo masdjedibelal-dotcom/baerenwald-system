@@ -1,12 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { previewAngebotKundeMail } from '@/app/(dashboard)/angebote/actions'
+import {
+  previewAngebotKundeMail,
+  previewAngebotWizardMailLive,
+} from '@/app/(dashboard)/angebote/actions'
 import { mailIframeSrcDoc } from '@/lib/mail/mail-iframe-srcdoc'
 
-/** Echte Kunden-Mail wie beim Versand (gleiche Vorlage wie sendAngebotToKunde). */
+/** Echte Kunden-Mail wie beim Versand — live aus Wizard ohne Entwurf, oder aus gespeichertem Angebot. */
 export function AngebotWizardMailPreview({
   angebotId,
+  /** true = nur Live-Vorschau, kein Speichern / kein DB-Angebot nötig */
+  liveOnly = false,
   betreff,
   einleitung,
   schluss,
@@ -15,8 +20,17 @@ export function AngebotWizardMailPreview({
   gesamtNetto,
   gueltigBis,
   empfaengerHint,
+  anrede,
+  kundeName,
+  kundeVorname,
+  kundeNachname,
+  kundeTyp,
+  reverseCharge,
+  unterSchwelleDirekt,
+  portalAudience,
 }: {
   angebotId: string | null
+  liveOnly?: boolean
   betreff?: string
   einleitung?: string | null
   schluss?: string | null
@@ -26,45 +40,81 @@ export function AngebotWizardMailPreview({
   gesamtNetto?: number | null
   gueltigBis?: string | null
   empfaengerHint?: string
+  anrede?: 'du' | 'sie'
+  kundeName?: string | null
+  kundeVorname?: string | null
+  kundeNachname?: string | null
+  kundeTyp?: string | null
+  reverseCharge?: boolean
+  unterSchwelleDirekt?: boolean
+  portalAudience?: 'privat' | 'organisation'
 }) {
   const [html, setHtml] = useState('')
   const [resolvedBetreff, setResolvedBetreff] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!angebotId) {
-      setHtml('')
-      setResolvedBetreff('')
-      setError(null)
-      return
-    }
+  const useLive = liveOnly || !angebotId
 
+  useEffect(() => {
     let cancelled = false
     const timer = window.setTimeout(() => {
       setLoading(true)
-      void previewAngebotKundeMail({
-        angebotId,
-        betreff: betreff?.trim() || undefined,
-        einleitung,
-        schluss,
-        leistungsumfang,
-        gesamtBrutto,
-        gesamtNetto,
-        gueltigBis,
-      }).then((res) => {
-        if (cancelled) return
-        setLoading(false)
-        if (!res.ok) {
-          setError(res.message)
+      setError(null)
+      void (async () => {
+        try {
+          const res = useLive
+            ? await previewAngebotWizardMailLive({
+                betreff: betreff?.trim() || undefined,
+                einleitung,
+                schluss,
+                leistungsumfang,
+                gesamtBrutto,
+                gueltigBis,
+                anrede,
+                kundeName,
+                kundeVorname,
+                kundeNachname,
+                kundeTyp,
+                reverseCharge,
+                unterSchwelleDirekt,
+                portalAudience,
+              })
+            : await previewAngebotKundeMail({
+                angebotId: angebotId!,
+                betreff: betreff?.trim() || undefined,
+                einleitung,
+                schluss,
+                leistungsumfang,
+                gesamtBrutto,
+                gesamtNetto,
+                gueltigBis,
+              })
+          if (cancelled) return
+          if (!res?.ok) {
+            setError(
+              res && 'message' in res && res.message
+                ? res.message
+                : 'E-Mail-Vorschau konnte nicht geladen werden'
+            )
+            setHtml('')
+            setResolvedBetreff('')
+            return
+          }
+          setError(null)
+          setHtml(res.html)
+          setResolvedBetreff(res.betreff)
+        } catch (e) {
+          if (cancelled) return
+          setError(
+            e instanceof Error ? e.message : 'E-Mail-Vorschau konnte nicht geladen werden'
+          )
           setHtml('')
           setResolvedBetreff('')
-          return
+        } finally {
+          if (!cancelled) setLoading(false)
         }
-        setError(null)
-        setHtml(res.html)
-        setResolvedBetreff(res.betreff)
-      })
+      })()
     }, 280)
 
     return () => {
@@ -72,6 +122,7 @@ export function AngebotWizardMailPreview({
       window.clearTimeout(timer)
     }
   }, [
+    useLive,
     angebotId,
     betreff,
     einleitung,
@@ -80,6 +131,14 @@ export function AngebotWizardMailPreview({
     gesamtBrutto,
     gesamtNetto,
     gueltigBis,
+    anrede,
+    kundeName,
+    kundeVorname,
+    kundeNachname,
+    kundeTyp,
+    reverseCharge,
+    unterSchwelleDirekt,
+    portalAudience,
   ])
 
   return (
@@ -129,11 +188,7 @@ export function AngebotWizardMailPreview({
           }}
           srcDoc={mailIframeSrcDoc(
             html,
-            !angebotId
-              ? 'E-Mail-Vorschau wird vorbereitet…'
-              : loading
-                ? 'E-Mail-Vorschau wird geladen…'
-                : 'Vorschau lädt…'
+            loading ? 'E-Mail-Vorschau wird geladen…' : 'Vorschau lädt…'
           )}
         />
       )}

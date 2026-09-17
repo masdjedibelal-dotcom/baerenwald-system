@@ -1,0 +1,14 @@
+P3 2026-08-26T00:03:39.159Z
+P3-4a-HV ❌ — Handoff-Button fehlt
+P3-4a-DB ✅ — hv_meldung_status=angebot_eingefordert
+P3-4a-CRM ✅ — Angebot erstellen sichtbar=true
+wizard url=https://staging--baerenwald-backend.netlify.app/anfragen/6eba4479-f520-4232-9e95-f3708fb0216c hasWizard=true
+number inputs=0
+P3-4a-SEND 🚫 — Senden nicht erreichbar
+P3-4a-FREIGABE ⚠️ — org_freigabe=undefined angebot=undefined
+P3-4a-MAIL ⚠️ — letzte: Wir kümmern uns um Ihren Vorgang — WEG Leopold 10 (Staging) | Neue Meldung: Wasser tritt aus in der Küche | Neue Meldung: Wasser tritt aus in der Küche | Neue Meldung: Wasser tritt aus in der Küche | Neue Meldung: Wasser tritt aus in der Küche
+P3-A-banner ⚠️ — kein Freigabe-Banner-Text gefunden
+P3-A1-sample 🚫 — kein Partner-Send-Button am Lead
+DONE
+after einmalig: Angebotslayout||Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst — nur bei einmaligen Projekten relevant.||Einfach|Nur Positionen — ohne Gewerk-Abschnitte|Komplex|Mit Gewerken — z. B. Sanitär, Elektro, Maler|Zurück
+step0: Angebotslayout||Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst — nur bei einmaligen Projekten relevant.||Einfach|Nur Positionen — ohne Gewerk-Abschnitte|K

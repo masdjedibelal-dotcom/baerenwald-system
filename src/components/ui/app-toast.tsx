@@ -64,6 +64,15 @@ export const toast = {
     if (opts?.id) releaseLoadingBusy(opts.id)
     return pushToast('info', msg, { id: opts?.id, action: opts?.action })
   },
+  /**
+   * Feedback nach stiller Auto-Speicherung (X / Close ohne explizites Speichern).
+   * Gleiche id → ersetzt vorherigen Auto-Save-Toast (kein Stapeln).
+   */
+  autoSaved: (opts?: { label?: string }) => {
+    const label = opts?.label?.trim()
+    const message = label ? `${label} gespeichert` : 'Änderungen gespeichert'
+    return pushToast('success', message, { id: 'auto-saved' })
+  },
   /** Bleibt stehen, bis dismiss/success/error mit derselben id — inkl. Loading-Screen. */
   loading: (msg: string, opts?: { id?: string }) => {
     const id = pushToast('loading', msg, { id: opts?.id, persist: true })

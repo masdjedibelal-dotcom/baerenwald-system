@@ -1,5 +1,5 @@
 import { formatKundennr } from '@/lib/angebot-utils'
-import { normalizeAngebotPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
   firmenBankverbindungZeilen,
   firmenSteuerFooterZeilen,
@@ -18,7 +18,7 @@ import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
-  formatKundeEmpfaengerFuerDokument,
+  formatRechnungEmpfaengerFuerDokument,
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
@@ -39,17 +39,14 @@ import {
   istAbschlagPauschalPosition,
   type RechnungAbschlagLink,
 } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition, Auftrag, Gewerk, Kunde, Rechnung } from '@/lib/types'
+import { resolveRechnungLeistungsortIn } from '@/lib/kunden-objekte'
+import type { AngebotPosition, Auftrag, Gewerk, Kunde, KundenObjekt, Rechnung } from '@/lib/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatDatum } from '@/lib/utils'
 
 function formatDatumDe(iso: string | null | undefined): string {
   if (!iso?.trim()) return '—'
-  try {
-    const ymd = iso.trim().slice(0, 10)
-    return new Date(`${ymd}T12:00:00`).toLocaleDateString('de-DE')
-  } catch {
-    return iso
-  }
+  return formatDatum(iso.trim())
 }
 
 function formatLeistungszeitraum(von: string | null, bis: string | null): string {
@@ -86,6 +83,8 @@ type AngebotJoin = AngebotLeistungsumfangQuelle | AngebotLeistungsumfangQuelle[]
 
 export type RechnungDetailForPdf = Omit<Rechnung, 'kunden' | 'angebote' | 'auftraege'> & {
   kunden: Kunde | null
+  /** Join über rechnungen.kunde_objekt_id */
+  kunden_objekte?: KundenObjekt | KundenObjekt[] | null
   angebote?: AngebotJoin
   auftraege?:
     | (Pick<Auftrag, 'id' | 'titel'> & { angebote?: AngebotJoin })
@@ -139,7 +138,11 @@ export function buildRechnungHtmlInput(
   row: RechnungDetailForPdf,
   firm: FirmenEinstellungen,
   gewerke: Gewerk[] = [],
-  opts?: { vorherigeAbschlaege?: RechnungAbschlagLink[] | null }
+  opts?: {
+    vorherigeAbschlaege?: RechnungAbschlagLink[] | null
+    /** Geladene Bezug-Rechnungsnummer (Storno/Gutschrift) */
+    bezugNr?: string | null
+  }
 ): AngebotHtmlInput {
   if (!row.kunden) throw new Error('Kunde fehlt')
 
@@ -159,6 +162,7 @@ export function buildRechnungHtmlInput(
     defaultMwstSatz: defaultMwst,
   }
   const berechnung = berechneRechnung(positionen, berechnungOpts)
+  const summenPos = summenAusPositionen(positionen, berechnung.mwst_satz || defaultMwst)
 
   const privat = istPrivatKundeTyp(row.kunden.typ)
   // Privat / Schluss: kein Arbeitskosten-Block — nur klare Gesamtabrechnung
@@ -207,8 +211,15 @@ export function buildRechnungHtmlInput(
     }
   )
 
-  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden)
-  const empfaenger = formatKundeEmpfaengerFuerDokument(row.kunden)
+  const objektJoin = firstJoin(row.kunden_objekte)
+  const apId = (row as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null
+  const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(row.kunden, null, {
+    selectedAnsprechpartnerId: apId,
+  })
+  const empfaenger = formatRechnungEmpfaengerFuerDokument(row.kunden, {
+    selectedAnsprechpartnerId: apId,
+    objekt: objektJoin,
+  })
   const anrede: AngebotMailAnrede = 'sie'
   const anredeCtx = kundeAnredeKontextFromEmpfaenger(empfaengerStamm)
   const rechnungsdatumDe = formatDatumDe(String(row.rechnungsdatum))
@@ -258,6 +269,7 @@ export function buildRechnungHtmlInput(
 
   const steuer = firmenSteuerFooterZeilen(firm)
   const bank = firmenBankverbindungZeilen(firm)
+  const durchfuehrungIn = resolveRechnungLeistungsortIn(objektJoin)
 
   return {
     dokument_art: 'rechnung',
@@ -284,6 +296,7 @@ export function buildRechnungHtmlInput(
     kunde_name: empfaenger.name,
     kunde_adresse: empfaenger.adresse,
     kunde_typ: row.kunden.typ ?? null,
+    durchfuehrung_in: durchfuehrungIn,
     leistungsumfang: projektTitel,
     variant_erste_ueberschrift:
       projektTitel && projektTitel !== 'Rechnung' ? projektTitel : undefined,
@@ -297,6 +310,13 @@ export function buildRechnungHtmlInput(
       mwst_prozent: berechnung.mwst_satz,
       mwst_betrag: berechnung.mwst_betrag,
       brutto: berechnung.brutto,
+      ...(summenPos.nachlassNetto > 0
+        ? {
+            nachlass_netto: Math.round(summenPos.nachlassNetto * 100) / 100,
+            nachlass_label: summenPos.nachlassLabel || 'Nachlass',
+            netto_vor_nachlass: Math.round(summenPos.nettoVorNachlass * 100) / 100,
+          }
+        : {}),
     },
     kostenaufstellung,
     rechtshinweise: {
@@ -310,6 +330,11 @@ export function buildRechnungHtmlInput(
     rechnung_typ:
       rechnungArt === 'schluss' ? 'schluss' : rechnungArt === 'abschlag' ? 'abschlag' : 'voll',
     rechnung_abschlag_index: abschlagIndex,
+    beleg_typ:
+      String((row as { beleg_typ?: string | null }).beleg_typ ?? '').toLowerCase() === 'gutschrift'
+        ? 'gutschrift'
+        : 'rechnung',
+    bezug_rechnungsnummer: opts?.bezugNr?.trim() || null,
     schluss_abrechnung,
   }
 }
@@ -343,23 +368,60 @@ export async function loadRechnungDetailForPdf(
   supabase: Parameters<typeof loadGewerkeAusfuehrung>[0],
   rechnungId: string
 ): Promise<RechnungDetailForPdf | null> {
-  const { data, error } = await supabase
+  const selectBase =
+    '*, kunden(*, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)), angebote(leistungsumfang, notizen), auftraege(id, titel, kostentraeger, versicherungs_nr, versicherungsakte_pdf_url, angebote(leistungsumfang, notizen))'
+  const selectMitObjekt = `${selectBase}, kunden_objekte(id, kunde_id, titel, strasse, hausnummer, plz, ort)`
+
+  let { data, error } = await supabase
     .from('rechnungen')
-    .select(
-      '*, kunden(*), angebote(leistungsumfang, notizen), auftraege(id, titel, kostentraeger, versicherungs_nr, versicherungsakte_pdf_url, angebote(leistungsumfang, notizen))'
-    )
+    .select(selectMitObjekt)
     .eq('id', rechnungId)
     .maybeSingle()
-  if (error || !data) return null
+
+  /** Prod ohne Migration kunde_objekt_id: Embed bricht den ganzen Select. */
+  if (
+    error &&
+    /kunde_objekt|kunden_objekte|ansprechpartner_id/i.test(error.message)
+  ) {
+    console.warn('[loadRechnungDetailForPdf] Fallback ohne Objekt-Join:', error.message)
+    ;({ data, error } = await supabase
+      .from('rechnungen')
+      .select(selectBase)
+      .eq('id', rechnungId)
+      .maybeSingle())
+  }
+
+  if (error) {
+    console.error('[loadRechnungDetailForPdf]', rechnungId, error.message)
+    return null
+  }
+  if (!data) return null
+
   const kRaw = data.kunden
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
   const aRaw = data.auftraege
   const auftrag = Array.isArray(aRaw) ? aRaw[0] : aRaw
   const angRaw = data.angebote
   const angebot = Array.isArray(angRaw) ? angRaw[0] : angRaw
+  const oRaw = (data as { kunden_objekte?: KundenObjekt | KundenObjekt[] | null }).kunden_objekte
+  let objekt = (Array.isArray(oRaw) ? oRaw[0] : oRaw) as KundenObjekt | null
+
+  const objektId = String(
+    (data as { kunde_objekt_id?: string | null }).kunde_objekt_id ?? ''
+  ).trim()
+  if (!objekt && objektId) {
+    const { data: objRow } = await supabase
+      .from('kunden_objekte')
+      .select('id, kunde_id, titel, strasse, hausnummer, plz, ort')
+      .eq('id', objektId)
+      .maybeSingle()
+    objekt = (objRow as KundenObjekt) ?? null
+  }
+
   return {
     ...(data as Rechnung),
     kunden: (kunde as Kunde) ?? null,
+    kunden_objekte: objekt,
     angebote: (angebot as AngebotLeistungsumfangQuelle | null) ?? null,
     auftraege: (auftrag as RechnungDetailForPdf['auftraege']) ?? null,
   }

@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | 0 | Datenmodell Spec-W2 | ✅ | `fe1b29e` | — (keine UI) |
 | 1 | Status-Töne + Primary-CTA | ✅ | `c43c100` | Bewertung-einholen = Toast-Platzhalter |
-| 2 | Sheet / Canvas, WizardShell weg | ✅ | `a567b32` | API heißt oft noch „Modal“, Layout = Sheet |
+| 2 | Sheet / Canvas, DocumentCanvas weg | ✅ | `a567b32` | API heißt oft noch „Modal“, Layout = Sheet |
 | 3 | Nav Handwerker / Organisation | ✅ | `aeb233e` | Kein Pixel-1:1, Struktur Spec §3 |
 | 4 | Vorgänge-Liste | ✅ | `3edebd3` | Swipe kam in Phase 11 |
 | 5a | Auftrag 5 Tabs | ✅ | `f87e859` | — |

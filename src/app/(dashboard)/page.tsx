@@ -5,6 +5,7 @@ import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
   isAktiverAuftragStatus,
+  isOffeneAnfrageStatus,
   isOffeneRechnungStatus,
   isOffenesAngebotStatus,
 } from '@/lib/dashboard-mock-mapping'
@@ -19,12 +20,18 @@ import {
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
+  isUmsatzAuftragStatus,
   type DashboardZeitraumFilter,
 } from '@/lib/dashboard/dashboard-analytics'
-import { loadDashboardMarketing } from '@/lib/dashboard/dashboard-marketing'
+import {
+  emptyDashboardMarketingSnapshot,
+  loadDashboardMarketingSafe,
+} from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
+/** Netlify Serverless: Dashboard darf Marketing-APIs nicht unbegrenzt warten lassen. */
+export const maxDuration = 26
 
 type SupabaseErr = { message: string } | null
 
@@ -62,6 +69,52 @@ async function safeMaybeSingle<T>(
 }
 
 async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
+  try {
+    return await DashboardDataInner({ zeitraumFilter })
+  } catch (e) {
+    console.error('[DashboardData]', e)
+    return (
+      <DashboardClient
+        vorname="Team"
+        zeitraumFilter={zeitraumFilter}
+        kpis={[
+          {
+            icon: 'inbox',
+            label: 'Offene Anfragen',
+            value: 0,
+            href: '/vorgaenge?tab=anfrage&lifecycle=offen',
+          },
+          {
+            icon: 'file-invoice',
+            label: 'Offene Angebote',
+            value: 0,
+            href: '/vorgaenge?tab=angebot&lifecycle=offen',
+          },
+          {
+            icon: 'tool',
+            label: 'Aktive Aufträge',
+            value: 0,
+            href: '/vorgaenge?tab=auftrag&lifecycle=offen',
+          },
+          {
+            icon: 'receipt',
+            label: 'Offene Rechnungen',
+            value: 0,
+            href: '/vorgaenge?tab=rechnung&lifecycle=offen',
+          },
+        ]}
+        marketing={emptyDashboardMarketingSnapshot('Dashboard konnte nicht vollständig geladen werden')}
+        umsatzMonate={[]}
+        funnel={{ stufen: [], conversionGesamt: 0 }}
+        gewerk={{ zeilen: [], gesamt: 0 }}
+        rankingHandwerker={[]}
+        rankingKunden={[]}
+      />
+    )
+  }
+}
+
+async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: DashboardZeitraumFilter }) {
   const supabase = createClient()
   const zeitraumRange = getDashboardZeitraumRange(zeitraumFilter)
 
@@ -95,6 +148,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
         db
           .from('leads')
           .select('id, status, kunde_id, created_at')
+          .is('geloescht_am', null)
           .order('created_at', { ascending: false })
           .limit(2000)
       )
@@ -106,7 +160,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .select(
             `
             id, status, status_einfach, kunde_id, lead_id, created_at,
-            gesamt_fix, gesamt_min, gesamt_max, positionen,
+            gesamt_fix, gesamt_min, gesamt_max,
             leads(id, status),
             auftraege(id, status)
           `
@@ -123,7 +177,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
             `
             id, status, kunde_id, lead_id, angebot_id, created_at, titel, ist_wiederkehrend,
             letzte_aktivitaet, fortschritt,
-            angebote(id, gesamt_fix, gesamt_min, gesamt_max, positionen),
+            angebote(id, gesamt_fix, gesamt_min, gesamt_max),
             kunden(id, name, vorname, nachname)
           `
           )
@@ -137,7 +191,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
           .from('rechnungen')
           .select(
             `
-            id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto,
+            id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto, ersetzt_durch,
             kunden(id, name, vorname, nachname)
           `
           )
@@ -150,8 +204,9 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       withCrmReadFallback(async (db) =>
         db
           .from('rechnungen')
-          .select('id, status, created_at, auftrag_id, positionen')
+          .select('id, status, created_at, auftrag_id, ersetzt_durch, positionen, netto')
           .neq('status', 'storniert')
+          .neq('status', 'entwurf')
           .order('created_at', { ascending: false })
           .limit(800)
       )
@@ -166,13 +221,13 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
             handwerker(id, name, firma),
             gewerke(name),
             auftraege(id, status, lead_id, angebot_id, kunde_id, created_at,
-              angebote(gesamt_fix, gesamt_min, gesamt_max, positionen))
+              angebote(gesamt_fix, gesamt_min, gesamt_max))
           `
           )
           .limit(3000)
       )
     ),
-    loadDashboardMarketing(zeitraumFilter),
+    loadDashboardMarketingSafe(zeitraumFilter),
     safeRows(() =>
       withCrmReadFallback(async (db) =>
         db.from('gewerke').select('id, name, slug').order('name')
@@ -201,6 +256,7 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     kunde_id?: string | null
     netto?: number | null
     brutto?: number | null
+    ersetzt_durch?: string | null
     kunden?:
       | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }
       | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null }[]
@@ -211,7 +267,9 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     status: string
     created_at: string
     auftrag_id?: string | null
+    ersetzt_durch?: string | null
     positionen?: unknown
+    netto?: number | null
   }>
 
   const leadsZ = leads.filter((l) => {
@@ -222,9 +280,18 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
   const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, zeitraumRange))
 
-  const neueAnfragenCount = leadsZ.filter(
-    (l) => String(l.status ?? '').toLowerCase() === 'neu'
-  ).length
+  /** Wie Vorgänge-Liste: mit Angebot zählt die Phase als Angebot, nicht als offene Anfrage. */
+  const leadIdsMitAngebot = new Set(
+    angebote
+      .map((a) => String(a.lead_id ?? '').trim())
+      .filter(Boolean)
+  )
+
+  const offeneAnfragenCount = leadsZ.filter((l) => {
+    if (!isOffeneAnfrageStatus(l.status as string)) return false
+    if (leadIdsMitAngebot.has(String(l.id))) return false
+    return true
+  }).length
   const offeneAngeboteCount = angeboteZ.filter((a) =>
     isOffenesAngebotStatus(a.status as string, a.status_einfach as string | null)
   ).length
@@ -238,8 +305,8 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
   const kpis = [
     {
       icon: 'inbox',
-      label: 'Neue Anfragen',
-      value: neueAnfragenCount,
+      label: 'Offene Anfragen',
+      value: offeneAnfragenCount,
       href: '/vorgaenge?tab=anfrage&lifecycle=offen',
     },
     {
@@ -262,20 +329,60 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
     },
   ]
 
-  // Umsatzverlauf: letzte 6 Monate — aktive/abgeschlossene Aufträge + Rechnungen
-  const umsatzMonate = buildUmsatzverlauf(
-    auftraege.map((a) => ({
+  // Umsatz: Aufträge ab Annahme/Direkt + Direkt-RE — Verlauf & Gewerk mit derselben Netto-Basis
+  const umsatzAuftraegeZ = auftraegeZ.filter((a) => isUmsatzAuftragStatus(String(a.status ?? '')))
+  const angebotIdsForGewerk = [
+    ...new Set(
+      umsatzAuftraegeZ
+        .map((a) => String(a.angebot_id ?? '').trim())
+        .filter(Boolean)
+    ),
+  ].slice(0, 200)
+
+  const angebotPositionenById = new Map<string, unknown>()
+  for (let i = 0; i < angebotIdsForGewerk.length; i += 40) {
+    const chunk = angebotIdsForGewerk.slice(i, i + 40)
+    const rows = await safeRows(() =>
+      withCrmReadFallback(async (db) =>
+        db.from('angebote').select('id, positionen').in('id', chunk)
+      )
+    )
+    for (const row of rows as Array<{ id?: string; positionen?: unknown }>) {
+      const id = String(row.id ?? '').trim()
+      if (id) angebotPositionenById.set(id, row.positionen)
+    }
+  }
+
+  const umsatzAuftraegeEnrich = umsatzAuftraegeZ.map((a) => {
+    const angId = String(a.angebot_id ?? '').trim()
+    const pos = angId ? angebotPositionenById.get(angId) : undefined
+    const embedded = a.angebote as
+      | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }
+      | { gesamt_fix?: number | null; gesamt_min?: number | null; gesamt_max?: number | null }[]
+      | null
+      | undefined
+    const base = Array.isArray(embedded) ? embedded[0] : embedded
+    return {
       status: String(a.status ?? ''),
       created_at: String(a.created_at ?? ''),
-      angebote: a.angebote as never,
-    })),
-    rechnungen.map((r) => ({
+      angebote: base
+        ? { ...base, positionen: pos }
+        : pos
+          ? { positionen: pos }
+          : null,
+    }
+  })
+
+  const umsatzMonate = buildUmsatzverlauf(
+    umsatzAuftraegeEnrich,
+    rechnungenZ.map((r) => ({
       status: r.status,
       created_at: r.created_at,
       netto: r.netto,
       auftrag_id: r.auftrag_id,
+      ersetzt_durch: r.ersetzt_durch,
     })),
-    6
+    { range: zeitraumRange, monateCount: 6 }
   )
 
   const auftraegeFunnelZ = auftraegeZ.filter(
@@ -310,16 +417,15 @@ async function DashboardData({ zeitraumFilter }: { zeitraumFilter: DashboardZeit
       slug: String(g.slug ?? ''),
     })
   )
+
   const gewerk = buildGewerkUmsatz(
-    angeboteZ.map((a) => ({
-      positionen: a.positionen,
-      leads: a.leads as never,
-      auftraege: a.auftraege as never,
-    })),
+    umsatzAuftraegeEnrich,
     rechnungenGewerkZ.map((r) => ({
       positionen: r.positionen,
       status: r.status,
       auftrag_id: r.auftrag_id,
+      ersetzt_durch: r.ersetzt_durch,
+      netto: r.netto,
     })),
     gewerkeKatalog
   )

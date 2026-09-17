@@ -134,7 +134,7 @@ export function AngebotWizardAngebotDetailsCard({
     <Card title="Angebot-Details">
       <p className="wizard-inline-hint mb-3 hidden md:block">
         Änderungen aus Schritt 1 werden beim Klick auf <strong>Weiter</strong> oder{' '}
-        <strong>Speichern</strong> in der Kopfzeile als Entwurf übernommen. Der Status steht oben neben
+        <strong>Als Entwurf speichern</strong> in der Kopfzeile als Entwurf übernommen. Der Status steht oben neben
         der Anfrage-Nummer.
       </p>
       <MobileEditableBlock sheetTitle="Angebot-Details" overview={overview}>

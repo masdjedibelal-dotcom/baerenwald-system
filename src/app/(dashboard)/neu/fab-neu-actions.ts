@@ -23,6 +23,7 @@ export async function listGewerkeFuerFab(): Promise<
     .from('gewerke')
     .select('id, name, slug')
     .eq('aktiv', true)
+    .order('sort_order')
     .order('name')
   if (error) return { ok: false, message: error.message }
   return {
@@ -132,6 +133,7 @@ export async function createAnfrageFuerKunde(
     melder_telefon?: string | null
     melder_einheit?: string | null
     kunde_objekt_id?: string | null
+    objekt_anlage_id?: string | null
   }
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const id = kundeId.trim()
@@ -184,13 +186,22 @@ export async function createAnfrageFuerKunde(
     melder_telefon: opts?.melder_telefon ?? null,
     melder_einheit: opts?.melder_einheit ?? null,
     kunde_objekt_id: opts?.kunde_objekt_id ?? null,
+    objekt_anlage_id: opts?.objekt_anlage_id ?? null,
     funnel_daten: {
       quelle: 'crm_direkt_angebot',
       direkt_dokument: 'angebot',
     },
   })
 
-  if (!r.ok) return r
+  if (!r?.ok) {
+    return {
+      ok: false,
+      message:
+        r && 'message' in r && r.message
+          ? r.message
+          : 'Anfrage konnte nicht angelegt werden.',
+    }
+  }
 
   // Sofort aus Anfragen-Pipeline nehmen (Status vor Angebot = neu/kontaktiert/termin).
   const now = new Date().toISOString()

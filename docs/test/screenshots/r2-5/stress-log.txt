@@ -1,0 +1,55 @@
+kunde_neu url=https://staging--baerenwald-backend.netlify.app/neu?art=kunde
+kunde_create_err=locator.fill: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('input.txt[placeholder="Vorname"]').first()
+
+after create kunde url=https://staging--baerenwald-backend.netlify.app/neu?art=kunde
+kundeId=null
+B1a long_saved=true layout_crash=false has_content=true
+B1b one_char_saved=true
+B1c spaces_save_disabled=true
+B1d empty_save_disabled=true
+B1e newlines_saved=true
+B1g saved=true xss_as_text=true script_exec=false unicode_visible=true
+B1 list_load_ms=1481
+B6 api_empty status=400 body={"ok":false,"error":"Ungültiger Name"}
+B6 api_spaces status=400 body={"ok":false,"error":"Ungültiger Name"}
+B6 api_ok status=200 body={"ok":true,"id":"8abb24da-77b3-499b-8de4-8f82ef43da2b"}
+B6 angebot_neu url=https://staging--baerenwald-backend.netlify.app/angebote/neu
+B6 no senden btn yet (wizard gate)
+B2 num_inputs=0
+B2 no number inputs visible at gate
+B3 no date inputs at gate
+console error: Failed to load resource: the server responded with a status of 413 ()
+B5 notiz_over8 toast=false
+B5 notiz_zero after=true
+B5 notiz_fake_exe accepted_or_err=Bärenwald ARBEIT Dashboard Vorgänge Kunden Handwerker ORGANISATION Kalender KI A
+B5 notiz_exact8 after_toast=false
+B5 melde no file input
+B4 vorgaenge_load_ms=1514 class=1-3s
+B4 anfragen_load_ms=901 class=<1s
+B4 kunden_load_ms=888 class=<1s
+B4 angebote_load_ms=1131 class=1-3s
+B4 search_ms=1511
+B4 csv_click_ms=1037
+TimeoutError: page.waitForSelector: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('input[type=password]') to be visible
+
+FAIL TimeoutError: page.waitForSelector: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('input[type=password]') to be visible
+    - waiting for "https://staging--baerenwald-backend.netlify.app/" navigation to finish...
+    - navigated to "https://staging--baerenwald-backend.netlify.app/"
+
+--- final ---
+buttons=["KI","3","Transaktionsdaten leeren","Privat","Hausverwaltung","Gewerbe"]
+after_kunde url=https://staging--baerenwald-backend.netlify.app/neu?art=kunde
+kundeId=null
+melde_body_snip=MN||Musterverwaltung Nord||Verwaltung||BEREICH||Was ist betroffen?||Wasser, Heizung, Strom & Co. — Dringlichkeit setzen wir automatisch||Wasser / Rohr / WC||tropft, läuft aus, verstopft, von oben
+melde_still_no_file
+B7 missing textarea
+stress_lead_open=true xss_visible=false
+lead_del=0
+CODE summenAusPositionen: Math.max(0, netto) → negative Zeilen werden nicht explizit geclampt vor Aggregation; End-Netto floored at 0
+CODE PhotoUpload website MAX 10MB; CRM notiz-foto + meldung-storage MAX 8MB

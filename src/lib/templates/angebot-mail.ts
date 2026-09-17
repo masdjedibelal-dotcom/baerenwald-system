@@ -28,6 +28,7 @@ export function parseAngebotAnrede(
 export function parseWizardMetaFromNotizen(
   notizen: string | null | undefined
 ): {
+  titel?: string
   einleitung?: string
   schluss?: string
   leistungsumfang?: string
@@ -37,6 +38,7 @@ export function parseWizardMetaFromNotizen(
   try {
     const j = JSON.parse(notizen ?? '{}') as {
       wizard_meta?: {
+        titel?: string
         einleitung?: string
         schluss?: string
         leistungsumfang?: string
@@ -47,6 +49,7 @@ export function parseWizardMetaFromNotizen(
     const wm = j.wizard_meta
     if (!wm) return null
     return {
+      titel: wm.titel,
       einleitung: wm.einleitung,
       schluss: wm.schluss,
       leistungsumfang: wm.leistungsumfang,
@@ -78,6 +81,11 @@ export type AngebotMailInput = KundeAnredeKontext & {
   visualisierung_vorschau_url?: string | null
   /** Reverse Charge (§13b) — Betrag netto */
   reverseCharge?: boolean
+  /**
+   * HV unter Freigabeschwelle: kein „Angebot annehmen“-CTA —
+   * Info, dass wir den Auftrag direkt übernehmen.
+   */
+  ctaMode?: 'annehmen' | 'unter_schwelle_direkt'
 }
 
 /** Platzhalter / Standard, wenn Felder in Schritt 2 leer bleiben */
@@ -92,9 +100,27 @@ export const ANGEBOT_ANNAHME_HINWEIS = {
   sie: 'Wenn das Angebot für Sie passt, unterzeichnen Sie es bitte und senden Sie es uns zurück — oder antworten Sie einfach auf unsere E-Mail.',
 } as const
 
+/** CTA unten in der Mail — Standard (Privat / über Schwelle). */
+export const ANGEBOT_MAIL_CTA_ANNEHMEN = {
+  du: 'Zum Angebot annehmen: Sende uns das unterzeichnete Angebot zurück oder antworte einfach auf diese E-Mail — wir freuen uns von dir zu hören.',
+  sie: 'Zum Angebot annehmen: Senden Sie uns das unterzeichnete Angebot zurück oder antworten Sie einfach auf diese E-Mail — wir freuen uns auf Ihre Rückmeldung.',
+} as const
+
+/** CTA unter Freigabeschwelle — kein Annehmen/Ablehnen. */
+export const ANGEBOT_MAIL_CTA_UNTER_SCHWELLE = {
+  du: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand siehst du jederzeit im Auftraggeber-Portal.',
+  sie: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand sehen Sie jederzeit im Auftraggeber-Portal.',
+} as const
+
 export const ANGEBOT_MAIL_SCHLUSS_STANDARD = {
   du: `${ANGEBOT_ANNAHME_HINWEIS.du}\n\nWir freuen uns von dir zu hören.\n\nViele Grüße\nDein Bärenwald Team`,
   sie: `${ANGEBOT_ANNAHME_HINWEIS.sie}\n\nWir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr Bärenwald Team`,
+} as const
+
+/** Schluss ohne Annahme-Aufforderung (HV unter Schwelle). */
+export const ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE = {
+  du: 'Wir freuen uns, wenn du im Portal mitliest.\n\nViele Grüße\nDein Bärenwald Team',
+  sie: 'Wir freuen uns, wenn Sie im Portal mitlesen.\n\nMit freundlichen Grüßen\nIhr Bärenwald Team',
 } as const
 
 /** Standard-Einleitung (Fließtext nach „Hallo …“) — in Schritt 2 vorausgefüllt und in der Vorschau sichtbar. */
@@ -109,7 +135,13 @@ export function defaultAngebotEinleitungText(
   return `anbei finden Sie Ihr persönliches Angebot für ${lu}. Bitte nehmen Sie sich die Zeit, es in Ruhe zu prüfen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.`
 }
 
-export function defaultAngebotSchlussText(anrede: AngebotMailAnrede): string {
+export function defaultAngebotSchlussText(
+  anrede: AngebotMailAnrede,
+  ctaMode: 'annehmen' | 'unter_schwelle_direkt' = 'annehmen'
+): string {
+  if (ctaMode === 'unter_schwelle_direkt') {
+    return ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE[anrede]
+  }
   return ANGEBOT_MAIL_SCHLUSS_STANDARD[anrede]
 }
 
@@ -182,11 +214,22 @@ export function resolveAngebotMailEinleitung(
 
 export function resolveAngebotMailSchluss(
   schluss: string | undefined,
-  anrede: AngebotMailAnrede
+  anrede: AngebotMailAnrede,
+  ctaMode: 'annehmen' | 'unter_schwelle_direkt' = 'annehmen'
 ): string {
   const t = schluss?.trim()
-  if (t) return t
-  return defaultAngebotSchlussText(anrede)
+  if (t) {
+    // Wizard-Standard mit Annahme-Hinweis → unter Schwelle ersetzen
+    if (
+      ctaMode === 'unter_schwelle_direkt' &&
+      (t === ANGEBOT_MAIL_SCHLUSS_STANDARD.du.trim() ||
+        t === ANGEBOT_MAIL_SCHLUSS_STANDARD.sie.trim())
+    ) {
+      return ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE[anrede]
+    }
+    return t
+  }
+  return defaultAngebotSchlussText(anrede, ctaMode)
 }
 
 /** Trenner im Wizard-Editor — Angebotsbox wird in der Mail dazwischen eingefügt. */
@@ -361,6 +404,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     einleitung,
     schluss,
     istKorrektur,
+    ctaMode = 'annehmen',
   } = data
 
   const formatEur = (n: number) =>
@@ -378,11 +422,11 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     : einleitungCore
   const einleitungHtml = textToHtmlParagraphs(einleitungFinal)
 
-  const ctaDu =
-    'Zum Angebot annehmen: Sende uns das unterzeichnete Angebot zurück oder antworte einfach auf diese E-Mail — wir freuen uns von dir zu hören.'
-  const ctaSie =
-    'Zum Angebot annehmen: Senden Sie uns das unterzeichnete Angebot zurück oder antworten Sie einfach auf diese E-Mail — wir freuen uns auf Ihre Rückmeldung.'
-  const schlussRaw = resolveAngebotMailSchluss(schluss, anrede)
+  const ctaText =
+    ctaMode === 'unter_schwelle_direkt'
+      ? ANGEBOT_MAIL_CTA_UNTER_SCHWELLE[anrede]
+      : ANGEBOT_MAIL_CTA_ANNEHMEN[anrede]
+  const schlussRaw = resolveAngebotMailSchluss(schluss, anrede, ctaMode)
   const grussHtml = textToHtmlParagraphs(schlussRaw)
 
   const boxLabel = anrede === 'du' ? 'DEIN ANGEBOT' : 'IHR ANGEBOT'
@@ -412,12 +456,12 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
-      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">
-        ${anrede === 'du' ? ctaDu : ctaSie}
+      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
+        ${ctaText}
       </p>
       ${grussHtml}
-      <p style="font-size:14px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
+      <p style="font-size:15px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
   return mailHtmlBase(
@@ -472,7 +516,7 @@ export function buildAngebotGueltigReminderMail(
       <h1 style="font-size:22px;font-weight:700;color:#111111;margin:0 0 20px;">${h1}</h1>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anredeText}</p>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
       <p style="margin:0 0 20px;">
         ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
       </p>`

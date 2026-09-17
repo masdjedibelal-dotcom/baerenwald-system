@@ -13,9 +13,14 @@ import {
 import { loadWizardContext } from '@/lib/wizard-context'
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import {
+  buildRechnungKorrekturKetteUi,
+  findeKorrekturOriginalId,
   findeNachfolgerRechnungId,
+  linkRechnungKorrekturKette,
   rechnungDarfStornoZurueckgenommenWerden,
+  type RechnungKorrekturKetteSiblingRow,
   type RechnungKorrekturSibling,
+  type RechnungKorrekturKetteUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { Gewerk, Handwerker, LeadDetail, Preisliste, Rechnung } from '@/lib/types'
@@ -50,6 +55,8 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
     abschlag_index?: number | null
     richtung?: string | null
     handwerker_id?: string | null
+    korrektur_von?: string | null
+    korrektur_art?: string | null
   }
 
   const isEingehend = String(rec.richtung ?? '') === 'eingehend'
@@ -112,13 +119,13 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
           ? supabase
               .from('rechnungen')
               .select(
-                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
+                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id, korrektur_von, ersetzt_durch, rechnungsnummer, brutto'
               )
               .eq('auftrag_id', auftragId)
           : supabase
               .from('rechnungen')
               .select(
-                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id'
+                'id, created_at, status, beleg_typ, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, bezug_rechnung_id, korrektur_von, ersetzt_durch, rechnungsnummer, brutto'
               )
               .eq('kunde_id', rec.kunde_id)
               .order('created_at', { ascending: false })
@@ -141,26 +148,109 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
   const auftragRechnungen = (auftragRechnungenRaw ?? []) as RechnungAuswahlZeile[]
   const siblings = (siblingRes.data ?? []) as RechnungKorrekturSibling[]
 
-  const nachfolgerRechnungId = isEingehend
-    ? null
-    : findeNachfolgerRechnungId(
-        {
-          id: params.id,
-          created_at: rec.created_at,
-          zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
-          rechnung_art: rec.rechnung_art,
-          abschlag_index: rec.abschlag_index,
-        },
-        siblings
-      )
+  let detailRec = data as Rechnung
+  if (
+    !isEingehend &&
+    String(rec.status ?? '') === 'entwurf' &&
+    !String(rec.korrektur_von ?? '').trim()
+  ) {
+    const origId = findeKorrekturOriginalId(
+      {
+        id: params.id,
+        created_at: rec.created_at,
+        zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
+        rechnung_art: rec.rechnung_art,
+        abschlag_index: rec.abschlag_index,
+      },
+      siblings
+    )
+    if (origId) {
+      await linkRechnungKorrekturKette(supabase, {
+        originalId: origId,
+        neuId: params.id,
+        art: 'gutschrift',
+      })
+      detailRec = {
+        ...detailRec,
+        korrektur_von: origId,
+        korrektur_art: 'gutschrift',
+      }
+    }
+  }
+
+  const nachfolgerRechnungId = (() => {
+    if (isEingehend) return null
+    const viaFind = findeNachfolgerRechnungId(
+      {
+        id: params.id,
+        created_at: rec.created_at,
+        zahlungsplan_abschlag_id: rec.zahlungsplan_abschlag_id,
+        rechnung_art: rec.rechnung_art,
+        abschlag_index: rec.abschlag_index,
+      },
+      siblings
+    )
+    if (viaFind) return viaFind
+    return (
+      String((detailRec as { ersetzt_durch?: string | null }).ersetzt_durch ?? '').trim() || null
+    )
+  })()
 
   const darfStornoZurueck = isEingehend
     ? false
     : rechnungDarfStornoZurueckgenommenWerden(rec.status, params.id, siblings)
 
+  let korrekturKette: RechnungKorrekturKetteUi | null = null
+  if (!isEingehend) {
+    const siblingRows = siblings as RechnungKorrekturKetteSiblingRow[]
+    korrekturKette = buildRechnungKorrekturKetteUi(
+      {
+        id: params.id,
+        status: detailRec.status,
+        beleg_typ: (detailRec as { beleg_typ?: string | null }).beleg_typ,
+        bezug_rechnung_id: (detailRec as { bezug_rechnung_id?: string | null }).bezug_rechnung_id,
+        korrektur_von: (detailRec as { korrektur_von?: string | null }).korrektur_von,
+        ersetzt_durch: (detailRec as { ersetzt_durch?: string | null }).ersetzt_durch,
+        rechnungsnummer: detailRec.rechnungsnummer,
+        brutto: detailRec.brutto ?? null,
+      },
+      siblingRows
+    )
+
+    // Fehlende Kettenglieder nachladen (z. B. andere Auftrags-Grenze)
+    if (korrekturKette) {
+      const missing = korrekturKette.members
+        .filter((m) => !siblingRows.some((s) => s.id === m.id) && m.id !== params.id)
+        .map((m) => m.id)
+      if (missing.length) {
+        const { data: extra } = await supabase
+          .from('rechnungen')
+          .select(
+            'id, created_at, status, beleg_typ, bezug_rechnung_id, korrektur_von, ersetzt_durch, rechnungsnummer, brutto'
+          )
+          .in('id', missing)
+        const merged = [...siblingRows, ...((extra ?? []) as RechnungKorrekturKetteSiblingRow[])]
+        korrekturKette = buildRechnungKorrekturKetteUi(
+          {
+            id: params.id,
+            status: detailRec.status,
+            beleg_typ: (detailRec as { beleg_typ?: string | null }).beleg_typ,
+            bezug_rechnung_id: (detailRec as { bezug_rechnung_id?: string | null })
+              .bezug_rechnung_id,
+            korrektur_von: (detailRec as { korrektur_von?: string | null }).korrektur_von,
+            ersetzt_durch: (detailRec as { ersetzt_durch?: string | null }).ersetzt_durch,
+            rechnungsnummer: detailRec.rechnungsnummer,
+            brutto: detailRec.brutto ?? null,
+          },
+          merged
+        )
+      }
+    }
+  }
+
   return (
     <RechnungDetailClient
-      detail={data as Rechnung}
+      detail={detailRec}
       kleinunternehmerFirma={parseKleinunternehmerSetting(firm.kleinunternehmer)}
       gewerke={(gwRes.data ?? []) as Gewerk[]}
       preislisten={(plRes.data ?? []) as Preisliste[]}
@@ -174,6 +264,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
       auftragRechnungen={auftragRechnungen}
       nachfolgerRechnungId={nachfolgerRechnungId}
       darfStornoZuruecknehmen={darfStornoZurueck}
+      korrekturKette={korrekturKette}
     />
   )
 }

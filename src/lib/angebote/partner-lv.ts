@@ -41,7 +41,8 @@ export function posBoardToPartnerLvVorgabe(lines: PosBoardLine[]): PartnerLvVorg
   return out
 }
 
-/** Intern-Angebot-JSON für die LV-Vorgabe an den Partner (Preis bleibt leer). */
+/** Intern-Angebot-JSON für die LV-Vorgabe an den Partner (Preis bewusst leer — Partner füllt EK).
+ * Nicht für Kunden-Angebot-Kopie / Direktbeauftragen verwenden. */
 export function partnerLvVorgabeToAngebotPositionen(
   rows: PartnerLvVorgabe[],
   gewerke: Array<{ id: string; name: string; slug?: string }>

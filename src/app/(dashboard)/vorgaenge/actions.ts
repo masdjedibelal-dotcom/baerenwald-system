@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 
 export type VorgangEntityRef =
@@ -69,6 +70,9 @@ export async function deleteVorgang(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = leadId.trim()
   if (!id) return { ok: false, message: 'Anfrage-ID fehlt.' }
+
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
 
   const { softDeleteLeadForPortal } = await import('@/lib/portal/soft-delete-lead')
   const r = await softDeleteLeadForPortal({ leadId: id })

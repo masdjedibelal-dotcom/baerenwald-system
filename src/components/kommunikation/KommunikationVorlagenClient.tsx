@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   deleteKommunikationMailVorlage,
   saveKommunikationMailVorlage,
@@ -90,12 +91,11 @@ export function KommunikationVorlagenClient({
   }
 
   function remove(id: string) {
-    if (!confirm('Vorlage löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Vorlage löschen?', async () => {
       const res = await deleteKommunikationMailVorlage(id)
       if (!res.ok) {
         toast.error(res.message)
-        return
+        throw new Error(res.message)
       }
       setRows((prev) => prev.filter((r) => r.id !== id))
       toast.success('Gelöscht')

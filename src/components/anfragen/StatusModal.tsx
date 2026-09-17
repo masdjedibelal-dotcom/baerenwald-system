@@ -34,6 +34,17 @@ import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
 
 export type StatusModalKind = 'termin' | 'nicht_erreichbar' | 'verloren'
 
+function isHvKanal(kanal: string | null | undefined): boolean {
+  const k = (kanal ?? '').trim().toLowerCase()
+  return (
+    k === 'hv_melder_link' ||
+    k === 'hv_einladung' ||
+    k === 'hv_direkt' ||
+    k === 'hv_manuell' ||
+    k.startsWith('hv_')
+  )
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -114,7 +125,7 @@ export function StatusModal({
     setNotiz('')
     setGrund('zu_teuer')
     setMitarbeiterId('')
-    setMailToggle(true)
+    setMailToggle(!isHvKanal(lead.kanal))
     setMailDraft(null)
     if (kind === 'termin') {
       setTeamLoading(true)
@@ -122,7 +133,7 @@ export function StatusModal({
         .then((list) => setTeam(list))
         .finally(() => setTeamLoading(false))
     }
-  }, [open, kind, lead.id])
+  }, [open, kind, lead.id, lead.kanal])
 
   useEffect(() => {
     if (!open) return

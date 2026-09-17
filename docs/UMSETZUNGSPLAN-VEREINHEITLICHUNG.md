@@ -19,7 +19,7 @@
 | Filter in Listen | Sheet/Modal ok | — | — |
 | Preview / Confirm / PDF | Modal ok | — | — |
 
-**Verboten als Parallel-Wahrheit:** zweites Fullpage-Formular neben Sheet · WizardShell neben Canvas für denselben Job · ⋯ im ⋯ · Primary nur im ⋯.
+**Verboten als Parallel-Wahrheit:** zweites Fullpage-Formular neben Sheet · DocumentCanvas neben Canvas für denselben Job · ⋯ im ⋯ · Primary nur im ⋯.
 
 ---
 
@@ -50,14 +50,14 @@ P0 Geld + Kette  →  P1 Eine Surface-Sprache  →  P2 Orientierung Detail
 
 ### P1 · Eine Surface-Sprache (2–3 Sprints) — „nicht alles unterschiedlich“
 
-Kern: **alles Create/Edit → EditorSheet/PickerSheet; Dokument-Flows → Canvas; keine WizardShell-Parallelwelt.**
+Kern: **alles Create/Edit → EditorSheet/PickerSheet; Dokument-Flows → Canvas; keine DocumentCanvas-Parallelwelt.**
 
 | # | ID | Was | Abnahme |
 |---|-----|-----|---------|
 | 1.1 | **W9-01/02** | **Abnahme:** 1 Canvas/Wizard ≤3 Steps; Inline/FillFlow löschen oder mergen | Ein Einstieg „Abnahme“ |
 | 1.2 | Rest-Modals A | Position **neu**, Leistung-Detail, Zuweisung → EditorSheet/Picker | Symmetrie Edit=Neu |
 | 1.3 | Rest-Modals B | Vor-Ort-Eintrag, PosBoard-Gewerk, Objekt Bewohner/Kontakt → EditorSheet | — |
-| 1.4 | **W10** Teil | Staff-Funnel / Anfrage: WizardShell → gleiches Chrome wie AG (Canvas oder Sheet-Stack) | Kein zweites Wizard-Feeling |
+| 1.4 | **W10** Teil | Staff-Funnel / Anfrage: Staff-Funnel → gleiches Chrome wie AG (Canvas oder Sheet-Stack) (Canvas oder Sheet-Stack) | Kein zweites Wizard-Feeling |
 | 1.5 | AG/RE | Chip-Steps → **eine Scroll-Seite** (Lexware) + Sheets nur für Subtasks | Kein Stepper-Feeling |
 | 1.6 | **W9-03/06** | Vor-Ort Segmented; bei Status abnahme Primary = Abnahme | — |
 
@@ -121,7 +121,7 @@ Kern: **alles Create/Edit → EditorSheet/PickerSheet; Dokument-Flows → Canvas
 ## Definition of Done — je Screen (Vereinheitlichung)
 
 1. Create/Edit = **nur** EditorSheet/PickerSheet (Ausnahme: Preview/Confirm/Filter).  
-2. Dokument-Job = **nur** DocumentCanvas (kein WizardShell daneben).  
+2. Dokument-Job = **nur** DocumentCanvas (kein zweites Wizard-Chrome daneben).  
 3. Header: **1 Primary** sichtbar, nicht im ⋯.  
 4. Mobile: Overlay = Bottom Sheet; Back schließt Overlay (S10).  
 5. Dirty: Confirm (S8).  

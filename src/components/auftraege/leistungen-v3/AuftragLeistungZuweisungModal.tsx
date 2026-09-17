@@ -191,17 +191,17 @@ export function AuftragLeistungZuweisungModal({
 
     if (isSingle) {
       ekNum = parseNum(partnerNetto)
-      if (ekNum == null || ekNum <= 0) {
-        toast.error('Partner-EK (netto) muss größer als 0 € sein.')
+      if (ekNum == null || ekNum < 0) {
+        toast.error('Partner-EK (netto) angeben (0 € oder mehr).')
         return
       }
     } else {
       ekByPositionId = {}
       for (const p of selectedPositions) {
         const n = parseNum(ekByPos[p.id] ?? '')
-        if (n == null || n <= 0) {
+        if (n == null || n < 0) {
           toast.error(
-            `Partner-EK fehlt für „${p.leistung_name?.trim() || 'Leistung'}“ (größer als 0 €).`
+            `Partner-EK fehlt für „${p.leistung_name?.trim() || 'Leistung'}“ (0 € oder mehr).`
           )
           return
         }
@@ -216,6 +216,25 @@ export function AuftragLeistungZuweisungModal({
         : bis.trim()
           ? displayToYmd(bis)
           : vonYmd
+
+    if (!isAngebotOnly) {
+      if (!vonYmd) {
+        toast.error(
+          zeitModus === 'tag'
+            ? 'Bitte ein Ausführungsdatum angeben.'
+            : 'Bitte den Leistungszeitraum (von) angeben.'
+        )
+        return
+      }
+      if (zeitModus === 'zeitraum' && !bisYmd) {
+        toast.error('Bitte den Leistungszeitraum (bis) angeben.')
+        return
+      }
+      if (vonYmd && bisYmd && bisYmd < vonYmd) {
+        toast.error('„Bis“ darf nicht vor „Von“ liegen.')
+        return
+      }
+    }
 
     dismissKiOverSheet()
     setPickerOpen(false)
@@ -285,6 +304,8 @@ export function AuftragLeistungZuweisungModal({
         handwerkerId: primaryHw,
         ekNetto: isSingle ? ekNum : null,
         ekNettoByPositionId: ekByPositionId,
+        startDatum: vonYmd,
+        endDatum: bisYmd,
       })
       if (!assign.ok) {
         toast.error(assign.message)
@@ -316,11 +337,11 @@ export function AuftragLeistungZuweisungModal({
   const ekOk = (() => {
     if (isSingle) {
       const n = parseNum(partnerNetto)
-      return n != null && n > 0
+      return n != null && n >= 0
     }
     return selectedPositions.every((p) => {
       const n = parseNum(ekByPos[p.id] ?? '')
-      return n != null && n > 0
+      return n != null && n >= 0
     })
   })()
   const canSend = !pending && selectedHwIds.size > 0 && ekOk
@@ -451,8 +472,8 @@ export function AuftragLeistungZuweisungModal({
                 disabled={pending || pickerOpen}
               >
                 <textarea
-                  className="input ta"
-                  rows={5}
+                  className="input ta ta--long"
+                  rows={14}
                   value={beschreibung}
                   onChange={(e) => {
                     setDirty(true)
@@ -473,7 +494,7 @@ export function AuftragLeistungZuweisungModal({
                   type="number"
                   className="input"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                   value={partnerNetto}
                   onChange={(e) => {
@@ -486,15 +507,70 @@ export function AuftragLeistungZuweisungModal({
               </div>
               {!ekOk ? (
                 <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
-                  Pflicht — größer als 0 €
+                  Pflicht — 0 € oder mehr
                 </span>
               ) : null}
             </label>
+          </>
+        ) : (
+          <div className="hw-anfrage-section">
+            <div className="hw-anfrage-section-head">
+              <span>Partner-EK je Leistung</span>
+              <span>Partner gilt für alle</span>
+            </div>
+            <div className="hw-zuw-ek-table" role="table" aria-label="Leistungen mit Partner-EK">
+              <div className="hw-zuw-ek-head" role="row">
+                <span role="columnheader">Leistung</span>
+                <span role="columnheader">VK</span>
+                <span role="columnheader">EK netto *</span>
+              </div>
+              {selectedPositions.map((p) => {
+                const raw = ekByPos[p.id] ?? ''
+                const n = parseNum(raw)
+                const rowOk = n != null && n >= 0
+                return (
+                  <div key={p.id} className="hw-zuw-ek-row" role="row">
+                    <span className="hw-zuw-ek-name" role="cell" title={p.leistung_name}>
+                      {p.leistung_name?.trim() || 'Leistung'}
+                    </span>
+                    <span className="hw-zuw-ek-vk" role="cell">
+                      {formatVk(p)}
+                    </span>
+                    <label className="hw-zuw-ek-input" role="cell">
+                      <span className="txt-prefix">
+                        <span className="prefix" aria-hidden>
+                          €
+                        </span>
+                        <input
+                          type="number"
+                          className="input"
+                          step="0.01"
+                          min="0"
+                          required
+                          value={raw}
+                          onChange={(e) => setEkForPos(p.id, e.target.value)}
+                          disabled={pending}
+                          aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`}
+                          aria-invalid={!rowOk && raw.trim() !== ''}
+                        />
+                      </span>
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+            {!ekOk ? (
+              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                Für jede Leistung Partner-EK eintragen (0 € oder mehr)
+              </span>
+            ) : null}
+          </div>
+        )}
 
-            {!isAngebotOnly ? (
+        {!isAngebotOnly ? (
             <div className="hw-anfrage-section">
               <div className="hw-anfrage-section-head">
-                <span>Zeitraum</span>
+                <span>Leistungszeitraum *</span>
               </div>
               <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
                 <button
@@ -533,11 +609,12 @@ export function AuftragLeistungZuweisungModal({
               {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
               <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
                 <label className="hw-anfrage-field">
-                  <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum' : 'Von'}</span>
+                  <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum *' : 'Von *'}</span>
                   <div className="hw-anfrage-date-field">
                     <input
                       type="date"
                       className="input"
+                      required
                       value={von.trim() ? displayToYmd(von) : ''}
                       onChange={(e) => {
                         setDirty(true)
@@ -577,11 +654,12 @@ export function AuftragLeistungZuweisungModal({
                     zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
                   )}
                 >
-                  <span className="hw-anfrage-label">Bis</span>
+                  <span className="hw-anfrage-label">Bis *</span>
                   <div className="hw-anfrage-date-field">
                     <input
                       type="date"
                       className="input"
+                      required={zeitModus === 'zeitraum'}
                       value={bis.trim() ? displayToYmd(bis) : ''}
                       onChange={(e) => {
                         setDirty(true)
@@ -616,63 +694,13 @@ export function AuftragLeistungZuweisungModal({
                   </div>
                 </label>
               </div>
+              {!von.trim() || (zeitModus === 'zeitraum' && !bis.trim()) ? (
+                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                  Pflicht — für Partner-Leistungen und spätere Belege
+                </span>
+              ) : null}
             </div>
-            ) : null}
-          </>
-        ) : (
-          <div className="hw-anfrage-section">
-            <div className="hw-anfrage-section-head">
-              <span>Partner-EK je Leistung</span>
-              <span>Partner gilt für alle</span>
-            </div>
-            <div className="hw-zuw-ek-table" role="table" aria-label="Leistungen mit Partner-EK">
-              <div className="hw-zuw-ek-head" role="row">
-                <span role="columnheader">Leistung</span>
-                <span role="columnheader">VK</span>
-                <span role="columnheader">EK netto *</span>
-              </div>
-              {selectedPositions.map((p) => {
-                const raw = ekByPos[p.id] ?? ''
-                const n = parseNum(raw)
-                const rowOk = n != null && n > 0
-                return (
-                  <div key={p.id} className="hw-zuw-ek-row" role="row">
-                    <span className="hw-zuw-ek-name" role="cell" title={p.leistung_name}>
-                      {p.leistung_name?.trim() || 'Leistung'}
-                    </span>
-                    <span className="hw-zuw-ek-vk" role="cell">
-                      {formatVk(p)}
-                    </span>
-                    <label className="hw-zuw-ek-input" role="cell">
-                      <span className="txt-prefix">
-                        <span className="prefix" aria-hidden>
-                          €
-                        </span>
-                        <input
-                          type="number"
-                          className="input"
-                          step="0.01"
-                          min="0.01"
-                          required
-                          value={raw}
-                          onChange={(e) => setEkForPos(p.id, e.target.value)}
-                          disabled={pending}
-                          aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`}
-                          aria-invalid={!rowOk && raw.trim() !== ''}
-                        />
-                      </span>
-                    </label>
-                  </div>
-                )
-              })}
-            </div>
-            {!ekOk ? (
-              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
-                Für jede Leistung Partner-EK größer als 0 € eintragen
-              </span>
-            ) : null}
-          </div>
-        )}
+        ) : null}
       </EditorSheet>
 
       <HandwerkerSuchenSheet

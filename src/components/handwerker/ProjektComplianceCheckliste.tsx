@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import {
   ablehnenPartnerDokument,
@@ -56,7 +57,13 @@ function statusLabel(s: ComplianceDokumentStatus, docStatus?: string | null): st
 
 function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
   if (status === 'ok') {
-    return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+    return (
+      <CheckCircle2
+        className="h-5 w-5 shrink-0 text-emerald-600"
+        strokeWidth={2.25}
+        aria-label="Vorhanden"
+      />
+    )
   }
   return (
     <AlertCircle
@@ -248,15 +255,18 @@ export function ProjektComplianceCheckliste({
   }
 
   function removeDoc(docId: string, titel: string) {
-    if (!confirm(`„${titel}" wirklich löschen?`)) return
-    startTransition(async () => {
-      const r = await deletePartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
-      else {
+    confirmDelete(
+      `„${titel}“ löschen?`,
+      async () => {
+        const r = await deletePartnerDokument(docId, handwerkerId)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
         toast.success('Gelöscht')
         router.refresh()
       }
-    })
+    )
   }
 
   const busy = pending || uploadingTyp != null

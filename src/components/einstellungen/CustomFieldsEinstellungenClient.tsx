@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
 import {
   loadAllCustomFieldDefinitions,
@@ -164,16 +165,20 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
     })
   }
 
-  async function remove(f: CustomFieldDefinition) {
-    if (!confirm(`Feld „${f.label}“ deaktivieren?`)) return
-    const r = await softDeleteCustomField(f.id)
-    if (!r.ok) {
-      toast.error(r.message)
-      return
-    }
-    toast.success('Feld deaktiviert')
-    setRows((prev) => prev.map((x) => (x.id === f.id ? { ...x, aktiv: false } : x)))
-    router.refresh()
+  function remove(f: CustomFieldDefinition) {
+    confirmDelete(
+      `Feld „${f.label}“ deaktivieren?`,
+      async () => {
+        const r = await softDeleteCustomField(f.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Feld deaktiviert')
+        setRows((prev) => prev.map((x) => (x.id === f.id ? { ...x, aktiv: false } : x)))
+        router.refresh()
+      }
+    )
   }
 
   async function onDragEnd(e: DragEndEvent) {

@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { filterHandwerkerFuerGewerkSlug, handwerkerHatGewerkSlug } from '@/lib/handwerker/gewerk-match'
@@ -11,6 +11,7 @@ import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-h
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { metaBeimSendenAnHandwerker } from '@/lib/auftraege/partner-vorgang-meta'
 import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import {
   listHandwerkerFuerGewerk,
   replaceAngebotHandwerkerUndSenden,
@@ -48,18 +49,6 @@ function mapHandwerkerMitEinsatz(
   }))
 }
 
-async function requireCrmSession(): Promise<{ ok: true } | { ok: false; message: string }> {
-  const {
-    data: { user },
-  } = await createClient().auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
-  return { ok: true }
-}
-
-/** CRM-Schreibzugriff: Detail lädt per Service Role, RLS blockiert sonst oft Positionen-Updates. */
-function crmDb(): SupabaseClient {
-  return supabaseAdmin
-}
 
 async function loadEinsatzMeta(
   supabase: SupabaseClient,
@@ -187,10 +176,13 @@ export async function assignAuftragHandwerkerGewerk(input: {
   status?: AuftragHandwerkerZuweisungStatus
   hwRechnungReverseCharge13b?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
+
+  const supabase = gate.db
   const status = input.status ?? 'angefragt'
   const now = new Date().toISOString()
 
@@ -326,10 +318,13 @@ export async function assignAuftragHandwerkerPosition(input: {
   status?: AuftragHandwerkerZuweisungStatus
   hwRechnungReverseCharge13b?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
+
+  const supabase = gate.db
   const status = input.status ?? 'angefragt'
   const now = new Date().toISOString()
 
@@ -457,6 +452,131 @@ export async function assignAuftragHandwerkerPosition(input: {
   return { ok: true }
 }
 
+/**
+ * Zuweisung einer oder mehrerer Auftragspositionen zurückziehen.
+ * Partner sieht die Leistung danach nicht mehr (Filter über handwerker_id).
+ */
+export async function clearAuftragHandwerkerPositionen(input: {
+  auftragId: string
+  positionIds: string[]
+}): Promise<{ ok: true; cleared: number } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+
+  const supabase = gate.db
+  const auftragId = input.auftragId.trim()
+  const positionIds = [
+    ...new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)),
+  ]
+  if (!auftragId || !positionIds.length) {
+    return { ok: false, message: 'Auftrag oder Position fehlt.' }
+  }
+
+  const { data: auftrag, error: aErr } = await supabase
+    .from('auftraege')
+    .select('id, status, angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
+  if (String(auftrag.status ?? '') === 'storniert') {
+    return { ok: false, message: 'Stornierte Aufträge können nicht geändert werden.' }
+  }
+
+  const { data: positions, error: pErr } = await supabase
+    .from('auftrag_positionen')
+    .select(
+      'id, auftrag_id, handwerker_id, gewerk_slug, gewerk_name, leistung_name, handwerker(name)'
+    )
+    .eq('auftrag_id', auftragId)
+    .in('id', positionIds)
+
+  if (pErr) return { ok: false, message: pErr.message }
+  const rows = positions ?? []
+  if (!rows.length) return { ok: false, message: 'Positionen nicht gefunden.' }
+
+  const assigned = rows.filter((r) => String(r.handwerker_id ?? '').trim())
+  if (!assigned.length) {
+    return { ok: false, message: 'Keine Zuweisung zum Zurückziehen.' }
+  }
+
+  const { error: upErr } = await supabase
+    .from('auftrag_positionen')
+    .update({
+      handwerker_id: null,
+      handwerker_status: null,
+      handwerker_angefragt_at: null,
+    })
+    .eq('auftrag_id', auftragId)
+    .in(
+      'id',
+      assigned.map((r) => String(r.id))
+    )
+
+  if (upErr) return { ok: false, message: upErr.message }
+
+  // auftrag_handwerker aufräumen, wenn keine Positionen mehr für HW+Gewerk
+  const touched = new Map<string, { handwerkerId: string; gewerkSlug: string | null }>()
+  for (const r of assigned) {
+    const hwId = String(r.handwerker_id ?? '').trim()
+    if (!hwId) continue
+    const slug = (r.gewerk_slug as string | null)?.trim() || null
+    touched.set(`${hwId}::${slug ?? ''}`, { handwerkerId: hwId, gewerkSlug: slug })
+  }
+
+  for (const { handwerkerId, gewerkSlug } of Array.from(touched.values())) {
+    let restQ = supabase
+      .from('auftrag_positionen')
+      .select('id')
+      .eq('auftrag_id', auftragId)
+      .eq('handwerker_id', handwerkerId)
+      .limit(1)
+    if (gewerkSlug) restQ = restQ.eq('gewerk_slug', gewerkSlug)
+    const { data: rest } = await restQ
+    if ((rest ?? []).length > 0) continue
+
+    if (gewerkSlug) {
+      const { data: gw } = await supabase
+        .from('gewerke')
+        .select('id')
+        .eq('slug', gewerkSlug)
+        .maybeSingle()
+      if (gw?.id) {
+        await supabase
+          .from('auftrag_handwerker')
+          .delete()
+          .eq('auftrag_id', auftragId)
+          .eq('handwerker_id', handwerkerId)
+          .eq('gewerk_id', gw.id)
+      }
+    } else {
+      await supabase
+        .from('auftrag_handwerker')
+        .delete()
+        .eq('auftrag_id', auftragId)
+        .eq('handwerker_id', handwerkerId)
+    }
+  }
+
+  const names = assigned.map((r) => {
+    const hw = Array.isArray(r.handwerker) ? r.handwerker[0] : r.handwerker
+    const hwName = (hw as { name?: string } | null)?.name?.trim() || 'Partner'
+    return `${r.leistung_name ?? 'Leistung'} ← ${hwName}`
+  })
+  await logHwTimeline(
+    auftragId,
+    assigned.length === 1 ? 'Zuweisung zurückgezogen' : 'Zuweisungen zurückgezogen',
+    names.join('; '),
+    String(assigned[0]?.handwerker_id ?? '') || null
+  )
+
+  revalidatePath(`/auftraege/${auftragId}`)
+  revalidatePath('/auftraege')
+  const angebotId = String(auftrag.angebot_id ?? '').trim()
+  if (angebotId) revalidatePath(`/angebote/${angebotId}`)
+
+  return { ok: true, cleared: assigned.length }
+}
+
 /** TC-11d: Partner hat abgelehnt → anderen Partner zuweisen und erneut anfragen. */
 export async function replaceAuftragHandwerkerUndSenden(input: {
   auftragId: string
@@ -473,10 +593,13 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     preisPartner?: number | null
   }>
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
+
+  const supabase = gate.db
   const auftragId = input.auftragId.trim()
   const alteZuweisungId = input.alteZuweisungId.trim()
   const neuerHandwerkerId = input.neuerHandwerkerId.trim()
@@ -654,6 +777,22 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   }
 
   const angebotId = auftrag.angebot_id ? String(auftrag.angebot_id).trim() : ''
+
+  /* Token-Links des Alt-Partners ungültig (Voll-Tausch) */
+  if (toAlt.length === 0 && angebotId) {
+    let ahQ = supabase
+      .from('angebot_handwerker')
+      .update({ status: 'ersetzt' })
+      .eq('angebot_id', angebotId)
+      .eq('handwerker_id', alterHandwerkerId)
+      .not('status', 'eq', 'ersetzt')
+    if (gewerkId) ahQ = ahQ.eq('gewerk_id', gewerkId)
+    const { error: ahErr } = await ahQ
+    if (ahErr && !/column|schema|status/i.test(ahErr.message)) {
+      return { ok: false, message: ahErr.message }
+    }
+  }
+
   let partnerBenachrichtigt = false
 
   if (angebotId && gewerkId && toAlt.length === 0) {
@@ -753,10 +892,10 @@ export async function updateAuftragHandwerkerStatus(input: {
   zuweisungId: string
   status: AuftragHandwerkerZuweisungStatus
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const supabase = gate.db
 
   const { data: row, error: findErr } = await supabase
     .from('auftrag_handwerker')
@@ -820,10 +959,10 @@ export async function updateAuftragPositionHandwerkerStatus(input: {
   positionId: string
   status: AuftragHandwerkerZuweisungStatus
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const supabase = gate.db
   const now = new Date().toISOString()
 
   const { data: pos, error: posErr } = await supabase
@@ -864,10 +1003,10 @@ export async function updateAuftragHandwerkerDetails(input: {
   absprachen?: string | null
   notizen?: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const supabase = gate.db
   const patch: Record<string, unknown> = {}
   if (input.vereinbarter_preis !== undefined) patch.vereinbarter_preis = input.vereinbarter_preis
   if (input.absprachen !== undefined) patch.absprachen = input.absprachen?.trim() || null
@@ -890,10 +1029,10 @@ export async function updateAuftragPositionDetails(input: {
   absprachen?: string | null
   notizen_intern?: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmSession()
+  const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
 
-  const supabase = crmDb()
+  const supabase = gate.db
   const patch: Record<string, unknown> = {}
   if (input.preis_fix !== undefined) patch.preis_fix = input.preis_fix
   if (input.absprachen !== undefined) patch.absprachen = input.absprachen?.trim() || null

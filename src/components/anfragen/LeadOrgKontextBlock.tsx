@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { Building2, Copy, Download, Shield, User } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   exportMelderAuskunft,
   loescheMelderDaten,
@@ -38,7 +39,7 @@ function orgFreigabeBadgeStatus(
   status: LeadDetail['org_freigabe_status']
 ): 'done' | 'offer' | 'cancel' | 'order' {
   if (status === 'freigegeben' || status === 'nicht_noetig') return 'done'
-  if (status === 'ausstehend') return 'offer'
+  if (status === 'ausstehend' || status === 'beschluss_ausstehend') return 'offer'
   if (status === 'abgelehnt') return 'cancel'
   return 'order'
 }
@@ -93,22 +94,30 @@ export function LeadOrgKontextBlock({
     toast.success('Auskunft exportiert')
   }
 
-  async function melderDatenLoeschen(kategorie: 'melder_leads_offen' | 'melder_leads_abgeschlossen' | 'melder_fotos') {
+  function melderDatenLoeschen(kategorie: 'melder_leads_offen' | 'melder_leads_abgeschlossen' | 'melder_fotos') {
     const labels = {
       melder_fotos: 'Melder-Fotos',
       melder_leads_offen: 'Melderdaten (vollständig)',
       melder_leads_abgeschlossen: 'Melderdaten (vollständig)',
     }
-    if (!window.confirm(`${labels[kategorie]} wirklich löschen/anonymisieren?`)) return
-    setBusy(kategorie)
-    const r = await loescheMelderDaten(lead.id, kategorie, 'betroffenenanfrage')
-    setBusy(null)
-    if (!r.ok) {
-      toast.error(r.message)
-      return
-    }
-    toast.success('Verarbeitet')
-    router.refresh()
+    confirmDelete(
+      `${labels[kategorie]} löschen?`,
+      async () => {
+        setBusy(kategorie)
+        try {
+          const r = await loescheMelderDaten(lead.id, kategorie, 'betroffenenanfrage')
+          if (!r.ok) {
+            toast.error(r.message)
+            throw new Error(r.message)
+          }
+          toast.success('Verarbeitet')
+          router.refresh()
+        } finally {
+          setBusy(null)
+        }
+      },
+      { body: `${labels[kategorie]} wirklich löschen/anonymisieren?` }
+    )
   }
 
   const melderLoeschKategorie =
@@ -125,6 +134,7 @@ export function LeadOrgKontextBlock({
     objekt ||
     fotos.length > 0 ||
     lead.org_freigabe_status === 'ausstehend' ||
+    lead.org_freigabe_status === 'beschluss_ausstehend' ||
     (lead.org_freigabe_log?.length ?? 0) > 0 ||
     zeigtHavarieAktionen
 

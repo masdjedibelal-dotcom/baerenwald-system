@@ -7,8 +7,11 @@ export type CrmLeadResolveSlice = {
   situation?: string | null
   funnel_daten?: unknown
   kanal?: string | null
+  erfassung_von?: string | null
+  anlass?: string | null
   org_freigabe_status?: string | null
   hv_meldung_status?: string | null
+  freigabe_bypass_grund?: string | null
   kontakt_name?: string | null
   plz?: string | null
   bereiche?: string[] | null
@@ -63,8 +66,11 @@ export function resolveVorgangFromCrmEntities(args: {
       situation: args.lead.situation,
       funnel_daten: args.lead.funnel_daten,
       kanal: args.lead.kanal as ResolveVorgangInput['lead']['kanal'],
+      erfassung_von: args.lead.erfassung_von,
+      anlass: args.lead.anlass,
       org_freigabe_status: args.lead.org_freigabe_status,
       hv_meldung_status: args.lead.hv_meldung_status,
+      freigabe_bypass_grund: args.lead.freigabe_bypass_grund,
       kontakt_name: args.lead.kontakt_name,
       plz: args.lead.plz,
       bereiche: args.lead.bereiche,

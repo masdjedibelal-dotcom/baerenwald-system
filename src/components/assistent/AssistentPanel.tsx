@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
-import { KiChatComposer } from '@/components/assistent/KiChatComposer'
+import { KiChatComposer, KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useVisualViewportFrame } from '@/hooks/useVisualViewportFrame'
@@ -313,22 +313,25 @@ export function AssistentPanel() {
   const chatStarted =
     messages.some((m) => m.role === 'user') || pending || Boolean(autoSession)
 
+  const isPositionenScope =
+    scoped?.scopeId === 'positionen' || scoped?.scopeId === 'position'
+
   const startHeadline = autoSession
     ? autoSession.title
     : scopeMeta
       ? scopeMeta.label
       : 'Wie kann ich dir helfen?'
   const startSub = autoSession
-    ? 'KPI-Analyse für den Geschäftsführer'
+    ? 'KPI-Analyse für den Geschäftsführer — KI-Assistent'
     : scopeMeta
       ? scoped?.layer === 'over-sheet'
         ? scoped.scopeId === 'feld'
-          ? 'Sag, wie der Feldtext werden soll — danach Übernehmen.'
-          : scoped.scopeId === 'positionen' || scoped.scopeId === 'position'
-            ? 'Beschreib die Position(en) — danach Übernehmen in die Karte.'
-            : 'Beschreib, was du brauchst — danach Übernehmen.'
-        : 'Ich bin dein Assistent für diesen Editor.'
-      : 'Ich bin dein CRM-Assistent.'
+          ? 'KI-Assistent: Sag, wie der Feldtext werden soll — danach Übernehmen.'
+          : isPositionenScope
+            ? 'KI-Assistent: Beschreib die Position(en) — danach Übernehmen in die Karte.'
+            : 'KI-Assistent: Beschreib, was du brauchst — danach Übernehmen.'
+        : 'Ich bin dein KI-Assistent für diesen Editor.'
+      : 'Ich bin dein KI-Assistent fürs CRM.'
 
   const overSheet = scoped?.layer === 'over-sheet'
   useEffect(() => {
@@ -468,7 +471,7 @@ export function AssistentPanel() {
       closePanel()
       return
     }
-    toast.success('In Formular übernommen — Fenster schließen oder weiter chatten.')
+    toast.success('In Formular übernommen')
   }
 
   function send(text: string, opts?: { historyOverride?: ChatMsg[] }) {
@@ -551,21 +554,21 @@ export function AssistentPanel() {
     ? autoSession.title
     : scopeMeta
       ? `KI · ${scopeMeta.label}`
-      : 'Assistent'
+      : 'KI-Assistent'
 
   return (
     <>
       <button
         type="button"
         className={cn('assistent-scrim', overSheet && 'assistent-scrim--over-sheet')}
-        aria-label="Assistent schließen"
+        aria-label="KI-Assistent schließen"
         onClick={closePanel}
       />
       <aside
         ref={panelRef}
         className={cn('assistent-panel', overSheet && 'assistent-panel--over-sheet')}
         role="dialog"
-        aria-label="Assistent"
+        aria-label="KI-Assistent"
       >
         <header className="assistent-panel__head">
           <button
@@ -730,6 +733,10 @@ export function AssistentPanel() {
             disabled={pending}
             placeholder={scopeMeta?.placeholder ?? 'Nachricht schreiben…'}
             inputRef={inputRef}
+            maxChars={
+              isPositionenScope ? KI_CHAT_POSITIONEN_MAX_CHARS : undefined
+            }
+            maxRows={isPositionenScope ? 10 : undefined}
           />
         </div>
       </aside>

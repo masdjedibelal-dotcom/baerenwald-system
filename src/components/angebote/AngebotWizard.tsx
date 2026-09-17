@@ -20,9 +20,10 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { ActionsMenu } from '@/components/ui/actions-menu'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { Check, FileText } from 'lucide-react'
+import { Check, FileText, Send } from 'lucide-react'
 import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
@@ -33,10 +34,17 @@ import {
   MelderLeistungsortFields,
   type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
+import {
+  KundenVersandEmailField,
+  versandFolgtKontakt,
+} from '@/components/crm/KundenVersandEmailField'
 import { DateInput } from '@/components/ui/DateInput'
 import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
+import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -89,7 +97,6 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
-import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import {
   kundentypLabel,
   leadKontaktAnzeigeName,
@@ -97,7 +104,6 @@ import {
   resolveLeadKunde,
   resolveLeadPreisAnzeige,
 } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
   istKundeHausverwaltungTyp,
@@ -121,7 +127,16 @@ import {
 } from '@/lib/templates/angebot-mail'
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
-import type { AngebotPosition, Gewerk, Handwerker, Kunde, KundenObjekt, LeadDetail, Preisliste } from '@/lib/types'
+import type {
+  AngebotPosition,
+  Gewerk,
+  Handwerker,
+  Kunde,
+  KundeAnsprechpartner,
+  KundenObjekt,
+  LeadDetail,
+  Preisliste,
+} from '@/lib/types'
 import { BEREICH_LABELS, cn, formatDatum } from '@/lib/utils'
 import type { ZahlfristSeg } from '@/lib/zahlfrist'
 
@@ -263,17 +278,7 @@ export function AngebotWizard({
   const sheetStadt = [sheetKunde?.plz?.trim(), sheetKunde?.ort?.trim()]
     .filter(Boolean)
     .join(' ')
-  const sheetEmail = (
-    sheetKunde?.email ?? leadState.kontakt_email ?? ''
-  ).trim()
-  const sheetTelefon = (
-    sheetKunde?.telefon ?? leadState.kontakt_telefon ?? ''
-  ).trim()
   const sheetKundentypLabel = kundentypLabel(sheetKunde?.typ ?? kundeTyp)
-  const crowKundeValue =
-    sheetFirma ||
-    [sheetNamen.vorname, sheetNamen.nachname].filter(Boolean).join(' ') ||
-    name
 
   const leadZeilen = useMemo(
     () =>
@@ -320,6 +325,7 @@ export function AngebotWizard({
   const [kundeEditOpen, setKundeEditOpen] = useState(false)
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
+  const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
   const [melderDraft, setMelderDraft] = useState<MelderLeistungsortDraft>(() =>
     draftFromLeadMelder(lead)
   )
@@ -340,11 +346,21 @@ export function AngebotWizard({
   const [mitAnfahrt, setMitAnfahrt] = useState(() => findAnfahrtZeilen(initialZeilen).length > 0)
   const [meta, setMeta] = useState<AngebotWizardMeta>(() => {
     const base = bootstrap?.meta ?? defaultMeta
-    if (bootstrap?.meta?.kunde_objekt_id) return base
-    if (leadState.kunde_objekt_id) {
-      return { ...base, kunde_objekt_id: leadState.kunde_objekt_id }
+    const withObjekt = bootstrap?.meta?.kunde_objekt_id
+      ? base
+      : leadState.kunde_objekt_id
+        ? { ...base, kunde_objekt_id: leadState.kunde_objekt_id }
+        : base
+    if (bootstrap?.meta?.objekt_anlage_id || leadState.objekt_anlage_id) {
+      return {
+        ...withObjekt,
+        objekt_anlage_id:
+          bootstrap?.meta?.objekt_anlage_id?.trim() ||
+          leadState.objekt_anlage_id?.trim() ||
+          null,
+      }
     }
-    return base
+    return withObjekt
   })
   const [dokumentTyp, setDokumentTyp] = useState<AngebotDokumentTyp>(
     () => bootstrap?.dokumentTyp ?? initialDokumentTypFromLead(leadState.bereiche, leadState.situation)
@@ -383,17 +399,55 @@ export function AngebotWizard({
   const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
   /** Lead, der in dieser Direkt-Angebot-Session angelegt wurde (für Abbruch-Cleanup). */
   const sessionCreatedLeadRef = useRef<string | null>(null)
 
-  const [mailTo, setMailTo] = useState<string[]>(() =>
-    sheetEmail && isValidEmail(sheetEmail) ? [sheetEmail] : []
-  )
+  const [mailTo, setMailTo] = useState<string[]>(() => {
+    const fallback = (
+      sheetKunde?.email ?? lead.kontakt_email ?? ''
+    ).trim()
+    return fallback && isValidEmail(fallback) ? [fallback] : []
+  })
   const [mailCc, setMailCc] = useState<string[]>([])
   const [mailBetreff, setMailBetreff] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+
+  const ansprechpartnerId = meta.ansprechpartner_id?.trim() || null
+  /** Gewählter AP, sonst Primär — steuert Anzeige & Anrede (nicht zwingend Versand-Mail). */
+  const effektivAp =
+    (ansprechpartnerId
+      ? apRows.find((a) => a.id === ansprechpartnerId)
+      : null) ??
+    apRows.find((a) => a.ist_primaer) ??
+    null
+  const apNamen = effektivAp
+    ? splitDeutscherVollname(String(effektivAp.name ?? '').trim())
+    : null
+  const displayVorname = apNamen?.vorname || sheetNamen.vorname
+  const displayNachname = apNamen?.nachname || sheetNamen.nachname
+  const sheetEmail = (
+    effektivAp?.email?.trim() ||
+    sheetKunde?.email ||
+    leadState.kontakt_email ||
+    ''
+  ).trim()
+  const sheetTelefon = (
+    effektivAp?.telefon?.trim() ||
+    sheetKunde?.telefon ||
+    leadState.kontakt_telefon ||
+    ''
+  ).trim()
+  const crowKundeValue = (() => {
+    const base =
+      sheetFirma ||
+      [sheetNamen.vorname, sheetNamen.nachname].filter(Boolean).join(' ') ||
+      name
+    const ap = effektivAp?.name?.trim()
+    return ap ? `${base} · ${ap}` : base
+  })()
 
   const zahlfristInit = zahlfristSegFromAngebotMeta(meta)
   const [zahlfristSeg, setZahlfristSeg] = useState<ZahlfristSeg>(() => zahlfristInit.seg)
@@ -423,12 +477,62 @@ export function AngebotWizard({
     }
   }, [isHv, hvKundeId])
 
+  /** Ansprechpartner der Vertragspartei (HV / Firma / Privat). */
+  useEffect(() => {
+    const kid = (hvKundeId || kundeId || '').trim()
+    if (!kid) {
+      setApRows([])
+      return
+    }
+    let cancelled = false
+    void listKundenAnsprechpartner(kid).then((rows) => {
+      if (!cancelled) setApRows(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hvKundeId, kundeId])
+
+  /** Bootstrap: Mail an gewählten AP, sobald die Liste da ist. */
+  useEffect(() => {
+    const sid = meta.ansprechpartner_id?.trim()
+    if (!sid || !apRows.length) return
+    const ap = apRows.find((a) => a.id === sid)
+    const mail = ap?.email?.trim() || ''
+    if (mail && isValidEmail(mail)) {
+      setMailTo((prev) =>
+        prev.length === 1 &&
+        prev[0] === (sheetKunde?.email || lead.kontakt_email || '').trim()
+          ? [mail]
+          : prev.length
+            ? prev
+            : [mail]
+      )
+    }
+    // nur einmal nach Laden der AP-Liste für den Bootstrap-Wert
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apRows])
+
   function patchMelderDraft(patch: Partial<MelderLeistungsortDraft>) {
     setMelderDraft((prev) => {
       const next = { ...prev, ...patch }
-      if (patch.kunde_objekt_id !== undefined) {
-        setMeta((m) => ({ ...m, kunde_objekt_id: next.kunde_objekt_id }))
+      if (
+        patch.kunde_objekt_id !== undefined &&
+        patch.kunde_objekt_id !== prev.kunde_objekt_id &&
+        patch.objekt_anlage_id === undefined
+      ) {
+        next.objekt_anlage_id = null
       }
+      setMeta((m) => ({
+        ...m,
+        ...(patch.kunde_objekt_id !== undefined
+          ? { kunde_objekt_id: next.kunde_objekt_id }
+          : {}),
+        ...(patch.objekt_anlage_id !== undefined ||
+        (patch.kunde_objekt_id !== undefined && next.objekt_anlage_id === null)
+          ? { objekt_anlage_id: next.objekt_anlage_id }
+          : {}),
+      }))
       return next
     })
     setDraftDirty(true)
@@ -442,17 +546,26 @@ export function AngebotWizard({
   const mailAnrede = mailAnredeFromKundeTyp(kundeTyp)
   const mailKundeKontext = useMemo((): KundeAnredeKontext => {
     const k = sheetKunde
+    const apName = effektivAp?.name?.trim() || null
     return {
       name: k?.name?.trim() || name,
-      vorname: k?.vorname ?? sheetNamen.vorname,
-      nachname: k?.nachname ?? sheetNamen.nachname,
+      vorname: displayVorname || null,
+      nachname: displayNachname || null,
       typ: k?.typ ?? kundeTyp,
       ansprechpartner:
-        k && 'ansprechpartner' in k
+        apName ||
+        (k && 'ansprechpartner' in k
           ? (k as { ansprechpartner?: string | null }).ansprechpartner
-          : null,
+          : null),
     }
-  }, [sheetKunde, name, sheetNamen.vorname, sheetNamen.nachname, kundeTyp])
+  }, [
+    sheetKunde,
+    name,
+    displayVorname,
+    displayNachname,
+    kundeTyp,
+    effektivAp,
+  ])
 
   useEffect(() => {
     if (sheet !== 'versand') return
@@ -559,7 +672,7 @@ export function AngebotWizard({
   }
 
   function onPosBoardChange(next: PosBoardLine[]) {
-    syncZeilenToPositions(posBoardLinesToDokumentZeilen(next, zeilen))
+    syncZeilenToPositions(posBoardLinesToDokumentZeilen(next, zeilen, gewerke))
   }
 
   const posBoardLines = useMemo(() => dokumentZeilenToPosBoardLines(zeilen), [zeilen])
@@ -664,9 +777,14 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
+      objekt_anlage_id: melderDraft.objekt_anlage_id,
     })
-    if (!r.ok) {
-      toast.error(r.message)
+    if (!r?.ok) {
+      toast.error(
+        r && 'message' in r && r.message
+          ? r.message
+          : 'Anfrage konnte nicht angelegt werden — bitte neu laden.'
+      )
       return null
     }
     sessionCreatedLeadRef.current = r.leadId
@@ -679,6 +797,7 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
+      objekt_anlage_id: melderDraft.objekt_anlage_id,
     }))
     return r.leadId
   }, [deferredLeadCreate, leadState, melderDraft])
@@ -697,13 +816,20 @@ export function AngebotWizard({
     }
   }, [deferredLeadCreate, angebotId])
 
+  useEffect(() => {
+    return () => {
+      void discardSessionLeadIfOrphan()
+    }
+  }, [discardSessionLeadIfOrphan])
+
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!kundeId) {
         toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
         return null
       }
-      const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
+      const titelOk =
+        meta.titel.trim() || meta.leistungsumfang.trim() || projekt.trim()
       if (!titelOk) {
         toast.error('Bitte einen Angebotstitel angeben.')
         return null
@@ -718,19 +844,19 @@ export function AngebotWizard({
         return null
       }
 
-      const leadId = await ensureLeadId()
-      if (!leadId) return null
-
-      const metaPersist: AngebotWizardMeta = {
-        ...meta,
-        ...angebotMetaPatchFromZahlfrist(zahlfristSeg, zahlfristDatum),
-        leistungsumfang: meta.leistungsumfang.trim() || meta.titel.trim() || projekt,
-        mit_anfahrt: mitAnfahrt,
-      }
-
       const manageBusy = opts?.manageBusy !== false
       if (manageBusy) setSaving(true)
       try {
+        const leadId = await ensureLeadId()
+        if (!leadId) return null
+
+        const metaPersist: AngebotWizardMeta = {
+          ...meta,
+          ...angebotMetaPatchFromZahlfrist(zahlfristSeg, zahlfristDatum),
+          leistungsumfang: meta.leistungsumfang.trim() || meta.titel.trim() || projekt,
+          mit_anfahrt: mitAnfahrt,
+        }
+
         const { positionQueues, notizenByGewerk } = gewerkHandwerkerZuweisungenToMaps(hwZuweisungen)
         const res = await saveAngebotWizardDraft({
           angebotId,
@@ -757,8 +883,12 @@ export function AngebotWizard({
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
-        if (!res.ok) {
-          toast.error(res.message)
+        if (!res?.ok) {
+          toast.error(
+            res && 'message' in res && res.message
+              ? res.message
+              : 'Speichern fehlgeschlagen — bitte Seite neu laden und erneut versuchen.'
+          )
           // Speichern fehlgeschlagen → frisch angelegten Träger wieder entfernen
           if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
             await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
@@ -774,10 +904,15 @@ export function AngebotWizard({
             melder_telefon: melderDraft.melder_telefon || null,
             melder_einheit: melderDraft.melder_einheit || null,
             kunde_objekt_id: melderDraft.kunde_objekt_id,
+            objekt_anlage_id: melderDraft.objekt_anlage_id,
             angebotId: res.angebotId,
           })
-          if (!sync.ok) {
-            toast.error(sync.message)
+          if (!sync?.ok) {
+            toast.error(
+              sync && 'message' in sync && sync.message
+                ? sync.message
+                : 'Melder/Leistungsort konnte nicht gespeichert werden.'
+            )
           } else {
             setLeadState((prev) => ({
               ...prev,
@@ -786,6 +921,7 @@ export function AngebotWizard({
               melder_telefon: melderDraft.melder_telefon || null,
               melder_einheit: melderDraft.melder_einheit || null,
               kunde_objekt_id: melderDraft.kunde_objekt_id,
+              objekt_anlage_id: melderDraft.objekt_anlage_id,
             }))
           }
         }
@@ -796,23 +932,31 @@ export function AngebotWizard({
         setDraftDirty(false)
         onSaved?.(res.angebotId)
         if (opts?.notify) {
+          const bereitsGesendet = Boolean(bootstrap?.bereitsGesendet)
           toast.success(
             istNachtrag
-              ? 'Nachtrag gespeichert — Auftrag bleibt bis zur Annahme unverändert'
+              ? 'Nachtrag gespeichert'
               : istAuftragKorrektur
                 ? hatGestellteAbschlaege
-                  ? 'Korrektur gespeichert. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
-                  : 'Korrektur gespeichert'
-                : res.angebotsnr?.trim()
-                  ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
-                  : 'Entwurf gespeichert'
+                  ? 'Korrektur gespeichert — Abschläge unverändert. Zum Kunden: Versenden.'
+                  : 'Korrektur gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
+                : bereitsGesendet
+                  ? 'Gespeichert — Portal bleibt bei der letzten Fassung. Zum Aktualisieren und Benachrichtigen: Versenden.'
+                  : res.angebotsnr?.trim()
+                    ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
+                    : 'Entwurf gespeichert'
           )
         }
         return res.angebotId
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
-        if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
-          await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
+        if (
+          deferredLeadCreate &&
+          sessionCreatedLeadRef.current &&
+          !angebotId
+        ) {
+          const orphan = sessionCreatedLeadRef.current
+          await discardOrphanDirektAngebotLead(orphan).catch(() => undefined)
           sessionCreatedLeadRef.current = null
           setLeadState((prev) => ({ ...prev, id: '' }))
         }
@@ -838,6 +982,7 @@ export function AngebotWizard({
       onSaved,
       istAuftragKorrektur,
       hatGestellteAbschlaege,
+      bootstrap?.bereitsGesendet,
       auftragKorrekturId,
       zahlungsplan,
       projekt,
@@ -866,9 +1011,7 @@ export function AngebotWizard({
   async function openVorschauSheet() {
     const id = await ensureDraftForPreview()
     if (!id) {
-      toast.error(
-        'Entwurf noch nicht gespeichert — Vorschau ggf. leer. Pflichtfelder vor Senden prüfen.'
-      )
+      toast.error('Entwurf prüfen')
     }
     setSheet('vorschau')
   }
@@ -902,31 +1045,38 @@ export function AngebotWizard({
     if (mail && isValidEmail(mail)) setMailTo([mail])
   }
 
-  async function handleCanvasClose() {
+  async function closeWizardClean() {
+    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
-    if (draftDirty && !saving) {
-      /* S9: X speichert best-effort — ohne Validierungs-Toasts bei leerem Entwurf */
-      const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      const titelOk = meta.titel.trim() || meta.leistungsumfang.trim()
-      const canSilentSave =
-        Boolean(kundeId) &&
-        Boolean(titelOk) &&
-        artikelA.length > 0 &&
-        !artikelA.some((z) => !z.bezeichnung.trim())
-      if (canSilentSave) {
-        try {
-          await persistDraft({ notify: false })
-        } catch {
-          /* ignore */
-        }
-      }
-    }
+    setFotoLightboxUrl(null)
+    setSheet(null)
     await discardSessionLeadIfOrphan()
     onClose()
   }
 
+  async function handleSaveDraftAndClose() {
+    if (saving) return
+    const id = await persistDraft({ notify: true })
+    if (!id) return
+    setCloseConfirmOpen(false)
+    setKundeEditOpen(false)
+    setFotoLightboxUrl(null)
+    setSheet(null)
+    onDone?.(id, {
+      mode: 'saved',
+      auftragKorrektur: istAuftragKorrektur || undefined,
+    })
+    onClose()
+    router.refresh()
+  }
+
   function handleRequestClose() {
-    void handleCanvasClose()
+    if (saving) return
+    if (!draftDirty) {
+      void closeWizardClean()
+      return
+    }
+    setCloseConfirmOpen(true)
   }
 
   async function handleFinishSpeichern() {
@@ -969,18 +1119,22 @@ export function AngebotWizard({
         betreff: mailBetreff.trim() || undefined,
         auftragKorrektur: istAuftragKorrektur,
       })
-      if (!res.ok) {
-        toast.error(res.message)
+      if (!res?.ok) {
+        toast.error(
+          res && 'message' in res && res.message
+            ? res.message
+            : 'Versand fehlgeschlagen — bitte Seite neu laden und erneut versuchen.'
+        )
         return
       }
       toast.success(
         istNachtrag
-          ? 'Nachtrag versendet — Auftrag bleibt bis zur Annahme unverändert'
+          ? 'Nachtrag versendet'
           : istAuftragKorrektur
             ? hatGestellteAbschlaege
-              ? 'Korrektur gespeichert und versendet. Gestellte Abschläge bleiben — stornieren und Rate neu stellen, falls sie zur neuen Summe passen sollen.'
-              : 'Korrektur gespeichert und an den Kunden versendet'
-            : `Angebot „${(meta.titel || projekt || 'Angebot').trim()}“ versendet · ${formatEurBetrag(mailSummen.bruttoMin)} brutto`
+              ? 'Korrektur versendet — Abschläge unverändert'
+              : 'Korrektur versendet'
+            : `Angebot versendet · ${formatEurBetrag(mailSummen.bruttoMin)}`
       )
       setSheet(null)
       setKundeEditOpen(false)
@@ -1064,37 +1218,29 @@ export function AngebotWizard({
       >
         <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
       </button>
-      <ActionsMenu
-        sheetTitle="Angebot"
-        align="right"
-        trigger={
-          <span
-            className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-            aria-label="Speichern oder senden"
-            title="Speichern oder senden"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </span>
-        }
-        items={[
-          {
-            label: saving ? 'Speichern…' : 'Speichern',
-            icon: <MockIcon ctx="btn" n="device-floppy" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinishSpeichern()
-            },
-          },
-          {
-            label: saving ? 'E-Mail…' : 'E-Mail senden',
-            icon: <MockIcon ctx="btn" n="send" size={16} />,
-            onClick: () => {
-              if (saving) return
-              void handleFinishVersenden()
-            },
-          },
-        ]}
-      />
+      <button
+        type="button"
+        className="editor-sheet__icon-btn"
+        disabled={saving}
+        onClick={() => void handleFinishVersenden()}
+        aria-label="E-Mail senden"
+        title="E-Mail senden"
+      >
+        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
+        disabled={saving}
+        onClick={() => {
+          if (saving) return
+          void handleFinishSpeichern()
+        }}
+        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
+      >
+        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+      </button>
     </>
   )
 
@@ -1102,12 +1248,10 @@ export function AngebotWizard({
     <div className="dc-doc flex flex-col gap-4">
       {istAuftragKorrektur && hatGestellteAbschlaege ? (
         <div className="zahlung-tab-hint">
-          <MockIcon ctx="btn" n="info" size={15} />
-          <span>
-            Bereits gestellte Abschläge bleiben nach der Korrektur unverändert. Die
-            Schlussrechnung gleicht die Differenz aus. Soll ein Abschlag zur neuen Summe
-            passen: Rechnung stornieren und die Rate neu stellen.
-          </span>
+          <MockInfoTip
+            label="Hinweis gestellte Abschläge"
+            tip="Gestellte Abschläge bleiben unverändert. Die Schlussrechnung gleicht die Differenz aus — oder Abschlag stornieren und Rate neu stellen."
+          />
         </div>
       ) : null}
       <PosBoard
@@ -1137,6 +1281,11 @@ export function AngebotWizard({
         ust={mailSummen.mwstBetragMin}
         brutto={mailSummen.bruttoMin}
         ustLabel={ustLabel}
+        nachlassNetto={mailSummen.nachlassNetto > 0 ? mailSummen.nachlassNetto : null}
+        nachlassLabel={mailSummen.nachlassLabel}
+        nettoVorNachlass={
+          mailSummen.nachlassNetto > 0 ? mailSummen.nettoVorNachlass : null
+        }
       />
     </div>
   )
@@ -1157,10 +1306,7 @@ export function AngebotWizard({
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
-        onClick={() => {
-          setSheet('versand')
-          void ensureDraftForPreview()
-        }}
+        onClick={() => setSheet('versand')}
       />
     </div>
   )
@@ -1184,6 +1330,7 @@ export function AngebotWizard({
         meta={metaColumn}
         className="wizard-flow"
         manageHistory={false}
+        draftDirty={draftDirty}
       />
 
       <EditorSheet
@@ -1191,6 +1338,9 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Kunde"
         context="canvas"
+        overlayClassName={
+          objektNeuOpen || kundeEditOpen ? 'editor-sheet-overlay--recessed' : undefined
+        }
         headerEnd={
           kundeZumBearbeiten ? (
             <button
@@ -1202,6 +1352,8 @@ export function AngebotWizard({
             </button>
           ) : null
         }
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1214,13 +1366,63 @@ export function AngebotWizard({
               <span className="gfc-v">{sheetFirma}</span>
             </div>
           ) : null}
+          <MockField label="Ansprechpartner" full>
+            <select
+              className="sel sel--choice"
+              value={ansprechpartnerId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value.trim() || null
+                const prevKontakt = sheetEmail
+                setMeta((m) => ({ ...m, ansprechpartner_id: next }))
+                const ap = next
+                  ? apRows.find((a) => a.id === next)
+                  : apRows.find((a) => a.ist_primaer)
+                const mail = (
+                  ap?.email?.trim() ||
+                  sheetKunde?.email ||
+                  leadState.kontakt_email ||
+                  ''
+                ).trim()
+                setMailTo((prev) => {
+                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                  if (mail && isValidEmail(mail)) return [mail]
+                  return []
+                })
+                setDraftDirty(true)
+              }}
+              disabled={!(hvKundeId || kundeId)}
+            >
+              <option value="">Hauptansprechpartner</option>
+              {apRows.map((ap) => (
+                <option key={ap.id} value={ap.id}>
+                  {ap.name.trim() || 'Ohne Name'}
+                  {ap.ist_primaer ? ' (Primär)' : ''}
+                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
+                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                </option>
+              ))}
+            </select>
+          </MockField>
+          <KundenVersandEmailField
+            apRows={apRows}
+            kontaktEmail={sheetEmail}
+            kundeStammEmail={sheetKunde?.email ?? leadState.kontakt_email}
+            versandEmail={mailTo[0] ?? ''}
+            disabled={!(hvKundeId || kundeId)}
+            onChange={(next) => {
+              if (next && isValidEmail(next)) setMailTo([next])
+              else if (sheetEmail && isValidEmail(sheetEmail)) setMailTo([sheetEmail])
+              else setMailTo([])
+              setDraftDirty(true)
+            }}
+          />
           <div className="gfc-row">
             <span className="gfc-l">{sheetFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}</span>
-            <span className="gfc-v">{sheetNamen.vorname || '—'}</span>
+            <span className="gfc-v">{displayVorname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">{sheetFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}</span>
-            <span className="gfc-v">{sheetNamen.nachname || '—'}</span>
+            <span className="gfc-v">{displayNachname || '—'}</span>
           </div>
           <div className="gfc-row">
             <span className="gfc-l">Anschrift</span>
@@ -1231,7 +1433,7 @@ export function AngebotWizard({
             <span className="gfc-v">{sheetStadt || '—'}</span>
           </div>
           <div className="gfc-row">
-            <span className="gfc-l">E-Mail</span>
+            <span className="gfc-l">E-Mail (Kontakt)</span>
             <span className="gfc-v">{sheetEmail || <em>fehlt</em>}</span>
           </div>
           <div className="gfc-row">
@@ -1250,6 +1452,8 @@ export function AngebotWizard({
               onChange={patchMelderDraft}
               objekte={hvObjekte}
               onNeuObjekt={hvKundeId ? () => setObjektNeuOpen(true) : undefined}
+              kundeId={hvKundeId}
+              gewerke={gewerke}
             />
           </div>
         ) : null}
@@ -1272,6 +1476,7 @@ export function AngebotWizard({
           onClose={() => setObjektNeuOpen(false)}
           kundeId={hvKundeId}
           verwaltungName={crowKundeValue}
+          context="canvas"
           onSaved={(objekt) => {
             setHvObjekte((prev) => {
               if (prev.some((o) => o.id === objekt.id)) return prev
@@ -1288,6 +1493,8 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Dokument"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           <SheetEditableField
@@ -1405,15 +1612,16 @@ export function AngebotWizard({
         onClose={closeSheet}
         title="Zahlung"
         context="canvas"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet">
           {istAuftragKorrektur && hatGestellteAbschlaege ? (
             <div className="full zahlung-tab-hint" style={{ marginBottom: 0 }}>
-              <MockIcon ctx="btn" n="info" size={15} />
-              <span>
-                Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag
-                stornieren und die Rate neu stellen.
-              </span>
+              <MockInfoTip
+                label="Hinweis gestellte Abschläge"
+                tip="Gestellte Abschläge bleiben. Schlussrechnung gleicht ab — oder Abschlag stornieren und Rate neu stellen."
+              />
             </div>
           ) : null}
           <MockField label="Gültig bis" full>
@@ -1466,6 +1674,8 @@ export function AngebotWizard({
         title="Vorschau"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <AngebotWizardPdfPreview
           angebotId={angebotId}
@@ -1480,6 +1690,8 @@ export function AngebotWizard({
         title="Versand"
         context="canvas"
         size="lg"
+        onConfirm={closeSheet}
+        confirmLabel="Übernehmen"
       >
         <div className="form-grid form-grid--sheet form-grid--sheet-versand">
           <EmailPillsField
@@ -1528,7 +1740,8 @@ export function AngebotWizard({
           />
           <div className="full">
             <AngebotWizardMailPreview
-              angebotId={angebotId}
+              liveOnly
+              angebotId={null}
               betreff={mailBetreff.trim() || defaultMailBetreff}
               einleitung={meta.einleitung}
               schluss={meta.schluss}
@@ -1537,10 +1750,35 @@ export function AngebotWizard({
               gesamtNetto={mailSummen.nettoMin}
               gueltigBis={meta.gueltig_bis}
               empfaengerHint={mailTo[0] || sheetEmail || undefined}
+              anrede={mailAnrede}
+              kundeName={mailKundeKontext.name}
+              kundeVorname={mailKundeKontext.vorname}
+              kundeNachname={mailKundeKontext.nachname}
+              kundeTyp={mailKundeKontext.typ ?? kundeTyp}
+              reverseCharge={reverseChargeAktiv}
+              portalAudience={isHv ? 'organisation' : 'privat'}
             />
           </div>
         </div>
       </EditorSheet>
+
+      <ConfirmPopup
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title="Änderungen speichern?"
+        cancelLabel="Weiter bearbeiten"
+        discardLabel="Beenden ohne Speichern"
+        saveDraftLabel="Als Entwurf speichern"
+        danger
+        onConfirm={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraft={() => {
+          void handleSaveDraftAndClose()
+        }}
+      >
+        Ungespeicherte Eingaben gehen sonst verloren.
+      </ConfirmPopup>
     </>
   )
 
@@ -1548,7 +1786,7 @@ export function AngebotWizard({
     !typConfirmed ? (
       <EditorSheet
         open
-        onClose={onClose}
+        onClose={handleRequestClose}
         title={typGateStep === 'layout' ? 'Angebotslayout' : 'Art der Leistung'}
         context="canvas"
         manageHistory={false}

@@ -91,8 +91,13 @@ async function loadLeadDokumenteOptional(
 async function loadLeadOrgKontextOptional(
   supabase: SupabaseClient,
   lead: LeadDetail
-): Promise<Pick<LeadDetail, 'auftraggeber' | 'kunden_objekte' | 'org_freigabe_log'>> {
-  const out: Pick<LeadDetail, 'auftraggeber' | 'kunden_objekte' | 'org_freigabe_log'> = {}
+): Promise<
+  Pick<LeadDetail, 'auftraggeber' | 'kunden_objekte' | 'objekt_anlagen' | 'org_freigabe_log'>
+> {
+  const out: Pick<
+    LeadDetail,
+    'auftraggeber' | 'kunden_objekte' | 'objekt_anlagen' | 'org_freigabe_log'
+  > = {}
 
   if (lead.auftraggeber_kunde_id) {
     const { data } = await supabase
@@ -112,6 +117,27 @@ async function loadLeadOrgKontextOptional(
       .eq('id', lead.kunde_objekt_id)
       .maybeSingle()
     if (data) out.kunden_objekte = data as KundenObjekt
+  }
+
+  if (lead.objekt_anlage_id) {
+    const { data } = await supabase
+      .from('objekt_anlagen')
+      .select('id, bezeichnung, gewerke(name)')
+      .eq('id', lead.objekt_anlage_id)
+      .maybeSingle()
+    if (data) {
+      const raw = data as {
+        id: string
+        bezeichnung: string
+        gewerke?: { name: string } | { name: string }[] | null
+      }
+      const gewerkJoin = Array.isArray(raw.gewerke) ? raw.gewerke[0] ?? null : raw.gewerke ?? null
+      out.objekt_anlagen = {
+        id: raw.id,
+        bezeichnung: raw.bezeichnung,
+        gewerke: gewerkJoin,
+      }
+    }
   }
 
   const { data: logRows } = await supabase

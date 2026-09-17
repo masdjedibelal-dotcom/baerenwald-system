@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 
+import type { CrmNotificationTyp } from '@/app/(dashboard)/notifications/actions'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
+import { sendCrmPushToStaff } from '@/lib/push/send'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function authorize(req: Request): boolean {
@@ -12,8 +14,9 @@ function authorize(req: Request): boolean {
 }
 
 /**
- * Portal → CRM: Ping dass Partner Positionsmeldung / Weitere Arbeit angelegt hat.
- * Glocke liest aus DB (partner_positions_anfragen / anerkennung_status).
+ * Portal → CRM: Ping dass Partner Positionsmeldung / Weitere Arbeit /
+ * Leistungs-Update angelegt hat.
+ * Glocke liest Updates zusätzlich aus position_eintraege.
  */
 export async function POST(req: Request) {
   if (!authorize(req)) {
@@ -26,6 +29,9 @@ export async function POST(req: Request) {
     positionId?: string
     typ?: string
     titel?: string
+    handwerkerId?: string
+    leistungName?: string
+    beschreibung?: string
   } = {}
   try {
     body = (await req.json()) as typeof body
@@ -38,8 +44,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'auftragId fehlt' }, { status: 400 })
   }
 
+  const rawTyp = String(body.typ ?? '').trim().toLowerCase()
   const typ =
-    body.typ === 'weitere_arbeit' ? 'weitere_arbeit' : 'positions_anfrage'
+    rawTyp === 'weitere_arbeit'
+      ? 'weitere_arbeit'
+      : rawTyp === 'leistung_update' || rawTyp === 'fortschritt' || rawTyp === 'update'
+        ? 'leistung_update'
+        : 'positions_anfrage'
+
+  const positionId = String(body.positionId ?? '').trim() || null
+  const titel = String(body.titel ?? '').trim() || null
+  const leistungName = String(body.leistungName ?? '').trim() || null
+  const beschreibung = String(body.beschreibung ?? '').trim() || null
+  const handwerkerId = String(body.handwerkerId ?? '').trim() || null
 
   await writeAuditEvent({
     entityType: 'auftrag',
@@ -47,27 +64,32 @@ export async function POST(req: Request) {
     aktion:
       typ === 'weitere_arbeit'
         ? 'partner_weitere_arbeit_ping'
-        : 'partner_positions_anfrage_ping',
+        : typ === 'leistung_update'
+          ? 'partner_leistung_update_ping'
+          : 'partner_positions_anfrage_ping',
     actorRolle: 'system',
     payload: {
       anfrage_id: body.anfrageId ?? null,
-      position_id: body.positionId ?? null,
-      titel: body.titel ?? null,
+      position_id: positionId,
+      titel,
+      leistung_name: leistungName,
     },
   })
 
-  await insertAuftragTimelineEvent({
-    auftrag_id: auftragId,
-    typ: 'handwerker_update',
-    titel:
-      typ === 'weitere_arbeit'
-        ? 'Weitere Arbeit gemeldet'
-        : 'Nachtrag / neue Position gemeldet',
-    beschreibung: String(body.titel ?? '').slice(0, 500) || null,
-    sichtbar_fuer_kunde: false,
-  })
+  if (typ !== 'leistung_update') {
+    await insertAuftragTimelineEvent({
+      auftrag_id: auftragId,
+      typ: 'handwerker_update',
+      titel:
+        typ === 'weitere_arbeit'
+          ? 'Weitere Arbeit gemeldet'
+          : 'Nachtrag / neue Position gemeldet',
+      beschreibung: (titel || beschreibung || '').slice(0, 500) || null,
+      sichtbar_fuer_kunde: false,
+      handwerker_id: handwerkerId,
+    })
+  }
 
-  // Existenz prüfen — verhindert stille Falsch-IDs
   const { data: auf } = await supabaseAdmin
     .from('auftraege')
     .select('id')
@@ -75,6 +97,37 @@ export async function POST(req: Request) {
     .maybeSingle()
   if (!auf) {
     return NextResponse.json({ ok: false, error: 'Auftrag unbekannt' }, { status: 404 })
+  }
+
+  let hwName = 'Handwerker'
+  if (handwerkerId) {
+    const { data: hw } = await supabaseAdmin
+      .from('handwerker')
+      .select('name')
+      .eq('id', handwerkerId)
+      .maybeSingle()
+    hwName = String(hw?.name ?? '').trim() || hwName
+  }
+
+  if (typ === 'leistung_update') {
+    const pushTyp: CrmNotificationTyp = 'handwerker_update'
+    const pushTitle = leistungName
+      ? `${hwName}: Update zu Leistung „${leistungName}“`
+      : `${hwName}: Update zu Leistung`
+    const pushBody =
+      beschreibung ||
+      titel ||
+      'Neuer Eintrag vom Partner unter Leistungen.'
+    const href = `/auftraege/${auftragId}?tab=leistungen${
+      positionId ? `&position=${encodeURIComponent(positionId)}` : ''
+    }`
+    void sendCrmPushToStaff({
+      typ: pushTyp,
+      title: pushTitle,
+      body: pushBody.slice(0, 180),
+      url: href,
+      tag: `leistung-update-${auftragId}-${positionId || 'all'}-${Date.now()}`,
+    }).catch((e) => console.warn('[partner-positions-meldung] push', e))
   }
 
   return NextResponse.json({ ok: true })

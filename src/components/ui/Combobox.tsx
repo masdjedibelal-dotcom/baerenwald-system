@@ -33,6 +33,8 @@ export type ComboboxProps = {
   className?: string
   /** Ab dieser Anzahl Optionen empfohlen — Aufrufer entscheidet; Select auto-switched bei >15 */
   emptyLabel?: string
+  /** Mobil/Picker: Liste sofort offen (Sheet-Höhe wächst mit Inhalt) */
+  defaultOpen?: boolean
 }
 
 /**
@@ -52,12 +54,13 @@ export function Combobox({
   required,
   className,
   emptyLabel = 'Keine Treffer',
+  defaultOpen = false,
 }: ComboboxProps) {
   const autoId = useId()
   const inputId = id ?? name ?? autoId
   const rootRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [q, setQ] = useState('')
   const [hi, setHi] = useState(0)
 

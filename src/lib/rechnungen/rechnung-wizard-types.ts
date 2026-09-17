@@ -51,6 +51,12 @@ export type RechnungWizardBootstrap = {
   auftragId: string | null
   angebotId: string | null
   kundeId: string
+  /** Optional: Empfänger-Ansprechpartner (null = Hauptkontakt / Primär). */
+  ansprechpartnerId?: string | null
+  /** Ausführungsort / Verwaltungsobjekt (HV/Gewerbe). */
+  kundeObjektId?: string | null
+  /** Anlage/Teil am Ausführungsort. */
+  objektAnlageId?: string | null
   /** Direktrechnung von /rechnungen/neu (ohne Anfrage/Angebot/Auftrag) */
   standalone?: boolean
   kunde: Pick<
@@ -84,31 +90,50 @@ export type RechnungWizardBootstrap = {
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
   /**
-   * Versendete/bezahlte RE im Wizard: materielle Änderungen → Storno + neue RE,
-   * nur Mail → ohne Storno.
+   * Versendete/bezahlte RE im Wizard:
+   * - materielle Änderung → Korrektur MIT Storno (Gutschrift + neue RE)
+   * - nur Mail/Fälligkeit → Update ohne Storno
+   * Auch Ersatz-Entwurf mit korrektur_von.
    */
   korrekturKontext?: {
     originalStatus: string
     originalNr: string
     materialFingerprint: string
+    /** true = bereits Ersatz-Entwurf (korrektur_von gesetzt) → Versand mit Storno-PDF */
+    istErsatzEntwurf?: boolean
+  } | null
+  /**
+   * Frisch angelegte Korrektur-Session (Storno + Ersatz).
+   * Beim Schließen ohne Speichern → Rollback (kein verwaister Entwurf).
+   */
+  korrekturSession?: {
+    originalId: string
+    gutschriftId: string
+    neuId: string
+    originalStatus: string
   } | null
 }
 
+/** Nur Entwürfe im Wizard — gesendet/bezahlt → Korrektur über Storno (Detail-CTA). */
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
   const s = (status ?? '').toLowerCase()
-  return s === 'entwurf' || s === 'gesendet' || s === 'bezahlt' || s === 'versendet'
+  return s === 'entwurf'
 }
 
-/** Entwurf, versendet/gesendet, bezahlt und storniert — harte Löschung erlaubt. */
+/** Deaktiviert-mit-Grund — Detail-CTA wechselt bei Gesendet/Bezahlt auf „Rechnung korrigieren“. */
+export function rechnungWizardBearbeitenSperrgrund(status: string): string | null {
+  if (rechnungDarfImWizardBearbeitetWerden(status)) return null
+  const s = (status ?? '').toLowerCase()
+  if (s === 'gesendet' || s === 'versendet' || s === 'bezahlt' || s === 'storniert') {
+    return 'Gesendet — Korrektur über Storno'
+  }
+  return 'Diese Rechnung kann nicht mehr im Wizard bearbeitet werden.'
+}
+
+/** Nur Entwürfe hart löschen (ohne Nummer/Versand). */
 export function rechnungDarfGeloeschtWerden(status: string): boolean {
   const s = (status ?? '').toLowerCase()
-  return (
-    s === 'entwurf' ||
-    s === 'gesendet' ||
-    s === 'versendet' ||
-    s === 'bezahlt' ||
-    s === 'storniert'
-  )
+  return s === 'entwurf'
 }
 
 function addDaysYmd(ymd: string, days: number): string {

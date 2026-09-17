@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { handwerkerAusGeschwisterPositionen, ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
 import { metaNeueLeistungMitPartner } from '@/lib/auftraege/partner-vorgang-meta'
@@ -61,15 +62,39 @@ async function setAuftragStatus(
   status: AuftragStatus,
   opts?: { timelineBeschreibung?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const fortschritt = FORTSCHRITT_BY_STATUS[status] ?? 0
   const patch: Record<string, unknown> = {
     status,
     fortschritt,
     updated_at: new Date().toISOString(),
   }
+  // Abschluss ohne Abnahme darf abnahme_datum nicht setzen — nur wenn Protokoll existiert.
   if (status === 'abgeschlossen') {
-    patch.abnahme_datum = new Date().toISOString().slice(0, 10)
+    const [{ data: aufRow }, { data: protRow }] = await Promise.all([
+      supabase
+        .from('auftraege')
+        .select('abnahme_protokoll_url, abnahme_datum')
+        .eq('id', auftragId)
+        .maybeSingle(),
+      supabase
+        .from('auftrag_abnahmeprotokolle')
+        .select('abnahme_datum')
+        .eq('auftrag_id', auftragId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    const hasProtokoll =
+      Boolean((aufRow?.abnahme_protokoll_url as string | null)?.trim()) ||
+      Boolean(protRow?.abnahme_datum)
+    if (hasProtokoll) {
+      const fromProt = (protRow?.abnahme_datum as string | null)?.trim()?.slice(0, 10)
+      const fromAuf = (aufRow?.abnahme_datum as string | null)?.trim()?.slice(0, 10)
+      patch.abnahme_datum = fromProt || fromAuf || new Date().toISOString().slice(0, 10)
+    }
   }
   const { error } = await supabase.from('auftraege').update(patch).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }
@@ -158,7 +183,9 @@ export async function completeAuftragNachEndabrechnung(input: {
   const art = (input.rechnungArt ?? 'voll').trim().toLowerCase()
   if (art !== 'voll' && art !== 'schluss') return { ok: true, changed: false }
 
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: row, error } = await supabase
     .from('auftraege')
     .select('id, status')

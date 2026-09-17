@@ -46,6 +46,8 @@ export type VorgangRechnungInput = {
   brutto?: number | null
   ist_wiederkehrend?: boolean | null
   wiederkehr_turnus?: string | null
+  /** rechnung | gutschrift — Gutschriften gewinnen nie die Stamm-Phase. */
+  beleg_typ?: string | null
 }
 
 export type VorgangLeadInput = {
@@ -54,8 +56,11 @@ export type VorgangLeadInput = {
   situation?: string | null
   funnel_daten?: unknown
   kanal?: string | null
+  erfassung_von?: string | null
+  anlass?: string | null
   org_freigabe_status?: string | null
   hv_meldung_status?: string | null
+  freigabe_bypass_grund?: string | null
   kontakt_name?: string | null
   plz?: string | null
   bereiche?: string[] | null
@@ -112,8 +117,15 @@ export type VorgangListeRow = ResolvedVorgang & {
   kontaktEmail?: string | null
   /** Ersetzt-Kette (Angebot/Rechnung). */
   ersetzt_durch?: string | null
+  /** Rechnungskorrektur: Verweis auf Original. */
+  korrektur_von?: string | null
+  korrektur_art?: string | null
+  /** Storno-Gutschrift → Original-RE. */
+  bezug_rechnung_id?: string | null
   /** ausgehend (Default) | eingehend (Partner-Rechnung). */
   rechnungRichtung?: 'ausgehend' | 'eingehend'
+  /** rechnung (Default) | gutschrift (Storno-Begleiter). */
+  belegTyp?: 'rechnung' | 'gutschrift' | null
   /** Nur eingehend: angebot_handwerker.id für Ensure/Deep-Link. */
   angebotHandwerkerId?: string | null
   /** Geschäftsvolumen für Listen-Summe (einmal pro Lead/Vorgang). */

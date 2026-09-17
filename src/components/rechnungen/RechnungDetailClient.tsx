@@ -1,5 +1,6 @@
 'use client'
 import { actionBusy, useTransition } from '@/components/ui/action-busy'
+import { confirmAction } from '@/components/ui/confirm-action'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
@@ -27,10 +28,15 @@ import {
   updateRechnungStatus,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   loadRechnungWizardBootstrap,
   loadRechnungWizardBootstrapStandalone,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import {
+  rechnungDarfImWizardBearbeitetWerden,
+} from '@/lib/rechnungen/rechnung-wizard-types'
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { RechnungStammdatenCard } from '@/components/rechnungen/RechnungStammdatenCard'
 import { RechnungEingangStammdatenCard } from '@/components/rechnungen/RechnungEingangStammdatenCard'
 import { RechnungEingangDokumenteCard } from '@/components/rechnungen/RechnungEingangDokumenteCard'
@@ -42,9 +48,11 @@ import { RechnungLeistungenMitBautagebuch } from '@/components/rechnungen/Rechnu
 import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
+import { RechnungKorrekturKetteCard } from '@/components/rechnungen/RechnungKorrekturKetteCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -59,6 +67,7 @@ import {
   rechnungDarfHardGeloeschtWerden,
   rechnungDarfOhneErsatzStorniertWerden,
   rechnungKorrekturModus,
+  resolveRechnungKorrekturUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
@@ -168,8 +177,9 @@ export function RechnungDetailClient({
   angebotDetail = null,
   auftragDetail = null,
   auftragRechnungen = [],
-  nachfolgerRechnungId = null,
+  nachfolgerRechnungId: _nachfolgerRechnungId = null,
   darfStornoZuruecknehmen = false,
+  korrekturKette = null,
 }: {
   detail: Rechnung
   kleinunternehmerFirma: boolean
@@ -188,6 +198,8 @@ export function RechnungDetailClient({
   nachfolgerRechnungId?: string | null
   /** Soft-Storno ohne Gutschrift → zurücknehmbar */
   darfStornoZuruecknehmen?: boolean
+  /** Original ↔ Storno-GS ↔ Korrektur */
+  korrekturKette?: import('@/lib/rechnungen/rechnung-korrektur').RechnungKorrekturKetteUi | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -201,7 +213,9 @@ export function RechnungDetailClient({
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
-  const [rechnungConfirm, setRechnungConfirm] = useState<'gutschrift' | null>(null)
+  const [rechnungConfirm, setRechnungConfirm] = useState<
+    'gutschrift' | 'bezahlt' | 'unbezahlt' | null
+  >(null)
   const [korrekturWahlOpen, setKorrekturWahlOpen] = useState(false)
 
   useEffect(() => {
@@ -270,7 +284,7 @@ export function RechnungDetailClient({
     parseInt(firm?.zahlungsziel_tage ?? '', 10) || defaultZahlungszielTage(detail.kunden?.typ)
   )
 
-  const pdfHref = detail.pdf_url?.trim() || `/api/rechnungen/${detail.id}/pdf`
+  const pdfHref = rechnungPdfHref(detail.id, detail.pdf_url)
 
   const positionenCount = useMemo(
     () => pos.filter((p) => !istGewerkBeschreibungPosition(p)).length,
@@ -318,7 +332,11 @@ export function RechnungDetailClient({
     setDetail((d) => ({
       ...d,
       status: s,
-      ...(s === 'bezahlt' ? { bezahlt_at: new Date().toISOString() } : {}),
+      ...(s === 'bezahlt'
+        ? { bezahlt_at: new Date().toISOString() }
+        : s === 'gesendet'
+          ? { bezahlt_at: null }
+          : {}),
     }))
     refresh()
   }
@@ -365,19 +383,36 @@ export function RechnungDetailClient({
       router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
       return
     }
-    toast.error('Kein Kunde oder Auftrag verknüpft — neue Rechnung kann nicht geöffnet werden.')
+    toast.error('Kein Auftrag verknüpft')
   }
 
   function handleSenden() {
-    void actionBusy.run('Wird gesendet…', async () => {
-      const r = await sendRechnung(detail.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      toast.success('Rechnung gesendet')
-      setDetail((d) => ({ ...d, status: 'gesendet' }))
-      refresh()
+    const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
+    const nr = detail.rechnungsnummer?.trim()
+    confirmAction({
+      title: istKorrektur
+        ? 'Korrektur mit Storno wirklich versenden?'
+        : 'Rechnung wirklich versenden?',
+      body: istKorrektur
+        ? nr
+          ? `${nr}: Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.`
+          : 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.'
+        : nr
+          ? `${nr} wird per E-Mail an den Kunden gesendet.`
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+      confirmLabel: istKorrektur ? 'Korrektur jetzt versenden' : 'Jetzt versenden',
+      cancelLabel: 'Abbrechen',
+      busyLabel: istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…',
+      onConfirm: async () => {
+        const r = await sendRechnung(detail.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(istKorrektur ? 'Korrektur mit Storno gesendet' : 'Rechnung gesendet')
+        setDetail((d) => ({ ...d, status: 'gesendet' }))
+        refresh()
+      },
     })
   }
 
@@ -403,7 +438,7 @@ export function RechnungDetailClient({
         toast.error(r.message)
         return
       }
-      toast.success('Wieder als versendet — ursprüngliches Versanddatum bleibt.')
+      toast.success('Wieder als versendet')
       setDetail((d) => ({ ...d, status: 'gesendet' }))
       refresh()
     })
@@ -421,6 +456,7 @@ export function RechnungDetailClient({
     const cta = primaryCta('rechnung', detail.status, {
       ueberfaellig,
       eingehend: isEingehend,
+      korrektur: Boolean(String(detail.korrektur_von ?? '').trim()),
     })
     if (cta?.id === 'rechnung_versenden') {
       if (isEingehend) return null
@@ -430,18 +466,7 @@ export function RechnungDetailClient({
       return {
         label: cta.label,
         icon: cta.icon,
-        onClick: () => {
-          void actionBusy.run(
-            isEingehend ? 'Wird als überwiesen markiert…' : 'Wird als bezahlt markiert…',
-            async () => {
-              if (isEingehend) {
-                await setStatus('bezahlt', { notifyPartner: true })
-              } else {
-                await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
-              }
-            }
-          )
-        },
+        onClick: () => setRechnungConfirm('bezahlt'),
         disabled: pending,
       }
     }
@@ -473,6 +498,7 @@ export function RechnungDetailClient({
     detail.status,
     detail.id,
     detail.auftrag_id,
+    detail.korrektur_von,
     ueberfaellig,
     pending,
     handleSenden,
@@ -484,14 +510,120 @@ export function RechnungDetailClient({
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (isEingehend) return null
-    if (rechnungKorrekturModus(detail.status) === 'gesperrt') return null
-    return {
-      label: 'Rechnung bearbeiten',
-      icon: 'pencil',
-      onClick: handleKorrigieren,
-      disabled: pending,
+    if (rechnungDarfImWizardBearbeitetWerden(detail.status)) {
+      return {
+        label: 'Rechnung bearbeiten',
+        shortLabel: 'Bearbeiten',
+        icon: 'pencil',
+        onClick: handleKorrigieren,
+        disabled: pending,
+      }
     }
+    if (rechnungKorrekturModus(detail.status) === 'storno_neu') {
+      return {
+        label: 'Rechnung korrigieren',
+        shortLabel: 'Korrigieren',
+        icon: 'pencil',
+        onClick: handleKorrigieren,
+        disabled: pending,
+        title: 'Storno-Gutschrift + neue Rechnung — Original bleibt bis Versand gültig',
+      }
+    }
+    return null
   }, [detail.status, pending, isEingehend])
+
+  const overflowMenuItems = useMemo((): ActionsMenuItem[] => {
+    if (isEingehend) {
+      return [
+        {
+          label: 'PDF öffnen',
+          icon: <MockIcon ctx="btn" n="file" size={16} />,
+          onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+        },
+      ]
+    }
+
+    const st = String(detail.status ?? '').toLowerCase()
+    const statusLabel =
+      st === 'gesendet'
+        ? 'Gesendet'
+        : st === 'bezahlt'
+          ? 'Bezahlt'
+          : st === 'storniert'
+            ? 'Storniert'
+            : st === 'entwurf'
+              ? 'Entwurf'
+              : st || 'Rechnung'
+
+    const korrekturModus = rechnungKorrekturModus(detail.status)
+    const korrekturDisabled = korrekturModus === 'gesperrt'
+    const korrekturHint = korrekturDisabled
+      ? `${statusLabel} — Korrektur nicht möglich`
+      : undefined
+
+    const erinnerungOk =
+      belegTyp === 'rechnung' && (st === 'gesendet' || ueberfaellig) && st !== 'bezahlt' && st !== 'storniert'
+    const erinnerungHint = !erinnerungOk
+      ? st === 'entwurf'
+        ? 'Entwurf — erst versenden'
+        : st === 'bezahlt'
+          ? 'Bezahlt — keine Erinnerung'
+          : st === 'storniert'
+            ? 'Storniert — keine Erinnerung'
+            : `${statusLabel} — Erinnerung nicht verfügbar`
+      : undefined
+
+    const items: ActionsMenuItem[] = [
+      {
+        label: 'PDF öffnen',
+        icon: <MockIcon ctx="btn" n="file" size={16} />,
+        onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
+      },
+    ]
+
+    // Gesendet/Bezahlt: Korrektur nur über Sekundär-CTA „Rechnung korrigieren“
+    // (Storno-Gutschrift + neue RE). Kein zweites Menü „Storno / Korrektur“.
+    if (korrekturModus !== 'storno_neu' && !secondaryAction) {
+      items.push({
+        label: 'Korrektur',
+        icon: <MockIcon ctx="btn" n="pencil" size={16} />,
+        disabled: korrekturDisabled,
+        hint: korrekturHint,
+        onClick: () => handleKorrigieren(),
+      })
+    }
+
+    items.push(
+      {
+        label: 'Zahlungserinnerung',
+        icon: <MockIcon ctx="btn" n="mail" size={16} />,
+        disabled: !erinnerungOk,
+        hint: erinnerungHint,
+        onClick: () => setErinnerungModalOpen(true),
+      },
+      ...(detail.status === 'bezahlt' && !isEingehend && belegTyp === 'rechnung'
+        ? ([
+            {
+              label: 'Als unbezahlt markieren',
+              icon: <MockIcon ctx="btn" n="arrow-left" size={16} />,
+              onClick: () => setRechnungConfirm('unbezahlt'),
+            },
+          ] as ActionsMenuItem[])
+        : [])
+    )
+    return items
+  }, [
+    isEingehend,
+    pdfHref,
+    detail.status,
+    detail.id,
+    detail.rechnungsnummer,
+    belegTyp,
+    ueberfaellig,
+    router,
+    refresh,
+    secondaryAction,
+  ])
 
   const projektTitelAnzeige = isEingehend
     ? detail.rechnungsnummer?.trim() ||
@@ -501,14 +633,21 @@ export function RechnungDetailClient({
   const rechnungStatus = rechnungStatusDisplay(detail.status, {
     ueberfaellig,
     eingehend: isEingehend,
+    korrektur_von: detail.korrektur_von,
+    korrektur_art: detail.korrektur_art,
+  })
+  const korrekturUi = resolveRechnungKorrekturUi({
+    status: detail.status,
+    korrektur_von: detail.korrektur_von,
+    korrektur_art: detail.korrektur_art,
   })
   const headMeta = useMemo(() => {
     const parts: string[] = []
-    if (projektTitelAnzeige && projektTitelAnzeige !== '—') parts.push(projektTitelAnzeige)
+    if (kundeName?.trim()) parts.push(kundeName.trim())
     if (detail.brutto != null) parts.push(formatEurBetrag(detail.brutto))
     if (detail.faellig_am) parts.push(`fällig ${formatDatum(detail.faellig_am)}`)
     return parts.join(' · ')
-  }, [projektTitelAnzeige, detail.brutto, detail.faellig_am])
+  }, [kundeName, detail.brutto, detail.faellig_am])
   const headSub =
     detail.status === 'gesendet'
       ? isEingehend
@@ -583,6 +722,7 @@ export function RechnungDetailClient({
 
   const uebersichtInhalt = (
     <div className="space-y-6">
+      {korrekturKette ? <RechnungKorrekturKetteCard kette={korrekturKette} /> : null}
       {stammdatenInhalt}
       {!isEingehend ? (
         <VorgangPhasenVerlauf
@@ -733,9 +873,14 @@ export function RechnungDetailClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: kundeName,
+        title: projektTitelAnzeige,
         sub: headSub,
-        badges: (
+        badges: korrekturUi.dualBadges ? (
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <StatusBadge status="gesendet" label={korrekturUi.dualBadges.primary} />
+            <StatusBadge status="entwurf" label={korrekturUi.dualBadges.secondary} />
+          </span>
+        ) : (
           <StatusBadge
             status={ueberfaellig ? 'ueberfaellig' : detail.status}
             label={rechnungStatus.label}
@@ -747,7 +892,7 @@ export function RechnungDetailClient({
             sheetTitle="Rechnung"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={[]}
+            menuItems={overflowMenuItems}
           />
         ),
       }}
@@ -791,12 +936,22 @@ export function RechnungDetailClient({
             firm={firm}
             zahlungszielTage={zahlungszielFallback}
             onClose={() => {
+              const neuId = wizardBootstrap.rechnungId
               setWizardOpen(false)
               setWizardBootstrap(null)
+              if (neuId && neuId !== detail.id) {
+                router.replace(`/rechnungen/${neuId}`)
+                return
+              }
+              refresh()
             }}
-            onDone={() => {
+            onDone={(id) => {
               setWizardOpen(false)
               setWizardBootstrap(null)
+              if (id && id !== detail.id) {
+                router.replace(`/rechnungen/${id}`)
+                return
+              }
               refresh()
             }}
           />
@@ -840,6 +995,58 @@ export function RechnungDetailClient({
           storniert markiert.
         </p>
       </Modal>
+
+      <ConfirmPopup
+        open={rechnungConfirm === 'bezahlt'}
+        onClose={() => setRechnungConfirm(null)}
+        title={isEingehend ? 'Als überwiesen markieren?' : 'Als bezahlt markieren?'}
+        confirmLabel={isEingehend ? 'Als überwiesen markieren' : 'Als bezahlt markieren'}
+        cancelLabel="Abbrechen"
+        onConfirm={() => {
+          setRechnungConfirm(null)
+          void actionBusy.run(
+            isEingehend ? 'Wird als überwiesen markiert…' : 'Wird als bezahlt markiert…',
+            async () => {
+              if (isEingehend) {
+                await setStatus('bezahlt', { notifyPartner: true })
+              } else {
+                await setStatus('bezahlt', { notifyKunde: Boolean(kundeEmail) })
+              }
+            }
+          )
+        }}
+      >
+        <p>
+          {(detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)) +
+            (detail.brutto != null ? ` · ${formatEurBetrag(detail.brutto)}` : '')}
+        </p>
+        <p className="mt-2">
+          {isEingehend
+            ? 'Die Eingangsrechnung wird als überwiesen verbucht.'
+            : 'Die Rechnung wird als bezahlt verbucht und fließt in Umsatz/KPIs ein.'}
+        </p>
+      </ConfirmPopup>
+
+      <ConfirmPopup
+        open={rechnungConfirm === 'unbezahlt'}
+        onClose={() => setRechnungConfirm(null)}
+        title="Bezahlung zurücknehmen?"
+        confirmLabel="Als unbezahlt markieren"
+        cancelLabel="Abbrechen"
+        danger
+        onConfirm={() => {
+          setRechnungConfirm(null)
+          void actionBusy.run('Wird zurückgesetzt…', async () => {
+            await setStatus('gesendet')
+          })
+        }}
+      >
+        <p>{detail.rechnungsnummer?.trim() || detail.id.slice(0, 8)}</p>
+        <p className="mt-2">
+          Status wird auf „Gesendet“ gesetzt, bezahlt_at geleert und der offene Betrag im Zahlplan neu
+          berechnet.
+        </p>
+      </ConfirmPopup>
     </EntityDetailLayout>
   )
 }

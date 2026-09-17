@@ -49,10 +49,14 @@ export type LeistungRow = {
   istRegie?: boolean
   /** Handwerker-Updates aus position_eintraege (Regie/BT) */
   handwerkerUpdates?: {
+    id?: string
+    typ?: string | null
     at?: string | null
     text: string
     zeitLabel?: string | null
     fotoCount?: number
+    /** Signierte Vorschau-URLs */
+    fotoUrls?: string[]
   }[]
   /** Erfasste Regie-Zeit (Soll/Ist-Label) */
   regieSollIstLabel?: string | null

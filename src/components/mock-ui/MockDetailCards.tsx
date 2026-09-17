@@ -35,7 +35,7 @@ export function MockDokumenteCard({
   return (
     <MockCard title={title} icon="files" className="dshell-framed">
       {empty ? (
-        <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien und Fotos erscheinen hier" />
+        <MockEmpty icon="files" title="Keine Dokumente" hint="Dateien über Hochladen oder Drag & Drop ablegen." />
       ) : (
         children
       )}

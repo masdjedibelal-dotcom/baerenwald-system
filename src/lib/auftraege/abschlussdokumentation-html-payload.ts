@@ -123,10 +123,11 @@ export function buildAbschlussdokuHtmlInput(
       beschreibung: e.beschreibung?.trim() || null,
     }))
 
-  const fotoUrls = pdf.fotoUrls.map((url, i) => ({
-    url,
-    caption: `Dokumentation ${i + 1}`,
-  }))
+  const fotoUrls = pdf.fotoUrls.map((f, i) =>
+    typeof f === 'string'
+      ? { url: f, caption: `Dokumentation ${i + 1}` }
+      : { url: f.url, caption: f.caption?.trim() || `Dokumentation ${i + 1}` }
+  )
 
   const mailAnrede = 'sie' as const
   const empfaengerStamm = kundeRechnungsempfaengerAusStammdaten(pdf.kunde)
@@ -163,6 +164,11 @@ export function buildAbschlussdokuHtmlInput(
       preis_netto: pdf.mitPreisen ? p.preis_fix : null,
     })),
     abnahmePunkte: pdf.abnahmePunkte,
+    abnahmeMaengel: pdf.abnahmeMaengel ?? null,
+    abnahmeMeta: pdf.abnahmeMeta ?? null,
+    abnahmeDatum: pdf.abnahmeDatum ? formatDe(pdf.abnahmeDatum) : null,
+    abnahmeNotizen: pdf.abnahmeNotizen?.trim() || null,
+    abnahmeErgebnisLabel: pdf.abnahmeErgebnisLabel?.trim() || null,
     bautagebuch,
     fotoUrls,
     mitBautagebuch: pdf.mitBautagebuch,

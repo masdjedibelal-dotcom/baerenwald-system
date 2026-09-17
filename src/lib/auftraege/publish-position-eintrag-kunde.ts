@@ -3,7 +3,7 @@ import 'server-only'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
+import { resolveEintragFotoDisplayUrl } from '@/lib/partner/handwerker-uploads'
 
 /**
  * Bautagebuch-/Positions-Eintrag sofort fürs Kundenportal freigeben
@@ -13,14 +13,24 @@ export async function publishPositionEintragFuerKunde(input: {
   eintragId: string
   auftragId: string
   typ: string
+  /** Expliziter Portal-Titel (sonst Typ · Leistung). */
+  titel?: string | null
   beschreibung?: string | null
   leistungName?: string | null
+  leistungNames?: string[] | null
   erstelltVon?: string | null
   handwerkerId?: string | null
 }): Promise<void> {
+  const leistungLabel =
+    (input.leistungNames ?? [])
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .join(', ') ||
+    input.leistungName?.trim() ||
+    null
   const titelParts = [
-    eintragTypLabel(input.typ as never) || 'Bautagebuch',
-    input.leistungName?.trim() || null,
+    input.titel?.trim() || eintragTypLabel(input.typ as never) || 'Bautagebuch',
+    input.titel?.trim() ? null : leistungLabel,
   ].filter(Boolean)
 
   const { data: fotos } = await supabaseAdmin
@@ -30,12 +40,11 @@ export async function publishPositionEintragFuerKunde(input: {
     .limit(12)
 
   const fotoUrls: string[] = []
-  for (const f of fotos ?? []) {
-    const path = String(f.storage_path ?? '').trim()
-    if (!path) continue
-    const url =
-      (await signedHandwerkerUploadUrl(path)) ??
-      (/^https?:\/\//i.test(path) ? path : null)
+  const paths = (fotos ?? [])
+    .map((f) => String(f.storage_path ?? '').trim())
+    .filter(Boolean)
+  const resolved = await Promise.all(paths.map((path) => resolveEintragFotoDisplayUrl(path)))
+  for (const url of resolved) {
     if (url) fotoUrls.push(url)
   }
 
@@ -50,4 +59,19 @@ export async function publishPositionEintragFuerKunde(input: {
     erstellt_von: input.erstelltVon ?? null,
     handwerker_id: input.handwerkerId ?? null,
   })
+
+  // Notify nicht blockierend — Speichern soll nicht auf Portal-Push warten
+  void import('@/lib/portal/notify-portal-bautagebuch')
+    .then(({ notifyPortalBautagebuchFromCrm }) =>
+      notifyPortalBautagebuchFromCrm({
+        auftragId: input.auftragId,
+        eintragTitel: titelParts.join(' · ') || 'Bautagebuch-Update',
+      })
+    )
+    .catch((e) => {
+      console.warn(
+        '[publishPositionEintragFuerKunde] Portal-Notify:',
+        e instanceof Error ? e.message : e
+      )
+    })
 }

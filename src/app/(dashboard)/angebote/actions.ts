@@ -2,7 +2,9 @@
 
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
@@ -26,6 +28,8 @@ import { formatDatumDeFromIso, projektOderStatusLink } from '@/lib/mail/versand-
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import {
   angebotDarfImWizardBearbeitetWerden,
+  angebotStatusErlaubtImWizard,
+  angebotWizardBearbeitenSperrgrund,
   defaultAngebotZahlungsbedingungen,
   resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
@@ -62,6 +66,7 @@ import { parseHwAnhangStoragePaths } from '@/lib/partner/partner-hw-dokument-typ
 import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
+  orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
@@ -76,6 +81,7 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
+import { resolveAngebotDokumentEmpfaenger } from '@/lib/angebote/angebot-html-payload'
 import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { supersedeLeadAngebote } from '@/lib/angebote/supersede-lead-angebote'
@@ -148,7 +154,10 @@ function parseVariantenRow(raw: unknown): AngebotVariantenPersistJson | null {
 
 const ANGEBOT_DETAIL_SELECT = `
       *,
-      kunden(*),
+      kunden(
+        *,
+        kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)
+      ),
       leads(*),
       kunden_objekte(*),
       angebot_handwerker(
@@ -168,6 +177,10 @@ async function loadAngebotDetail(id: string): Promise<AngebotDetail | null> {
   return {
     ...row,
     positionen: parsePositionen(row.positionen),
+    positionen_portal:
+      (row as { positionen_portal?: unknown }).positionen_portal != null
+        ? parsePositionen((row as { positionen_portal?: unknown }).positionen_portal)
+        : null,
   }
 }
 
@@ -177,7 +190,10 @@ export async function loadAngebotDetailAdmin(id: string): Promise<AngebotDetail 
     .select(
       `
       *,
-      kunden(*),
+      kunden(
+        *,
+        kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)
+      ),
       leads(*),
       kunden_objekte(*),
       angebot_handwerker(
@@ -195,6 +211,10 @@ export async function loadAngebotDetailAdmin(id: string): Promise<AngebotDetail 
   return {
     ...row,
     positionen: parsePositionen(row.positionen),
+    positionen_portal:
+      (row as { positionen_portal?: unknown }).positionen_portal != null
+        ? parsePositionen((row as { positionen_portal?: unknown }).positionen_portal)
+        : null,
   }
 }
 
@@ -215,6 +235,22 @@ export async function searchKunden(q: string) {
   )
 
   return { kunden: (data ?? []) as Kunde[] }
+}
+
+/** Kurz-Stammdaten für Auswahlfelder (Anfrage / Angebot). */
+export async function getKundeKurz(id: string): Promise<Kunde | null> {
+  const kid = id.trim()
+  if (!kid) return null
+  const { data } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select(
+        'id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at'
+      )
+      .eq('id', kid)
+      .maybeSingle()
+  )
+  return (data as Kunde | null) ?? null
 }
 
 export async function createKundeQuick(input: {
@@ -287,7 +323,7 @@ export async function createKundeQuick(input: {
     db
       .from('kunden')
       .insert({
-        name: null,
+        name: displayName || [v, n].filter(Boolean).join(' ') || 'Privatkunde',
         vorname: v || null,
         nachname: n || null,
         email,
@@ -329,6 +365,10 @@ export type CreateAngebotInput = {
   varianten?: AngebotVariantenPersistJson | null
   wichtige_hinweise?: string | null
   kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort — mit Lead durch Pipeline mitgeführt. */
+  objekt_anlage_id?: string | null
+  /** Optionaler Ansprechpartner (Versand / Anrede / PDF z. Hd.) */
+  ansprechpartner_id?: string | null
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
   handwerker_aufgabe_notizen?: Record<string, string | null | undefined>
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
@@ -468,6 +508,8 @@ export async function createAngebot(
       varianten: input.varianten ?? null,
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+      objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
+      ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
       ist_wiederkehrend: input.ist_wiederkehrend === true,
       wiederkehr_turnus:
         input.ist_wiederkehrend === true
@@ -524,15 +566,6 @@ export async function createAngebot(
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
-      leadId: input.lead_id,
-      angebotId: id,
-      betragEur: summen.nettoMax,
-    })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
-
     const { data: leadRow } = await supabase
       .from('leads')
       .select('status')
@@ -583,7 +616,12 @@ export async function updateAngebotProjektFelder(
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
   if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
-    return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
+    return {
+      ok: false,
+      message:
+        angebotWizardBearbeitenSperrgrund(String(current.status)) ??
+        'Dieses Angebot kann nicht mehr bearbeitet werden',
+    }
   }
 
   const db: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -601,7 +639,7 @@ export async function updateAngebotProjektFelder(
 export async function updateAngebot(
   angebotId: string,
   input: Omit<CreateAngebotInput, 'lead_id'> & { lead_id: string | null },
-  opts?: { asSystem?: boolean }
+  opts?: { asSystem?: boolean; /** Auftrags-Korrektur: angenommenes Angebot darf Positionen ändern */ forAuftragKorrektur?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
   const user = opts?.asSystem
@@ -616,8 +654,14 @@ export async function updateAngebot(
     .maybeSingle()
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
-  if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
-    return { ok: false, message: 'Dieses Angebot kann nicht mehr bearbeitet werden' }
+  if (!angebotStatusErlaubtImWizard(current.status, opts)) {
+    return {
+      ok: false,
+      message: opts?.forAuftragKorrektur
+        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        : angebotWizardBearbeitenSperrgrund(String(current.status)) ??
+          'Dieses Angebot kann nicht mehr bearbeitet werden',
+    }
   }
 
   const positionen = normalizeAngebotPositionen(input.positionen)
@@ -695,6 +739,12 @@ export async function updateAngebot(
       ...(input.zahlungsplan !== undefined ? { zahlungsplan: input.zahlungsplan } : {}),
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+        : {}),
+      ...(input.objekt_anlage_id !== undefined
+        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
+        : {}),
+      ...(input.ansprechpartner_id !== undefined
+        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
         : {}),
       ...(input.ist_wiederkehrend !== undefined
         ? {
@@ -829,14 +879,6 @@ export async function updateAngebot(
     await reparentPartnerEinholungenZuKundenangebot(leadId, angebotId)
     const syncLead = await syncAngebotLeistungenToLead(leadId, positionen)
     if (!syncLead.ok) return syncLead
-    const freigabeSync = await syncAngebotMitOrgFreigabe({
-      leadId,
-      angebotId,
-      betragEur: summen.nettoMax,
-    })
-    if (!freigabeSync.ok) {
-      console.warn('syncAngebotMitOrgFreigabe:', freigabeSync.message)
-    }
   }
 
   if (!opts?.asSystem) {
@@ -866,7 +908,14 @@ export async function setAngebotStatus(
   status: AngebotStatus,
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = opts?.asSystem ? supabaseAdmin : createClient()
+  let supabase: SupabaseClient
+  if (opts?.asSystem) {
+    supabase = supabaseAdmin
+  } else {
+    const gate = await requireStaffAndServiceRole()
+    if (!gate.ok) return { ok: false, message: gate.message }
+    supabase = gate.db
+  }
   const now = new Date().toISOString()
   const extra: Record<string, string> = {}
   if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
@@ -951,22 +1000,39 @@ export async function persistPdfForAngebot(
   const shouldPromote = hasNummer && !terminal && (wasEntwurf || !hadTimestamps)
   const now = new Date().toISOString()
 
-  const { error: dbErr } = await supabaseAdmin
+  const pdfUpdateBase = {
+    pdf_url: publicUrl,
+    updated_at: now,
+  }
+  const pdfUpdatePromote = shouldPromote
+    ? {
+        status_einfach: 'gesendet' as const,
+        status: 'gesendet_kunde' as const,
+        positionen_portal: detail.positionen ?? [],
+        ...(!hadTimestamps
+          ? { gesendet_am: now, gesendet_kunde_at: now }
+          : {}),
+      }
+    : {}
+
+  let { error: dbErr } = await supabaseAdmin
     .from('angebote')
-    .update({
-      pdf_url: publicUrl,
-      updated_at: now,
-      ...(shouldPromote
-        ? {
-            status_einfach: 'gesendet' as const,
-            status: 'gesendet_kunde' as const,
-            ...(!hadTimestamps
-              ? { gesendet_am: now, gesendet_kunde_at: now }
-              : {}),
-          }
-        : {}),
-    })
+    .update({ ...pdfUpdateBase, ...pdfUpdatePromote })
     .eq('id', angebotId)
+
+  if (dbErr && /positionen_portal/i.test(dbErr.message) && shouldPromote) {
+    const { positionen_portal: _drop, ...promoteWithoutPortal } = pdfUpdatePromote as {
+      positionen_portal?: unknown
+      status_einfach: 'gesendet'
+      status: 'gesendet_kunde'
+      gesendet_am?: string
+      gesendet_kunde_at?: string
+    }
+    ;({ error: dbErr } = await supabaseAdmin
+      .from('angebote')
+      .update({ ...pdfUpdateBase, ...promoteWithoutPortal })
+      .eq('id', angebotId))
+  }
 
   if (dbErr) return { ok: false, message: dbErr.message }
 
@@ -1685,11 +1751,8 @@ export async function ablehneHandwerkerEinreichung(input: {
   | { ok: true; mailGesendet: boolean; mailHinweis?: string }
   | { ok: false; message: string }
 > {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
 
   const crmNotiz = input.crmNotiz.trim()
   if (!crmNotiz) return { ok: false, message: 'Bitte einen Grund für den Handwerker eingeben.' }
@@ -1698,7 +1761,7 @@ export async function ablehneHandwerkerEinreichung(input: {
   if (!loaded.ok) return loaded
 
   const now = new Date().toISOString()
-  const { error: upErr } = await supabaseAdmin
+  const { error: upErr } = await gate.db
     .from('angebot_handwerker')
     .update({
       hw_status: 'abgelehnt',
@@ -1744,24 +1807,49 @@ export async function sendAngebotToKunde(
     skipHandwerkerGate?: boolean
   }
 ) {
-  const supabase = options?.asSystem ? supabaseAdmin : createClient()
+  let supabase: SupabaseClient
+  if (options?.asSystem) {
+    supabase = supabaseAdmin
+  } else {
+    const gate = await requireStaffAndServiceRole()
+    if (!gate.ok) return { ok: false as const, message: gate.message }
+    supabase = gate.db
+  }
   const detail = await loadAngebotDetailAdmin(angebotId)
   if (!detail) {
     return { ok: false as const, message: 'Angebot nicht gefunden' }
   }
+  const orgFreigabe = orgFreigabeKundenversandOptsFromLead(
+    detail.leads as {
+      org_freigabe_status?: string | null
+      hv_meldung_status?: string | null
+      freigabe_bypass_grund?: string | null
+      funnel_daten?: unknown
+    } | null
+  )
   if (
     !options?.skipHandwerkerGate &&
-    !darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status)
+    !darfAngebotAnKundeSenden(detail.angebot_handwerker, detail.status, orgFreigabe)
   ) {
-    const orgStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
-      ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
     return {
       ok: false as const,
-      message: handwerkerSendenBlockierHinweis(detail.angebot_handwerker, orgStatus),
+      message: handwerkerSendenBlockierHinweis(
+        detail.angebot_handwerker,
+        orgFreigabe?.orgStatus,
+        orgFreigabe?.hvMeldungStatus,
+        orgFreigabe
+      ),
     }
   }
   const istKorrektur = Boolean(options?.statusBeibehalten || detail.gesendet_kunde_at)
-  const kundenMail = detail.kunden?.email?.trim() ?? ''
+  const apIdSend =
+    (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id?.trim() || null
+  const kundenMail =
+    kundeRechnungsempfaengerAusStammdaten(detail.kunden, null, {
+      selectedAnsprechpartnerId: apIdSend,
+    }).email?.trim() ||
+    detail.kunden?.email?.trim() ||
+    ''
   const toList =
     options?.to?.map((e) => e.trim()).filter(Boolean) ??
     (kundenMail ? [kundenMail] : [])
@@ -1787,27 +1875,74 @@ export async function sendAngebotToKunde(
   }
 
   const now = new Date().toISOString()
+  async function updateNachVersand(payload: Record<string, unknown>) {
+    let { error } = await supabase.from('angebote').update(payload).eq('id', angebotId)
+    if (error && /positionen_portal/i.test(error.message)) {
+      const { positionen_portal: _drop, ...rest } = payload
+      ;({ error } = await supabase.from('angebote').update(rest).eq('id', angebotId))
+    }
+    if (error) {
+      return { ok: false as const, message: error.message }
+    }
+    return { ok: true as const }
+  }
+
   if (options?.statusBeibehalten) {
-    await supabase
-      .from('angebote')
-      .update({
-        gesendet_kunde_at: now,
-        gesendet_am: now,
-        status: 'kunde_akzeptiert',
-        status_einfach: 'angenommen',
-        updated_at: now,
-      })
-      .eq('id', angebotId)
+    const up = await updateNachVersand({
+      gesendet_kunde_at: now,
+      gesendet_am: now,
+      status: 'kunde_akzeptiert',
+      status_einfach: 'angenommen',
+      positionen_portal: detail.positionen ?? [],
+      updated_at: now,
+    })
+    if (!up.ok) return up
   } else {
-    await supabase
-      .from('angebote')
-      .update({
-        gesendet_kunde_at: now,
-        gesendet_am: now,
-        status_einfach: 'gesendet',
-        updated_at: now,
+    const up = await updateNachVersand({
+      gesendet_kunde_at: now,
+      gesendet_am: now,
+      status_einfach: 'gesendet',
+      positionen_portal: detail.positionen ?? [],
+      updated_at: now,
+    })
+    if (!up.ok) return up
+  }
+
+  // Org-Freigabe erst nach Speichern/Status „gesendet“ — nicht beim Entwurfs-Speichern.
+  // Über Schwelle → ausstehend (HV kann freigeben); unter Schwelle → Bypass für Mail-CTA.
+  if (detail.lead_id) {
+    try {
+      const posForFreigabe = normalizeAngebotPositionen(detail.positionen)
+      const summenFreigabe = summenAusPositionen(posForFreigabe, 19)
+      const freigabeSync = await syncAngebotMitOrgFreigabe({
+        leadId: detail.lead_id,
+        angebotId,
+        betragEur: summenFreigabe.nettoMax,
+        gesamtFix: detail.gesamt_fix,
+        gesamtMax: detail.gesamt_max,
       })
-      .eq('id', angebotId)
+      if (!freigabeSync.ok) {
+        console.warn('[sendAngebotToKunde] syncAngebotMitOrgFreigabe:', freigabeSync.message)
+      } else {
+        const { data: leadFresh } = await supabaseAdmin
+          .from('leads')
+          .select('org_freigabe_status, freigabe_bypass_grund')
+          .eq('id', detail.lead_id)
+          .maybeSingle()
+        if (detail.leads && typeof detail.leads === 'object' && leadFresh) {
+          const leadPatch = detail.leads as {
+            org_freigabe_status?: string | null
+            freigabe_bypass_grund?: string | null
+          }
+          leadPatch.org_freigabe_status =
+            (leadFresh.org_freigabe_status as string | null) ?? leadPatch.org_freigabe_status
+          leadPatch.freigabe_bypass_grund =
+            (leadFresh.freigabe_bypass_grund as string | null) ?? null
+        }
+      }
+    } catch (e) {
+      console.warn('[sendAngebotToKunde] org freigabe sync', e)
+    }
   }
 
   const posMail = normalizeAngebotPositionen(detail.positionen)
@@ -1836,13 +1971,23 @@ export async function sendAngebotToKunde(
       })()
     : gueltigFallback
 
-  const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
-    plz: detail.leads?.plz ?? null,
-    kontakt_name: detail.leads?.kontakt_name ?? null,
+  const { anredeKontext: kundenAnrede } = resolveAngebotDokumentEmpfaenger({
+    kunden: detail.kunden,
+    kunden_objekte: detail.kunden_objekte,
+    ansprechpartner_id:
+      (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null,
+    leads: detail.leads,
   })
   const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
   const portalAudience = portalAudienceFromKunde(detail.kunden)
-  const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
+  const unterSchwelleDirekt =
+    portalAudience === 'organisation' &&
+    String(
+      (detail.leads as { freigabe_bypass_grund?: string | null } | null)
+        ?.freigabe_bypass_grund ?? ''
+    )
+      .trim()
+      .toLowerCase() === 'schwelle'
   const angebotNr = detail.angebotsnr?.trim()
   const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
   const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
@@ -1874,6 +2019,7 @@ export async function sendAngebotToKunde(
             portalAudience,
             visualisierung_vorschau_url: vizPreviewUrl,
             reverseCharge: mailReverseCharge,
+            ctaMode: unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen',
           },
           branding
         ),
@@ -1964,6 +2110,27 @@ export async function previewAngebotKundeMail(input: {
   /** Live Gültig-bis (YYYY-MM-DD oder ISO), sonst DB/Fallback. */
   gueltigBis?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  try {
+    return await previewAngebotKundeMailInner(input)
+  } catch (e) {
+    console.error('[previewAngebotKundeMail]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'E-Mail-Vorschau fehlgeschlagen',
+    }
+  }
+}
+
+async function previewAngebotKundeMailInner(input: {
+  angebotId: string
+  betreff?: string
+  einleitung?: string | null
+  schluss?: string | null
+  leistungsumfang?: string | null
+  gesamtBrutto?: number | null
+  gesamtNetto?: number | null
+  gueltigBis?: string | null
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const angebotId = input.angebotId.trim()
   if (!angebotId) return { ok: false, message: 'Angebot fehlt' }
 
@@ -2009,13 +2176,23 @@ export async function previewAngebotKundeMail(input: {
       })()
     : gueltigFallback
 
-  const kundenEmpfaenger = kundeRechnungsempfaengerAusStammdaten(detail.kunden, {
-    plz: detail.leads?.plz ?? null,
-    kontakt_name: detail.leads?.kontakt_name ?? null,
+  const { anredeKontext: kundenAnrede } = resolveAngebotDokumentEmpfaenger({
+    kunden: detail.kunden,
+    kunden_objekte: detail.kunden_objekte,
+    ansprechpartner_id:
+      (detail as { ansprechpartner_id?: string | null }).ansprechpartner_id ?? null,
+    leads: detail.leads,
   })
   const portalLink = detail.kunde_id ? buildPortalLoginLink() : null
   const portalAudience = portalAudienceFromKunde(detail.kunden)
-  const kundenAnrede = kundeAnredeKontextFromEmpfaenger(kundenEmpfaenger)
+  const leadRow = Array.isArray(detail.leads)
+    ? (detail.leads[0] as { freigabe_bypass_grund?: string | null } | undefined)
+    : (detail.leads as { freigabe_bypass_grund?: string | null } | null)
+  const unterSchwelleDirekt =
+    portalAudience === 'organisation' &&
+    String(leadRow?.freigabe_bypass_grund ?? '')
+      .trim()
+      .toLowerCase() === 'schwelle'
   const angebotNr = detail.angebotsnr?.trim()
   const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
   const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
@@ -2050,6 +2227,7 @@ export async function previewAngebotKundeMail(input: {
         portalAudience,
         visualisierung_vorschau_url: vizPreviewUrl,
         reverseCharge: mailReverseCharge,
+        ctaMode: unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen',
       },
       branding
     )
@@ -2078,6 +2256,85 @@ export async function previewAngebotKundeMail(input: {
   }
 }
 
+/**
+ * Mail-Vorschau aus Wizard-Stand — ohne Angebot zu speichern / ohne Entwurf anzulegen.
+ * Platzhalter-Nr. „ENTWURF“; echte Nummer erst beim Versand.
+ */
+export async function previewAngebotWizardMailLive(input: {
+  betreff?: string
+  einleitung?: string | null
+  schluss?: string | null
+  leistungsumfang?: string | null
+  gesamtBrutto?: number | null
+  gueltigBis?: string | null
+  anrede?: 'du' | 'sie'
+  kundeName?: string | null
+  kundeVorname?: string | null
+  kundeNachname?: string | null
+  kundeTyp?: string | null
+  reverseCharge?: boolean
+  unterSchwelleDirekt?: boolean
+  /** organisation = Auftraggeber-Portal-Wording */
+  portalAudience?: 'privat' | 'organisation'
+}): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
+  try {
+    const branding = await getMailBranding(supabaseAdmin)
+    const firmMail = await fetchFirmenEinstellungen(supabaseAdmin)
+    const anrede = input.anrede === 'du' ? 'du' : 'sie'
+    const lu = input.leistungsumfang?.trim() || 'Ihr Projekt'
+    const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
+    const gueltigFallback = new Date(
+      Date.now() + gueltigTage * 24 * 60 * 60 * 1000
+    ).toLocaleDateString('de-DE')
+    const gueltigSource = input.gueltigBis?.trim()
+    const gueltig = gueltigSource
+      ? (() => {
+          try {
+            return new Date(gueltigSource).toLocaleDateString('de-DE')
+          } catch {
+            return gueltigFallback
+          }
+        })()
+      : gueltigFallback
+    const brutto =
+      input.gesamtBrutto != null && Number.isFinite(Number(input.gesamtBrutto))
+        ? Number(input.gesamtBrutto)
+        : 0
+    const audience = input.portalAudience === 'organisation' ? 'organisation' : 'privat'
+    const ctaMode = input.unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen'
+    const betreff =
+      input.betreff?.trim() ||
+      angebotMailBetreff(anrede, 'ENTWURF', branding.firmenname)
+    const html = buildAngebotMail(
+      {
+        name: input.kundeName?.trim() || 'Kunde',
+        vorname: input.kundeVorname?.trim() || null,
+        nachname: input.kundeNachname?.trim() || null,
+        typ: input.kundeTyp ?? null,
+        angebotsnr: 'ENTWURF',
+        leistungsumfang: lu,
+        gesamt_brutto: brutto,
+        gueltig_bis: gueltig,
+        anrede,
+        einleitung: input.einleitung ?? undefined,
+        schluss: input.schluss ?? undefined,
+        portalLink: buildPortalLoginLink() ?? undefined,
+        portalAudience: audience,
+        reverseCharge: Boolean(input.reverseCharge),
+        ctaMode,
+      },
+      branding
+    )
+    return { ok: true, html, betreff }
+  } catch (e) {
+    console.error('[previewAngebotWizardMailLive]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'E-Mail-Vorschau fehlgeschlagen',
+    }
+  }
+}
+
 export async function markKundeAbgelehnt(angebotId: string) {
   return setAngebotStatus(angebotId, 'abgelehnt')
 }
@@ -2090,10 +2347,12 @@ export async function recordKundeAbgelehntMitDetails(
     notiz: string | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: row } = await supabase
     .from('angebote')
-    .select('id, status, status_einfach')
+    .select('id, status, status_einfach, lead_id')
     .eq('id', angebotId)
     .maybeSingle()
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
@@ -2119,6 +2378,7 @@ export async function recordKundeAbgelehntMitDetails(
     input.konkurrenz_preis_eur != null && Number.isFinite(input.konkurrenz_preis_eur)
       ? Math.round(input.konkurrenz_preis_eur * 100) / 100
       : null
+  const now = new Date().toISOString()
   const { error } = await supabase
     .from('angebote')
     .update({
@@ -2127,10 +2387,24 @@ export async function recordKundeAbgelehntMitDetails(
       ablehnung_grund: input.grund,
       ablehnung_konkurrenz_preis: kp,
       ablehnung_notiz: input.notiz?.trim() || null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq('id', angebotId)
   if (error) return { ok: false, message: error.message }
+
+  const leadId = String(row.lead_id ?? '').trim()
+  if (leadId) {
+    await supabaseAdmin
+      .from('leads')
+      .update({
+        org_freigabe_status: 'abgelehnt',
+        updated_at: now,
+      })
+      .eq('id', leadId)
+      .in('org_freigabe_status', ['ausstehend', 'beschluss_ausstehend', 'freigegeben'])
+    revalidatePath(`/anfragen/${leadId}`)
+  }
+
   revalidatePath('/angebote')
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/')
@@ -2275,7 +2549,9 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
   alteZuweisungId: string
   neuerHandwerkerId: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: zuAlt, error: zErr } = await supabase
     .from('angebot_handwerker')
     .select('id, gewerk_id, handwerker_id, status, hw_status, hw_eingereicht_at')
@@ -3238,7 +3514,9 @@ export async function updateAngebotVorlage(
 export async function deleteAngebot(
   angebotId: string
 ): Promise<{ success: true } | { error: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { error: gate.message }
+  const supabase = gate.db
   const { data: auf } = await supabase.from('auftraege').select('id').eq('angebot_id', angebotId).maybeSingle()
   if (auf) {
     return {

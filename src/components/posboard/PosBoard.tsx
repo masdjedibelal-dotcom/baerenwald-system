@@ -52,7 +52,6 @@ export type PosBoardProps = {
     helpers: {
       onChange: (patch: Partial<PosBoardLine>) => void
       onClose: () => void
-      onRemove: () => void
     }
   ) => ReactNode
   lineOf?: (p: PosBoardLine) => number
@@ -78,20 +77,20 @@ export type PosBoardProps = {
 }
 
 function gewerkOf(p: PosBoardLine): string {
-  return p.gewerk?.trim() || 'Allgemein'
+  return (p.gewerk ?? '').trim()
 }
 
 function defaultMengeLabel(p: PosBoardLine): string {
-  if (p.kind === 'freitext') return '—'
-  if (p.kind === 'nachlass') {
-    return p.nachlassModus === 'betrag' ? 'Betrag' : `${p.preis || 0} %`
-  }
+  if (p.kind === 'freitext' || p.kind === 'nachlass') return ''
   return `${p.menge != null ? p.menge + ' ' : ''}${p.einheit || ''}`.trim()
 }
 
 function defaultPreisLabel(p: PosBoardLine, lineNetto: number): string {
   if (p.kind === 'freitext') return '—'
   if (p.kind === 'nachlass') {
+    if (p.nachlassModus === 'ziel_netto' || p.nachlassModus === 'ziel_brutto') {
+      return `→ ${formatEurBetrag(p.preis || 0)}`
+    }
     if (p.nachlassModus === 'betrag') return `−${formatEurBetrag(p.preis || 0)}`
     return `−${p.preis || 0} %`
   }
@@ -143,11 +142,23 @@ export function PosBoard({
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
   const [gewerkAddPick, setGewerkAddPick] = useState('')
   const [gewerkAddCustom, setGewerkAddCustom] = useState('')
+  /** Leere Gewerk-Abschnitte (noch ohne Zeile) — Angebot/Rechnung Komplex + Standalone. */
+  const [pendingGewerke, setPendingGewerke] = useState<string[]>([])
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
   const _line = lineOf ?? posBoardLineNetto
 
+  const claimPendingGewerk = (gewerk: string) => {
+    const g = gewerk.trim()
+    if (!g) return
+    setPendingGewerke((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : prev))
+  }
+
   const update = (id: string, patch: Partial<PosBoardLine>) => {
     if (!onChange) return
+    if (typeof patch.gewerk === 'string' && patch.gewerk.trim()) {
+      claimPendingGewerk(patch.gewerk)
+    }
     onChange(positionen.map((p) => (p.id === id ? { ...p, ...patch } : p)))
   }
 
@@ -160,6 +171,12 @@ export function PosBoard({
       delete n[id]
       return n
     })
+    setPendingRemoveId(null)
+  }
+
+  const requestRemove = (id: string) => {
+    if (!onChange) return
+    setPendingRemoveId(id)
   }
 
   const dup = (id: string) => {
@@ -179,7 +196,7 @@ export function PosBoard({
   }
 
   const defaultGewerk = (): string => {
-    if (positionen.length === 0) return gewerke[0] || 'Allgemein'
+    if (positionen.length === 0) return hideAddGewerk ? gewerke[0] || 'Allgemein' : ''
     return gewerkOf(positionen[positionen.length - 1])
   }
 
@@ -193,6 +210,7 @@ export function PosBoard({
     regieSchein?: boolean
   }) => {
     if (!onChange) return
+    claimPendingGewerk(gewerk)
     const id = neuePosBoardLine().id
     const np: PosBoardLine = makeNew
       ? {
@@ -285,10 +303,12 @@ export function PosBoard({
     draft?: { name?: string; beschreibung?: string }
   ) => {
     if (!onChange) return
+    const g = (gewerk ?? '').trim()
+    claimPendingGewerk(g)
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
-      gewerk: gewerk?.trim() || defaultGewerk(),
+      gewerk: g,
       name: draft?.name?.trim() || '',
       beschreibung: draft?.beschreibung?.trim() || '',
       menge: 0,
@@ -301,20 +321,27 @@ export function PosBoard({
     setEditId(draft?.name?.trim() || draft?.beschreibung?.trim() ? null : id)
   }
 
-  const addNachlass = (draft?: {
-    name?: string
-    nachlassModus?: 'prozent' | 'betrag'
-    preis?: number
-  }) => {
+  const addNachlass = (
+    draft?: {
+      name?: string
+      nachlassModus?: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+      preis?: number
+    },
+    gewerk?: string
+  ) => {
     if (!onChange) return
+    const g = gewerk !== undefined ? gewerk.trim() : ''
+    if (g) claimPendingGewerk(g)
     const existing = positionen.find((p) => p.kind === 'nachlass')
     if (existing) {
       if (draft) {
+        const modus = draft.nachlassModus ?? existing.nachlassModus ?? 'prozent'
         update(existing.id, {
           name: draft.name?.trim() || existing.name,
-          nachlassModus: draft.nachlassModus ?? existing.nachlassModus ?? 'prozent',
+          nachlassModus: modus,
           preis: draft.preis ?? existing.preis,
-          einheit: (draft.nachlassModus ?? existing.nachlassModus) === 'betrag' ? '€' : '%',
+          einheit: modus === 'prozent' ? '%' : '€',
+          gewerk: gewerk !== undefined ? gewerk.trim() : existing.gewerk,
         })
       }
       setEditId(existing.id)
@@ -324,10 +351,10 @@ export function PosBoard({
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
-      gewerk: 'Allgemein',
+      gewerk: g,
       name: draft?.name?.trim() || 'Nachlass',
       menge: 1,
-      einheit: modus === 'betrag' ? '€' : '%',
+      einheit: modus === 'prozent' ? '%' : '€',
       preis: draft?.preis ?? 0,
       ust: 0,
       kind: 'nachlass',
@@ -341,10 +368,15 @@ export function PosBoard({
     if (!onChange) return
     const id = neuePosBoardLine().id
     const gewerkName =
-      preislisteTargetGewerk?.trim() || pl.gewerke?.name?.trim() || defaultGewerk()
+      preislisteTargetGewerk != null
+        ? preislisteTargetGewerk.trim()
+        : pl.gewerke?.name?.trim() || defaultGewerk()
+    claimPendingGewerk(gewerkName)
     const np = neuePosBoardLine({
       id,
       gewerk: gewerkName,
+      gewerk_id: pl.gewerk_id?.trim() || pl.gewerke?.id?.trim() || null,
+      gewerk_slug: pl.gewerke?.slug?.trim() || null,
       name: pl.leistung,
       beschreibung: '',
       menge: 1,
@@ -364,7 +396,7 @@ export function PosBoard({
   }
 
   const addFromKatalog = (r: {
-    position: { titel: string; gewerk_name?: string | null }
+    position: { titel: string; gewerk_id?: string; gewerk_name?: string | null; gewerk_slug?: string | null }
     variante: {
       id: string
       beschreibung: string
@@ -377,12 +409,15 @@ export function PosBoard({
     if (!onChange) return
     const id = neuePosBoardLine().id
     const gewerkName =
-      preislisteTargetGewerk?.trim() ||
-      r.position.gewerk_name?.trim() ||
-      defaultGewerk()
+      preislisteTargetGewerk != null
+        ? preislisteTargetGewerk.trim()
+        : r.position.gewerk_name?.trim() || defaultGewerk()
+    claimPendingGewerk(gewerkName)
     const np = neuePosBoardLine({
       id,
       gewerk: gewerkName,
+      gewerk_id: r.position.gewerk_id?.trim() || null,
+      gewerk_slug: r.position.gewerk_slug?.trim() || null,
       name: r.position.titel,
       beschreibung: r.beschreibung,
       menge: r.menge,
@@ -398,11 +433,12 @@ export function PosBoard({
   }
 
   const onAddKind = (kind: PosAddKind, gewerk?: string) => {
-    const target = gewerk?.trim() || defaultGewerk()
+    // Ohne zweiten Arg = Dokument-Ebene (ohne Gewerk). Mit Arg = unter Gewerk-Gruppe.
+    const target = gewerk !== undefined ? gewerk.trim() : ''
     if (kind === 'position' || kind === 'preisliste') {
       openAddSheet(target, 'preisliste')
     } else if (kind === 'freitext') addFreitext(target)
-    else if (kind === 'nachlass') addNachlass()
+    else if (kind === 'nachlass') addNachlass(undefined, target)
   }
 
   const addGewerk = () => {
@@ -412,7 +448,7 @@ export function PosBoard({
   }
 
   const confirmAddGewerk = (forcedName?: string) => {
-    const used = new Set(positionen.map(gewerkOf))
+    const used = new Set([...positionen.map(gewerkOf), ...pendingGewerke])
     const fromSelect = gewerkAddPick.trim()
     const fromCustom = gewerkAddCustom.trim()
     let name = (forcedName?.trim() || fromCustom || fromSelect).trim()
@@ -426,14 +462,20 @@ export function PosBoard({
     setGewerkAddOpen(false)
     setGewerkAddPick('')
     setGewerkAddCustom('')
-    setPreislisteTargetGewerk(name)
-    setAddSheetMode('preisliste')
-    setAddSheetOpen(true)
+    // Leerer Abschnitt — Positionen über Dokument-Toolbar; unter Gewerk nur Freitext/Nachlass.
+    setPendingGewerke((prev) => (prev.includes(name) ? prev : [...prev, name]))
   }
 
   const renameGewerk = (from: string, to: string) => {
+    const next = to.trim()
+    if (!next || next === from) return
+    setPendingGewerke((prev) => {
+      if (!prev.includes(from)) return prev
+      const without = prev.filter((g) => g !== from)
+      return without.includes(next) ? without : [...without, next]
+    })
     if (!onChange) return
-    onChange(positionen.map((p) => (gewerkOf(p) === from ? { ...p, gewerk: to } : p)))
+    onChange(positionen.map((p) => (gewerkOf(p) === from ? { ...p, gewerk: next } : p)))
   }
 
   const copyGewerk = (gewerk: string) => {
@@ -448,6 +490,7 @@ export function PosBoard({
   }
 
   const deleteGewerk = (gewerk: string) => {
+    setPendingGewerke((prev) => prev.filter((g) => g !== gewerk))
     if (!onChange) return
     onChange(positionen.filter((p) => gewerkOf(p) !== gewerk))
   }
@@ -457,7 +500,20 @@ export function PosBoard({
     const from = positionen.findIndex((p) => p.id === draggedId)
     const targetPos = positionen.find((p) => p.id === targetId)
     if (from < 0 || !targetPos) return
-    const moved = { ...positionen[from], gewerk: gewerkOf(targetPos) }
+    const src = positionen[from]
+    // Nachlass bleibt dokumentweit — kein Gewerk-Wechsel
+    if (src.kind === 'nachlass') {
+      const arr = positionen.filter((p) => p.id !== draggedId)
+      const to = arr.findIndex((p) => p.id === targetId)
+      arr.splice(to < 0 ? arr.length : to, 0, src)
+      onChange(arr)
+      return
+    }
+    const targetGewerk = gewerkOf(targetPos)
+    const moved =
+      gewerkOf(src) === targetGewerk
+        ? src
+        : { ...src, gewerk: targetGewerk, gewerk_id: null, gewerk_slug: null }
     const arr = positionen.filter((p) => p.id !== draggedId)
     const to = arr.findIndex((p) => p.id === targetId)
     arr.splice(to < 0 ? arr.length : to, 0, moved)
@@ -468,7 +524,13 @@ export function PosBoard({
     if (!onChange) return
     const from = positionen.findIndex((p) => p.id === draggedId)
     if (from < 0) return
-    const moved = { ...positionen[from], gewerk }
+    const src = positionen[from]
+    if (src.kind === 'nachlass') return
+    claimPendingGewerk(gewerk)
+    const moved =
+      gewerkOf(src) === gewerk
+        ? src
+        : { ...src, gewerk, gewerk_id: null, gewerk_slug: null }
     const arr = positionen.filter((p) => p.id !== draggedId)
     let lastIdx = -1
     arr.forEach((p, i) => {
@@ -480,7 +542,7 @@ export function PosBoard({
 
   /** Gewerk-Abschnitte als Blöcke umsortieren (Flat-Array-Reihenfolge). */
   const reorderGroups = (draggedGewerk: string, targetGewerk: string) => {
-    if (!onChange || draggedGewerk === targetGewerk) return
+    if ((!onChange && pendingGewerke.length === 0) || draggedGewerk === targetGewerk) return
     const map = new Map<string, PosBoardLine[]>()
     const order: string[] = []
     for (const p of positionen) {
@@ -491,13 +553,21 @@ export function PosBoard({
       }
       map.get(g)!.push(p)
     }
+    for (const g of pendingGewerke) {
+      const name = g.trim()
+      if (!name || map.has(name) || order.includes(name)) continue
+      map.set(name, [])
+      order.push(name)
+    }
     const fromIdx = order.indexOf(draggedGewerk)
     if (fromIdx < 0 || !order.includes(targetGewerk)) return
     order.splice(fromIdx, 1)
     const insertAt = order.indexOf(targetGewerk)
     if (insertAt < 0) return
     order.splice(insertAt, 0, draggedGewerk)
-    onChange(order.flatMap((g) => map.get(g) ?? []))
+    const nextPending = order.filter((g) => (map.get(g)?.length ?? 0) === 0)
+    setPendingGewerke(nextPending)
+    if (onChange) onChange(order.flatMap((g) => map.get(g) ?? []))
   }
 
   const netto = positionen.reduce((s, p) => s + _line(p), 0)
@@ -506,6 +576,20 @@ export function PosBoard({
     0
   )
   const brutto = netto + ust
+  /** Positionssummen vor Nachlass — für Zielbetrag-Nachlass. */
+  const artikelNettoVorNachlass = positionen
+    .filter((p) => (p.kind ?? 'position') === 'position')
+    .reduce((s, p) => s + _line(p), 0)
+  const artikelBruttoVorNachlass =
+    Math.round(
+      positionen
+        .filter((p) => (p.kind ?? 'position') === 'position')
+        .reduce((s, p) => {
+          const n = _line(p)
+          const f = (p.ust != null ? Number(p.ust) : 19) / 100
+          return s + n * (1 + f)
+        }, 0) * 100
+    ) / 100
 
   const groups = useMemo((): PosTableGroup[] => {
     const map = new Map<string, PosBoardLine[]>()
@@ -515,7 +599,7 @@ export function PosBoard({
       arr.push(p)
       map.set(g, arr)
     })
-    return Array.from(map.entries()).map(([gewerk, arr], gi) => ({
+    const fromLines = Array.from(map.entries()).map(([gewerk, arr], gi) => ({
       id: `g${gi}`,
       gewerk,
       items: arr.map((p: PosBoardLine) => {
@@ -527,14 +611,29 @@ export function PosBoard({
           name: namePlain || beschPlain || '(ohne Bezeichnung)',
           beschreibung: namePlain ? beschPlain : '',
           mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
-          menge: typeof p.menge === 'number' ? p.menge : Number(p.menge) || undefined,
-          einheit: p.einheit || undefined,
+          menge:
+            p.kind === 'nachlass' || p.kind === 'freitext'
+              ? undefined
+              : typeof p.menge === 'number'
+                ? p.menge
+                : Number(p.menge) || undefined,
+          einheit: p.kind === 'nachlass' || p.kind === 'freitext' ? undefined : p.einheit || undefined,
+          mengeEditable: p.kind !== 'nachlass' && p.kind !== 'freitext',
           preisLabel: preisLabelOf ? preisLabelOf(p) : defaultPreisLabel(p, lineNetto),
           badge: badgeOf ? badgeOf(p) : defaultBadge(p),
         }
       }),
     }))
-  }, [positionen, mengeLabelOf, preisLabelOf, badgeOf, _line])
+    const used = new Set(fromLines.map((g) => g.gewerk))
+    const pending = pendingGewerke
+      .filter((g) => g.trim() && !used.has(g))
+      .map((gewerk, i) => ({
+        id: `pending-${i}-${gewerk}`,
+        gewerk,
+        items: [] as PosTableGroup['items'],
+      }))
+    return [...fromLines, ...pending]
+  }, [positionen, pendingGewerke, mengeLabelOf, preisLabelOf, badgeOf, _line])
 
   const itemActions = editable
     ? (g: PosTableGroup, it: { id: string }) => {
@@ -555,7 +654,7 @@ export function PosBoard({
             label: 'Löschen',
             icon: 'trash',
             danger: true,
-            onClick: () => remove(it.id),
+            onClick: () => requestRemove(it.id),
           },
         ]
         return items
@@ -614,19 +713,18 @@ export function PosBoard({
           guardSheetPointerFallthrough()
           setEditId(null)
         },
-        onRemove: () => remove(editP.id),
       }
     : null
 
   const gewerkOptions = useMemo(() => {
     const fromLines = positionen.map((p) => gewerkOf(p))
-    return Array.from(new Set([...gewerke, ...fromLines]))
-  }, [positionen, gewerke])
+    return Array.from(new Set([...gewerke, ...fromLines, ...pendingGewerke]))
+  }, [positionen, gewerke, pendingGewerke])
 
   const gewerkeZumHinzufuegen = useMemo(() => {
-    const used = new Set(positionen.map(gewerkOf))
+    const used = new Set([...positionen.map(gewerkOf), ...pendingGewerke])
     return gewerke.filter((g) => g.trim() && !used.has(g.trim()))
-  }, [gewerke, positionen])
+  }, [gewerke, positionen, pendingGewerke])
 
   const aktivePreislisten = useMemo(
     () => preislisten.filter((p) => p.aktiv !== false),
@@ -729,6 +827,10 @@ export function PosBoard({
         groups={groups}
         onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
         onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
+        gewerkAddKinds={hideAddGewerk ? undefined : ['freitext', 'nachlass']}
+        documentAddKinds={
+          hideAddGewerk ? undefined : ['position', 'freitext', 'nachlass']
+        }
         groupActions={groupActions}
         itemActions={itemActions}
         selectable={selectable}
@@ -737,14 +839,18 @@ export function PosBoard({
         onToggleGroup={toggleGroup}
         dnd={editable}
         onReorder={reorder}
-        onDropToGroup={dropToGroup}
-        onReorderGroup={reorderGroups}
+        onDropToGroup={hideAddGewerk ? undefined : dropToGroup}
+        onReorderGroup={hideAddGewerk ? undefined : reorderGroups}
         onCopyItem={editable ? dup : undefined}
-        onDeleteItem={editable ? remove : undefined}
+        onDeleteItem={editable ? requestRemove : undefined}
         onItemOpen={editable ? (it) => setEditId(it.id) : undefined}
         onMengeChange={
           editable
-            ? (id, menge) => update(id, { menge })
+            ? (id, menge) => {
+                const row = positionen.find((p) => p.id === id)
+                if (!row || row.kind === 'nachlass' || row.kind === 'freitext') return
+                update(id, { menge })
+              }
             : undefined
         }
         showTotals={showTotals ?? showUst !== false}
@@ -765,17 +871,60 @@ export function PosBoard({
             <button
               type="button"
               className="posboard-add-fab"
-              onClick={() => openAddSheet(defaultGewerk(), 'preisliste')}
+              onClick={() =>
+                openAddSheet(hideAddGewerk ? defaultGewerk() : '', 'preisliste')
+              }
             >
               <MockIcon ctx="btn" n="plus" size={18} />
               Position hinzufügen
             </button>
             {!hideAddGewerk ? (
-              <button type="button" className="posboard-add-fab posboard-add-fab--secondary" onClick={addGewerk}>
-                <MockIcon ctx="btn" n="folder-open" size={18} />
-                Gewerk hinzufügen
-              </button>
-            ) : null}
+              <>
+                <button
+                  type="button"
+                  className="posboard-add-fab posboard-add-fab--secondary"
+                  onClick={() => onAddKind('freitext')}
+                >
+                  <MockIcon ctx="btn" n="align-left" size={18} />
+                  Freitext
+                </button>
+                <button
+                  type="button"
+                  className="posboard-add-fab posboard-add-fab--secondary"
+                  onClick={() => onAddKind('nachlass')}
+                >
+                  <MockIcon ctx="btn" n="percent" size={18} />
+                  Nachlass
+                </button>
+                <button
+                  type="button"
+                  className="posboard-add-fab posboard-add-fab--secondary"
+                  onClick={addGewerk}
+                >
+                  <MockIcon ctx="btn" n="folder-open" size={18} />
+                  Gewerk hinzufügen
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="posboard-add-fab posboard-add-fab--secondary"
+                  onClick={() => onAddKind('freitext')}
+                >
+                  <MockIcon ctx="btn" n="align-left" size={18} />
+                  Freitext
+                </button>
+                <button
+                  type="button"
+                  className="posboard-add-fab posboard-add-fab--secondary"
+                  onClick={() => onAddKind('nachlass')}
+                >
+                  <MockIcon ctx="btn" n="percent" size={18} />
+                  Nachlass
+                </button>
+              </>
+            )}
           </div>
         </>
       ) : null}
@@ -787,9 +936,10 @@ export function PosBoard({
                 position={editP}
                 onChange={helpers.onChange}
                 onClose={helpers.onClose}
-                onRemove={editable ? helpers.onRemove : undefined}
                 showUst={showUst}
                 gewerke={gewerkOptions}
+                artikelNetto={artikelNettoVorNachlass}
+                artikelBrutto={artikelBruttoVorNachlass}
               />
             )
         : null}
@@ -890,8 +1040,9 @@ export function PosBoard({
           preferredGewerkName={preislisteTargetGewerk}
           gewerke={gewerkOptions}
           showUst={showUst}
-          allowGewerk={!hideAddGewerk}
-          allowNachlass
+          allowGewerk={false}
+          allowNachlass={false}
+          allowOhneGewerk={!hideAddGewerk}
           onClose={() => {
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)
@@ -913,32 +1064,6 @@ export function PosBoard({
             })
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)
-          }}
-          onAddFreitext={(draft) => {
-            addFreitext(draft.gewerk, {
-              name: draft.name,
-              beschreibung: draft.beschreibung,
-            })
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddNachlass={(draft) => {
-            addNachlass(draft)
-            setAddSheetOpen(false)
-            setPreislisteTargetGewerk(null)
-          }}
-          onAddGewerk={(name) => {
-            const used = new Set(positionen.map(gewerkOf))
-            let n = name.trim()
-            if (!n) return
-            if (used.has(n)) {
-              let i = 2
-              const base = n
-              while (used.has(`${base} ${i}`)) i += 1
-              n = `${base} ${i}`
-            }
-            setPreislisteTargetGewerk(n)
-            setAddSheetMode('preisliste')
           }}
         />
       ) : null}
@@ -988,6 +1113,37 @@ export function PosBoard({
                 </option>
               ))}
             </select>
+          </div>
+        </MockModal>
+      ) : null}
+      {pendingRemoveId ? (
+        <MockModal
+          open
+          icon="trash"
+          title="Position löschen?"
+          sub="Aus dem Leistungsblatt entfernen."
+          size="sm"
+          onClose={() => setPendingRemoveId(null)}
+          footer={
+            <>
+              <MockBtn kind="ghost" onClick={() => setPendingRemoveId(null)}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              <MockBtn
+                kind="danger"
+                icon="trash"
+                onClick={() => {
+                  if (pendingRemoveId) remove(pendingRemoveId)
+                }}
+              >
+                Position löschen
+              </MockBtn>
+            </>
+          }
+        >
+          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+            Die Position wird aus der Liste entfernt. Speichern im Wizard übernimmt die Änderung.
           </div>
         </MockModal>
       ) : null}

@@ -1,0 +1,119 @@
+R2-1B-P2 2026-08-25T23:33:31.714Z
+[23:33:37] P2-F161 ✅ — Amber-Banner sichtbar=true
+[23:33:39] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:39] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:41] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:42] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:43] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:44] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:45] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:46] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:47] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:33:48] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:34:21] P2-F167 ❌ — 9MB Toast/Error=false
+[23:34:23] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:34:25] funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+[23:34:26] funnel picked: Küche
+[23:34:28] funnel picked: Ja
+[23:34:29] funnel picked: Ja
+[23:34:31] funnel picked: Rutschgefahr
+[23:34:41] P2-F163 ✅ — confirm=true ref=true url=https://staging--baerenwald.netlify.app/melden/bestaetigung?org=Musterverwaltung+Nord&kennung=staging-muster-nord&token=7M-Ggl4k4X98t351HDicenX8gdPwGR6o&ref=024EEEAF&name=ZZTEST+P2deploy1&email=zztest.r2.1b.p2.deploy1%40example.test&telefon=08999993333
+[23:34:41] P2-F162 ✅ — next staging/relativ=true
+[23:34:41] P2-CTA ✅ — neutral CTA=true
+[23:34:44] P2-F170 ❌ — website-catch=false new=0
+[23:34:46] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:34:47] funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+[23:34:49] funnel picked: Küche
+[23:34:50] funnel picked: Ja
+[23:34:52] funnel picked: Ja
+[23:34:53] funnel picked: Rutschgefahr
+[23:35:03] F176 run1 ok=true url=https://staging--baerenwald.netlify.app/melden/bestaetigung?org=Musterverwaltung+Nord&kennung=staging-muster-nord&token=kiVlIY0QXQxmIuBlV-bz5ZNR9DfOxAR5&ref=355FED3F&name=ZZTEST+P2f176-1&email=zztest.r2.1b.p2.f176-1%40example.test&telefon=08999993333
+[23:35:07] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:35:08] funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+[23:35:10] funnel picked: Küche
+[23:35:11] funnel picked: Ja
+[23:35:13] funnel picked: Ja
+[23:35:14] funnel picked: Rutschgefahr
+[23:35:23] F176 run2 ok=true url=https://staging--baerenwald.netlify.app/melden/bestaetigung?org=Musterverwaltung+Nord&kennung=staging-muster-nord&token=Ggj_SQSzWstRxcKlc-uuPnRq4TaUJkIK&ref=DE09F527&name=ZZTEST+P2f176-2&email=zztest.r2.1b.p2.f176-2%40example.test&telefon=08999993333
+[23:35:26] funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+[23:35:28] funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+[23:35:29] funnel picked: Küche
+[23:35:31] funnel picked: Ja
+[23:35:32] funnel picked: Ja
+[23:35:34] funnel picked: Rutschgefahr
+[23:35:42] F176 run3 ok=true url=https://staging--baerenwald.netlify.app/melden/bestaetigung?org=Musterverwaltung+Nord&kennung=staging-muster-nord&token=1rSlE6YFYRQu9IGnDQcZCLKXB2PQbFGm&ref=7F02C45C&name=ZZTEST+P2f176-3&email=zztest.r2.1b.p2.f176-3%40example.test&telefon=08999993333
+[23:35:44] P2-F176 ✅ — 3× Redirect bestaetigung: #1=true, #2=true, #3=true
+[23:36:38] P2-DEL-23547a2c ⚠️ — modal=true toast=true dbGone=false
+[23:37:19] P2-DEL-130d4aa3 ⚠️ — modal=true toast=true dbGone=false
+[23:37:30] P2-4a-HV ⚠️ — Übergabe-Button nicht gefunden — evtl. bereits übergeben
+[23:37:35] P2-4a-CRM ⚠️ — Angebot-CTA nach HV=false
+[23:37:35] P2-4a-wizard 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A1 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A2 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A3 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A4 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A5 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A6 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A7 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4b-A8 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B1 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B2 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B3 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B4 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B5 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4c-B6 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C1 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C2 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C3 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C4 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C5 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4d-C6 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4e-E2E 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4f-E8 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4f-E9 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4f-F7 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4f-F9 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:37:35] P2-4g-N 🚫 — In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf
+[23:38:36] P2-4f-E8 🚫 — E8 Fehler: locator.waitFor: Timeout 60000ms exceeded.
+Call log:
+  - waiting for locator('input[type=password]') to be visible
+    - waiting for "https://staging--baerenwald-backend.netlify.app/" navigation to finish...
+    - navigated to "https://staging--baerenwald-backend.netlify.app/"
+
+[23:38:37] DONE

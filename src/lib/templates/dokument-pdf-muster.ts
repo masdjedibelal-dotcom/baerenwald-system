@@ -431,7 +431,7 @@ export function buildDokumentPdfMusterListe(
       html: buildAushangHtml({
         orgName: 'Verwaltung Mustermann',
         orgSub: 'Verwaltung',
-        primaryColor: '#22508C',
+        primaryColor: '#363B41',
         objektTitel: 'WEG Musterstraße 12',
         objektAdresse: 'Musterstraße 12 · 80331 München',
         meldeUrl: 'https://baerenwaldmuenchen.de/melden/musterverwaltung/musterstrasse-12',

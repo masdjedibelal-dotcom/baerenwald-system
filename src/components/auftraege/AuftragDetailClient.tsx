@@ -51,6 +51,7 @@ import type {
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { ClientOnly } from '@/components/ui/ClientOnly'
+import { confirmAction } from '@/components/ui/confirm-action'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
@@ -77,7 +78,8 @@ import {
   parseZahlungsplan,
   zahlplanAbgerechnetAusLinks,
 } from '@/lib/rechnungen/zahlungsplan'
-import { sendRechnung, updateRechnungStatus } from '@/app/(dashboard)/rechnungen/actions'
+import { sendRechnung, updateRechnungStatus, korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
+import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   defaultZahlungszielTage,
   type RechnungAuswahlZeile,
@@ -450,7 +452,7 @@ export function AuftragDetailClient({
       return
     }
     if (!detail.lead_id) {
-      toast.error('Keine Anfrage verknüpft — Korrektur nur über das Angebot möglich.')
+      toast.error('Keine Anfrage verknüpft')
       return
     }
     startTransition(async () => {
@@ -481,7 +483,7 @@ export function AuftragDetailClient({
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
-      toast.info('Nachtrag-Angebot — der laufende Auftrag bleibt bis zur Annahme unverändert.')
+      toast.info('Nachtrag — Auftrag unverändert')
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
@@ -663,12 +665,14 @@ export function AuftragDetailClient({
   })
   const headMeta = useMemo(() => {
     const parts: string[] = []
-    if (projektName) parts.push(projektName)
+    if (name && name !== 'Auftrag') parts.push(name)
     if (detail.created_at) parts.push(`erstellt ${formatDatum(detail.created_at)}`)
     return parts.filter(Boolean).join(' · ')
-  }, [projektName, detail.created_at])
+  }, [name, detail.created_at])
 
-  const freigabeAusstehend = (_leadDetail?.org_freigabe_status ?? '').trim() === 'ausstehend'
+  const freigabeStatus = (_leadDetail?.org_freigabe_status ?? '').trim()
+  const freigabeAusstehend =
+    freigabeStatus === 'ausstehend' || freigabeStatus === 'beschluss_ausstehend'
 
   const positionenAktiv = useMemo(
     () => auftragPositionenFuerSumme(detail.auftrag_positionen),
@@ -916,7 +920,29 @@ export function AuftragDetailClient({
         const { loadRechnungWizardBootstrap } = await import(
           '@/app/(dashboard)/rechnungen/wizard-actions'
         )
-        const res = await loadRechnungWizardBootstrap(rechnungId, detail.id)
+        const row = rechnungenListe.find((r) => r.id === rechnungId)
+        const status = row?.status
+        const modus = status
+          ? rechnungKorrekturModus(status)
+          : ('direkt' as const) // unbekannter Status → Entwurf-Load versuchen
+
+        let targetId = rechnungId
+        if (modus === 'storno_neu') {
+          const korr = await korrigiereRechnung(rechnungId)
+          if (!korr.ok) {
+            toast.error(korr.message)
+            return
+          }
+          if (korr.mode === 'storno_neu') {
+            targetId = korr.neuId
+            toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+          }
+        } else if (modus === 'gesperrt') {
+          toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+          return
+        }
+
+        const res = await loadRechnungWizardBootstrap(targetId, detail.id)
         if (!res.ok) {
           toast.error(res.message)
           return
@@ -924,22 +950,40 @@ export function AuftragDetailClient({
         openRechnungWizard(res.bootstrap)
       })
     },
-    [detail.id, openRechnungWizard]
+    [detail.id, openRechnungWizard, rechnungenListe]
   )
 
   const versendeNaechsteRechnung = useCallback(
     (rechnungId: string) => {
-      startTransition(async () => {
-        const r = await sendRechnung(rechnungId)
-        if (!r.ok) {
-          toast.error(r.message)
-          return
-        }
-        toast.success('Rechnung gesendet')
-        refresh()
+      const row = rechnungenListe.find((r) => r.id === rechnungId)
+      const nr = row?.rechnungsnummer?.trim()
+      confirmAction({
+        title: 'Rechnung wirklich versenden?',
+        body: nr
+          ? `${nr} wird per E-Mail an den Kunden gesendet.`
+          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
+        confirmLabel: 'Jetzt versenden',
+        cancelLabel: 'Abbrechen',
+        busyLabel: 'Wird gesendet…',
+        onConfirm: async () => {
+          const r = await sendRechnung(rechnungId)
+          if (!r.ok) {
+            toast.error(r.message)
+            return
+          }
+          toast.success('Rechnung gesendet')
+          refresh()
+        },
       })
     },
-    [refresh]
+    [refresh, rechnungenListe]
+  )
+
+  const openRechnungZurPruefung = useCallback(
+    (rechnungId: string) => {
+      router.push(`/rechnungen/${rechnungId}`)
+    },
+    [router]
   )
 
   const markiereNaechsteRechnungBezahlt = useCallback(
@@ -984,6 +1028,30 @@ export function AuftragDetailClient({
       const q = new URLSearchParams(searchParams.toString())
       q.delete('segment')
       router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+    }
+    // Deep-Link Abnahme → Canvas; Abschließen → Sheet
+    const vorOrt = vorOrtAbschnittFromQuery(rawTab)
+    if (
+      vorOrt === 'abnahme' &&
+      detail.status !== 'storniert' &&
+      detail.status !== 'abgeschlossen'
+    ) {
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('tab', 'leistungen')
+      q.delete('abschliessen')
+      router.replace(`/auftraege/${detail.id}/abnahme/erstellen`)
+      return
+    }
+    const wantsAbschliessen =
+      searchParams.get('abschliessen') === '1' || vorOrt === 'abschluss'
+    if (wantsAbschliessen && detail.status !== 'storniert' && detail.status !== 'abgeschlossen') {
+      setAbschliessenOpen(true)
+      if (vorOrt === 'abschluss' || searchParams.get('abschliessen') === '1') {
+        const q = new URLSearchParams(searchParams.toString())
+        if (vorOrt === 'abschluss') q.set('tab', 'leistungen')
+        q.delete('abschliessen')
+        router.replace(`/auftraege/${detail.id}?${q.toString()}`, { scroll: false })
+      }
     }
   }, [searchParams, detail.status, detail.id, zahlungOffen, router])
 
@@ -1109,9 +1177,16 @@ export function AuftragDetailClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: name,
+        title: projektName,
         titleBadges: freigabeAusstehend ? (
-          <StatusBadge status="termin" label="Wartet auf Freigabe" />
+          <StatusBadge
+            status="termin"
+            label={
+              freigabeStatus === 'beschluss_ausstehend'
+                ? 'Wartet auf Beschluss'
+                : 'Wartet auf Freigabe'
+            }
+          />
         ) : null,
         badges: (
           <StatusBadge status={detail.status} label={auftragStatus.label} />
@@ -1127,7 +1202,11 @@ export function AuftragDetailClient({
                 rechnungBezahlt:
                   detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
                 naechsterAbschlagSenden: Boolean(
-                  hatAbschlagsplan && naechsteRechnungAktion?.art === 'erstellen'
+                  hatAbschlagsplan &&
+                    naechsteRechnungAktion &&
+                    (naechsteRechnungAktion.art === 'erstellen' ||
+                      naechsteRechnungAktion.art === 'versenden') &&
+                    naechsteRechnungAktion.abschlag
                 ),
                 naechsteRechnungAktion:
                   detail.status === 'abgeschlossen'
@@ -1137,8 +1216,25 @@ export function AuftragDetailClient({
                     : undefined,
               })
               if (!cta) return null
+              const draftArt =
+                naechsteRechnungAktion?.rechnungId != null
+                  ? rechnungenListe.find((r) => r.id === naechsteRechnungAktion.rechnungId)
+                      ?.rechnung_art
+                  : null
+              const versandLabel =
+                draftArt === 'schluss' ||
+                (hatAbschlagsplan && draftArt === 'voll' && !naechsteRechnungAktion?.abschlag)
+                  ? 'Schlussrechnung versenden'
+                  : draftArt === 'abschlag' ||
+                      (hatAbschlagsplan && naechsteRechnungAktion?.abschlag)
+                    ? 'Abschlag versenden'
+                    : 'Rechnung versenden'
               const onClick = () => {
-                if (cta.id === 'abnahme_starten' || cta.id === 'auftrag_abschliessen') {
+                if (cta.id === 'abnahme_starten') {
+                  router.push(`/auftraege/${detail.id}/abnahme/erstellen`)
+                  return
+                }
+                if (cta.id === 'auftrag_abschliessen') {
                   openAuftragAbschliessen()
                   return
                 }
@@ -1169,29 +1265,98 @@ export function AuftragDetailClient({
                 }
               }
               return {
-                label: cta.label,
+                label:
+                  cta.id === 'rechnung_versenden' ? versandLabel : cta.label,
                 icon: cta.icon,
                 onClick,
+                href:
+                  cta.id === 'abnahme_starten'
+                    ? `/auftraege/${detail.id}/abnahme/erstellen`
+                    : undefined,
                 disabled: pending,
               }
             })()}
-            secondary={
-              !istStorniert && detail.angebot_id
-                ? {
-                    label: 'Auftrag bearbeiten',
-                    icon: 'pencil',
-                    onClick: openAngebotKorrektur,
-                    disabled: pending,
-                  }
-                : null
-            }
+            secondary={(() => {
+              if (istStorniert) return null
+              // Primary = Abschließen → Secondary = Abnahme-Canvas (direkt, kein Sheet-Hop)
+              if (
+                detail.status === 'offen' ||
+                detail.status === 'in_arbeit' ||
+                detail.status === 'abnahme'
+              ) {
+                // Bei Status Abnahme ist Primary schon „Abnahme starten“ — kein Doppel-CTA
+                if (detail.status === 'abnahme') return null
+                return {
+                  label: 'Abnahme starten',
+                  icon: 'clipboard-list',
+                  onClick: () =>
+                    router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+                  href: `/auftraege/${detail.id}/abnahme/erstellen`,
+                  disabled: pending,
+                  title: 'Abnahmeprotokoll erstellen (optional)',
+                }
+              }
+              // Nie zweiten „Versenden“-Button — mobil links leicht mit „Korrigieren“ verwechselt.
+              if (
+                detail.status === 'abgeschlossen' &&
+                naechsteRechnungAktion?.art === 'versenden' &&
+                naechsteRechnungAktion.rechnungId
+              ) {
+                return {
+                  label: 'Rechnung prüfen',
+                  icon: 'file-invoice',
+                  onClick: () =>
+                    openRechnungZurPruefung(naechsteRechnungAktion.rechnungId!),
+                  disabled: pending,
+                  title: 'Rechnung öffnen — korrigieren oder erst dann versenden',
+                }
+              }
+              if (
+                detail.status === 'abgeschlossen' &&
+                naechsteRechnungAktion?.art === 'bezahlt' &&
+                naechsteRechnungAktion.rechnungId
+              ) {
+                return {
+                  label: 'Rechnung öffnen',
+                  icon: 'file-invoice',
+                  onClick: () =>
+                    openRechnungZurPruefung(naechsteRechnungAktion.rechnungId!),
+                  disabled: pending,
+                  title: 'Rechnung öffnen — dort korrigieren',
+                }
+              }
+              if (detail.angebot_id) {
+                return {
+                  label: 'Auftrag bearbeiten',
+                  icon: 'pencil',
+                  onClick: openAngebotKorrektur,
+                  disabled: pending,
+                }
+              }
+              return null
+            })()}
             menuItems={
-              !istStorniert && detail.angebot_id && detail.lead_id
+              !istStorniert
                 ? [
-                    {
-                      label: 'Nachtrag erstellen',
-                      onClick: openNachtragAngebot,
-                    },
+                    ...(detail.angebot_id &&
+                    (detail.status === 'offen' ||
+                      detail.status === 'in_arbeit' ||
+                      detail.status === 'abnahme')
+                      ? [
+                          {
+                            label: 'Auftrag bearbeiten',
+                            onClick: openAngebotKorrektur,
+                          },
+                        ]
+                      : []),
+                    ...(detail.angebot_id && detail.lead_id
+                      ? [
+                          {
+                            label: 'Nachtrag erstellen',
+                            onClick: openNachtragAngebot,
+                          },
+                        ]
+                      : []),
                   ]
                 : []
             }

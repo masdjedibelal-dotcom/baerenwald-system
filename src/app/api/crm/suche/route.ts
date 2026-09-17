@@ -18,8 +18,10 @@ export async function GET(req: Request) {
       .limit(5),
     supabase
       .from('kunden')
-      .select('id, name, vorname, nachname, ort')
-      .or(`name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},ort.ilike.${pattern}`)
+      .select('id, name, vorname, nachname, ort, org_anzeigename')
+      .or(
+        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},ort.ilike.${pattern},org_anzeigename.ilike.${pattern}`
+      )
       .limit(5),
     supabase
       .from('auftraege')
@@ -65,7 +67,9 @@ export async function GET(req: Request) {
   }
 
   for (const k of kunden.data ?? []) {
+    const orgName = (k.org_anzeigename as string | null)?.trim()
     const name =
+      orgName ||
       (k.name as string) ||
       [(k.vorname as string), (k.nachname as string)].filter(Boolean).join(' ') ||
       'Kunde'

@@ -42,7 +42,9 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
   if (!angebotId) return { ok: false, message: 'Kein verknüpftes Angebot.' }
   if (!leadId) return { ok: false, message: 'Keine verknüpfte Anfrage — Wizard nicht verfügbar.' }
 
-  const loaded = await loadAngebotWizardBootstrap(angebotId, leadId)
+  const loaded = await loadAngebotWizardBootstrap(angebotId, leadId, {
+    forAuftragKorrektur: true,
+  })
   if (!loaded.ok) return loaded
 
   const lead = await loadAnfrageDetail(supabase, leadId)

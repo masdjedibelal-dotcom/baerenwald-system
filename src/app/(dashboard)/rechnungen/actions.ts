@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { updateGesamtUmsatz } from '@/app/actions/kunden'
@@ -14,7 +15,11 @@ import {
   kundeAnredeKontextFromEmpfaenger,
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
-import { buildRechnungMail, sanitizeRechnungMailBetreff } from '@/lib/mail/rechnung-mail'
+import {
+  buildRechnungMail,
+  rechnungKorrekturMailBetreff,
+  sanitizeRechnungMailBetreff,
+} from '@/lib/mail/rechnung-mail'
 import { buildZahlungserinnerungMail } from '@/lib/mail-templates'
 import {
   zahlungserinnerungZahlbarBis,
@@ -29,6 +34,7 @@ import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-m
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
+import { linkRechnungKorrekturKette, resolveRechnungKorrekturKette } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   berechneRechnungMitFirmeneinstellungen,
   isRechnungComplianceSchemaError,
@@ -50,7 +56,10 @@ import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
-import { ensureRechnungsnummerFuerVersand } from '@/lib/rechnungen/next-rechnungsnummer'
+import {
+  ensureRechnungsnummerFuerVersand,
+  releaseRechnungsnummerWennEntwurf,
+} from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
   positionen: AngebotPosition[]
@@ -73,8 +82,14 @@ export type RechnungEntwurfPayload = {
   liste_berechnung?: RechnungBerechnung | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
-  /** Nur Anzeige/Vorschau — Entwürfe speichern keine offizielle Nummer. */
+  /** Entwurf: keine Nummer — offizielle RE erst beim Versand (siehe ensureRechnungsnummerFuerVersand). */
   rechnungsnummer?: string | null
+  /** Empfänger-Ansprechpartner (null = Hauptkontakt). */
+  ansprechpartner_id?: string | null
+  /** Ausführungsort / Verwaltungsobjekt. */
+  kunde_objekt_id?: string | null
+  /** Anlage/Teil am Ausführungsort. */
+  objekt_anlage_id?: string | null
 }
 
 async function validateVorSpeichern(
@@ -142,6 +157,9 @@ export async function createRechnungEntwurf(input: {
       auftrag_id: input.auftrag_id,
       kunde_id: input.kunde_id,
       rechnungsnummer: null,
+      ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
+      kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
+      objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: input.leistungszeitraum_von,
@@ -180,7 +198,9 @@ export async function updateRechnungEntwurf(
   id: string,
   input: RechnungEntwurfPayload & { kunde_id: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   const valid = await validateVorSpeichern(supabase, input.kunde_id, input)
   if (!valid.ok) return valid
@@ -213,6 +233,15 @@ export async function updateRechnungEntwurf(
       mail_betreff: input.mail_betreff?.trim() || null,
       zahlungsbedingungen: input.zahlungsbedingungen?.trim() || null,
       hinweis_35a: input.hinweis_35a ?? null,
+      ...(input.ansprechpartner_id !== undefined
+        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
+        : {}),
+      ...(input.kunde_objekt_id !== undefined
+        ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+        : {}),
+      ...(input.objekt_anlage_id !== undefined
+        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
+        : {}),
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
       ...(input.zahlungsplan_abschlag_id
@@ -235,6 +264,10 @@ export async function updateRechnungEntwurf(
   )
 
   if (error) return { ok: false, message: error.message }
+
+  // Korrektur-Entwurf: Art bleibt 'gutschrift' (DB-Check) — UI leitet Status aus status ab
+  // absichtlich kein Update auf ungültige Werte wie 'gespeichert'/'entwurf'
+
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${id}`)
   revalidatePath('/vorgaenge')
@@ -250,7 +283,9 @@ export async function updateRechnungZahlungsziel(input: {
   const rechnungId = input.rechnungId?.trim()
   if (!rechnungId) return { ok: false, message: 'Rechnung fehlt.' }
 
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: rec, error: loadErr } = await supabase
     .from('rechnungen')
     .select('id, status, beleg_typ, richtung, faellig_am, rechnungsdatum, created_at, zahlungsbedingungen')
@@ -301,9 +336,18 @@ export async function updateRechnungZahlungsziel(input: {
 
 /** Gutschrift zur Originalrechnung (negative Beträge, neue Nummer GS-BW-…). */
 export async function createGutschriftFromRechnung(
-  rechnungId: string
+  rechnungId: string,
+  opts?: {
+    /**
+     * true = Original bleibt gesendet/bezahlt bis Korrektur-Versand
+     * (Korrektur-Flow). false/default = Original sofort stornieren (reine Gutschrift).
+     */
+    deferOriginalStorno?: boolean
+  }
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   const { data: orig, error: loadErr } = await supabase
     .from('rechnungen')
@@ -333,10 +377,6 @@ export async function createGutschriftFromRechnung(
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
   const { data: row, error } = await rechnungInsertMitSchemaFallback(
     supabase,
     {
@@ -351,7 +391,7 @@ export async function createGutschriftFromRechnung(
       faellig_am: null,
       rechnungsdatum: new Date().toISOString().slice(0, 10),
       pdf_url: null,
-      erstellt_von: user?.id ?? null,
+      erstellt_von: gate.user.id,
       zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
       rechnung_art: orig.rechnung_art ?? null,
       abschlag_index: orig.abschlag_index ?? null,
@@ -366,10 +406,12 @@ export async function createGutschriftFromRechnung(
 
   if (error || !row) return { ok: false, message: error?.message ?? 'Gutschrift fehlgeschlagen' }
 
-  await supabase
-    .from('rechnungen')
-    .update({ status: 'storniert', updated_at: new Date().toISOString() })
-    .eq('id', rechnungId)
+  if (!opts?.deferOriginalStorno) {
+    await supabase
+      .from('rechnungen')
+      .update({ status: 'storniert', updated_at: new Date().toISOString() })
+      .eq('id', rechnungId)
+  }
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
@@ -385,10 +427,12 @@ export async function createGutschriftFromRechnung(
  */
 export async function korrigiereRechnung(rechnungId: string): Promise<
   | { ok: true; mode: 'direkt' }
-  | { ok: true; mode: 'storno_neu'; stornoId: string; neuId: string }
+  | { ok: true; mode: 'storno_neu'; stornoId: string; neuId: string; originalStatus: string }
   | { ok: false; message: string }
 > {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   const { data: orig, error: loadErr } = await supabase
     .from('rechnungen')
@@ -419,8 +463,29 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     return { ok: false, message: 'Status erlaubt keine Korrektur.' }
   }
 
-  // 1) Storno-Beleg (Gutschrift, negativ, mit Bezug)
-  const gutschrift = await createGutschriftFromRechnung(rechnungId)
+  const bestehendeErsetzt = String(orig.ersetzt_durch ?? '').trim()
+  if (bestehendeErsetzt) {
+    const { data: laufend } = await supabase
+      .from('rechnungen')
+      .select('id, status')
+      .eq('id', bestehendeErsetzt)
+      .maybeSingle()
+    const st = String(laufend?.status ?? '').toLowerCase()
+    if (laufend && st !== 'storniert') {
+      return {
+        ok: false,
+        message:
+          st === 'entwurf'
+            ? 'Korrektur-Entwurf läuft bereits — bitte fortsetzen oder verwerfen.'
+            : 'Diese Rechnung wurde bereits ersetzt — keine weitere Korrektur.',
+      }
+    }
+  }
+
+  // 1) Storno-Beleg (Gutschrift) — Original bleibt gesendet bis Versand
+  const gutschrift = await createGutschriftFromRechnung(rechnungId, {
+    deferOriginalStorno: true,
+  })
   if (!gutschrift.ok) return gutschrift
 
   // 2) Neue Rechnung als Entwurf (Nummer erst beim Versand)
@@ -429,10 +494,6 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     positionen: positionenRaw,
     reverse_charge_13b: Boolean(orig.reverse_charge_13b),
   })
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   const { data: neu, error: neuErr } = await rechnungInsertMitSchemaFallback(
     supabase,
@@ -448,15 +509,22 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       faellig_am: null,
       rechnungsdatum: new Date().toISOString().slice(0, 10),
       pdf_url: null,
-      erstellt_von: user?.id ?? null,
+      erstellt_von: gate.user.id,
       einleitung: orig.einleitung ?? null,
       hinweise: orig.hinweise ?? null,
       zahlungsbedingungen: orig.zahlungsbedingungen ?? null,
+      mail_einleitung: null,
+      mail_betreff: null,
+      ansprechpartner_id: orig.ansprechpartner_id ?? null,
+      kunde_objekt_id: orig.kunde_objekt_id ?? null,
+      objekt_anlage_id: orig.objekt_anlage_id ?? null,
       reverse_charge_13b: Boolean(orig.reverse_charge_13b),
       hinweis_35a: orig.hinweis_35a ?? null,
       rechnung_art: orig.rechnung_art ?? 'voll',
       abschlag_index: orig.abschlag_index ?? null,
       zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
+      korrektur_von: rechnungId,
+      korrektur_art: 'gutschrift',
     },
     berechnung,
     {
@@ -470,11 +538,58 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     return { ok: false, message: neuErr?.message ?? 'Neue Rechnung konnte nicht angelegt werden.' }
   }
 
+  const link = await linkRechnungKorrekturKette(supabase, {
+    originalId: rechnungId,
+    neuId: neu.id as string,
+    art: 'gutschrift',
+  })
+  if (!link.ok) {
+    console.warn('[korrigiereRechnung] link:', link.message)
+  }
+
+  // Sicherstellen: korrektur_von + ersetzt_durch (sonst kein Storno-Anhang / keine Korrektur-Mail)
+  const { data: linked } = await supabase
+    .from('rechnungen')
+    .select('korrektur_von')
+    .eq('id', neu.id)
+    .maybeSingle()
+  if (!String(linked?.korrektur_von ?? '').trim()) {
+    const { error: forceErr } = await supabase
+      .from('rechnungen')
+      .update({
+        korrektur_von: rechnungId,
+        korrektur_art: 'gutschrift',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', neu.id)
+    if (forceErr) {
+      console.warn('[korrigiereRechnung] korrektur_von force:', forceErr.message)
+    }
+  }
+  const { data: origLinked } = await supabase
+    .from('rechnungen')
+    .select('ersetzt_durch')
+    .eq('id', rechnungId)
+    .maybeSingle()
+  if (String(origLinked?.ersetzt_durch ?? '').trim() !== String(neu.id)) {
+    const { error: forceOrig } = await supabase
+      .from('rechnungen')
+      .update({
+        ersetzt_durch: neu.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', rechnungId)
+    if (forceOrig) {
+      console.warn('[korrigiereRechnung] ersetzt_durch force:', forceOrig.message)
+    }
+  }
+
   // Storno-Gutschrift: Bezug bleibt auf Original; optional Hinweis auf Nachfolger in Notizen weglassen
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath(`/rechnungen/${gutschrift.id}`)
   revalidatePath(`/rechnungen/${neu.id}`)
+  revalidatePath('/vorgaenge')
   if (orig.auftrag_id) revalidatePath(`/auftraege/${orig.auftrag_id}`)
 
   return {
@@ -482,7 +597,97 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     mode: 'storno_neu',
     stornoId: gutschrift.id,
     neuId: neu.id as string,
+    originalStatus: status,
   }
+}
+
+/**
+ * Korrektur abbrechen ohne Speichern: Ersatz-Entwurf + Storno-Gutschrift hart löschen,
+ * Original wieder auf gesendet/bezahlt setzen.
+ */
+export async function abbrecheRechnungKorrekturSession(input: {
+  originalId: string
+  gutschriftId: string
+  neuId: string
+  originalStatus: 'gesendet' | 'bezahlt' | string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
+
+  const originalId = input.originalId.trim()
+  const gutschriftId = input.gutschriftId.trim()
+  const neuId = input.neuId.trim()
+  if (!originalId || !gutschriftId || !neuId) {
+    return { ok: false, message: 'Korrektur-Session unvollständig.' }
+  }
+
+  const { data: neu } = await supabase
+    .from('rechnungen')
+    .select('id, status, beleg_typ, korrektur_von')
+    .eq('id', neuId)
+    .maybeSingle()
+  if (!neu) {
+    // Schon weg — Original ggf. trotzdem reparieren
+  } else {
+    if (String(neu.status ?? '').toLowerCase() !== 'entwurf') {
+      return { ok: false, message: 'Ersatz-Rechnung ist kein Entwurf mehr — Abbruch nicht möglich.' }
+    }
+    if (String(neu.korrektur_von ?? '').trim() !== originalId) {
+      return { ok: false, message: 'Ersatz-Rechnung gehört nicht zu dieser Korrektur.' }
+    }
+  }
+
+  const { data: gs } = await supabase
+    .from('rechnungen')
+    .select('id, status, beleg_typ, bezug_rechnung_id')
+    .eq('id', gutschriftId)
+    .maybeSingle()
+  if (gs) {
+    if (String(gs.status ?? '').toLowerCase() !== 'entwurf') {
+      return { ok: false, message: 'Gutschrift ist kein Entwurf mehr — Abbruch nicht möglich.' }
+    }
+    if (String(gs.beleg_typ ?? '') !== 'gutschrift') {
+      return { ok: false, message: 'Ungültige Gutschrift für Abbruch.' }
+    }
+    if (String(gs.bezug_rechnung_id ?? '').trim() !== originalId) {
+      return { ok: false, message: 'Gutschrift gehört nicht zum Original.' }
+    }
+  }
+
+  if (neuId) {
+    const { error: delNeu } = await supabase.from('rechnungen').delete().eq('id', neuId)
+    if (delNeu) return { ok: false, message: delNeu.message }
+  }
+  if (gutschriftId) {
+    const { error: delGs } = await supabase.from('rechnungen').delete().eq('id', gutschriftId)
+    if (delGs) return { ok: false, message: delGs.message }
+  }
+
+  const restoreStatus =
+    String(input.originalStatus ?? '').toLowerCase() === 'bezahlt' ? 'bezahlt' : 'gesendet'
+  // Verzögerter Storno: Original oft noch gesendet — nur Kette lösen.
+  // Legacy: war schon storniert → Status wiederherstellen.
+  const { data: origRow } = await supabase
+    .from('rechnungen')
+    .select('status')
+    .eq('id', originalId)
+    .maybeSingle()
+  const origSt = String(origRow?.status ?? '').toLowerCase()
+  const { error: restoreErr } = await supabase
+    .from('rechnungen')
+    .update({
+      ...(origSt === 'storniert' ? { status: restoreStatus } : {}),
+      ersetzt_durch: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', originalId)
+  if (restoreErr) return { ok: false, message: restoreErr.message }
+
+  revalidatePath('/rechnungen')
+  revalidatePath(`/rechnungen/${originalId}`)
+  revalidatePath('/vorgaenge')
+  return { ok: true }
 }
 
 /**
@@ -492,8 +697,9 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
 export async function storniereRechnungOhneErsatz(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: orig, error } = await supabase
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { data: orig, error } = await gate.db
     .from('rechnungen')
     .select('status, beleg_typ')
     .eq('id', rechnungId)
@@ -523,7 +729,9 @@ export async function storniereRechnungOhneErsatz(
 export async function nehmeRechnungStornoZurueck(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const { data: orig, error } = await supabase
     .from('rechnungen')
     .select('id, status, beleg_typ')
@@ -700,22 +908,30 @@ export async function updateRechnungStatus(
   status: RechnungStatus,
   options?: UpdateRechnungStatusOptions
 ): Promise<UpdateRechnungStatusResult> {
-  const supabase = createClient()
+  const rechnungId = id?.trim()
+  if (!rechnungId) return { ok: false, message: 'Rechnung nicht gefunden' }
+
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const db = gate.db
+
   const notifyKunde = options?.notifyKunde === true
 
-  const { data: before } = await supabase
+  const { data: before, error: loadErr } = await db
     .from('rechnungen')
     .select(
-      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id, gesendet_at, bezahlt_at'
+      'status, beleg_typ, auftrag_id, rechnung_art, rechnungsnummer, richtung, handwerker_id, angebot_handwerker_id, gesendet_at, bezahlt_at, kunde_id'
     )
-    .eq('id', id)
+    .eq('id', rechnungId)
     .maybeSingle()
+  if (loadErr) return { ok: false, message: loadErr.message }
   if (!before) return { ok: false, message: 'Rechnung nicht gefunden' }
   if (before.status === status) return { ok: true }
 
   const isEingehend = String(before.richtung ?? '') === 'eingehend'
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+  const vorherBezahlt = before.status === 'bezahlt'
   // Storno zurücknehmen darf das echte Versanddatum nicht auf „heute“ überschreiben.
   if (status === 'gesendet' && !before.gesendet_at) {
     patch.gesendet_at = new Date().toISOString()
@@ -723,13 +939,17 @@ export async function updateRechnungStatus(
   if (status === 'bezahlt' && !before.bezahlt_at) {
     patch.bezahlt_at = new Date().toISOString()
   }
-  const { error } = await supabase.from('rechnungen').update(patch).eq('id', id)
+  // F-201: Revert bezahlt → gesendet muss KPI/Zahlplan nicht verfälschen.
+  if (status === 'gesendet' && vorherBezahlt) {
+    patch.bezahlt_at = null
+  }
+  const { error } = await db.from('rechnungen').update(patch).eq('id', rechnungId)
   if (error) return { ok: false, message: error.message }
 
-  if (status === 'bezahlt' && !isEingehend) {
-    const { data: r } = await supabase.from('rechnungen').select('kunde_id').eq('id', id).maybeSingle()
-    if (r?.kunde_id) {
-      await updateGesamtUmsatz(r.kunde_id as string)
+  if (!isEingehend) {
+    const kundeId = (before.kunde_id as string | null)?.trim()
+    if (kundeId && (status === 'bezahlt' || (status === 'gesendet' && vorherBezahlt))) {
+      await updateGesamtUmsatz(kundeId)
     }
   }
 
@@ -763,7 +983,7 @@ export async function updateRechnungStatus(
       '@/lib/rechnungen/sync-eingangsrechnung-ueberwiesen'
     )
     const sync = await syncEingangsrechnungUeberwiesen({
-      rechnungId: id,
+      rechnungId,
       angebotHandwerkerId: (before.angebot_handwerker_id as string | null) ?? null,
       handwerkerId: (before.handwerker_id as string | null) ?? null,
       auftragId: (before.auftrag_id as string | null) ?? null,
@@ -776,7 +996,7 @@ export async function updateRechnungStatus(
     before.status !== 'bezahlt' &&
     before.status !== 'storniert'
   ) {
-    const mailRes = await sendZahlungsbestaetigungForRechnung(id)
+    const mailRes = await sendZahlungsbestaetigungForRechnung(rechnungId)
     if (mailRes.ok) {
       zahlungsbestaetigungGesendet = !('skipped' in mailRes && mailRes.skipped)
     } else {
@@ -785,7 +1005,7 @@ export async function updateRechnungStatus(
   }
 
   revalidatePath('/rechnungen')
-  revalidatePath(`/rechnungen/${id}`)
+  revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath('/vorgaenge')
   const auftragId = (before.auftrag_id as string | null | undefined) ?? null
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
@@ -797,8 +1017,9 @@ export async function updateRechnungStatus(
 export async function sendZahlungsbestaetigung(
   rechnungId: string
 ): Promise<{ ok: true; skipped?: boolean } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: rec } = await supabase
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { data: rec } = await gate.db
     .from('rechnungen')
     .select('status')
     .eq('id', rechnungId)
@@ -819,7 +1040,9 @@ export async function sendRechnung(
   rechnungId: string,
   options?: { to?: string[]; cc?: string[]; mitAbschlussbericht?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   type RechnungVersandRow = {
     rechnungsnummer: string | null
@@ -833,6 +1056,9 @@ export async function sendRechnung(
     mail_betreff?: string | null
     rechnung_art?: string | null
     reverse_charge_13b?: boolean | null
+    ansprechpartner_id?: string | null
+    korrektur_von?: string | null
+    korrektur_art?: string | null
     kunden: Kunde | Kunde[] | null
     angebote: unknown
     auftraege: unknown
@@ -854,9 +1080,12 @@ export async function sendRechnung(
       mail_betreff,
       rechnung_art,
       reverse_charge_13b,
-      kunden(name, email, typ, vorname, nachname),
-      angebote(leistungsumfang, notizen),
-      auftraege(titel, angebote(leistungsumfang, notizen))
+      ansprechpartner_id,
+      korrektur_von,
+      korrektur_art,
+      kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
+      angebote(id, leistungsumfang, notizen),
+      auftraege(titel, angebote(id, leistungsumfang, notizen))
     `
       )
       .eq('id', rechnungId)
@@ -865,6 +1094,12 @@ export async function sendRechnung(
 
   if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden' }
 
+  /** Nach erfolgreicher Mail keine Nummer mehr freigeben (Kunde hat den Beleg). */
+  let nummerFreigabeErlaubt = true
+  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
+  let stornoAnhang: StornoAnhang | null = null
+
+  try {
   const numRes = await ensureRechnungsnummerFuerVersand(
     supabase,
     rechnungId,
@@ -875,12 +1110,37 @@ export async function sendRechnung(
   const rechnungsnummer = numRes.nummer
   rec.rechnungsnummer = rechnungsnummer
 
+  const angRechnungPre = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
+  const aufPre = Array.isArray(rec.auftraege) ? rec.auftraege[0] : rec.auftraege
+  const angAufPre = aufPre?.angebote
+    ? Array.isArray(aufPre.angebote)
+      ? aufPre.angebote[0]
+      : aufPre.angebote
+    : null
+  const angebotFuerTitel = (angRechnungPre ?? angAufPre) as
+    | { id?: string; leistungsumfang?: string | null; notizen?: string | null }
+    | null
+  const projektTitelVorPdf = resolveRechnungProjektTitel({
+    angebot: angebotFuerTitel,
+    auftragTitel: (aufPre?.titel as string | null) ?? null,
+  })
+  if (
+    projektTitelVorPdf &&
+    projektTitelVorPdf !== 'Rechnung' &&
+    angebotFuerTitel?.id &&
+    !String(angebotFuerTitel.leistungsumfang ?? '').trim()
+  ) {
+    await supabase
+      .from('angebote')
+      .update({ leistungsumfang: projektTitelVorPdf })
+      .eq('id', angebotFuerTitel.id)
+    angebotFuerTitel.leistungsumfang = projektTitelVorPdf
+  }
+
   const pdf = await persistPdfForRechnung(rechnungId)
   if (!pdf.ok) return pdf
 
   /** Storno-Gutschrift zur gleichen Planzeile (nach „Stornieren & neu stellen“) mitversenden. */
-  type StornoAnhang = { id: string; nr: string; buffer: Buffer; bezugRechnungsnummer: string | null }
-  let stornoAnhang: StornoAnhang | null = null
   const belegTyp = String(rec.beleg_typ ?? 'rechnung')
   if (belegTyp !== 'gutschrift') {
     const { data: neuMeta } = await supabase
@@ -895,7 +1155,7 @@ export async function sendRechnung(
     async function loadGutschriftAnhang(origId: string): Promise<StornoAnhang | null> {
       const { data: gs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, status, bezug_rechnung_id')
+        .select('id, rechnungsnummer, status, bezug_rechnung_id, brutto, reverse_charge_13b')
         .eq('bezug_rechnung_id', origId)
         .eq('beleg_typ', 'gutschrift')
         .in('status', ['entwurf', 'gesendet'])
@@ -903,7 +1163,45 @@ export async function sendRechnung(
         .limit(1)
         .maybeSingle()
       if (!gs?.id) return null
-      const gsPdf = await persistPdfForRechnung(String(gs.id))
+
+      // Legacy-Bug: Festpreis nur in vk_netto → Gutschrift mit Brutto 0 — Beträge nachziehen
+      if (Math.abs(Number(gs.brutto ?? 0)) < 0.01) {
+        const { data: origPos } = await supabase
+          .from('rechnungen')
+          .select('positionen, reverse_charge_13b')
+          .eq('id', origId)
+          .maybeSingle()
+        if (origPos?.positionen) {
+          const positionenNeg = positionenFuerGutschrift(
+            (origPos.positionen as AngebotPosition[]) ?? []
+          )
+          const { positionen, berechnung } = await berechneRechnungMitFirmeneinstellungen(
+            supabase,
+            {
+              positionen: positionenNeg,
+              reverse_charge_13b: Boolean(
+                origPos.reverse_charge_13b ?? gs.reverse_charge_13b
+              ),
+            }
+          )
+          await rechnungUpdateMitSchemaFallback(
+            supabase,
+            String(gs.id),
+            {
+              positionen,
+              updated_at: new Date().toISOString(),
+            },
+            berechnung,
+            {
+              reverse_charge_13b: Boolean(
+                origPos.reverse_charge_13b ?? gs.reverse_charge_13b
+              ),
+            }
+          )
+        }
+      }
+
+      const gsPdf = await persistPdfForRechnung(String(gs.id), { allocateNummer: true })
       if (!gsPdf.ok) return null
       const { data: gsAfter } = await supabase
         .from('rechnungen')
@@ -948,30 +1246,96 @@ export async function sendRechnung(
       }
     }
 
-    // Direktrechnung / FAB: Gutschrift nach Korrektur ohne Auftrag/Planzeile mitnehmen
-    if (!stornoAnhang && kundeIdMeta && !auftragIdMeta) {
+    // Korrektur-Kette: neue RE zeigt auf Original
+    if (!stornoAnhang) {
+      const { data: neuKor } = await supabase
+        .from('rechnungen')
+        .select('korrektur_von')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      const korVon = String(neuKor?.korrektur_von ?? '').trim()
+      if (korVon) {
+        const found = await loadGutschriftAnhang(korVon)
+        if (found) stornoAnhang = found
+      }
+    }
+
+    // Fallback: Original mit ersetzt_durch = diese RE (auch verzögerter Storno: noch gesendet)
+    if (!stornoAnhang) {
+      const { data: ersetzt } = await supabase
+        .from('rechnungen')
+        .select('id')
+        .eq('ersetzt_durch', rechnungId)
+        .in('status', ['storniert', 'gesendet', 'bezahlt', 'versendet'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const origId = String(ersetzt?.id ?? '').trim()
+      if (origId) {
+        const found = await loadGutschriftAnhang(origId)
+        if (found) stornoAnhang = found
+      }
+    }
+
+    // Fallback: Original zeigt fälschlich auf die Gutschrift (ersetzt_durch = GS-ID)
+    if (!stornoAnhang && kundeIdMeta) {
+      const { data: thisRec } = await supabase
+        .from('rechnungen')
+        .select('created_at')
+        .eq('id', rechnungId)
+        .maybeSingle()
+      const createdMs = thisRec?.created_at ? Date.parse(String(thisRec.created_at)) : NaN
+
       const { data: openGs } = await supabase
         .from('rechnungen')
-        .select('id, rechnungsnummer, bezug_rechnung_id')
+        .select('id, rechnungsnummer, bezug_rechnung_id, created_at, auftrag_id')
         .eq('kunde_id', kundeIdMeta)
         .eq('beleg_typ', 'gutschrift')
         .eq('status', 'entwurf')
-        .is('auftrag_id', null)
         .order('created_at', { ascending: false })
-        .limit(8)
+        .limit(12)
+
       for (const gs of openGs ?? []) {
         const bezugId = String(gs.bezug_rechnung_id ?? '').trim()
         if (!bezugId) continue
         const { data: orig } = await supabase
           .from('rechnungen')
-          .select('id, status, kunde_id')
+          .select('id, status, kunde_id, ersetzt_durch')
           .eq('id', bezugId)
           .maybeSingle()
         if (!orig || String(orig.status) !== 'storniert') continue
         if (String(orig.kunde_id ?? '') !== kundeIdMeta) continue
+
+        // Passend wenn: ersetzt_durch = diese RE, oder ersetzt_durch = diese GS, oder zeitnah erzeugt
+        const ersetzt = String(orig.ersetzt_durch ?? '').trim()
+        const gsCreated = gs.created_at ? Date.parse(String(gs.created_at)) : NaN
+        const zeitnah =
+          Number.isFinite(createdMs) &&
+          Number.isFinite(gsCreated) &&
+          Math.abs(createdMs - gsCreated) <= 15 * 60 * 1000
+        const kettePasst =
+          ersetzt === rechnungId || ersetzt === String(gs.id) || !ersetzt || zeitnah
+        if (!kettePasst) continue
+
         const found = await loadGutschriftAnhang(bezugId)
         if (found) {
           stornoAnhang = found
+          // Kette nachziehen (Prod-Altlast: ersetzt_durch zeigte auf GS statt neue RE)
+          if (ersetzt !== rechnungId) {
+            await supabase
+              .from('rechnungen')
+              .update({ ersetzt_durch: rechnungId, updated_at: new Date().toISOString() })
+              .eq('id', bezugId)
+            await supabase
+              .from('rechnungen')
+              .update({
+                korrektur_von: bezugId,
+                korrektur_art: 'gutschrift',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', rechnungId)
+              .is('korrektur_von', null)
+          }
           break
         }
       }
@@ -981,12 +1345,14 @@ export async function sendRechnung(
   const kRaw = rec.kunden as Kunde | Kunde[] | null
   const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
   const toList = options?.to?.map((v) => v.trim()).filter(Boolean) ?? []
-  const email = kunde?.email?.trim()
+  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde, null, {
+    selectedAnsprechpartnerId: rec.ansprechpartner_id ?? null,
+  })
+  const email = empfaenger.email?.trim() || kunde?.email?.trim()
   if (!toList.length && !email) return { ok: false, message: 'Kunden-E-Mail fehlt' }
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
-  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
@@ -1049,9 +1415,105 @@ export async function sendRechnung(
     ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
     : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
-  const mailEinleitung = stornoAnhang
-    ? mailEinleitungBase
+
+  // Korrektur-Kette: Original ↔ neue RE ↔ Storno-Gutschrift
+  let korrekturVonId = String(rec.korrektur_von ?? '').trim()
+  if (!korrekturVonId) {
+    const { data: ersetzt } = await supabase
+      .from('rechnungen')
+      .select('id')
+      .eq('ersetzt_durch', rechnungId)
+      .in('status', ['storniert', 'gesendet', 'bezahlt', 'versendet'])
+      .limit(1)
+      .maybeSingle()
+    korrekturVonId = String(ersetzt?.id ?? '').trim()
+  }
+
+  const korrekturArt = String(rec.korrektur_art ?? '').trim()
+  const { data: ketteSiblings } = korrekturVonId
+    ? await supabase
+        .from('rechnungen')
+        .select('id, beleg_typ, bezug_rechnung_id, status, created_at, ersetzt_durch')
+        .or(
+          `id.eq.${korrekturVonId},id.eq.${rechnungId},bezug_rechnung_id.eq.${korrekturVonId},ersetzt_durch.eq.${rechnungId}`
+        )
+        .limit(40)
+    : { data: [] as Array<Record<string, unknown>> | null }
+
+  const kette = resolveRechnungKorrekturKette({
+    neuId: rechnungId,
+    korrektur_von: korrekturVonId || null,
+    korrektur_art: korrekturArt || null,
+    siblings: (ketteSiblings ?? []) as Array<{
+      id: string
+      beleg_typ?: string | null
+      bezug_rechnung_id?: string | null
+      status?: string | null
+      created_at?: string | null
+      ersetzt_durch?: string | null
+    }>,
+  })
+
+  // Letzter Versuch: Gutschrift über Kette laden/PDF erzeugen
+  if (kette.mitStorno && !stornoAnhang && kette.originalId) {
+    const { data: gs } = await supabase
+      .from('rechnungen')
+      .select('id, rechnungsnummer')
+      .eq('bezug_rechnung_id', kette.originalId)
+      .eq('beleg_typ', 'gutschrift')
+      .in('status', ['entwurf', 'gesendet'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (gs?.id) {
+      const gsPdf = await persistPdfForRechnung(String(gs.id), { allocateNummer: true })
+      if (gsPdf.ok) {
+        const { data: gsAfter } = await supabase
+          .from('rechnungen')
+          .select('rechnungsnummer')
+          .eq('id', gs.id)
+          .maybeSingle()
+        const { data: origRow } = await supabase
+          .from('rechnungen')
+          .select('rechnungsnummer')
+          .eq('id', kette.originalId)
+          .maybeSingle()
+        stornoAnhang = {
+          id: String(gs.id),
+          nr: String(gsAfter?.rechnungsnummer ?? gs.rechnungsnummer ?? 'Gutschrift').trim(),
+          buffer: gsPdf.buffer,
+          bezugRechnungsnummer: String(origRow?.rechnungsnummer ?? '').trim() || null,
+        }
+      }
+    }
+  }
+
+  if (kette.mitStorno && !stornoAnhang) {
+    return {
+      ok: false,
+      message:
+        'Korrektur mit Storno: Storno-Gutschrift-PDF fehlt oder konnte nicht erzeugt werden. Bitte Gutschrift prüfen und erneut versenden.',
+    }
+  }
+
+  const istKorrekturVersand = Boolean(stornoAnhang) || Boolean(kette.originalId)
+  const mitStornoAnhang = Boolean(stornoAnhang)
+
+  // Korrektur: nie die kopierte PDF-Einleitung („Hiermit stellen wir…“) — Standard-Korrekturtext
+  const mailEinleitung = istKorrekturVersand
+    ? null
     : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
+
+  let korrekturOriginalNr =
+    stornoAnhang?.bezugRechnungsnummer?.trim() || null
+  if (!korrekturOriginalNr && kette.originalId) {
+    const { data: origNrRow } = await supabase
+      .from('rechnungen')
+      .select('rechnungsnummer')
+      .eq('id', kette.originalId)
+      .maybeSingle()
+    korrekturOriginalNr = String(origNrRow?.rechnungsnummer ?? '').trim() || null
+  }
 
   const tpl = buildRechnungMail(
     {
@@ -1062,11 +1524,15 @@ export async function sendRechnung(
       faelligAm: formatDatumDeFromIso(rec.faellig_am as string | null),
       projektTitel: projektTitel || null,
       mailEinleitung,
-      mailBetreff: (rec.mail_betreff as string | null)?.trim() || null,
+      // Korrektur: Standard-Betreff erzwingen (Wizard-Kopie der alten RE-Nr. nicht übernehmen)
+      mailBetreff: istKorrekturVersand
+        ? null
+        : (rec.mail_betreff as string | null)?.trim() || null,
       reverseCharge: Boolean(rec.reverse_charge_13b),
-      mitStornoAnhang: Boolean(stornoAnhang),
+      istKorrektur: istKorrekturVersand,
+      mitStornoAnhang,
       stornoGutschriftNummer: stornoAnhang?.nr ?? null,
-      stornoBezugRechnungsnummer: stornoAnhang?.bezugRechnungsnummer ?? null,
+      stornoBezugRechnungsnummer: korrekturOriginalNr,
       mitAbschlussberichtAnhang: Boolean(abschlussAnhang),
     },
     branding
@@ -1085,12 +1551,8 @@ export async function sendRechnung(
     typ: 'rechnung',
     an: toList.length ? toList : (email as string),
     cc: options?.cc?.map((v) => v.trim()).filter(Boolean),
-    anName: kunde?.name ?? null,
-    betreff: stornoAnhang
-      ? sanitizeRechnungMailBetreff(
-          `Storno + Rechnung ${rechnungsnummer} · ${branding.firmenname}`
-        )
-      : tpl.betreff,
+    anName: empfaenger.ansprechpartner || kunde?.name || null,
+    betreff: tpl.betreff,
     html: tpl.html,
     pdfBuffer: pdf.buffer,
     pdfName: `Rechnung-${rechnungsnummer}.pdf`,
@@ -1100,6 +1562,9 @@ export async function sendRechnung(
     rechnungId,
   })
   if (!mail.success) return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen' }
+
+  /** Ab hier: Kunde hat die Mail — Nummer nicht mehr zurücksetzen. */
+  nummerFreigabeErlaubt = false
 
   if (stornoAnhang) {
     const nowGs = new Date().toISOString()
@@ -1113,6 +1578,21 @@ export async function sendRechnung(
       .eq('id', stornoAnhang.id)
       .in('status', ['entwurf', 'gesendet'])
     revalidatePath(`/rechnungen/${stornoAnhang.id}`)
+
+    // Verzögerter Storno: Original erst jetzt auf storniert
+    const origId = kette.originalId?.trim()
+    if (origId) {
+      await supabase
+        .from('rechnungen')
+        .update({
+          status: 'storniert' as RechnungStatus,
+          ersetzt_durch: rechnungId,
+          updated_at: nowGs,
+        })
+        .eq('id', origId)
+        .in('status', ['gesendet', 'bezahlt', 'versendet', 'storniert'])
+      revalidatePath(`/rechnungen/${origId}`)
+    }
   }
 
   const now = new Date().toISOString()
@@ -1125,8 +1605,8 @@ export async function sendRechnung(
     await insertAuftragTimelineEvent({
       auftrag_id: auftragId,
       typ: 'rechnung_gesendet',
-      titel: stornoAnhang
-        ? `Storno + Rechnung ${rechnungsnummer} versendet`
+      titel: istKorrekturVersand
+        ? `Korrektur ${rechnungsnummer} versendet`
         : abschlussAnhang
           ? `Rechnung ${rechnungsnummer} + Abschlussbericht versendet`
           : `Rechnung ${rechnungsnummer} versendet`,
@@ -1162,25 +1642,34 @@ export async function sendRechnung(
     })
   }
 
-  void import('@/lib/portal/notify-portal-rechnung-gesendet')
-    .then(({ notifyPortalRechnungGesendetFromCrm }) =>
-      notifyPortalRechnungGesendetFromCrm({
-        rechnungId,
-        auftragId: auftragId || null,
-        kundeId: (rec.kunde_id as string | null) ?? null,
-        rechnungsnummer,
-        brutto: rec.brutto != null ? Number(rec.brutto) : null,
-      })
+  try {
+    const { notifyPortalRechnungGesendetFromCrm } = await import(
+      '@/lib/portal/notify-portal-rechnung-gesendet'
     )
-    .catch((e) =>
-      console.warn('[sendRechnung] HV-Notify:', e)
-    )
+    await notifyPortalRechnungGesendetFromCrm({
+      rechnungId,
+      auftragId: auftragId || null,
+      kundeId: (rec.kunde_id as string | null) ?? null,
+      rechnungsnummer,
+      brutto: rec.brutto != null ? Number(rec.brutto) : null,
+    })
+  } catch (e) {
+    console.warn('[sendRechnung] HV-Notify:', e)
+  }
 
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
   revalidatePath('/vorgaenge')
   if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
   return { ok: true }
+  } finally {
+    if (nummerFreigabeErlaubt) {
+      await releaseRechnungsnummerWennEntwurf(rechnungId)
+      if (stornoAnhang?.id) {
+        await releaseRechnungsnummerWennEntwurf(stornoAnhang.id)
+      }
+    }
+  }
 }
 
 /** Echte Kunden-Mail-HTML wie beim Versand (ohne PDF / Statusänderung). */
@@ -1193,13 +1682,20 @@ export async function previewRechnungKundeMail(input: {
   faelligAm?: string | null
   projektTitel?: string | null
   rechnungsnummer?: string | null
+  istKorrektur?: boolean
+  mitStornoAnhang?: boolean
+  korrekturOriginalNr?: string | null
 }): Promise<{ ok: true; html: string; betreff: string } | { ok: false; message: string }> {
   const rechnungId = input.rechnungId?.trim() || ''
   const kundeId = input.kundeId?.trim() || ''
 
-  type KundeSnap = Pick<Kunde, 'name' | 'email' | 'typ' | 'vorname' | 'nachname'>
+  type KundeSnap = Pick<
+    Kunde,
+    'name' | 'email' | 'typ' | 'vorname' | 'nachname' | 'ansprechpartner' | 'kunden_ansprechpartner'
+  >
 
   let kunde: KundeSnap | null = null
+  let selectedAnsprechpartnerId: string | null = null
   let rechnungsnummer =
     input.rechnungsnummer?.trim() || 'Rechnung'
   let brutto = input.brutto ?? 0
@@ -1212,6 +1708,10 @@ export async function previewRechnungKundeMail(input: {
   let mailBetreff: string | null =
     input.betreff !== undefined ? input.betreff?.trim() || null : null
   let reverseCharge = false
+  let istKorrektur = Boolean(input.istKorrektur)
+  let mitStornoAnhang = Boolean(input.mitStornoAnhang)
+  let korrekturOriginalNr = input.korrekturOriginalNr?.trim() || null
+  let stornoGutschriftNummer: string | null = null
 
   if (rechnungId) {
     type RechnungPreviewRow = {
@@ -1223,6 +1723,8 @@ export async function previewRechnungKundeMail(input: {
       mail_einleitung?: string | null
       mail_betreff?: string | null
       reverse_charge_13b?: boolean | null
+      ansprechpartner_id?: string | null
+      korrektur_von?: string | null
       kunden: Kunde | Kunde[] | null
       angebote: unknown
       auftraege: unknown
@@ -1241,7 +1743,9 @@ export async function previewRechnungKundeMail(input: {
       mail_einleitung,
       mail_betreff,
       reverse_charge_13b,
-      kunden(name, email, typ, vorname, nachname),
+      ansprechpartner_id,
+      korrektur_von,
+      kunden(name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)),
       angebote(leistungsumfang, notizen),
       auftraege(titel, angebote(leistungsumfang, notizen))
     `
@@ -1263,6 +1767,7 @@ export async function previewRechnungKundeMail(input: {
 
       const kRaw = rec.kunden as Kunde | Kunde[] | null
       kunde = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as KundeSnap | null
+      selectedAnsprechpartnerId = rec.ansprechpartner_id ?? null
 
       if (input.brutto === undefined) brutto = Number(rec.brutto ?? 0)
       if (input.faelligAm === undefined) faelligRaw = rec.faellig_am as string | null
@@ -1273,6 +1778,32 @@ export async function previewRechnungKundeMail(input: {
         mailBetreff = (rec.mail_betreff as string | null)?.trim() || null
       }
       reverseCharge = Boolean(rec.reverse_charge_13b)
+
+      const korVon = String(rec.korrektur_von ?? '').trim()
+      if (korVon) {
+        istKorrektur = true
+        if (input.mitStornoAnhang === undefined) mitStornoAnhang = true
+        if (!korrekturOriginalNr) {
+          const { data: origNrRow } = await supabaseAdmin
+            .from('rechnungen')
+            .select('rechnungsnummer')
+            .eq('id', korVon)
+            .maybeSingle()
+          korrekturOriginalNr = String(origNrRow?.rechnungsnummer ?? '').trim() || null
+        }
+        if (mitStornoAnhang && !stornoGutschriftNummer) {
+          const { data: gsRow } = await supabaseAdmin
+            .from('rechnungen')
+            .select('rechnungsnummer')
+            .eq('bezug_rechnung_id', korVon)
+            .eq('beleg_typ', 'gutschrift')
+            .in('status', ['entwurf', 'gesendet'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          stornoGutschriftNummer = String(gsRow?.rechnungsnummer ?? '').trim() || null
+        }
+      }
 
       if (input.projektTitel === undefined) {
         const angRechnung = Array.isArray(rec.angebote) ? rec.angebote[0] : rec.angebote
@@ -1297,7 +1828,9 @@ export async function previewRechnungKundeMail(input: {
     const { data: k } = await withCrmReadFallback<KundeSnap>(async (db) =>
       db
         .from('kunden')
-        .select('name, email, typ, vorname, nachname')
+        .select(
+          'name, email, typ, vorname, nachname, ansprechpartner, kunden_ansprechpartner(id, name, email, telefon, rolle, ist_primaer, sort_order)'
+        )
         .eq('id', kundeId)
         .maybeSingle()
     )
@@ -1306,7 +1839,9 @@ export async function previewRechnungKundeMail(input: {
 
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = 'sie'
-  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde)
+  const empfaenger = kundeRechnungsempfaengerAusStammdaten(kunde as Kunde, null, {
+    selectedAnsprechpartnerId,
+  })
   const begruessung = kundeAngebotBegruessung(anrede, kundeAnredeKontextFromEmpfaenger(empfaenger))
 
   const faelligAm =
@@ -1323,8 +1858,12 @@ export async function previewRechnungKundeMail(input: {
       faelligAm,
       projektTitel,
       mailEinleitung: mailEinleitung?.trim() || null,
-      mailBetreff,
+      mailBetreff: istKorrektur ? null : mailBetreff,
       reverseCharge,
+      istKorrektur,
+      mitStornoAnhang,
+      stornoGutschriftNummer,
+      stornoBezugRechnungsnummer: korrekturOriginalNr,
     },
     branding
   )
@@ -1505,10 +2044,13 @@ export async function sendZahlungserinnerungMail(
     html?: string
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+
   const loaded = await loadRechnungFuerZahlungserinnerung(rechnungId)
   if (!loaded.ok) return loaded
 
-  const mahnKontext = await mahnungBetragKontextFuerRechnung(supabaseAdmin, {
+  const mahnKontext = await mahnungBetragKontextFuerRechnung(gate.db, {
     id: rechnungId,
     auftrag_id: loaded.rec.auftrag_id,
     brutto: loaded.rec.brutto,
@@ -1521,7 +2063,7 @@ export async function sendZahlungserinnerungMail(
   const toList = options.to.map((v) => v.trim()).filter(Boolean)
   if (!toList.length) return { ok: false, message: 'Bitte mindestens eine Empfänger-Adresse angeben.' }
 
-  const branding = await getMailBranding(supabaseAdmin)
+  const branding = await getMailBranding(gate.db)
   const betragFelder = mahnungBetragMailFelder(mahnKontext)
   const preview = buildZahlungserinnerungVorschau(
     loaded.rec,
@@ -1553,27 +2095,23 @@ export async function sendZahlungserinnerungMail(
   if (!mail.success) return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen' }
 
   const now = new Date().toISOString()
-  const supabase = createClient()
   const patch: Record<string, unknown> = {
     updated_at: now,
   }
   if (options.stufe === 1) patch.erinnerung_7_sent_at = now
   if (options.stufe === 2) patch.erinnerung_21_sent_at = now
 
-  const { error } = await supabase.from('rechnungen').update(patch).eq('id', rechnungId)
+  const { error } = await gate.db.from('rechnungen').update(patch).eq('id', rechnungId)
   if (error) return { ok: false, message: error.message }
 
   const auftragId = (loaded.rec.auftrag_id as string | null) ?? null
   if (auftragId) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
     await insertAuftragTimelineEvent({
       auftrag_id: auftragId,
       typ: 'rechnung_erinnerung',
       titel: `${options.stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung'} ${loaded.rechnungsnummer}`,
       beschreibung: `An ${toList.join(', ')} · Zahlbar bis ${formatDatumDeFromIso(preview.zahlbarBisIso)}`,
-      erstellt_von: user?.id ?? null,
+      erstellt_von: gate.user.id,
       sichtbar_fuer_kunde: true,
       fuer_kunde_freigegeben: true,
       freigegeben_at: now,

@@ -1,0 +1,123 @@
+{
+  "finished_at": "2026-08-26T13:43:39.600Z",
+  "by": {
+    "ok": 15,
+    "fail": 4
+  },
+  "results": [
+    {
+      "id": "Env-CRM-HTTP",
+      "status": "ok",
+      "note": "status load · title=Bärenwald CRM",
+      "at": "2026-08-26T13:41:09.351Z"
+    },
+    {
+      "id": "Env-WEB-HTTP",
+      "status": "ok",
+      "note": "status load · title=Bärenwald München — Maler, Elektriker, Bodenleger — alles aus einer Hand",
+      "at": "2026-08-26T13:41:09.759Z"
+    },
+    {
+      "id": "Env-Supabase-URL",
+      "status": "ok",
+      "note": "NEXT_PUBLIC → wnotlydvhsmfkhexgeol",
+      "at": "2026-08-26T13:41:10.699Z"
+    },
+    {
+      "id": "Env-Mail-Catcher-Flags",
+      "status": "ok",
+      "note": "keine Catcher=1 in gescannten Chunks",
+      "at": "2026-08-26T13:41:10.699Z"
+    },
+    {
+      "id": "Env-Steuernummern",
+      "status": "ok",
+      "note": "ust=DE362198001 steuer=14417721070 firma=Bärenwald München",
+      "at": "2026-08-26T13:41:10.830Z"
+    },
+    {
+      "id": "Login-info@",
+      "status": "ok",
+      "note": "https://baerenwald-backend.netlify.app/",
+      "at": "2026-08-26T13:41:15.313Z"
+    },
+    {
+      "id": "info-RE-Overflow",
+      "status": "ok",
+      "note": "Modal via Primary geöffnet",
+      "at": "2026-08-26T13:41:20.945Z"
+    },
+    {
+      "id": "info-RE2111",
+      "status": "ok",
+      "note": "geladen · modalProbe=true",
+      "at": "2026-08-26T13:41:20.945Z"
+    },
+    {
+      "id": "Smoke-Vorgaenge",
+      "status": "ok",
+      "note": "5 geöffnet",
+      "at": "2026-08-26T13:41:32.127Z"
+    },
+    {
+      "id": "Smoke-Kunden",
+      "status": "ok",
+      "note": "5 geöffnet",
+      "at": "2026-08-26T13:41:46.106Z"
+    },
+    {
+      "id": "Smoke-Objekte",
+      "status": "ok",
+      "note": "3/3 über /kunden/…/objekte/…",
+      "at": "2026-08-26T13:41:51.996Z"
+    },
+    {
+      "id": "Smoke-REs",
+      "status": "ok",
+      "note": "3 geöffnet",
+      "at": "2026-08-26T13:41:58.278Z"
+    },
+    {
+      "id": "Smoke-Console",
+      "status": "ok",
+      "note": "keine Errors",
+      "at": "2026-08-26T13:41:58.279Z"
+    },
+    {
+      "id": "Smoke-Network",
+      "status": "ok",
+      "note": "keine 4xx/5xx",
+      "at": "2026-08-26T13:41:58.279Z"
+    },
+    {
+      "id": "Hydration-0dc0180a",
+      "status": "fail",
+      "note": "Error: Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Error: Minified React error #422; visit https://react.dev/errors/422 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "at": "2026-08-26T13:42:01.702Z"
+    },
+    {
+      "id": "Hydration-8b8b6727",
+      "status": "fail",
+      "note": "Error: Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Error: Minified React error #422; visit https://react.dev/errors/422 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "at": "2026-08-26T13:42:04.877Z"
+    },
+    {
+      "id": "Hydration-bb0ac8f3",
+      "status": "ok",
+      "note": "Ihr Projekt  Aktualisiert vor 0 Min.  PROJEKT  reinigung — Genius Hausverwaltung",
+      "at": "2026-08-26T13:42:08.493Z"
+    },
+    {
+      "id": "Hydration-Summary",
+      "status": "fail",
+      "note": "clean=1 hydraErr=2",
+      "at": "2026-08-26T13:42:08.493Z"
+    },
+    {
+      "id": "RUN",
+      "status": "fail",
+      "note": "page.goto: Timeout 90000ms exceeded.\nCall log:\n  - navigating to \"https://baerenwald-backend.netlify.app/\", waiting until \"domcontentloaded\"\n",
+      "at": "2026-08-26T13:43:39.507Z"
+    }
+  ]
+}

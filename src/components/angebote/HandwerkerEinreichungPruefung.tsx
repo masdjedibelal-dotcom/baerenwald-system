@@ -87,7 +87,7 @@ export function HandwerkerEinreichungPruefung({
         <p className="mt-1">
           Preise und Leistungen pflegt ihr im Auftrag unter Tab{' '}
           <strong>Positionen</strong> (Zuweisen → Senden). Der Partner bestätigt im Portal unter{' '}
-          <strong>Vorgänge</strong> — ohne Gegenvorschlag oder „Übernehmen“ hier.
+          <strong>Vorgänge</strong> — ohne Gegenvorschlag oder Bestätigung hier.
         </p>
         <Link
           href={`/auftraege/${auftragId}?tab=leistung`}
@@ -163,28 +163,13 @@ export function HandwerkerEinreichungPruefung({
         toast.error(res.message)
         return
       }
-      const preisTeil =
-        res.aktualisiert > 0
-          ? ` Vereinbarter Einkaufspreis in ${res.aktualisiert} Position(en) gesetzt.`
-          : ''
-      const mailTeil = res.mailGesendet
-        ? ' Bestätigung an den Handwerker gesendet.'
-        : res.mailHinweis
-          ? ` Hinweis: ${res.mailHinweis}`
-          : ''
       if (res.openWizard && onAcceptWizard) {
-        toast.success(
-          `Konditionen übernommen.${preisTeil}${mailTeil} Partner bestätigt im Portal. Nachunternehmervertrag wird geöffnet…`
-        )
+        toast.success('Konditionen übernommen')
         onAcceptWizard(res.openWizard)
         onRefresh()
         return
       }
-      toast.success(
-        konditionen
-          ? `Konditionen übernommen.${preisTeil}${mailTeil} Der Partner muss die vereinbarten Preise im Portal noch bestätigen.`
-          : `Konditionen übernommen.${preisTeil}${mailTeil}`
-      )
+      toast.success('Konditionen übernommen')
       onRefresh()
     })
   }
@@ -339,7 +324,7 @@ export function HandwerkerEinreichungPruefung({
           {kannPruefen ? (
             <>
               <Button type="button" variant="primary" size="sm" loading={pending} onClick={bestaetigen}>
-                {z.ohne_lv ? 'Bestätigen' : 'Übernehmen'}
+                Bestätigen
               </Button>
               <Button
                 type="button"

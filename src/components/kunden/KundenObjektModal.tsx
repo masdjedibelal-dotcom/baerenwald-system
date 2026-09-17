@@ -2,8 +2,10 @@
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
@@ -19,6 +21,8 @@ export function KundenObjektModal({
   verwaltungName,
   editObjekt,
   onSaved,
+  context = 'detail',
+  overlayClassName,
 }: {
   open: boolean
   onClose: () => void
@@ -27,6 +31,10 @@ export function KundenObjektModal({
   verwaltungName?: string
   editObjekt?: KundenObjekt | null
   onSaved: (objekt: KundenObjekt) => void
+  /** canvas = über Wizard/DocumentCanvas (z. B. Rechnung → Kunde → Objekt anlegen). */
+  context?: EditorSheetContext
+  /** z. B. editor-sheet-overlay--stack über einem Detail-Sheet. */
+  overlayClassName?: string
 }) {
   const [pending, startTransition] = useTransition()
   const [titel, setTitel] = useState('')
@@ -36,8 +44,10 @@ export function KundenObjektModal({
   const [ort, setOrt] = useState('')
   const [baujahr, setBaujahr] = useState('')
   const [gesamtflaeche, setGesamtflaeche] = useState('')
+  const [meldeSlug, setMeldeSlug] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [slugWarnOpen, setSlugWarnOpen] = useState(false)
 
   const isEdit = Boolean(editObjekt)
 
@@ -51,6 +61,7 @@ export function KundenObjektModal({
       setOrt(editObjekt.ort ?? '')
       setBaujahr('')
       setGesamtflaeche('')
+      setMeldeSlug(editObjekt.melde_slug ?? '')
     } else {
       setTitel('')
       setStrasse('')
@@ -59,9 +70,11 @@ export function KundenObjektModal({
       setOrt('')
       setBaujahr('')
       setGesamtflaeche('')
+      setMeldeSlug('')
     }
     setErr(null)
     setDirty(false)
+    setSlugWarnOpen(false)
   }, [open, editObjekt])
 
   function mark<T>(setter: (v: T) => void, v: T) {
@@ -69,7 +82,18 @@ export function KundenObjektModal({
     setDirty(true)
   }
 
+  function requestSpeichern() {
+    const prev = String(editObjekt?.melde_slug ?? '').trim().toLowerCase()
+    const next = meldeSlug.trim().toLowerCase()
+    if (isEdit && prev && next && prev !== next) {
+      setSlugWarnOpen(true)
+      return
+    }
+    speichern()
+  }
+
   function speichern() {
+    setSlugWarnOpen(false)
     setErr(null)
     if (!strasse.trim()) {
       setErr('Straße ist Pflicht.')
@@ -89,7 +113,7 @@ export function KundenObjektModal({
       hausnummer: hausnummer.trim() || null,
       plz,
       ort,
-      melde_slug: editObjekt?.melde_slug ?? null,
+      melde_slug: isEdit ? meldeSlug.trim() || null : editObjekt?.melde_slug ?? null,
       melde_aktiv: editObjekt?.melde_aktiv !== false,
       einheiten_hinweis: hinweisParts.length
         ? hinweisParts.join(' · ')
@@ -137,15 +161,17 @@ export function KundenObjektModal({
     !pending
 
   return (
+    <>
     <EditorSheet
       open={open}
       onClose={onClose}
       title={isEdit ? 'Objekt bearbeiten' : 'Objekt anlegen'}
       crumb={isEdit ? 'Objekt >' : 'Neues Objekt >'}
-      context="detail"
+      context={context}
+      overlayClassName={overlayClassName}
       dirty={dirty}
       size="lg"
-      onConfirm={speichern}
+      onConfirm={requestSpeichern}
       confirmDisabled={!canSave}
       confirmBusy={pending}
       className="kunde-create-sheet"
@@ -221,6 +247,16 @@ export function KundenObjektModal({
               disabled
             />
           </MockField>
+          {isEdit ? (
+            <MockField label="Melde-Slug (URL)" full>
+              <input
+                className="input"
+                value={meldeSlug}
+                onChange={(e) => mark(setMeldeSlug, e.target.value)}
+                placeholder="z. B. lindenhof-14"
+              />
+            </MockField>
+          ) : null}
         </MockFormSection>
 
         {!isEdit ? (
@@ -238,5 +274,33 @@ export function KundenObjektModal({
         ) : null}
       </div>
     </EditorSheet>
+
+    {slugWarnOpen ? (
+      <MockModal
+        open
+        icon="alert-triangle"
+        title="Melde-Slug ändern?"
+        sub="Gedruckte Aushänge werden ungültig."
+        size="sm"
+        onClose={() => setSlugWarnOpen(false)}
+        footer={
+          <>
+            <MockBtn kind="ghost" onClick={() => setSlugWarnOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn kind="danger" icon="check" onClick={speichern} disabled={pending}>
+              Slug ändern
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
+          drucken.
+        </div>
+      </MockModal>
+    ) : null}
+    </>
   )
 }

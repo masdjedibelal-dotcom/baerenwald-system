@@ -1,0 +1,239 @@
+{
+  "results": [
+    {
+      "id": "PRE-1",
+      "status": "✅",
+      "note": "email_log staging-catch CRM=true Website=false (n=1)"
+    },
+    {
+      "id": "F-170",
+      "status": "⚠️",
+      "note": "Kein staging-catch:website- Eintrag in email_log (Website-Catcher unbelegt)"
+    },
+    {
+      "id": "PRE-3",
+      "status": "✅",
+      "note": "Seed Auftrag=in_arbeit RE=STG-R2-0001/gesendet"
+    },
+    {
+      "id": "R2-V-F1",
+      "status": "✅",
+      "note": "RE edit disabled=true title=Gesendet — Korrektur über Storno",
+      "fund": null
+    },
+    {
+      "id": "R2-V-F6",
+      "status": "❌",
+      "note": "Amber-Hinweis sichtbar=false",
+      "fund": "F-171"
+    },
+    {
+      "id": "R2-V-F8",
+      "status": "✅",
+      "note": "Primary button bg=rgb(54, 59, 65) (Anthrazit≈rgb(54,59,65))",
+      "fund": null
+    },
+    {
+      "id": "R2-V-F12",
+      "status": "⚠️",
+      "note": "9MB client error visible=false",
+      "fund": "F-172"
+    },
+    {
+      "id": "T1-.1",
+      "status": "⚠️",
+      "note": "Confirm url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10"
+    },
+    {
+      "id": "T1-.1-F163",
+      "status": "❌",
+      "note": "Referenz sichtbar=false",
+      "fund": "F-173"
+    },
+    {
+      "id": "T1-.1-F162",
+      "status": "✅",
+      "note": "next= nicht prod-hardcoded=true",
+      "fund": null
+    },
+    {
+      "id": "T1-.1-CTA",
+      "status": "❌",
+      "note": "Neutraler Konto-CTA=false"
+    },
+    {
+      "id": "T1-.2",
+      "status": "❌",
+      "note": "Lead gefunden id=null"
+    },
+    {
+      "id": "T1-.2-F165",
+      "status": "❌",
+      "note": "Meldungsdetails-Karte=false",
+      "fund": "F-174"
+    },
+    {
+      "id": "T1-.2-badge",
+      "status": "⚠️",
+      "note": "HV-Meldung Badge=false"
+    },
+    {
+      "id": "T1-.2b-F166",
+      "status": "⚠️",
+      "note": "HvWarteFreigabeSheet=false",
+      "fund": "F-175"
+    },
+    {
+      "id": "T1-.3",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.4",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.5",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A1",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A2",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A3",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A4",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A5",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.6",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.7",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A6",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-A7",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B1",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B2",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B3",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B4",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B5",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-B6",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.8",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.9",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.10",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-.11",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "T1-D2",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "Block-C",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "E7",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "E8",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "E9",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "F7",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "F9",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    },
+    {
+      "id": "N-block",
+      "status": "🚫",
+      "note": "In dieser Automation-Session nicht vollständig durchgespielt — manuell/Nachlauf"
+    }
+  ],
+  "zztest": [],
+  "fundNext": 176
+}

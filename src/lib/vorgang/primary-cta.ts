@@ -47,6 +47,8 @@ export type PrimaryCtaContext = {
   unterSchwelleDirektAuftrag?: boolean
   /** Partner-Eingangsrechnung: CTA „Als überwiesen markieren“ statt „Als bezahlt“ */
   eingehend?: boolean
+  /** Korrektur-Entwurf (korrektur_von) → „Korrektur versenden“ */
+  korrektur?: boolean
 }
 
 function norm(status: string | null | undefined): string {
@@ -123,14 +125,24 @@ export function primaryCta(
 
   if (phase === 'auftrag') {
     if (ui === 'geplant' || ui === 'aktiv') {
+      if (ctx.abnahmeFaellig) {
+        return { id: 'abnahme_starten', label: 'Abnahme starten', icon: 'clipboard-list' }
+      }
       return { id: 'auftrag_abschliessen', label: 'Auftrag abschließen', icon: 'check' }
     }
     if (ui === 'fertig') {
       if (ctx.naechsteRechnungAktion === 'bezahlt') {
         return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
       }
+      // Unversendete Schluss-/Abschlags-RE: Primary = versenden (P3-15 / E1)
       if (ctx.naechsteRechnungAktion === 'versenden') {
-        return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+        return {
+          id: 'rechnung_versenden',
+          label: ctx.naechsterAbschlagSenden
+            ? 'Abschlag versenden'
+            : 'Rechnung versenden',
+          icon: 'send',
+        }
       }
       if (ctx.naechsteRechnungAktion === 'erstellen') {
         return {
@@ -167,6 +179,9 @@ export function primaryCta(
     return { id: 'rechnung_erstellen', label: 'Rechnung erstellen', icon: 'file-invoice' }
   }
   if (ui === 'entwurf') {
+    if (ctx.korrektur) {
+      return { id: 'rechnung_versenden', label: 'Korrektur versenden', icon: 'send' }
+    }
     if (ctx.naechsterAbschlagSenden) {
       return { id: 'rechnung_versenden', label: 'Abschlag senden', icon: 'send' }
     }

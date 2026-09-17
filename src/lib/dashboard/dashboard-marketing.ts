@@ -144,6 +144,48 @@ function buildFunnelStages(
   })
 }
 
+/** Fallback wenn PostHog/GSC hängen oder das Dashboard-Zeitbudget überschreiten. */
+export function emptyDashboardMarketingSnapshot(
+  error = 'Nicht geladen (Timeout)'
+): DashboardMarketingSnapshot {
+  return {
+    pageviews: null,
+    pageviewsOk: false,
+    pageviewsError: error,
+    gscClicks: null,
+    gscImpressions: null,
+    gscOk: false,
+    gscError: error,
+    topQueries: [],
+    funnelOk: false,
+    funnelError: error,
+    funnelStages: [],
+    rechnerStart: null,
+    rechnerLead: null,
+  }
+}
+
+/** Marketing-KPIs mit hartem Timeout — blockiert nicht das gesamte Dashboard (Netlify). */
+export async function loadDashboardMarketingSafe(
+  zeitraumFilter: DashboardZeitraumFilter = { preset: 'gesamt', von: '', bis: '' },
+  timeoutMs = 2500
+): Promise<DashboardMarketingSnapshot> {
+  try {
+    return await Promise.race([
+      loadDashboardMarketing(zeitraumFilter),
+      new Promise<DashboardMarketingSnapshot>((resolve) => {
+        setTimeout(
+          () => resolve(emptyDashboardMarketingSnapshot('Externe Quelle antwortet nicht rechtzeitig')),
+          timeoutMs
+        )
+      }),
+    ])
+  } catch (e) {
+    console.error('[loadDashboardMarketingSafe]', e)
+    return emptyDashboardMarketingSnapshot('Marketing-KPIs nicht verfügbar')
+  }
+}
+
 /** Leichtes Laden der Marketing-Zahlen für das Haupt-Dashboard (ohne vollen KI-Hub-Payload). */
 export async function loadDashboardMarketing(
   zeitraumFilter: DashboardZeitraumFilter = { preset: 'gesamt', von: '', bis: '' }

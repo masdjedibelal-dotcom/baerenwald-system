@@ -1,0 +1,14 @@
+[07:06:22] F-178-header SKIP — Keine Checkboxen auf /vorgaenge
+[07:06:23] Lead org_freigabe_status=freigegeben
+[07:06:30] F-179-verify FAIL — Button „Freigabe erneut anfordern“ nicht sichtbar
+[07:06:34] A6-refreeze-up WARN — nach Erhöhung 950€ status=freigegeben (letzter freigegeben betrag=n/a)
+[07:06:34] A7-refreeze-down OK — nach Senkung 400€ status=freigegeben
+[07:06:37] A8-notmassnahme OK — hv=notmassnahme + org=ausstehend gesetzt; Partner-UI sichtbar=false (Gate-Ausnahme laut Code)
+[07:06:45] E8-staff2 WARN — Kein Notiz-Feld gefunden
+[07:07:45] FATAL FAIL — locator.waitFor: Timeout 60000ms exceeded.
+Call log:
+  - waiting for locator('input[type=password]') to be visible
+    - waiting for "https://staging--baerenwald-backend.netlify.app/" navigation to finish...
+    - navigated to "https://staging--baerenwald-backend.netlify.app/"
+
+[07:07:46] DONE 7 results → /Users/belalmasdjedi/code/baerenwald-system/docs/test/r2-1b-p5-results.json

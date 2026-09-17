@@ -33,6 +33,8 @@ export type RechnungMailInput = {
   mailBetreff?: string | null
   /** Reverse Charge (§13b) — Betrag netto, kein „inkl. MwSt.“ */
   reverseCharge?: boolean
+  /** Korrektur-Versand (Betreff / Defaults), auch ohne Storno-PDF */
+  istKorrektur?: boolean
   /** Storno-Gutschrift + neue RE in einer Mail */
   mitStornoAnhang?: boolean
   /** GS-Nummer für klarere Mail (z. B. GS-RE2026-2072) */
@@ -52,6 +54,22 @@ export function rechnungMailBetreff(
   return anrede === 'du'
     ? `Deine Rechnung ${nr} · ${firmenname}`
     : `Ihre Rechnung ${nr} · ${firmenname}`
+}
+
+/** Betreff bei Korrektur (Storno-Gutschrift + neue RE). */
+export function rechnungKorrekturMailBetreff(
+  rechnungsnummer: string,
+  firmenname: string,
+  opts?: { originalNr?: string | null }
+): string {
+  const neu = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
+  const orig = opts?.originalNr?.trim()
+    ? sanitizeRechnungNrFuerBetreff(opts.originalNr)
+    : null
+  if (orig && orig !== neu) {
+    return `Korrektur ${orig} → ${neu} · ${firmenname}`
+  }
+  return `Korrektur ${neu} · ${firmenname}`
 }
 
 /** Kein „Entwurf“ im Kunden-Betreff (auch bei Platzhalter ohne echte Nummer). */
@@ -85,6 +103,64 @@ export function defaultRechnungMailEinleitung(anrede: AngebotMailAnrede = 'sie')
     : 'anbei erhalten Sie Ihre Rechnung als PDF — kurz zur Übersicht:'
 }
 
+/** Standard-Einleitung bei Korrektur ohne Storno (nur neue/korrigierte RE im Anhang). */
+export function defaultRechnungKorrekturMailEinleitung(
+  anrede: AngebotMailAnrede = 'sie',
+  opts?: {
+    originalNr?: string | null
+    neueNr?: string | null
+  }
+): string {
+  const orig = opts?.originalNr?.trim() || null
+  const neu = opts?.neueNr?.trim() || null
+  if (anrede === 'du') {
+    if (orig && neu && orig !== neu) {
+      return `wir korrigieren die Rechnung ${orig} — im Anhang findest du die korrigierte Rechnung ${neu}.`
+    }
+    if (orig) {
+      return `wir korrigieren die Rechnung ${orig} — im Anhang findest du die korrigierte Rechnung.`
+    }
+    return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang findest du die korrigierte Rechnung.'
+  }
+  if (orig && neu && orig !== neu) {
+    return `wir korrigieren die Rechnung ${orig} — im Anhang finden Sie die korrigierte Rechnung ${neu}.`
+  }
+  if (orig) {
+    return `wir korrigieren die Rechnung ${orig} — im Anhang finden Sie die korrigierte Rechnung.`
+  }
+  return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang finden Sie die korrigierte Rechnung.'
+}
+
+/** Standard-Einleitung bei Korrektur mit Storno-Gutschrift + neuer RE (zwei PDFs). */
+export function defaultRechnungKorrekturMitStornoMailEinleitung(
+  anrede: AngebotMailAnrede = 'sie',
+  opts?: {
+    originalNr?: string | null
+    gutschriftNr?: string | null
+    neueNr?: string | null
+  }
+): string {
+  const orig = opts?.originalNr?.trim() || null
+  const gs = opts?.gutschriftNr?.trim() || null
+  const neu = opts?.neueNr?.trim() || null
+  if (anrede === 'du') {
+    if (orig && gs && neu) {
+      return `wir korrigieren die Rechnung ${orig}: Im Anhang findest du die Storno-Gutschrift ${gs} und die neue Rechnung ${neu}.`
+    }
+    if (orig) {
+      return `wir korrigieren die Rechnung ${orig} — im Anhang findest du die Storno-Gutschrift und die neue Rechnung.`
+    }
+    return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang findest du die Storno-Gutschrift und die neue Rechnung.'
+  }
+  if (orig && gs && neu) {
+    return `wir korrigieren die Rechnung ${orig}: Im Anhang finden Sie die Storno-Gutschrift ${gs} und die neue Rechnung ${neu}.`
+  }
+  if (orig) {
+    return `wir korrigieren die Rechnung ${orig} — im Anhang finden Sie die Storno-Gutschrift und die neue Rechnung.`
+  }
+  return 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang finden Sie die Storno-Gutschrift und die neue Rechnung.'
+}
+
 export function buildRechnungMail(
   data: RechnungMailInput,
   b: MailBranding
@@ -94,25 +170,30 @@ export function buildRechnungMail(
   const nr = esc(data.rechnungsnummer)
   const faellig = esc(data.faelligAm)
   const titel = esc(data.projektTitel?.trim() || data.rechnungsnummer)
+  const mitStorno = Boolean(data.mitStornoAnhang)
+  const istKorrektur = Boolean(data.istKorrektur || mitStorno)
 
   const introRaw =
     data.mailEinleitung?.trim() ||
-    (data.mitStornoAnhang
-      ? anrede === 'du'
-        ? data.stornoBezugRechnungsnummer && data.stornoGutschriftNummer
-          ? `wir korrigieren die Rechnung ${data.stornoBezugRechnungsnummer}: Im Anhang findest du die Storno-Gutschrift ${data.stornoGutschriftNummer} und die neue Rechnung ${data.rechnungsnummer}.`
-          : 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang findest du die Storno-Gutschrift und die neue Rechnung.'
-        : data.stornoBezugRechnungsnummer && data.stornoGutschriftNummer
-          ? `wir korrigieren die Rechnung ${data.stornoBezugRechnungsnummer}: Im Anhang finden Sie die Storno-Gutschrift ${data.stornoGutschriftNummer} und die neue Rechnung ${data.rechnungsnummer}.`
-          : 'wir korrigieren eine zuvor gestellte Rechnung — im Anhang finden Sie die Storno-Gutschrift und die neue Rechnung.'
-      : defaultRechnungMailEinleitung(anrede))
+    (mitStorno
+      ? defaultRechnungKorrekturMitStornoMailEinleitung(anrede, {
+          originalNr: data.stornoBezugRechnungsnummer,
+          gutschriftNr: data.stornoGutschriftNummer,
+          neueNr: data.rechnungsnummer,
+        })
+      : istKorrektur
+        ? defaultRechnungKorrekturMailEinleitung(anrede, {
+            originalNr: data.stornoBezugRechnungsnummer,
+            neueNr: data.rechnungsnummer,
+          })
+        : defaultRechnungMailEinleitung(anrede))
   const intro = esc(introRaw)
 
   const pdfHinweis = data.mitAbschlussberichtAnhang
     ? anrede === 'du'
       ? 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
       : 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
-    : data.mitStornoAnhang
+    : mitStorno
       ? anrede === 'du'
         ? data.stornoGutschriftNummer
           ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`
@@ -124,14 +205,10 @@ export function buildRechnungMail(
         ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
         : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
 
-  const summaryLabel = data.mitStornoAnhang
+  const summaryLabel = istKorrektur
     ? data.stornoBezugRechnungsnummer
-      ? anrede === 'du'
-        ? `KORREKTUR · ${data.stornoBezugRechnungsnummer} → ${nr}`
-        : `KORREKTUR · ${data.stornoBezugRechnungsnummer} → ${nr}`
-      : anrede === 'du'
-        ? `STORNO + RECHNUNG · ${nr}`
-        : `STORNO + RECHNUNG · ${nr}`
+      ? `KORREKTUR · ${data.stornoBezugRechnungsnummer} → ${nr}`
+      : `KORREKTUR · ${nr}`
     : anrede === 'du'
       ? `DEINE RECHNUNG · ${nr}`
       : `IHRE RECHNUNG · ${nr}`
@@ -140,7 +217,7 @@ export function buildRechnungMail(
     label: summaryLabel,
     title: titel,
     priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
-    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
+    metaHtml: `<p style="font-size:15px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
   const contact = mailKundenContactLine(anrede, b.telefon)
@@ -157,8 +234,8 @@ export function buildRechnungMail(
     `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
@@ -168,7 +245,11 @@ export function buildRechnungMail(
 
   const betreff = sanitizeRechnungMailBetreff(
     data.mailBetreff?.trim() ||
-      rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname)
+      (istKorrektur
+        ? rechnungKorrekturMailBetreff(data.rechnungsnummer, b.firmenname, {
+            originalNr: data.stornoBezugRechnungsnummer,
+          })
+        : rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname))
   )
 
   return { betreff, html }

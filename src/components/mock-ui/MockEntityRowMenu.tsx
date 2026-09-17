@@ -19,6 +19,8 @@ function toPopoverItems(items: EntityMenuItem[]): MockPopoverItem[] {
       icon: it.icon,
       label: it.label,
       danger: it.danger,
+      disabled: it.disabled,
+      hint: it.hint,
       onClick: it.onClick,
     }
   })
@@ -31,6 +33,7 @@ function toActionsMenuItems(items: EntityMenuItem[]): ActionsMenuItem[] {
       label: it.label,
       hint: it.hint,
       danger: it.danger,
+      disabled: it.disabled,
       icon: it.icon ? <MockIcon ctx="row" n={it.icon} size={15} /> : undefined,
       onClick: it.onClick,
     }

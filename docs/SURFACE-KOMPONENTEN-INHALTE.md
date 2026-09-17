@@ -26,11 +26,11 @@
 
 ## A · Shells (Rahmen)
 
-### A1 · `DocumentCanvas` *(neu / ersetzt WizardShell-Body für AG/RE)*
+### A1 · `DocumentCanvas` *(neu / ersetzt den früheren Wizard-Body für AG/RE)*
 
 | | |
 |--|--|
-| **Ersetzt / ändert** | `WizardShell` Step-Body, teils `AppFlowScreen` für Dokument-Flows |
+| **Ersetzt / ändert** | Früheren Wizard-Step-Body / teils `AppFlowScreen` für Dokument-Flows |
 | **Job** | Ein Dokument erstellen/bearbeiten |
 
 **Struktur (von oben nach unten):**
@@ -70,12 +70,9 @@
 
 ---
 
-### A2 · `WizardShell` *(behalten für Funnel / Übergang)*
+### A2 · Früher „WizardShell“ — **obsolet**
 
-| | |
-|--|--|
-| **Ändert** | Weniger Nutzung; AG/RE → Canvas; Funnel/Vertrag ggf. Shell |
-| **Inhalt** | Stepper-Dots · Step-Titel 17 · Hint 13 · Sticky Weiter |
+Kanonisch nur **DocumentCanvas** (A1). Staff-Funnel / Übergang: gleiches Chrome wie AG (Canvas oder Sheet-Stack), kein paralleles Shell-Muster.
 
 **Verboten:** Lange Meta-Formulare im Step ohne Overview→Sheet; doppelter Sticky-Footer + Header-Primary.
 

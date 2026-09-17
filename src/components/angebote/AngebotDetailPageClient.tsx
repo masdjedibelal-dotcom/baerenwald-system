@@ -27,13 +27,13 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
+import { DirektauftragUnterSchwelleBanner } from '@/components/anfragen/DirektauftragUnterSchwelleBanner'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
-import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
+import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotAuswahlZeile } from '@/components/angebote/AngebotAuswahlPanel'
 import {
@@ -47,6 +47,7 @@ import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCa
 import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotZahlungTab } from '@/components/angebote/AngebotZahlungTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
+import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'
@@ -63,10 +64,10 @@ import {
 } from '@/lib/angebot-einfach'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { angebotStatusDisplay, gesendetDetailSubline } from '@/lib/status/status-display'
+import { angebotStatusDisplay, angebotInhaltGeaendertNachVersand, gesendetDetailSubline } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
-import { angebotDarfImWizardBearbeitetWerden, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
   AngebotDetail,
@@ -216,9 +217,9 @@ export function AngebotDetailPageClient({
     [detail.positionen]
   )
 
-  const kannBearbeiten =
-    (statusEinfach === 'entwurf' || statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
-    angebotDarfImWizardBearbeitetWerden(detail.status)
+  /** Entwurf + gesendet (vor Annahme/Ablehnung); angenommen nur über AG-Korrektur. */
+  const kannBearbeiten = angebotDarfImWizardBearbeitetWerden(detail.status)
+  const bearbeitenSperrgrund = angebotWizardBearbeitenSperrgrund(detail.status)
 
   const angeboteAuswahlZeilen = useMemo((): AngebotAuswahlZeile[] => {
     const fromCtx = (projektKontext?.angebote ?? []).map((a) => ({
@@ -271,7 +272,7 @@ export function AngebotDetailPageClient({
 
   function openWizardBearbeiten() {
     if (!kannBearbeiten) {
-      toast.error('Dieses Angebot kann nicht mehr bearbeitet werden.')
+      toast.error(bearbeitenSperrgrund ?? 'Dieses Angebot kann nicht mehr bearbeitet werden.')
       return
     }
     if (!detail.lead_id || !lead) {
@@ -285,6 +286,21 @@ export function AngebotDetailPageClient({
     }
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(detail.id, detail.lead_id!)
+      if (!res.ok) {
+        toast.error(res.message)
+        return
+      }
+      openWizardMitBootstrap(res.bootstrap)
+    })
+  }
+
+  function openNeuesAngebotAlsKopie() {
+    if (!detail.lead_id) {
+      toast.error('Keine verknüpfte Anfrage.')
+      return
+    }
+    startTransition(async () => {
+      const res = await loadAngebotWizardBootstrapKopie(detail.id, detail.lead_id!)
       if (!res.ok) {
         toast.error(res.message)
         return
@@ -391,36 +407,43 @@ export function AngebotDetailPageClient({
   )
   const headMeta = useMemo(() => {
     const parts = [
-      projektTitel && projektTitel !== '—' ? projektTitel : null,
+      kundeName?.trim() || null,
       formatEurBetrag(summenMail.bruttoMin),
       gueltigBisYmd
         ? `gültig bis ${formatDatum(gueltigBisYmd) || gueltigBisYmd}`
         : null,
     ].filter(Boolean)
     return parts.join(' · ')
-  }, [projektTitel, summenMail.bruttoMin, gueltigBisYmd])
+  }, [kundeName, summenMail.bruttoMin, gueltigBisYmd])
+  const gesendetAm = gesendetAmWert(detail)
+  const inhaltGeaendertNachVersand =
+    (statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') &&
+    angebotInhaltGeaendertNachVersand(gesendetAm, detail.updated_at, {
+      positionen: detail.positionen,
+      positionen_portal: detail.positionen_portal,
+    })
   const headSub =
     statusEinfach === 'gesendet'
-      ? gesendetDetailSubline(gesendetAmWert(detail), detail.updated_at)
+      ? gesendetDetailSubline(gesendetAm, detail.updated_at, {
+          inhaltGeaendert: inhaltGeaendertNachVersand,
+        })
       : undefined
 
-  const statusMenuItems = useMemo((): ActionsMenuItem[] => {
+  const dangerAction = useMemo((): DetailActionDef | null => {
     if (!((statusEinfach === 'gesendet' || statusEinfach === 'abgelaufen') && !auftragId)) {
-      return []
+      return null
     }
-    return [
-      {
-        label: 'Ablehnen',
-        danger: true,
-        icon: <MockIcon ctx="btn" n="x" size={16} />,
-        onClick: () => {
-          setAblehnenGrund('')
-          setAblehnenNotiz('')
-          setAblehnenKonkurrenz('')
-          setAblehnenOpen(true)
-        },
+    return {
+      label: 'Ablehnen',
+      icon: 'x',
+      danger: true,
+      onClick: () => {
+        setAblehnenGrund('')
+        setAblehnenNotiz('')
+        setAblehnenKonkurrenz('')
+        setAblehnenOpen(true)
       },
-    ]
+    }
   }, [statusEinfach, auftragId])
 
   const kundeEmail =
@@ -493,8 +516,12 @@ export function AngebotDetailPageClient({
         send_kunden_email: false,
         direktOhneHvFreigabe: true,
       })
-      if (!res.ok) {
-        toast.error(res.message)
+      if (!res?.ok) {
+        toast.error(
+          res && 'message' in res && res.message
+            ? res.message
+            : 'Direkt Auftrag fehlgeschlagen — bitte neu laden.'
+        )
         return
       }
       toast.success('Auftrag erstellt — ohne Kundenmail / ohne HV-Freigabe')
@@ -536,24 +563,59 @@ export function AngebotDetailPageClient({
   }, [statusEinfach, detail.status, pending, unterSchwelleDirektAuftrag, runDirektAuftrag])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
-    if (!kannBearbeiten) return null
-    return {
-      label: 'Angebot bearbeiten',
-      icon: 'pencil',
-      onClick: openWizardBearbeiten,
-      disabled: pending,
+    if (kannBearbeiten) {
+      return {
+        label: 'Angebot bearbeiten',
+        icon: 'pencil',
+        onClick: openWizardBearbeiten,
+        disabled: pending,
+      }
     }
-  }, [kannBearbeiten, pending])
+    if (statusEinfach === 'abgelehnt') {
+      return {
+        label: 'Neues Angebot',
+        icon: 'pencil',
+        onClick: openNeuesAngebotAlsKopie,
+        disabled: pending,
+        title: 'Inhalt als neuen Entwurf übernehmen',
+      }
+    }
+    if (bearbeitenSperrgrund) {
+      return {
+        label: 'Angebot bearbeiten',
+        icon: 'pencil',
+        onClick: () => toast.info(bearbeitenSperrgrund),
+        disabled: true,
+        title: bearbeitenSperrgrund,
+      }
+    }
+    return null
+  }, [kannBearbeiten, bearbeitenSperrgrund, pending, statusEinfach])
 
   const stammdatenInhalt = (
     <>
-      <AngebotStammdatenCard detail={detail} lead={lead} onSaved={() => refresh()} />
+      <AngebotStammdatenCard
+        detail={detail}
+        lead={lead}
+        onSaved={() => refresh()}
+      />
       {lead ? (
         <HvMeldungKontextCards
           lead={lead}
-          direktAuftragUnterSchwelle={direktAuftragUnterSchwelleHinweis}
           angebotId={detail.id}
           onSaved={() => refresh()}
+        />
+      ) : null}
+      {lead?.id &&
+      (lead.org_freigabe_status || (lead.org_freigabe_log?.length ?? 0) > 0) ? (
+        <AngebotOrgFreigabeBanner
+          leadId={lead.id}
+          angebotId={detail.id}
+          orgFreigabeStatus={lead.org_freigabe_status}
+          orgFreigabeLog={lead.org_freigabe_log}
+          gesamtFix={detail.gesamt_fix}
+          gesamtMax={detail.gesamt_max}
+          onDone={() => refresh()}
         />
       ) : null}
     </>
@@ -685,7 +747,7 @@ export function AngebotDetailPageClient({
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
       crumbBackLabel="Zurück zu den Suchergebnissen"
       crumbSectionLabel="Angebote"
-      breadcrumbTitle={kundeName}
+      breadcrumbTitle={projektTitel}
       className="space-y-4 pb-0"
       wiedervorlageDatum={detail.wiedervorlage_datum}
       wiedervorlageNotiz={detail.wiedervorlage_notiz}
@@ -694,7 +756,7 @@ export function AngebotDetailPageClient({
       onWiedervorlageSaved={() => refresh()}
       quickBar={quickBar}
       head={{
-        title: kundeName,
+        title: projektTitel,
         sub: headSub,
         badges: (
           <StatusBadge
@@ -709,7 +771,7 @@ export function AngebotDetailPageClient({
             sheetTitle="Angebot"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={statusMenuItems}
+            danger={dangerAction}
           />
         ),
       }}
@@ -720,6 +782,33 @@ export function AngebotDetailPageClient({
           {detail.updated_at ? ` am ${formatDatum(detail.updated_at)}` : ''}
           {detail.ablehnung_grund ? ` — ${detail.ablehnung_grund}` : ''}
         </p>
+      ) : null}
+
+      {inhaltGeaendertNachVersand || direktAuftragUnterSchwelleHinweis ? (
+        <div className="detail-info-banners">
+          {inhaltGeaendertNachVersand ? (
+            <div className="detail-info-banner detail-info-banner--warn flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[length:var(--fs-text)] text-amber-950">
+                Inhalt geändert seit Versand
+                {gesendetAm ? ` am ${formatDatum(gesendetAm)}` : ''} — der Kunde hat die neue
+                Fassung noch nicht per E-Mail.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setKundeVersandOpen(true)}
+                disabled={pending}
+              >
+                Korrigierte Fassung senden
+              </Button>
+            </div>
+          ) : null}
+          {direktAuftragUnterSchwelleHinweis ? (
+            <DirektauftragUnterSchwelleBanner
+              betragEur={direktAuftragUnterSchwelleHinweis.betragEur}
+              schwelleEur={direktAuftragUnterSchwelleHinweis.schwelleEur}
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {hatAngebotHandwerker(detail.angebot_handwerker) && !detail.ist_partner_einholung ? (

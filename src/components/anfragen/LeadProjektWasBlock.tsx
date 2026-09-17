@@ -99,7 +99,7 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
   }, [lead.funnel_daten, lead.bereiche, lead.situation, gewerke])
 
   const persist = useCallback(
-    (next: ProjektWasZeile[]) => {
+    (next: ProjektWasZeile[], successMsg = 'Gespeichert') => {
       startTransition(async () => {
         const res = await saveLeadProjektWasZeilen(lead.id, next)
         if (!res.ok) {
@@ -108,6 +108,7 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
         }
         setZeilen(next)
         setDirty(false)
+        toast.success(successMsg)
         onSaved?.()
       })
     },
@@ -144,8 +145,7 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
       const next = zeilen.filter((z) => z.id !== id)
       setZeilen(next)
       if (openId === id) setOpenId(null)
-      persist(next)
-      toast.success('Leistung entfernt.')
+      persist(next, 'Leistung entfernt')
     },
     [zeilen, openId, persist]
   )
@@ -469,7 +469,7 @@ function ProjektLeistungAccordion({
                 onClick={onClose}
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
-                Fertig
+                Speichern
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
+import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 import {
   draftFromLeadMelder,
   MelderLeistungsortFields,
@@ -16,7 +17,7 @@ import { toast } from '@/components/ui/app-toast'
 import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsort'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
-import type { KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
+import type { Gewerk, KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
 
@@ -41,15 +42,12 @@ function melderAdresse(lead: LeadDetail): string {
   return [strasse, plzOrt, einheit ? `Einheit ${einheit}` : null].filter(Boolean).join(', ') || '—'
 }
 
-function formatEur(n: number): string {
-  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
-}
-
 const FREIGABE_BADGE: Record<
   OrgFreigabeStatus,
   { label: string; tone: 'yel' | 'grn' | 'muted' | 'red' }
 > = {
   ausstehend: { label: 'Ausstehend', tone: 'yel' },
+  beschluss_ausstehend: { label: 'Wartet auf Beschluss', tone: 'yel' },
   freigegeben: { label: 'Freigegeben', tone: 'grn' },
   nicht_noetig: { label: 'Nicht nötig', tone: 'muted' },
   abgelehnt: { label: 'Abgelehnt', tone: 'red' },
@@ -74,24 +72,14 @@ function PropRow({ label, value }: { label: string; value: ReactNode }) {
 
 /**
  * HV-Meldung: Melder + Leistungsort.
- * Schwellen-Hinweis nur nach Angebot und nur wenn Direktauftrag unter Schwelle möglich ist.
  * Stift: Melder/Objekt im CRM nachträglich setzen (ohne Anfrage-Wizard).
  */
 export function HvMeldungKontextCards({
   lead,
-  direktAuftragUnterSchwelle,
   angebotId,
   onSaved,
 }: {
   lead: LeadDetail
-  /**
-   * Nur am Angebot setzen, wenn Betrag ≤ Freigabe-Schwelle → Direktauftrag ohne HV.
-   * Vorher / sonst: kein Schwellen-Hinweis.
-   */
-  direktAuftragUnterSchwelle?: {
-    betragEur: number
-    schwelleEur: number
-  } | null
   angebotId?: string | null
   onSaved?: () => void
 }) {
@@ -113,18 +101,12 @@ export function HvMeldungKontextCards({
   const melderTel = lead.melder_telefon?.trim() || lead.kontakt_telefon?.trim() || null
   const melderMail = lead.melder_email?.trim() || lead.kontakt_email?.trim() || null
 
-  const showDirektUnterSchwelle =
-    direktAuftragUnterSchwelle != null &&
-    Number.isFinite(direktAuftragUnterSchwelle.betragEur) &&
-    direktAuftragUnterSchwelle.betragEur > 0 &&
-    Number.isFinite(direktAuftragUnterSchwelle.schwelleEur) &&
-    direktAuftragUnterSchwelle.schwelleEur > 0
-
   const [editOpen, setEditOpen] = useState(false)
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState<MelderLeistungsortDraft>(() => draftFromLeadMelder(lead))
   const [objekte, setObjekte] = useState<KundenObjekt[]>([])
+  const [gewerke, setGewerke] = useState<Gewerk[]>([])
 
   useEffect(() => {
     if (!editOpen) return
@@ -145,6 +127,13 @@ export function HvMeldungKontextCards({
     }
   }, [editOpen, agKundeId])
 
+  useEffect(() => {
+    if (!editOpen) return
+    void listGewerkeFuerFab()
+      .then((r) => setGewerke(r.ok ? (r.gewerke as Gewerk[]) : []))
+      .catch(() => setGewerke([]))
+  }, [editOpen])
+
   async function saveEdit() {
     if (saving) return
     setSaving(true)
@@ -155,6 +144,7 @@ export function HvMeldungKontextCards({
         melder_telefon: draft.melder_telefon || null,
         melder_einheit: draft.melder_einheit || null,
         kunde_objekt_id: draft.kunde_objekt_id,
+        objekt_anlage_id: draft.objekt_anlage_id,
         angebotId: angebotId ?? null,
       })
       if (!r.ok) {
@@ -193,18 +183,6 @@ export function HvMeldungKontextCards({
           </div>
         </div>
         <div className="card-b">
-          {showDirektUnterSchwelle && direktAuftragUnterSchwelle ? (
-            <div className="mb-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--surface-2,#f7f7f5)] px-3 py-2">
-              <div className="text-[length:var(--fs-meta)] font-semibold text-[var(--text)]">
-                Direktauftrag möglich — unter Freigabe-Schwelle
-              </div>
-              <p className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                Angebotspreis {formatEur(direktAuftragUnterSchwelle.betragEur)} ≤ Schwelle{' '}
-                {formatEur(direktAuftragUnterSchwelle.schwelleEur)}. Auftrag ohne HV-Freigabe /
-                ohne Kundenmail anlegen.
-              </p>
-            </div>
-          ) : null}
           <div className="detail-soft-block">
             <div className="props">
               <PropRow label="Name" value={melderName(lead)} />
@@ -257,6 +235,10 @@ export function HvMeldungKontextCards({
               <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
               <PropRow label="PLZ" value={leistungsort.plz || '—'} />
               <PropRow label="Ort" value={leistungsort.ort || '—'} />
+              <PropRow
+                label="Anlage / Teil"
+                value={lead.objekt_anlagen?.bezeichnung?.trim() || '—'}
+              />
             </div>
           </div>
         </div>
@@ -266,6 +248,7 @@ export function HvMeldungKontextCards({
         open={editOpen}
         onClose={() => setEditOpen(false)}
         title="Melder & Leistungsort"
+        overlayClassName={objektNeuOpen ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
           <button
             type="button"
@@ -283,6 +266,8 @@ export function HvMeldungKontextCards({
           objekte={objekte}
           onNeuObjekt={agKundeId ? () => setObjektNeuOpen(true) : undefined}
           disabled={saving}
+          kundeId={agKundeId}
+          gewerke={gewerke}
         />
       </EditorSheet>
 
@@ -291,6 +276,7 @@ export function HvMeldungKontextCards({
           open={objektNeuOpen}
           onClose={() => setObjektNeuOpen(false)}
           kundeId={agKundeId}
+          overlayClassName="editor-sheet-overlay--stack"
           onSaved={(objekt) => {
             setObjekte((prev) => {
               if (prev.some((o) => o.id === objekt.id)) return prev

@@ -1,0 +1,21 @@
+after bereich
+S0: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 1/2 | 
+S1: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 2/3 | 
+S2: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 3/3 | 
+S3: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 4/5 | 
+S4: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 5/5 | 
+S5: MN |  | Musterverwaltung Nord |  | Verwaltung |  | FOTOS | 
+foto
+S6: MN |  | Musterverwaltung Nord |  | Verwaltung |  | BESCHREIBUNG | 
+S7: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S8: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S9: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S10: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S11: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S12: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S13: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+S14: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT | 
+FINAL url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
+CTA_BW=false KONTO=false
+REF=false
+MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT |  | Ihre Adresse und Kontaktdaten | Ich stimme der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage zu. |  | Datenschutzhinweis zur Schadenmeldung |  | Verantwortlich ist in der Regel Ihre Verwaltung (Musterverwaltung Nord). Ein technischer Dienstleister unterstützt die Erfassung und Koordination der Bearbeitung. |  | Zweck: Aufnahme und Bearbeitung Ihrer Meldung, Abstimmung mit der Verwaltung und ggf. Weitergabe an beauftragte Handwerksbetriebe. |  | Rechtsgrundlagen: Art. 6 Abs. 1 lit. b und/oder lit. f DSGVO. Empfänger: Ihre Verwaltung, ein technischer Dienstleister für den Plattformbetrieb sowie ggf. beauftragte Handwerksbetriebe. |  | Speicherdauer: bi

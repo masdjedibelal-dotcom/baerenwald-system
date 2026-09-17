@@ -5,17 +5,30 @@ import { useTransition } from '@/components/ui/action-busy'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
 import {
+  activateObjektHausmeisterPortal,
   inviteObjektHausmeister,
   removeObjektHausmeister,
   saveObjektHausmeister,
 } from '@/app/actions/org-hausmeister'
+import { getPortalLoginHint } from '@/app/actions/kunden'
+import { openPortalAsKunde } from '@/app/(dashboard)/impersonation/actions'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
+import { LIST } from '@/lib/crm-labels'
+import type { EntityMenuItem } from '@/lib/entity-menu'
+import { cn } from '@/lib/utils'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
+
+const HM_LIST_COLS = 'minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr) auto'
 
 type Props = {
   kundeId: string
@@ -26,8 +39,8 @@ type Props = {
 }
 
 /**
- * Hausmeister am Objekt — analog HV-Portal:
- * ohne Zuordnung → neu anlegen; optional bestehenden Org-HM zuweisen.
+ * Hausmeister am Objekt — gleiche Listen-Card wie Kontakte/Ansprechpartner
+ * (ap-list + ⋯-Menü für Bearbeiten/Entfernen).
  */
 export function ObjektHausmeisterCard({
   kundeId,
@@ -36,10 +49,12 @@ export function ObjektHausmeisterCard({
   amObjekt: initialAmObjekt,
   onChanged,
 }: Props) {
+  const isMobile = useIsMobile()
   const [liste, setListe] = useState(initialListe)
   const [amObjekt, setAmObjekt] = useState(initialAmObjekt)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pending, startTransition] = useTransition()
+  const isCrmAdmin = useIsCrmAdmin()
 
   const [mode, setMode] = useState<'existing' | 'new'>('new')
   const [hmId, setHmId] = useState('')
@@ -47,15 +62,50 @@ export function ObjektHausmeisterCard({
   const [email, setEmail] = useState('')
   const [portalZugang, setPortalZugang] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [registered, setRegistered] = useState<boolean | null>(null)
+  const [loginBusy, setLoginBusy] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [removePending, setRemovePending] = useState(false)
 
   useEffect(() => {
     setListe(initialListe)
     setAmObjekt(initialAmObjekt)
   }, [initialListe, initialAmObjekt])
 
+  const portalKundeId = amObjekt?.portal_kunde_id?.trim() || null
+  const hmEmail = amObjekt?.email?.trim() || ''
+  const primaryStaff = isBaerenwaldPrimaryStaffEmail(hmEmail)
+
+  useEffect(() => {
+    if (!amObjekt || amObjekt.isLegacy || !amObjekt.portal_zugang) {
+      setRegistered(null)
+      return
+    }
+    if (!portalKundeId) {
+      setRegistered(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const hint = await getPortalLoginHint(portalKundeId)
+      if (cancelled) return
+      if (hint.ok && hint.hasAuthAccount) {
+        setRegistered(true)
+        return
+      }
+      if (primaryStaff) {
+        setRegistered(true)
+        return
+      }
+      setRegistered(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [amObjekt, portalKundeId, primaryStaff, amObjekt?.portal_zugang, amObjekt?.isLegacy])
+
   function openSheet() {
     setErr(null)
-    // Wie Portal: am Objekt schon HM → bearbeiten; sonst → neu anlegen
     if (amObjekt && !amObjekt.isLegacy) {
       setMode('existing')
       setHmId(amObjekt.id)
@@ -120,7 +170,16 @@ export function ObjektHausmeisterCard({
         toast.error(r.message)
         return
       }
-      toast.success(mode === 'new' ? 'Hausmeister angelegt' : 'Hausmeister gespeichert')
+      const staffMail = isBaerenwaldPrimaryStaffEmail(
+        mode === 'new' ? email : email || amObjekt?.email
+      )
+      toast.success(
+        staffMail && portalZugang
+          ? 'Hausmeister gespeichert — Portal aktiviert'
+          : mode === 'new'
+            ? 'Hausmeister angelegt'
+            : 'Hausmeister gespeichert'
+      )
       setSheetOpen(false)
       if (r.inviteMailto) {
         window.location.href = r.inviteMailto
@@ -129,22 +188,48 @@ export function ObjektHausmeisterCard({
     })
   }
 
-  function entfernen() {
-    if (!amObjekt || amObjekt.isLegacy) return
-    startTransition(async () => {
+  async function runEntfernen() {
+    if (!amObjekt || amObjekt.isLegacy || removePending) return
+    setRemovePending(true)
+    try {
       const r = await removeObjektHausmeister(kundeId, objektId)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
+      setRemoveOpen(false)
       toast.success('Zuordnung entfernt')
       onChanged()
-    })
+    } finally {
+      setRemovePending(false)
+    }
   }
 
-  function einladen() {
+  function einladenOderAktivieren() {
     if (!amObjekt || amObjekt.isLegacy || !amObjekt.portal_zugang) return
     startTransition(async () => {
+      if (primaryStaff || !portalKundeId) {
+        const r = await activateObjektHausmeisterPortal(kundeId, objektId, amObjekt.id)
+        if (!r.ok) {
+          toast.error(r.message)
+          return
+        }
+        toast.success(
+          r.primaryStaff
+            ? 'Hausmeister-Portal aktiv (Team-Login)'
+            : r.hasAuthAccount
+              ? 'Portal aktiv'
+              : 'Portal-Stub angelegt — Einladung senden'
+        )
+        if (!r.primaryStaff && !r.hasAuthAccount) {
+          const inv = await inviteObjektHausmeister(kundeId, objektId, amObjekt.id)
+          if (inv.ok && inv.inviteMailto) {
+            window.location.href = inv.inviteMailto
+          }
+        }
+        onChanged()
+        return
+      }
       const r = await inviteObjektHausmeister(kundeId, objektId, amObjekt.id)
       if (!r.ok) {
         toast.error(r.message)
@@ -165,6 +250,27 @@ export function ObjektHausmeisterCard({
     })
   }
 
+  async function openLogin() {
+    if (loginBusy || !portalKundeId) return
+    setLoginBusy(true)
+    const popup = window.open('about:blank', '_blank')
+    try {
+      const r = await openPortalAsKunde(portalKundeId)
+      if (!r.ok) {
+        popup?.close()
+        toast.error(r.message)
+        return
+      }
+      if (popup) popup.location.href = r.url
+      else window.location.assign(r.url)
+    } catch {
+      popup?.close()
+      toast.error('Portal konnte nicht geöffnet werden.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
   const selectOptions = [
     { value: '__new__', label: '＋ Neu anlegen' },
     ...liste.map((h) => ({
@@ -173,77 +279,190 @@ export function ObjektHausmeisterCard({
     })),
   ]
 
-  const ctaLabel =
-    amObjekt && !amObjekt.isLegacy
-      ? 'Bearbeiten'
-      : amObjekt?.isLegacy
-        ? 'Als Org-HM speichern'
-        : liste.length > 0
-          ? 'Anlegen / Zuweisen'
-          : 'Anlegen'
+  const showPortalZeile =
+    amObjekt && !amObjekt.isLegacy && amObjekt.portal_zugang
+  const statusLabel = amObjekt?.isLegacy
+    ? 'Legacy (Objekt-Kontakt)'
+    : !amObjekt?.portal_zugang
+      ? 'Ohne Portal'
+      : registered === true
+        ? 'Portal aktiv'
+        : registered === false
+          ? 'Noch nicht registriert'
+          : '…'
+  const showInvite = Boolean(showPortalZeile && registered === false)
+  /** Login sobald Portal-Stub existiert (nicht erst nach Auth-Check). */
+  const showLogin = Boolean(
+    showPortalZeile && portalKundeId && isCrmAdmin
+  )
+
+  function rowMenu(): EntityMenuItem[] {
+    if (!amObjekt) return []
+    const items: EntityMenuItem[] = [
+      {
+        icon: 'pencil',
+        label: amObjekt.isLegacy ? 'Als Org-HM speichern' : 'Bearbeiten',
+        onClick: openSheet,
+      },
+    ]
+    if (showInvite) {
+      items.push({
+        icon: 'send',
+        label: primaryStaff ? 'Portal aktivieren' : 'Einladen',
+        onClick: einladenOderAktivieren,
+        disabled: pending,
+      })
+    }
+    if (showLogin) {
+      items.push({
+        icon: 'log-in',
+        label: 'Login',
+        onClick: () => void openLogin(),
+        disabled: loginBusy || pending,
+      })
+    }
+    if (!amObjekt.isLegacy) {
+      items.push('sep', {
+        icon: 'trash',
+        label: 'Entfernen',
+        danger: true,
+        onClick: () => setRemoveOpen(true),
+      })
+    }
+    return items
+  }
+
+  function rowBody() {
+    if (!amObjekt) return null
+    const kontakt = amObjekt.email?.trim() || '—'
+    return (
+      <div
+        className={isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row'}
+        style={isMobile ? undefined : { gridTemplateColumns: HM_LIST_COLS }}
+      >
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={openSheet}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{amObjekt.name}</span>
+              </div>
+              <div className="ap-mobile-card__meta">{statusLabel}</div>
+              <div className="ap-mobile-card__meta">{kontakt}</div>
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">{amObjekt.name}</span>
+              <span className="ap-list__dim">
+                {showPortalZeile ? (
+                  <span className="vgid-portal" style={{ display: 'inline-flex' }}>
+                    <span
+                      className={cn(
+                        'd',
+                        registered === true ? 'is-on' : registered === false ? 'is-off' : ''
+                      )}
+                      aria-hidden
+                    />
+                    <span className="t">{statusLabel}</span>
+                  </span>
+                ) : (
+                  statusLabel
+                )}
+              </span>
+              <span className="ap-list__dim">{kontakt}</span>
+            </>
+          )}
+        </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}
+        >
+          {showLogin ? (
+            <PortalLoginIconButton
+              kundeId={portalKundeId}
+              label="Hausmeister-Portal öffnen"
+              withLabel
+            />
+          ) : null}
+          <MockEntityRowMenu items={rowMenu()} title={amObjekt.name} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
       <MockCard
-        title="Hausmeister"
+        title={amObjekt ? 'Hausmeister · 1' : 'Hausmeister'}
         icon="key"
         actions={
-          <MockBtn sm kind="ghost" onClick={openSheet} disabled={pending}>
-            {ctaLabel}
-          </MockBtn>
+          !amObjekt ? (
+            <MockBtn sm kind="primary" icon="plus" onClick={openSheet} disabled={pending}>
+              {LIST.hinzufuegen}
+            </MockBtn>
+          ) : null
         }
       >
         {!amObjekt ? (
           <MockEmpty
+            icon="key"
             title="Kein Hausmeister"
             hint="Neu anlegen oder bestehenden Org-Hausmeister zuweisen — Pflicht für Meldungen."
           />
+        ) : isMobile ? (
+          <div className="ap-cards">{rowBody()}</div>
         ) : (
-          <div className="space-y-2" style={{ fontSize: 'var(--fs-body)' }}>
-            <div>
-              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{amObjekt.name}</div>
-              {amObjekt.email ? (
-                <div style={{ color: 'var(--text-3)', marginTop: 2 }}>{amObjekt.email}</div>
-              ) : null}
+          <div className="ap-list">
+            <div
+              className="ap-list__head"
+              style={{ gridTemplateColumns: HM_LIST_COLS }}
+            >
+              <span>Name</span>
+              <span>Status</span>
+              <span>Kontakt</span>
+              <span aria-hidden />
             </div>
-            <div style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-              Portal-Zugang:{' '}
-              {amObjekt.isLegacy
-                ? 'nur Kontakt (Legacy)'
-                : amObjekt.portal_zugang
-                  ? amObjekt.portal_kunde_id
-                    ? 'aktiv'
-                    : 'Einladung möglich'
-                  : 'nein'}
-            </div>
-            {amObjekt.isLegacy ? (
-              <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)', margin: 0 }}>
-                Noch unter Objekt-Kontakte. Bitte hier als Org-Hausmeister speichern, damit Portal und
-                Auto-Zuweisung greifen.
-              </p>
-            ) : null}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {!amObjekt.isLegacy && amObjekt.portal_zugang && !amObjekt.portal_kunde_id ? (
-                <MockBtn sm kind="secondary" disabled={pending} onClick={einladen}>
-                  Einladung senden
-                </MockBtn>
-              ) : null}
-              {!amObjekt.isLegacy && amObjekt.portal_zugang && amObjekt.portal_kunde_id ? (
-                <PortalLoginIconButton
-                  kundeId={amObjekt.portal_kunde_id}
-                  label="Hausmeister-Portal öffnen"
-                  withLabel
-                />
-              ) : null}
-              {!amObjekt.isLegacy ? (
-                <MockBtn sm kind="ghost" disabled={pending} onClick={entfernen}>
-                  Entfernen
-                </MockBtn>
-              ) : null}
-            </div>
+            {rowBody()}
           </div>
         )}
       </MockCard>
+
+      <MockModal
+        open={removeOpen}
+        onClose={() => {
+          if (!removePending) setRemoveOpen(false)
+        }}
+        icon="trash"
+        title="Hausmeister entfernen?"
+        sub="Zuordnung am Objekt aufheben."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={removePending} onClick={() => setRemoveOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={removePending ? undefined : 'trash'}
+              disabled={removePending}
+              onClick={() => void runEntfernen()}
+            >
+              {removePending ? 'Wird entfernt…' : 'Entfernen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {removePending
+            ? 'Bitte warten…'
+            : `„${amObjekt?.name ?? 'Hausmeister'}“ wird vom Objekt entfernt.`}
+        </div>
+      </MockModal>
 
       <EditorSheet
         open={sheetOpen}
@@ -295,7 +514,11 @@ export function ObjektHausmeisterCard({
                   onChange={(e) => setPortalZugang(e.target.checked)}
                   style={{ marginTop: 2 }}
                 />
-                <span>Portal-Zugang — Einladung per E-Mail nach Speichern</span>
+                <span>
+                  {isBaerenwaldPrimaryStaffEmail(email)
+                    ? 'Portal-Zugang — Team-Login sofort aktiv'
+                    : 'Portal-Zugang — Einladung per E-Mail nach Speichern'}
+                </span>
               </label>
               {portalZugang ? (
                 <Input

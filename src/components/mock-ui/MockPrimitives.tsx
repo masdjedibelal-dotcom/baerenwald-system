@@ -1,6 +1,6 @@
 'use client'
 
-import type { PointerEvent, ReactNode } from 'react'
+import type { MouseEvent, PointerEvent, ReactNode } from 'react'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +49,7 @@ export function MockBtn({
   kind?: 'primary' | 'ghost' | 'secondary' | 'danger' | ''
   sm?: boolean
   icon?: string
-  onClick?: () => void
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void
   children?: ReactNode
   title?: string
   'aria-label'?: string

@@ -6,23 +6,39 @@ import { MockModal } from '@/components/mock-ui/MockModal'
 import { actionBusy } from '@/components/ui/action-busy'
 
 type ConfirmState = {
-  label: string
+  /** Verb + Objekt, z. B. „Vorgang löschen?“ */
+  title: string
+  sub?: string
+  body?: string
   onConfirm: () => void | Promise<void>
 }
 
 type ConfirmDeleteContextValue = {
-  confirmDelete: (label: string, onConfirm: () => void | Promise<void>) => void
+  confirmDelete: (
+    title: string,
+    onConfirm: () => void | Promise<void>,
+    opts?: { sub?: string; body?: string }
+  ) => void
 }
 
 const ConfirmDeleteContext = createContext<ConfirmDeleteContextValue | null>(null)
 
-let globalConfirmDelete: ((label: string, onConfirm: () => void | Promise<void>) => void) | null =
-  null
+let globalConfirmDelete:
+  | ((
+      title: string,
+      onConfirm: () => void | Promise<void>,
+      opts?: { sub?: string; body?: string }
+    ) => void)
+  | null = null
 
-/** Wie Mock `window.__confirmDelete` — für entityMenu-Löschaktionen */
-export function confirmDelete(label: string, onConfirm: () => void | Promise<void>) {
+/** Wie Bulk-Löschen: MockModal Verb+Objekt — für Swipe / entityMenu. */
+export function confirmDelete(
+  title: string,
+  onConfirm: () => void | Promise<void>,
+  opts?: { sub?: string; body?: string }
+) {
   if (globalConfirmDelete) {
-    globalConfirmDelete(label, onConfirm)
+    globalConfirmDelete(title, onConfirm, opts)
     return
   }
   void Promise.resolve(onConfirm())
@@ -38,10 +54,23 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConfirmState | null>(null)
   const [pending, setPending] = useState(false)
 
-  const confirmDeleteFn = useCallback((label: string, onConfirm: () => void | Promise<void>) => {
-    setPending(false)
-    setState({ label, onConfirm })
-  }, [])
+  const confirmDeleteFn = useCallback(
+    (
+      title: string,
+      onConfirm: () => void | Promise<void>,
+      opts?: { sub?: string; body?: string }
+    ) => {
+      setPending(false)
+      const t = title.trim()
+      setState({
+        title: t.endsWith('?') ? t : `${t}?`,
+        sub: opts?.sub,
+        body: opts?.body,
+        onConfirm,
+      })
+    },
+    []
+  )
 
   globalConfirmDelete = confirmDeleteFn
 
@@ -67,8 +96,9 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
         <MockModal
           open
           icon="trash"
-          title="Wirklich löschen?"
-          sub={state.label}
+          title={state.title}
+          sub={state.sub ?? 'Dauerhaft entfernen.'}
+          size="sm"
           onClose={() => {
             if (!pending) setState(null)
           }}
@@ -78,16 +108,22 @@ export function ConfirmDeleteProvider({ children }: { children: ReactNode }) {
                 Abbrechen
               </MockBtn>
               <div style={{ flex: 1 }} />
-              <MockBtn kind="danger" icon={pending ? undefined : 'trash'} disabled={pending} onClick={() => void handleConfirm()}>
+              <MockBtn
+                kind="danger"
+                icon={pending ? undefined : 'trash'}
+                disabled={pending}
+                onClick={() => void handleConfirm()}
+              >
                 {pending ? 'Wird gelöscht…' : 'Löschen'}
               </MockBtn>
             </>
           }
         >
-          <div style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
             {pending
-              ? 'Bitte warten — der Vorgang wird gelöscht…'
-              : `${state.label} wird dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.`}
+              ? 'Bitte warten…'
+              : state.body ??
+                'Der Eintrag wird unwiderruflich gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.'}
           </div>
         </MockModal>
       ) : null}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+import { TokenLinkInvalid, PublicTokenLegalFooter } from '@/components/public/TokenLinkInvalid'
 import {
   HANDWERKER_ABLEHNUNG_GRUND_LABELS,
   HANDWERKER_ABLEHNUNG_GRUND_VALUES,
@@ -28,12 +29,14 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   const laden = useCallback(async () => {
     setFehler(null)
     const res = await fetch(`/api/handwerker/anfrage/${encodeURIComponent(token)}`)
-    if (!res.ok) {
-      setFehler('Dieser Link ist nicht mehr gültig.')
+    const json = (await res.json().catch(() => null)) as
+      | (HandwerkerAnfragePublicPayload & { ok?: boolean; error?: string })
+      | null
+    if (!res.ok || !json || json.ok === false || json.error === 'ungueltig') {
+      setFehler('invalid')
       setFlow('fertig')
       return
     }
-    const json = (await res.json()) as HandwerkerAnfragePublicPayload
     setData(json)
     if (json.antwort_at && json.antwort) {
       setFlow('fertig')
@@ -89,12 +92,10 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   }
 
   if (fehler || !data) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-10 text-center">
-        <p className="text-lg font-medium text-ink">{fehler ?? 'Link ungültig'}</p>
-      </div>
-    )
+    return <TokenLinkInvalid />
   }
+
+  const legal = <PublicTokenLegalFooter />
 
   if (flow === 'fertig' && data.antwort && data.antwort_at) {
     const txt =
@@ -106,9 +107,12 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
         ? 'Vielen Dank! Wir melden uns kurzfristig.'
         : 'Danke für die Rückmeldung.'
     return (
-      <div className="mx-auto max-w-md px-4 py-10">
-        <p className="text-center text-sm text-muted">{txt}</p>
-        <p className="mt-4 text-center text-lg font-semibold text-primary">{success}</p>
+      <div className="flex min-h-dvh flex-col">
+        <div className="mx-auto max-w-md flex-1 px-4 py-10">
+          <p className="text-center text-sm text-muted">{txt}</p>
+          <p className="mt-4 text-center text-lg font-semibold text-primary">{success}</p>
+        </div>
+        {legal}
       </div>
     )
   }
@@ -125,7 +129,8 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       })),
     ]
     return (
-      <div className="mx-auto max-w-md px-4 py-6">
+      <div className="flex min-h-dvh flex-col">
+        <div className="mx-auto max-w-md flex-1 px-4 py-6">
         <h2 className="mb-4 text-lg font-semibold text-ink">Anfrage ablehnen</h2>
         <Select
           label="Grund"
@@ -168,13 +173,16 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
             Zurück
           </Button>
         </div>
+        </div>
+        {legal}
       </div>
     )
   }
 
   if (flow === 'bestaetigen' && wahl === 'akzeptiert') {
     return (
-      <div className="mx-auto max-w-md px-4 py-6">
+      <div className="flex min-h-dvh flex-col">
+        <div className="mx-auto max-w-md flex-1 px-4 py-6">
         <h2 className="mb-4 text-lg font-semibold text-ink">Anfrage annehmen</h2>
         <Textarea
           label="Anmerkungen (optional)"
@@ -206,12 +214,15 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
             Zurück
           </Button>
         </div>
+        </div>
+        {legal}
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pb-16 pt-6">
+    <div className="flex min-h-dvh flex-col">
+    <div className="mx-auto max-w-md flex-1 px-4 pb-16 pt-6">
       <header className="mb-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Bärenwald</p>
         <h1 className="text-xl font-bold text-ink">Neue Anfrage</h1>
@@ -317,6 +328,8 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
           Ich bin leider nicht verfügbar
         </Button>
       </div>
+    </div>
+    {legal}
     </div>
   )
 }

@@ -46,7 +46,8 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
     return { ok: true, skipped: true, reason: 'Angebot existiert bereits.' }
   }
 
-  if ((lead.org_freigabe_status ?? '').trim() === 'ausstehend') {
+  const freigabe = (lead.org_freigabe_status ?? '').trim()
+  if (freigabe === 'ausstehend' || freigabe === 'beschluss_ausstehend') {
     return { ok: true, skipped: true, reason: 'Wartet auf Org-Freigabe.' }
   }
 

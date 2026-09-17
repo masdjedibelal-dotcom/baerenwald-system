@@ -7,6 +7,7 @@ import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { bulkDeleteAngebotPositionen } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { summenAusPositionen, positionNettoZeile } from '@/lib/angebot-positionen'
@@ -162,46 +163,42 @@ export function AngebotPositionenV3Tab({
   function bulkDelete() {
     const ids = Array.from(selectedIds)
     if (!ids.length) return
-    if (
-      !window.confirm(
-        ids.length === 1
-          ? 'Diese Position wirklich entfernen?'
-          : `${ids.length} Positionen wirklich entfernen?`
-      )
-    ) {
-      return
-    }
-    startTransition(async () => {
-      const r = await bulkDeleteAngebotPositionen(angebotId, ids)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+    confirmDelete(
+      ids.length === 1 ? 'Position entfernen?' : `${ids.length} Positionen entfernen?`,
+      async () => {
+        const r = await bulkDeleteAngebotPositionen(angebotId, ids)
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success(r.deleted === 1 ? 'Position entfernt.' : `${r.deleted} Positionen entfernt.`)
+        clearSelection()
+        setDetailPos(null)
+        refresh()
       }
-      toast.success(r.deleted === 1 ? 'Position entfernt.' : `${r.deleted} Positionen entfernt.`)
-      clearSelection()
-      setDetailPos(null)
-      refresh()
-    })
+    )
   }
 
   function deleteOne(pos: AngebotPosition) {
     const titel = angebotPositionAnzeigeTitel(pos)
-    if (!window.confirm(`„${titel}" wirklich entfernen?`)) return
-    startTransition(async () => {
-      const r = await bulkDeleteAngebotPositionen(angebotId, [pos.id])
-      if (!r.ok) {
-        toast.error(r.message)
-        return
+    confirmDelete(
+      `„${titel}“ entfernen?`,
+      async () => {
+        const r = await bulkDeleteAngebotPositionen(angebotId, [pos.id])
+        if (!r.ok) {
+          toast.error(r.message)
+          throw new Error(r.message)
+        }
+        toast.success('Position entfernt.')
+        setDetailPos(null)
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(pos.id)
+          return next
+        })
+        refresh()
       }
-      toast.success('Position entfernt.')
-      setDetailPos(null)
-      setSelectedIds((prev) => {
-        const next = new Set(prev)
-        next.delete(pos.id)
-        return next
-      })
-      refresh()
-    })
+    )
   }
 
   const selectedCount = selectedIds.size

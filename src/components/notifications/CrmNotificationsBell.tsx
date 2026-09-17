@@ -124,7 +124,16 @@ export function CrmNotificationsBell() {
     startTransition(async () => {
       await markAllCrmNotificationsRead()
       setDetail(null)
-      reload(filter)
+      setUnreadCount(0)
+      /* Auf „Gelesen“ umschalten — Sheet bleibt offen, Liste zeigt die Einträge. */
+      setFilter('gelesen')
+      const res = await listCrmNotifications('gelesen')
+      if (!res.ok) {
+        setItems([])
+        return
+      }
+      setItems(res.items)
+      setUnreadCount(res.unreadCount)
     })
   }
 
@@ -162,7 +171,15 @@ export function CrmNotificationsBell() {
         overlayClassName={detail ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
           unreadCount > 0 ? (
-            <MockBtn sm kind="ghost" disabled={pending} onClick={onMarkAll}>
+            <MockBtn
+              sm
+              kind="ghost"
+              disabled={pending}
+              onClick={(e) => {
+                e.stopPropagation()
+                onMarkAll()
+              }}
+            >
               Alle gelesen
             </MockBtn>
           ) : null

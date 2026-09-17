@@ -1,4 +1,6 @@
-# Nr. 3 — WizardShell-Optik (Angebot + Rechnung)
+> **Hinweis 2026-08-25:** Docs-Name „WizardShell“ ist obsolet. Kanonische Shell = **DocumentCanvas** ([PATTERN-LEITFADEN](../ui-audit/PATTERN-LEITFADEN.md)).
+
+# Nr. 3 — DocumentCanvas-Optik (Angebot + Rechnung)
 
 Optik-Angleichung an Mock (`/tmp/mock_design.css` → `.wizard*`, `.stepper`, `.card`, `.prop`, `.btn`). Keine Speicher-/Logik-Änderungen, kein PosBoard.
 

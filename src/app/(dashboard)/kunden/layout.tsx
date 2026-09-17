@@ -7,7 +7,12 @@ export const metadata: Metadata = {
 }
 
 export default async function KundenLayout({ children }: { children: React.ReactNode }) {
-  const kunden = await loadKundenListe()
+  let kunden: Awaited<ReturnType<typeof loadKundenListe>> = []
+  try {
+    kunden = await loadKundenListe()
+  } catch (e) {
+    console.error('KundenLayout', e)
+  }
 
   return <KundenMasterDetailShell kunden={kunden}>{children}</KundenMasterDetailShell>
 }

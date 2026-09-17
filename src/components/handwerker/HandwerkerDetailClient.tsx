@@ -35,6 +35,7 @@ import {
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   formatHandwerkerBewertung,
@@ -179,20 +180,30 @@ export function HandwerkerDetailClient({
 
   function togglePortalGesperrt() {
     const next = !istPortalGesperrt
-    const label = next
-      ? 'Partner vom Portal ausschließen? Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
-      : 'Portal-Ausschluss aufheben? Login und Registrierung sind danach wieder möglich.'
-    if (!confirm(label)) return
-    setPortalGesperrtPending(true)
-    void setHandwerkerPortalGesperrt(hw.id, next).then((r) => {
-      setPortalGesperrtPending(false)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setIstPortalGesperrt(next)
-      toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
-      router.refresh()
+    confirmAction({
+      title: next ? 'Vom Portal ausschließen?' : 'Portal-Ausschluss aufheben?',
+      body: next
+        ? 'Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
+        : 'Login und Registrierung sind danach wieder möglich.',
+      confirmLabel: next ? 'Ausschließen' : 'Aufheben',
+      cancelLabel: 'Abbrechen',
+      danger: next,
+      busyLabel: null,
+      onConfirm: async () => {
+        setPortalGesperrtPending(true)
+        try {
+          const r = await setHandwerkerPortalGesperrt(hw.id, next)
+          if (!r.ok) {
+            toast.error(r.message)
+            return
+          }
+          setIstPortalGesperrt(next)
+          toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
+          router.refresh()
+        } finally {
+          setPortalGesperrtPending(false)
+        }
+      },
     })
   }
 

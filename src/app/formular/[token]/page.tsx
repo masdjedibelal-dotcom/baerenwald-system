@@ -1,5 +1,8 @@
-import { notFound } from 'next/navigation'
 import { FormularOeffentlichClient } from '@/components/formulare/FormularOeffentlichClient'
+import {
+  PublicTokenLegalFooter,
+  TokenLinkInvalid,
+} from '@/components/public/TokenLinkInvalid'
 import { loadOeffentlichesFormular } from '@/app/formular/[token]/load-formular'
 
 export default async function OeffentlichesFormularPage({
@@ -8,7 +11,14 @@ export default async function OeffentlichesFormularPage({
   params: { token: string }
 }) {
   const data = await loadOeffentlichesFormular(params.token)
-  if (!data) notFound()
+  if (!data) return <TokenLinkInvalid />
 
-  return <FormularOeffentlichClient initial={data} />
+  return (
+    <div className="flex min-h-screen flex-col">
+      <div className="flex-1">
+        <FormularOeffentlichClient initial={data} />
+      </div>
+      <PublicTokenLegalFooter />
+    </div>
+  )
 }

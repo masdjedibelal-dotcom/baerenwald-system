@@ -3,34 +3,38 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
 
 export function DemoModeBanner() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
 
-  async function wipeTransactionalData() {
-    if (
-      !window.confirm(
-        'Alle CRM-Transaktionsdaten (Anfragen, Kunden, Aufträge, Rechnungen, Termine …) unwiderruflich löschen? Es werden keine Demo-Testdaten neu angelegt.'
-      )
-    ) {
-      return
-    }
-    setBusy(true)
-    try {
-      const res = await fetch('/api/demo/reset', { method: 'POST' })
-      const json = (await res.json()) as { ok?: boolean; error?: string }
-      if (!res.ok || !json.ok) {
-        toast.error(json.error ?? 'Löschen fehlgeschlagen')
-        return
-      }
-      toast.success('Transaktionsdaten wurden gelöscht.')
-      router.refresh()
-    } catch {
-      toast.error('Netzwerkfehler')
-    } finally {
-      setBusy(false)
-    }
+  function wipeTransactionalData() {
+    confirmAction({
+      title: 'Transaktionsdaten leeren?',
+      body: 'Alle CRM-Transaktionsdaten (Anfragen, Kunden, Aufträge, Rechnungen, Termine …) werden unwiderruflich gelöscht. Es werden keine Demo-Testdaten neu angelegt.',
+      confirmLabel: 'Alles löschen',
+      cancelLabel: 'Abbrechen',
+      danger: true,
+      busyLabel: null,
+      onConfirm: async () => {
+        setBusy(true)
+        try {
+          const res = await fetch('/api/demo/reset', { method: 'POST' })
+          const json = (await res.json()) as { ok?: boolean; error?: string }
+          if (!res.ok || !json.ok) {
+            toast.error(json.error ?? 'Löschen fehlgeschlagen')
+            return
+          }
+          toast.success('Transaktionsdaten wurden gelöscht.')
+          router.refresh()
+        } catch {
+          toast.error('Netzwerkfehler')
+        } finally {
+          setBusy(false)
+        }
+      },
+    })
   }
 
   return (
@@ -42,7 +46,7 @@ export function DemoModeBanner() {
       <button
         type="button"
         disabled={busy}
-        onClick={() => void wipeTransactionalData()}
+        onClick={() => wipeTransactionalData()}
         className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1 text-[length:var(--fs-meta)] font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
       >
         {busy ? 'Bitte warten…' : 'Transaktionsdaten leeren'}

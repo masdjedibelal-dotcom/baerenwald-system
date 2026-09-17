@@ -1,3 +1,4 @@
+import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import { isAusgehendeRechnung } from '@/lib/rechnungen/rechnung-richtung'
@@ -174,7 +175,7 @@ export function rechnungDokumentZeilen(rechnungen: RechnungAuswahlZeile[]): Auft
       beschreibung: `${art} · ${st || '—'}`,
       datum: r.gesendet_at ?? r.rechnungsdatum ?? r.created_at ?? '',
       fuerKunde: st === 'gesendet' || st === 'bezahlt' || st === 'versendet',
-      href: r.pdf_url?.trim() || `/api/rechnungen/${r.id}/pdf`,
+      href: rechnungPdfHref(r.id, r.pdf_url),
       quelle: 'rechnung' as const,
     }
   })

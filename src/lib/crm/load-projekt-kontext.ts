@@ -28,7 +28,7 @@ const RECHNUNG_KURZ_SELECT =
   'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'
 
 const AUFTRAG_KURZ_SELECT =
-  'id, titel, status, created_at, abnahme_protokoll_url, abschlussdokumentation_url, abschlussdokumentation_gesendet_at'
+  'id, titel, status, created_at, angebot_id, abnahme_protokoll_url, abschlussdokumentation_url, abschlussdokumentation_gesendet_at'
 
 function leadLabel(row: {
   situation?: string | null
@@ -186,6 +186,7 @@ export async function loadProjektKontext(
       titel: (aRow.titel as string | null) ?? null,
       status: String(aRow.status ?? ''),
       created_at: (aRow.created_at as string | null) ?? null,
+      angebot_id: (aRow.angebot_id as string | null) ?? null,
       abnahme_protokoll_url: (aRow.abnahme_protokoll_url as string | null) ?? null,
       abschlussdokumentation_url: (aRow.abschlussdokumentation_url as string | null) ?? null,
       abschlussdokumentation_gesendet_at:

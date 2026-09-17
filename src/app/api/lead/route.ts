@@ -219,7 +219,11 @@ export async function POST(req: Request) {
     await sendAnfrageBestaetigung(leadId)
   }
 
-  void notifyNewLeadAlert(leadId).catch(() => undefined)
+  const alert = await notifyNewLeadAlert(leadId).catch(() => null)
+  if (alert && typeof alert === 'object' && 'ok' in alert && !(alert as { ok?: boolean }).ok) {
+    console.warn('[api/lead] notifyNewLeadAlert fehlgeschlagen', alert)
+  }
+  // Best-effort Push (kein Mail): Fire-and-forget bewusst.
   void import('@/lib/push/send')
     .then(({ sendCrmPushToStaff }) =>
       sendCrmPushToStaff({

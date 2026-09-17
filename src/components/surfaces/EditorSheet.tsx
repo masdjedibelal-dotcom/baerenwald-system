@@ -13,6 +13,7 @@ import {
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { toast } from '@/components/ui/app-toast'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -58,6 +59,13 @@ export type EditorSheetProps = {
   onConfirm?: () => void
   confirmDisabled?: boolean
   confirmBusy?: boolean
+  /** Label für Confirm. Default „Speichern“ (Footer) bzw. Compose-Label. */
+  confirmLabel?: string
+  /**
+   * Wo die Confirm-Aktion liegt.
+   * Default: Compose → Header, sonst Footer.
+   */
+  confirmPlacement?: 'footer' | 'header'
   /** Optional statt ✓ / Senden (z. B. nur +) */
   headerEnd?: ReactNode
   /** Zusätzlicher Versuch zu schließen (Swipe etc.) */
@@ -66,7 +74,7 @@ export type EditorSheetProps = {
   bodyClassName?: string
   overlayClassName?: string
   size?: 'md' | 'lg'
-  /** Sticky Footer-CTAs (LeistungDrawer / RateDrawer) — Aktionen nur hier */
+  /** Sticky Footer-CTAs — Aktionen nur hier (oder Auto-Speichern aus onConfirm) */
   footer?: ReactNode
   /**
    * Browser-History für Back-to-Close (default true).
@@ -93,6 +101,8 @@ export function EditorSheet({
   onConfirm,
   confirmDisabled,
   confirmBusy,
+  confirmLabel: confirmLabelProp,
+  confirmPlacement: confirmPlacementProp,
   headerEnd,
   onDismissAttempt,
   className,
@@ -141,6 +151,30 @@ export function EditorSheet({
   onDismissAttemptRef.current = onDismissAttempt
   const onConfirmRef = useRef(onConfirm)
   onConfirmRef.current = onConfirm
+
+  const confirmPlacement =
+    confirmPlacementProp ?? (compose ? 'header' : 'footer')
+  const confirmLabel =
+    confirmLabelProp ?? (compose ? composeLabel : 'Speichern')
+  const showHeaderConfirm =
+    Boolean(onConfirm) && confirmPlacement === 'header' && headerEnd == null
+  const showFooterConfirm =
+    Boolean(onConfirm) && confirmPlacement === 'footer' && footer == null
+  const resolvedFooter =
+    footer ??
+    (showFooterConfirm ? (
+      <button
+        type="button"
+        className="btn primary"
+        disabled={confirmDisabled || confirmBusy}
+        onClick={() => {
+          guardSheetPointerFallthrough()
+          onConfirmRef.current?.()
+        }}
+      >
+        {confirmBusy ? '…' : confirmLabel}
+      </button>
+    ) : null)
 
   const finishClose = useCallback(() => {
     setDiscardOpen(false)
@@ -316,7 +350,7 @@ export function EditorSheet({
 
   const end =
     headerEnd ??
-    (onConfirm ? (
+    (showHeaderConfirm ? (
       compose ? (
         <button
           type="button"
@@ -324,7 +358,7 @@ export function EditorSheet({
           disabled={confirmDisabled || confirmBusy}
           onClick={handleConfirm}
         >
-          {confirmBusy ? '…' : composeLabel}
+          {confirmBusy ? '…' : confirmLabel}
         </button>
       ) : (
         <button
@@ -332,8 +366,8 @@ export function EditorSheet({
           className="editor-sheet__confirm"
           disabled={confirmDisabled || confirmBusy}
           onClick={handleConfirm}
-          aria-label="Bestätigen"
-          title="Bestätigen"
+          aria-label={confirmLabel}
+          title={confirmLabel}
         >
           <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
         </button>
@@ -390,9 +424,9 @@ export function EditorSheet({
       <div className={cn('editor-sheet__body', bodyClassName)} data-scroll-lock-allow>
         {children}
       </div>
-      {footer ? (
+      {resolvedFooter ? (
         <EditorSheetApiContext.Provider value={api}>
-          <div className="editor-sheet__footer">{footer}</div>
+          <div className="editor-sheet__footer">{resolvedFooter}</div>
         </EditorSheetApiContext.Provider>
       ) : null}
     </div>
@@ -422,13 +456,16 @@ export function EditorSheet({
       <ConfirmPopup
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
-        title="Änderungen verwerfen?"
+        title="Nicht gespeichert"
         confirmLabel="Verwerfen"
         cancelLabel="Weiter bearbeiten"
         danger
-        onConfirm={confirmClose}
+        onConfirm={() => {
+          toast.info('Nicht gespeichert')
+          confirmClose()
+        }}
       >
-        Ungespeicherte Eingaben gehen verloren.
+        Ihre Änderungen werden verworfen.
       </ConfirmPopup>
     </EditorSheetApiContext.Provider>,
     document.body

@@ -6,6 +6,7 @@ import type {
   FremdVorgang,
   ObjektAkteDetailPayload,
   ObjektAkteReadOnlyPayload,
+  ObjektAnlage,
   ObjektDokument,
   ObjektEinheit,
   ObjektKontakt,
@@ -26,6 +27,88 @@ export async function loadKundenObjektForAkte(
 
   if (error || !data) return null
   return data as KundenObjekt
+}
+
+async function fetchObjektAnlagenRows(
+  supabase: ReturnType<typeof createClient>,
+  kundeId: string,
+  objektId: string,
+  select: string
+): Promise<{ data: ObjektAnlage[] | null; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .select(select)
+    .eq('kunde_id', kundeId)
+    .eq('kunde_objekt_id', objektId)
+    .order('sort_order', { ascending: true })
+    .order('bezeichnung', { ascending: true })
+  return {
+    data: (data ?? null) as ObjektAnlage[] | null,
+    error: error ? { message: error.message } : null,
+  }
+}
+
+async function loadObjektAnlagen(
+  supabase: ReturnType<typeof createClient>,
+  kundeId: string,
+  objektId: string
+): Promise<ObjektAnlage[]> {
+  const fullSelect =
+    '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+  const fullSelectNoEtage =
+    '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
+  const basicSelect =
+    'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+  const basicSelectNoEtage =
+    'id, kunde_id, kunde_objekt_id, bezeichnung, gewerk_id, standort, objekt_einheit_id, einbau_datum, foto_url, notiz, status, sort_order, created_at, updated_at, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
+
+  let res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, fullSelect)
+
+  if (res.error && /etage/i.test(res.error.message)) {
+    res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, fullSelectNoEtage)
+  }
+
+  if (res.error && /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|does not exist|Could not find/i.test(res.error.message)) {
+    res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, basicSelect)
+    if (res.error && /etage/i.test(res.error.message)) {
+      res = await fetchObjektAnlagenRows(supabase, kundeId, objektId, basicSelectNoEtage)
+    }
+  }
+
+  if (res.error) {
+    if (/objekt_anlagen|does not exist|Could not find/i.test(res.error.message)) {
+      return []
+    }
+    console.warn('loadObjektAnlagen:', res.error.message)
+    return []
+  }
+
+  const anlagen = res.data ?? []
+  if (!anlagen.length) return []
+
+  const ids = anlagen.map((a) => a.id)
+  const { data: countRows, error: countErr } = await supabase
+    .from('leads')
+    .select('objekt_anlage_id')
+    .in('objekt_anlage_id', ids)
+
+  if (countErr) {
+    console.warn('loadObjektAnlagen counts:', countErr.message)
+    return anlagen
+  }
+
+  const counts = (countRows ?? []).reduce<Record<string, number>>((acc, row) => {
+    const id = String(row.objekt_anlage_id ?? '')
+    if (!id) return acc
+    acc[id] = (acc[id] ?? 0) + 1
+    return acc
+  }, {})
+
+  return anlagen.map((a) => ({
+    ...a,
+    dokument_urls: a.dokument_urls ?? [],
+    vorgang_count: counts[a.id] ?? 0,
+  }))
 }
 
 async function loadReadOnlyAkte(
@@ -118,7 +201,7 @@ export async function loadObjektAkteDetail(
 
   const supabase = createClient()
 
-  const [kontakteRes, einheitenRes, readOnly, orgHausmeisterListe, hausmeisterAmObjekt] =
+  const [kontakteRes, einheitenRes, anlagenRes, readOnly, orgHausmeisterListe, hausmeisterAmObjekt] =
     await Promise.all([
       supabase
         .from('objekt_kontakte')
@@ -132,6 +215,7 @@ export async function loadObjektAkteDetail(
         .eq('kunde_objekt_id', oid)
         .eq('aktiv', true)
         .order('sort_order', { ascending: true }),
+      loadObjektAnlagen(supabase, kid, oid),
       loadReadOnlyAkte(supabase, kid, oid),
       listOrgHausmeister(kid),
       loadHausmeisterForObjekt(oid),
@@ -188,6 +272,7 @@ export async function loadObjektAkteDetail(
     kontakte: (kontakteRes.data ?? []) as ObjektKontakt[],
     einheiten,
     bewohner,
+    anlagen: anlagenRes,
     orgHausmeisterListe,
     hausmeisterAmObjekt,
     ...readOnly,

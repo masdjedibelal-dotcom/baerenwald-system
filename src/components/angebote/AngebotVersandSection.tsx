@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -18,6 +20,7 @@ import {
   darfAngebotAnKundeSenden,
   handwerkerSendenBlockierHinweis,
   handwerkerZuweisungAktiv,
+  orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import { betragAnzeige } from '@/lib/angebot-einfach'
@@ -138,6 +141,18 @@ export function AngebotVersandSection({
   )
   const orgFreigabeStatus = (detail.leads as { org_freigabe_status?: string } | null | undefined)
     ?.org_freigabe_status as import('@/lib/types').OrgFreigabeStatus | undefined
+  const orgFreigabe = useMemo(
+    () =>
+      orgFreigabeKundenversandOptsFromLead(
+        detail.leads as {
+          org_freigabe_status?: string | null
+          hv_meldung_status?: string | null
+          freigabe_bypass_grund?: string | null
+          funnel_daten?: unknown
+        } | null
+      ),
+    [detail.leads]
+  )
   const titel =
     angebotTitel?.trim() ||
     detail.notizen?.trim()?.slice(0, 80) ||
@@ -182,7 +197,7 @@ export function AngebotVersandSection({
     detail.status === 'gesendet_kunde' ||
     String(detail.status_einfach ?? '').trim().toLowerCase() === 'gesendet'
   const kannAnKunde =
-    darfAngebotAnKundeSenden(rows, detail.status) &&
+    darfAngebotAnKundeSenden(rows, detail.status, orgFreigabe) &&
     statusOk &&
     Boolean(kundeEmail)
 
@@ -330,7 +345,9 @@ export function AngebotVersandSection({
         <div className="mb-3">
           <h2 className="mb-1 text-[length:var(--fs-head)] font-semibold text-ink">Versand</h2>
           <p className="m-0 text-[length:var(--fs-text)] text-muted">
-            Speichern legt das Angebot im Portal vor. Hier nur noch die E-Mail an den Kunden.
+            Speichern hält den Entwurf im CRM. Versenden legt das Angebot im Portal vor und
+            startet bei Bedarf die HV-Freigabe (über Schwelle) bzw. den Direkt-Auftrag-Pfad
+            (unter Schwelle).
           </p>
         </div>
       ) : null}
@@ -352,8 +369,13 @@ export function AngebotVersandSection({
           <p className="text-[length:var(--fs-text)] text-muted">
             {!kundeEmail
               ? 'Kunden-E-Mail fehlt — Versand nicht möglich.'
-              : !darfAngebotAnKundeSenden(rows, detail.status)
-                ? handwerkerSendenBlockierHinweis(rows, orgFreigabeStatus)
+              : !darfAngebotAnKundeSenden(rows, detail.status, orgFreigabe)
+                ? handwerkerSendenBlockierHinweis(
+                    rows,
+                    orgFreigabeStatus,
+                    orgFreigabe?.hvMeldungStatus,
+                    orgFreigabe
+                  )
                 : 'E-Mail-Versand möglich, sobald das Angebot gespeichert ist.'}
           </p>
         )}
@@ -434,23 +456,25 @@ export function AngebotVersandSection({
                           size="sm"
                           disabled={pending}
                           onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Anfrage von ${name} im CRM als akzeptiert markieren?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await crmBestaetigeHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
-                                toast.success('Anfrage bestätigt')
-                                router.refresh()
-                              }
+                            confirmAction({
+                              title: 'Anfrage bestätigen?',
+                              body: `Anfrage von ${name} im CRM als akzeptiert markieren?`,
+                              confirmLabel: 'Bestätigen',
+                              cancelLabel: 'Abbrechen',
+                              busyLabel: null,
+                              onConfirm: () => {
+                                startTransition(async () => {
+                                  const r = await crmBestaetigeHandwerkerAnfrage({
+                                    angebotId: detail.id,
+                                    zuweisungId: z.id,
+                                  })
+                                  if (!r.ok) toast.error(r.message)
+                                  else {
+                                    toast.success('Anfrage bestätigt')
+                                    router.refresh()
+                                  }
+                                })
+                              },
                             })
                           }}
                         >
@@ -466,24 +490,22 @@ export function AngebotVersandSection({
                           disabled={pending}
                           className="text-danger"
                           onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Partner-Anfrage an ${name} wirklich löschen?`
-                              )
-                            ) {
-                              return
-                            }
-                            startTransition(async () => {
-                              const r = await loescheHandwerkerAnfrage({
-                                angebotId: detail.id,
-                                zuweisungId: z.id,
-                              })
-                              if (!r.ok) toast.error(r.message)
-                              else {
+                            confirmDelete(
+                              'Partner-Anfrage löschen?',
+                              async () => {
+                                const r = await loescheHandwerkerAnfrage({
+                                  angebotId: detail.id,
+                                  zuweisungId: z.id,
+                                })
+                                if (!r.ok) {
+                                  toast.error(r.message)
+                                  throw new Error(r.message)
+                                }
                                 toast.success('Anfrage gelöscht')
                                 router.refresh()
-                              }
-                            })
+                              },
+                              { body: `Partner-Anfrage an ${name} wirklich löschen?` }
+                            )
                           }}
                         >
                           <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />

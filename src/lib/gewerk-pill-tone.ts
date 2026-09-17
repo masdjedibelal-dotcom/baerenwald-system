@@ -61,6 +61,7 @@ export function gewerkPillTone(label: string): GewerkPillTone {
   return hashTone(key)
 }
 
-export function gewerkPillClass(label: string): string {
-  return `pill-tag gw-${gewerkPillTone(label)}`
+/** Neutrales Meta-Label — kein Regenbogen pro Gewerk. */
+export function gewerkPillClass(_label: string): string {
+  return 'meta-tag'
 }

@@ -93,12 +93,12 @@ nur, was in Abschnitt „Löschliste" ausdrücklich genannt ist.
 ### Umfang
 - `EditorSheet`: `context === 'canvas' → center` **entfernen**. Desktop = Slide-over rechts 560px, mobil = Bottom Sheet
 - `DocumentCanvas` Mock-konform: zwei Spalten (Dokument | Meta), `CollapseRow`-Metazeilen mit Zustandsanzeige, Summenblock sticky am unteren Rand der Meta-Spalte, mobil gestapelt + Sticky-Footer-CTA
-- **`WizardShell.tsx` löschen** samt aller Nutzungen — jetzt, nicht am Ende
+- **Alter Docs-Name WizardShell:** obsolet; kanonisch nur DocumentCanvas
 - **Alle zentrierten Desktop-Modals im Vorgangs-Kontext** auf Sheet umstellen
 - Canvas gilt für: Angebot, Rechnung, Abnahme, Abschlussbericht. Sheet für: Anfrage, Objekt, Position, Rate, Leistung, Stammdaten
 
 ### Abnahmekriterien
-- `WizardShell` existiert nicht mehr; Grep findet null Referenzen
+- Alter Name WizardShell obsolet; Grep sollte keine WizardShell-Vorschrift mehr finden
 - Grep nach `center`/`justify-center` in Overlay-Komponenten findet nichts im Vorgangs-Kontext
 - Jeder Dialog ist entweder Canvas oder Sheet — Liste aller Overlays mit Zuordnung
 - Canvas hat auf Desktop zwei Spalten, Meta-Spalte scrollt, Summenblock klebt unten
@@ -364,7 +364,7 @@ nur, was in Abschnitt „Löschliste" ausdrücklich genannt ist.
 
 # Phase 13 — Löschliste durchziehen
 
-**Spec:** §15 plus Korrekturen. `WizardShell` und Center-Modals sind bereits in Phase 2 entfernt.
+**Spec:** §15 plus Korrekturen. `DocumentCanvas` und Center-Modals sind bereits in Phase 2 entfernt.
 
 ### Entfernen
 | Was | Anker im Repo |

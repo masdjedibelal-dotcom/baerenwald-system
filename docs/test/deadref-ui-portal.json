@@ -1,0 +1,18 @@
+{
+  "leadSnips": [
+    "Noch nicht registriert",
+    "ANGEBOT",
+    "noch nicht erstellt",
+    "noch nicht erstellt",
+    "RECHNUNG",
+    "noch nicht erstellt"
+  ],
+  "softOk": true,
+  "softSnippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n12\nDemo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).\nTransaktionsdaten leeren\nZurück zu den Su",
+  "kundeSnippet": "Bärenwald\nARBEIT\nDashboard\nVorgänge\nKunden\nHandwerker\nORGANISATION\nKalender\nKI Analytics\nEinstellungen\n⌘K\nKI\n12\nDemo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).\nTransaktionsdaten leeren\nZurück zur Liste",
+  "badTok": "!\nLink nicht verfügbar\n\nDieser Link ist ungültig oder nicht mehr aktiv.\n\nDatenschutz · Impressum",
+  "partnerLogged": true,
+  "partnerSnippet": "Partner-Portal wird geladen…\n\nEinen Moment — wir bereiten deine Übersicht vor.\n\nCookies & Datenschutz\n\nWir verwenden technisch notwendige Speicher (z. B. für Login im Kunden- und Partner-Portal). Mit Ihrer Einwilligung nutzen wir zusätzlich Statistik",
+  "hvUrl": "https://staging--baerenwald.netlify.app/portal/vorgaenge",
+  "hvDetail": "Bärenwald\nWie es funktioniert\nLeistungen\nRatgeber\nFAQ\nInformation\nKontakt aufnehmen\n\n404\n\nDiese Seite gibt es nicht.\n\nDer Link ist veraltet oder die Adresse wurde falsch eingegeben. Starte neu — wir helfen dir beim nächsten Schritt.\n\nZur Startseite\nKontakt aufnehmen\nRatgeber\n\nBärenwald\n\nSCHNELLZUGRIFF\n\nStartseite\nRatgeber-Übersicht\nKontakt\n\nLEISTUNGEN\n\nDachbodenausbau\nKellerausbau\nWanddurchbruch\nT"
+}

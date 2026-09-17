@@ -246,6 +246,8 @@ const PDF_BOTTOM_MARGIN_MM = 12
 export type RenderHtmlToPdfOptions = {
   /** Puppeteer footerTemplate (z. B. Angebots-PDF) */
   footerTemplate?: string
+  /** Puppeteer headerTemplate (ab Seite 1 — Deckblatt ggf. im HTML) */
+  headerTemplate?: string
   /** Ohne Header/Footer (z. B. einseitiger Aushang) */
   displayHeaderFooter?: boolean
   /** CSS @page-Größe bevorzugen */
@@ -401,15 +403,16 @@ function pdfMarginBottomMm(pdfOptions?: RenderHtmlToPdfOptions): number {
 
 function puppeteerPdfOptions(pdfOptions?: RenderHtmlToPdfOptions) {
   const footer = pdfOptions?.footerTemplate?.trim()
+  const header = pdfOptions?.headerTemplate?.trim()
   const useFooter =
-    pdfOptions?.displayHeaderFooter === false ? false : Boolean(footer)
+    pdfOptions?.displayHeaderFooter === false ? false : Boolean(footer || header)
   const margin = pdfOptions?.margin
   return {
     format: 'A4' as const,
     printBackground: true,
     preferCSSPageSize: Boolean(pdfOptions?.preferCSSPageSize),
     displayHeaderFooter: useFooter,
-    headerTemplate: '<div></div>',
+    headerTemplate: useFooter && header ? header : '<div></div>',
     footerTemplate: useFooter && footer ? footer : '<div></div>',
     margin: {
       top: margin?.top ?? '12mm',

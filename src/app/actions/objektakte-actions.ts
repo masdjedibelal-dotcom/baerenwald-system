@@ -2,11 +2,17 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
-import { OBJEKT_KONTAKT_ROLLEN } from '@/lib/objektakte/labels'
+import { OBJEKT_ANLAGE_STATUS, OBJEKT_KONTAKT_ROLLEN, OBJEKT_ANLAGE_WARTUNGSINTERVALL } from '@/lib/objektakte/labels'
+import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type {
   EinheitBewohner,
   EinheitBewohnerInput,
   EinheitBewohnerRolle,
+  ObjektAnlage,
+  ObjektAnlageInput,
+  ObjektAnlageStatus,
+  ObjektAnlageVorgangRow,
   ObjektEinheit,
   ObjektEinheitInput,
   ObjektKontakt,
@@ -413,6 +419,270 @@ export async function deleteEinheitBewohner(
   return { ok: true }
 }
 
+/**
+ * Bestehenden Eigentümer (andere Einheit desselben Objekts) an diese Einheit hängen.
+ * Kopiert Stammdaten + portal_kunde_id in eine neue einheit_bewohner-Zeile.
+ */
+export async function assignExistingEigentuemerToEinheit(
+  kundeId: string,
+  objektId: string,
+  input: {
+    einheitId: string
+    sourceBewohnerId: string
+    sondereigentum_verwaltung?: boolean
+  }
+): Promise<
+  | { ok: true; bewohner: EinheitBewohner }
+  | { ok: false; message: string }
+> {
+  const einheitId = input.einheitId.trim()
+  const sourceId = input.sourceBewohnerId.trim()
+  if (!einheitId || !sourceId) {
+    return { ok: false, message: 'Einheit und Eigentümer sind erforderlich.' }
+  }
+  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: source, error: srcErr } = await supabase
+    .from('einheit_bewohner')
+    .select(
+      'id, name, email, telefon, portal_kunde_id, sondereigentum_verwaltung, rolle, objekt_einheit_id, aktiv'
+    )
+    .eq('id', sourceId)
+    .eq('kunde_id', kundeId)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (srcErr || !source?.id) {
+    return { ok: false, message: 'Eigentümer nicht gefunden.' }
+  }
+  if (String(source.rolle) !== 'eigentuemer') {
+    return { ok: false, message: 'Quelle ist kein Eigentümer.' }
+  }
+
+  // Quelle muss zu einer Einheit dieses Objekts gehören
+  const { data: srcEinheit } = await supabase
+    .from('objekt_einheiten')
+    .select('id')
+    .eq('id', String(source.objekt_einheit_id))
+    .eq('kunde_objekt_id', objektId)
+    .maybeSingle()
+  if (!srcEinheit?.id) {
+    return { ok: false, message: 'Eigentümer gehört nicht zu diesem Objekt.' }
+  }
+
+  if (String(source.objekt_einheit_id) === einheitId) {
+    return { ok: false, message: 'Eigentümer ist dieser Einheit bereits zugeordnet.' }
+  }
+
+  const portalId =
+    source.portal_kunde_id != null ? String(source.portal_kunde_id).trim() : ''
+  const email = source.email != null ? String(source.email).trim() : ''
+
+  let alreadyQ = supabase
+    .from('einheit_bewohner')
+    .select('id')
+    .eq('objekt_einheit_id', einheitId)
+    .eq('kunde_id', kundeId)
+    .eq('rolle', 'eigentuemer')
+    .eq('aktiv', true)
+    .is('anonymisiert_am', null)
+
+  if (portalId) {
+    alreadyQ = alreadyQ.eq('portal_kunde_id', portalId)
+  } else if (email) {
+    alreadyQ = alreadyQ.ilike('email', email)
+  } else {
+    alreadyQ = alreadyQ.eq('id', source.id)
+  }
+
+  const { data: already } = await alreadyQ.maybeSingle()
+  if (already?.id) {
+    return { ok: false, message: 'Eigentümer ist dieser Einheit bereits zugeordnet.' }
+  }
+
+  const se =
+    input.sondereigentum_verwaltung !== undefined
+      ? Boolean(input.sondereigentum_verwaltung)
+      : Boolean(source.sondereigentum_verwaltung)
+
+  const insertRow: Record<string, unknown> = {
+    kunde_id: kundeId,
+    objekt_einheit_id: einheitId,
+    name: String(source.name ?? '').trim() || 'Eigentümer',
+    email: email || null,
+    telefon: source.telefon != null ? String(source.telefon).trim() || null : null,
+    rolle: 'eigentuemer',
+    sondereigentum_verwaltung: se,
+    portal_kunde_id: portalId || null,
+    aktiv: true,
+  }
+
+  let { data, error } = await supabase
+    .from('einheit_bewohner')
+    .insert(insertRow)
+    .select('*, objekt_einheiten(bezeichnung, etage)')
+    .single()
+
+  if (error && /portal_kunde_id/i.test(error.message)) {
+    delete insertRow.portal_kunde_id
+    const retry = await supabase
+      .from('einheit_bewohner')
+      .insert(insertRow)
+      .select('*, objekt_einheiten(bezeichnung, etage)')
+      .single()
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error && /etage/i.test(error.message)) {
+    const retry = await supabase
+      .from('einheit_bewohner')
+      .insert(insertRow)
+      .select('*, objekt_einheiten(bezeichnung)')
+      .single()
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error || !data) {
+    return { ok: false, message: error?.message ?? 'Zuordnung fehlgeschlagen.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, bewohner: data as EinheitBewohner }
+}
+
+/** E-Mail → bereits Portal-Konto (kunden.auth_user_id) vorhanden? */
+export async function checkPortalEmailRegistered(
+  email: string
+): Promise<
+  | { ok: true; registered: boolean; kundeId: string | null }
+  | { ok: false; message: string }
+> {
+  const mail = email.trim().toLowerCase()
+  if (!mail || !mail.includes('@')) {
+    return { ok: true, registered: false, kundeId: null }
+  }
+
+  const { withCrmReadFallback } = await import('@/lib/kunden/kunden-db')
+  const { data, error } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .select('id, auth_user_id')
+      .ilike('email', mail)
+      .not('auth_user_id', 'is', null)
+      .limit(1)
+      .maybeSingle()
+  )
+
+  if (error) return { ok: false, message: error.message }
+  const row = data as { id?: string; auth_user_id?: string | null } | null
+  const kid = row?.id ? String(row.id) : null
+  return {
+    ok: true,
+    registered: Boolean(kid && row?.auth_user_id),
+    kundeId: kid,
+  }
+}
+
+/**
+ * Portal-Einladung für Mieter/Eigentümer anlegen (mailto öffnet HV-Mail-App).
+ */
+export async function inviteEinheitBewohnerPortal(
+  kundeId: string,
+  objektId: string,
+  bewohnerId: string,
+  opts?: { hvName?: string | null; objektLabel?: string | null }
+): Promise<
+  | { ok: true; url: string; mailto: string }
+  | { ok: false; message: string }
+> {
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
+    return { ok: false, message: 'Objekt nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: bewohner, error: bErr } = await supabase
+    .from('einheit_bewohner')
+    .select('id, name, email, rolle, objekt_einheit_id, aktiv')
+    .eq('id', bewohnerId)
+    .eq('kunde_id', kundeId)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (bErr || !bewohner?.id) {
+    return { ok: false, message: 'Person nicht gefunden.' }
+  }
+
+  const email = String(bewohner.email ?? '').trim()
+  if (!email) {
+    return { ok: false, message: 'E-Mail ist für die Einladung erforderlich.' }
+  }
+
+  const einheitId = String(bewohner.objekt_einheit_id)
+  if (!(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const { data: einheit } = await supabase
+    .from('objekt_einheiten')
+    .select('bezeichnung')
+    .eq('id', einheitId)
+    .maybeSingle()
+
+  const {
+    createPortalEinladungToken,
+    portalEinladungExpiresAt,
+    buildPortalEinladungUrl,
+    buildBewohnerPortalEinladungMailto,
+  } = await import('@/lib/portal/portal-einladungen')
+
+  const token = createPortalEinladungToken()
+  const expires_at = portalEinladungExpiresAt().toISOString()
+  const { data, error } = await supabase
+    .from('portal_einladungen')
+    .insert({
+      token,
+      kunde_id: kundeId,
+      objekt_id: objektId,
+      einheit_id: einheitId,
+      einheit_ref: einheit?.bezeichnung?.trim() || null,
+      bewohner_id: bewohnerId,
+      status: 'offen',
+      expires_at,
+    })
+    .select('token')
+    .single()
+
+  if (error) {
+    const missing = /portal_einladungen|does not exist|relation/i.test(error.message)
+    return {
+      ok: false,
+      message: missing
+        ? 'Einladungs-Tabelle noch nicht freigeschaltet (Migration).'
+        : error.message,
+    }
+  }
+
+  const t = String(data?.token ?? token)
+  const url = buildPortalEinladungUrl(t)
+  const rolle = String(bewohner.rolle) === 'eigentuemer' ? 'eigentuemer' : 'mieter'
+  const mailto = buildBewohnerPortalEinladungMailto({
+    link: url,
+    hvName: opts?.hvName?.trim() || 'Ihre Verwaltung',
+    objektLabel: opts?.objektLabel?.trim() || 'Objekt',
+    einheitRef: einheit?.bezeichnung?.trim() || null,
+    toEmail: email,
+    rolle,
+  })
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, url, mailto }
+}
+
 export async function createObjektEinheit(
   kundeId: string,
   objektId: string,
@@ -672,10 +942,14 @@ export async function createPrivatkundeFromBewohner(
   }
 
   const { vorname, nachname } = splitBewohnerName(bewohner.name)
+  const displayName =
+    [vorname, nachname].filter(Boolean).join(' ').trim() ||
+    bewohner.name?.trim() ||
+    'Privatkunde'
   const { data: created, error: createErr } = await supabase
     .from('kunden')
     .insert({
-      name: null,
+      name: displayName,
       vorname,
       nachname,
       email,
@@ -802,4 +1076,481 @@ export async function loadBewohnerLinksForPrivatkunde(
     })
   }
   return out
+}
+
+async function assertAnlageGehoertObjekt(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<boolean> {
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) return false
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('objekt_anlagen')
+    .select('id')
+    .eq('id', anlageId)
+    .eq('kunde_objekt_id', objektId)
+    .eq('kunde_id', kundeId)
+    .maybeSingle()
+  return Boolean(data)
+}
+
+function normalizeAnlageStatus(status?: ObjektAnlageStatus | null): ObjektAnlageStatus {
+  if (status === 'ausgetauscht' || status === 'stillgelegt') return status
+  return 'aktiv'
+}
+
+function validateAnlageInput(input: ObjektAnlageInput): string | null {
+  if (!input.bezeichnung?.trim()) return 'Bezeichnung ist erforderlich.'
+  if (!input.gewerk_id?.trim()) return 'Gewerk ist erforderlich.'
+  if (input.status && !OBJEKT_ANLAGE_STATUS.includes(input.status)) {
+    return 'Ungültiger Status.'
+  }
+  return null
+}
+
+function parseEinbauDatum(value: string | null | undefined): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  if (/^\d{4}$/.test(v)) return `${v}-01-01`
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  return null
+}
+
+function parseIsoDate(value: string | null | undefined): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  return null
+}
+
+function parseAnschaffungswert(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const n =
+    typeof value === 'number'
+      ? value
+      : Number(String(value).replace(/\./g, '').replace(',', '.').trim())
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n * 100) / 100
+}
+
+function normalizeWartungsintervall(
+  value: string | null | undefined
+): (typeof OBJEKT_ANLAGE_WARTUNGSINTERVALL)[number] | null {
+  const v = value?.trim()
+  if (!v || v === 'keins') return v === 'keins' ? 'keins' : null
+  return (OBJEKT_ANLAGE_WARTUNGSINTERVALL as readonly string[]).includes(v)
+    ? (v as (typeof OBJEKT_ANLAGE_WARTUNGSINTERVALL)[number])
+    : null
+}
+
+function normalizeDokumentUrls(urls: string[] | null | undefined): string[] {
+  if (!urls?.length) return []
+  return urls.map((u) => u.trim()).filter(Boolean).slice(0, 20)
+}
+
+const ANLAGE_DETAIL_COLUMNS = [
+  'hersteller',
+  'modell',
+  'seriennummer',
+  'anschaffungswert_eur',
+  'garantie_bis',
+  'gewaehrleistung_bis',
+  'wartungsintervall',
+  'letzte_wartung_am',
+  'dokument_urls',
+] as const
+
+function stripAnlageDetailFields(row: Record<string, unknown>): Record<string, unknown> {
+  const copy = { ...row }
+  for (const key of ANLAGE_DETAIL_COLUMNS) delete copy[key]
+  return copy
+}
+
+function isObjektEinheitEtageSchemaError(message: string): boolean {
+  return /objekt_einheiten.*etage|etage.*does not exist|column.*etage/i.test(message)
+}
+
+function isAnlageDetailSchemaError(message: string): boolean {
+  if (isObjektEinheitEtageSchemaError(message)) return false
+  return /garantie|gewaehrleistung|anschaffungswert|dokument_urls|hersteller|wartungsintervall|does not exist|Could not find|schema cache/i.test(
+    message
+  )
+}
+
+const ANLAGE_SELECT_WITH_ETAGE =
+  '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung, etage)'
+const ANLAGE_SELECT_WITHOUT_ETAGE =
+  '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
+
+async function selectAnlageAfterWrite(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  id: string
+): Promise<{ data: ObjektAnlage | null; error: string | null }> {
+  const full = await supabase
+    .from('objekt_anlagen')
+    .select(ANLAGE_SELECT_WITH_ETAGE)
+    .eq('id', id)
+    .maybeSingle()
+  if (!full.error && full.data) {
+    return { data: full.data as ObjektAnlage, error: null }
+  }
+  if (full.error && isObjektEinheitEtageSchemaError(full.error.message)) {
+    const basic = await supabase
+      .from('objekt_anlagen')
+      .select(ANLAGE_SELECT_WITHOUT_ETAGE)
+      .eq('id', id)
+      .maybeSingle()
+    if (!basic.error && basic.data) {
+      return { data: basic.data as ObjektAnlage, error: null }
+    }
+    return { data: null, error: basic.error?.message ?? full.error.message }
+  }
+  return { data: null, error: full.error?.message ?? 'Anlage nicht geladen.' }
+}
+
+function anlageRowFromInput(
+  kundeId: string,
+  objektId: string,
+  input: ObjektAnlageInput,
+  sortOrder: number
+): Record<string, unknown> {
+  const now = new Date().toISOString()
+  return {
+    kunde_id: kundeId,
+    kunde_objekt_id: objektId,
+    bezeichnung: input.bezeichnung.trim(),
+    gewerk_id: input.gewerk_id.trim(),
+    standort: input.standort?.trim() || null,
+    objekt_einheit_id: input.objekt_einheit_id?.trim() || null,
+    einbau_datum: parseEinbauDatum(input.einbau_datum),
+    foto_url: input.foto_url?.trim() || null,
+    notiz: input.notiz?.trim() || null,
+    hersteller: input.hersteller?.trim() || null,
+    modell: input.modell?.trim() || null,
+    seriennummer: input.seriennummer?.trim() || null,
+    anschaffungswert_eur: parseAnschaffungswert(input.anschaffungswert_eur),
+    garantie_bis: parseIsoDate(input.garantie_bis),
+    gewaehrleistung_bis: parseIsoDate(input.gewaehrleistung_bis),
+    wartungsintervall: normalizeWartungsintervall(input.wartungsintervall ?? null),
+    letzte_wartung_am: parseIsoDate(input.letzte_wartung_am),
+    dokument_urls: normalizeDokumentUrls(input.dokument_urls),
+    status: normalizeAnlageStatus(input.status),
+    sort_order: sortOrder,
+    updated_at: now,
+  }
+}
+
+export async function createObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  input: ObjektAnlageInput
+): Promise<{ ok: true; anlage: ObjektAnlage } | { ok: false; message: string }> {
+  const err = validateAnlageInput(input)
+  if (err) return { ok: false, message: err }
+  if (!(await assertObjektGehoertKunde(kundeId, objektId))) {
+    return { ok: false, message: 'Objekt nicht gefunden.' }
+  }
+
+  const einheitId = input.objekt_einheit_id?.trim() || null
+  if (
+    einheitId &&
+    !(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))
+  ) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: maxRow } = await supabase
+    .from('objekt_anlagen')
+    .select('sort_order')
+    .eq('kunde_objekt_id', objektId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const now = new Date().toISOString()
+  const row = {
+    ...anlageRowFromInput(kundeId, objektId, input, (maxRow?.sort_order ?? -1) + 1),
+    updated_at: now,
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('objekt_anlagen')
+    .insert(row)
+    .select('id')
+    .single()
+
+  let anlageId = inserted?.id ? String(inserted.id) : ''
+  let lastError = insertError?.message ?? null
+
+  if ((!anlageId || insertError) && isAnlageDetailSchemaError(insertError?.message ?? '')) {
+    const retry = await supabase
+      .from('objekt_anlagen')
+      .insert(stripAnlageDetailFields(row))
+      .select('id')
+      .single()
+    if (!retry.error && retry.data?.id) {
+      anlageId = String(retry.data.id)
+      lastError = null
+    } else {
+      lastError = retry.error?.message ?? lastError
+    }
+  }
+
+  if (!anlageId) {
+    return { ok: false, message: lastError ?? 'Anlage konnte nicht angelegt werden.' }
+  }
+
+  const loaded = await selectAnlageAfterWrite(supabase, anlageId)
+  if (!loaded.data) {
+    return { ok: false, message: loaded.error ?? 'Anlage angelegt, aber nicht lesbar.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  const anlage = {
+    ...loaded.data,
+    dokument_urls: loaded.data.dokument_urls ?? [],
+    vorgang_count: 0,
+  }
+  return { ok: true, anlage }
+}
+
+export async function updateObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  anlageId: string,
+  input: ObjektAnlageInput
+): Promise<{ ok: true; anlage: ObjektAnlage } | { ok: false; message: string }> {
+  const err = validateAnlageInput(input)
+  if (err) return { ok: false, message: err }
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const einheitId = input.objekt_einheit_id?.trim() || null
+  if (
+    einheitId &&
+    !(await assertEinheitGehoertObjekt(kundeId, objektId, einheitId))
+  ) {
+    return { ok: false, message: 'Einheit nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const patch = {
+    ...anlageRowFromInput(kundeId, objektId, input, 0),
+  }
+  delete (patch as { sort_order?: number }).sort_order
+
+  const { error } = await supabase
+    .from('objekt_anlagen')
+    .update(patch)
+    .eq('id', anlageId)
+
+  let lastError = error?.message ?? null
+
+  if (error && isAnlageDetailSchemaError(error.message)) {
+    const retry = await supabase
+      .from('objekt_anlagen')
+      .update(stripAnlageDetailFields(patch))
+      .eq('id', anlageId)
+    if (retry.error) {
+      return { ok: false, message: retry.error.message }
+    }
+    lastError = null
+  } else if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  const loaded = await selectAnlageAfterWrite(supabase, anlageId)
+  if (!loaded.data) {
+    return { ok: false, message: loaded.error ?? lastError ?? 'Anlage nicht geladen.' }
+  }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true, anlage: loaded.data }
+}
+
+export async function deleteObjektAnlage(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const [{ count: leadCount }, { count: angebotCount }, { count: rechnungCount }] =
+    await Promise.all([
+      supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+      supabase
+        .from('angebote')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+      supabase
+        .from('rechnungen')
+        .select('id', { count: 'exact', head: true })
+        .eq('objekt_anlage_id', anlageId),
+    ])
+
+  const linked = (leadCount ?? 0) + (angebotCount ?? 0) + (rechnungCount ?? 0)
+  if (linked > 0) {
+    return {
+      ok: false,
+      message:
+        'Anlage ist mit Vorgängen verknüpft — bitte Status auf „Stillgelegt“ setzen statt löschen.',
+    }
+  }
+
+  const { error } = await supabase.from('objekt_anlagen').delete().eq('id', anlageId)
+  if (error) return { ok: false, message: error.message }
+
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true }
+}
+
+export async function loadObjektAnlageVorgaenge(
+  kundeId: string,
+  objektId: string,
+  anlageId: string
+): Promise<{ ok: true; rows: ObjektAnlageVorgangRow[] } | { ok: false; message: string }> {
+  if (!(await assertAnlageGehoertObjekt(kundeId, objektId, anlageId))) {
+    return { ok: false, message: 'Anlage nicht gefunden.' }
+  }
+
+  const supabase = createClient()
+  const { data: leads, error } = await supabase
+    .from('leads')
+    .select('id, created_at, status, anlass, situation, bereiche')
+    .eq('objekt_anlage_id', anlageId)
+    .order('created_at', { ascending: false })
+
+  if (error) return { ok: false, message: error.message }
+
+  const leadIds = (leads ?? []).map((l) => String(l.id)).filter(Boolean)
+  if (!leadIds.length) return { ok: true, rows: [] }
+
+  const [{ data: angebote }, { data: auftraege }] = await Promise.all([
+    supabase
+      .from('angebote')
+      .select('id, lead_id, status, gesamt_fix, gesamt_min, gesamt_max, leistungsumfang, notizen')
+      .in('lead_id', leadIds),
+    supabase.from('auftraege').select('id, lead_id, angebot_id, status').in('lead_id', leadIds),
+  ])
+
+  const auftragIds = (auftraege ?? []).map((a) => String(a.id)).filter(Boolean)
+  const angebotIds = (angebote ?? []).map((a) => String(a.id)).filter(Boolean)
+  let rechnungen: Array<{
+    auftrag_id?: string | null
+    angebot_id?: string | null
+    status: string
+    brutto?: number | null
+    rechnung_art?: string | null
+    created_at: string
+    updated_at?: string | null
+  }> = []
+  if (auftragIds.length || angebotIds.length) {
+    let q = supabase
+      .from('rechnungen')
+      .select('auftrag_id, angebot_id, status, brutto, rechnung_art, created_at, updated_at')
+    if (auftragIds.length && angebotIds.length) {
+      q = q.or(`auftrag_id.in.(${auftragIds.join(',')}),angebot_id.in.(${angebotIds.join(',')})`)
+    } else if (auftragIds.length) {
+      q = q.in('auftrag_id', auftragIds)
+    } else {
+      q = q.in('angebot_id', angebotIds)
+    }
+    const { data } = await q
+    rechnungen = (data ?? []) as typeof rechnungen
+  }
+
+  const angeboteByLead = new Map<string, NonNullable<typeof angebote>>()
+  for (const a of angebote ?? []) {
+    const lid = String(a.lead_id ?? '')
+    if (!lid) continue
+    const list = angeboteByLead.get(lid) ?? []
+    list.push(a)
+    angeboteByLead.set(lid, list)
+  }
+  const auftraegeByLead = new Map<string, NonNullable<typeof auftraege>>()
+  for (const a of auftraege ?? []) {
+    const lid = String(a.lead_id ?? '')
+    if (!lid) continue
+    const list = auftraegeByLead.get(lid) ?? []
+    list.push(a)
+    auftraegeByLead.set(lid, list)
+  }
+
+  const rows: ObjektAnlageVorgangRow[] = (leads ?? []).map((l) => {
+    const lid = String(l.id)
+    const leadAuf = auftraegeByLead.get(lid) ?? []
+    const leadAng = angeboteByLead.get(lid) ?? []
+    const aufIds = new Set(leadAuf.map((a) => String(a.id)))
+    const angIds = new Set(leadAng.map((a) => String(a.id)))
+    const recs = rechnungen.filter(
+      (r) =>
+        (r.auftrag_id && aufIds.has(String(r.auftrag_id))) ||
+        (r.angebot_id && angIds.has(String(r.angebot_id)))
+    )
+    const kosten = resolveObjektVorgangKosten({
+      rechnungen: recs,
+      auftraege: leadAuf as Array<{ status: string; angebot_id?: string | null }>,
+      angebote: leadAng as Array<{
+        id?: string
+        status?: string
+        gesamt_fix?: number | null
+        gesamt_min?: number | null
+        gesamt_max?: number | null
+      }>,
+    })
+    return {
+      id: lid,
+      titel: angebotTitelOderSituationBereich({
+        angebot: leadAng[0]
+          ? {
+              leistungsumfang: (leadAng[0] as { leistungsumfang?: string | null }).leistungsumfang,
+              notizen: (leadAng[0] as { notizen?: string | null }).notizen,
+            }
+          : null,
+        situation: (l.situation as string | null) ?? null,
+        bereiche: (l.bereiche as string[] | null) ?? null,
+      }),
+      created_at: l.created_at as string,
+      status: (l.status as string | null) ?? null,
+      phase: (l.anlass as string | null) ?? null,
+      kosten_label: kosten.label,
+    }
+  })
+
+  return { ok: true, rows }
+}
+
+export async function fetchObjektAnlagenForPicker(
+  kundeId: string,
+  objektId: string
+): Promise<ObjektAnlage[]> {
+  const kid = kundeId.trim()
+  const oid = objektId.trim()
+  if (!kid || !oid) return []
+  if (!(await assertObjektGehoertKunde(kid, oid))) return []
+
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('objekt_anlagen')
+    .select('*, gewerke(id, name, slug)')
+    .eq('kunde_id', kid)
+    .eq('kunde_objekt_id', oid)
+    .neq('status', 'stillgelegt')
+    .order('bezeichnung', { ascending: true })
+
+  if (error) {
+    console.warn('fetchObjektAnlagenForPicker:', error.message)
+    return []
+  }
+  return (data ?? []) as ObjektAnlage[]
 }

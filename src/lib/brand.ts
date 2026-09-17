@@ -49,12 +49,13 @@ function emailLogoHostFallback(): string {
 }
 
 function websiteLogoPath(variant: BrandLogoVariant): string {
-  return variant === 'white' ? '/logo-mark-white.png' : '/logo-mark-green.png'
+  // Kleine Mail-Variante (~14 KB) — besser für Clients als logo-mark (~90 KB)
+  return variant === 'white' ? '/mail-logo-white.png' : '/mail-logo-green.png'
 }
 
 /**
- * Absolute Logo-URL für E-Mails — wie auf der Webseite:
- * https://baerenwaldmuenchen.de/logo-mark-green.png (bzw. -white)
+ * Absolute Logo-URL für E-Mails — gehostet auf der Website (HTTPS, kein CID):
+ * https://baerenwaldmuenchen.de/mail-logo-green.png (bzw. -white)
  */
 export function resolveBrandLogoUrl(
   variant: BrandLogoVariant = 'white',

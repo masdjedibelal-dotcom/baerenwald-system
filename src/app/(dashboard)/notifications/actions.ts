@@ -8,11 +8,13 @@ import {
 
 export type CrmNotificationTyp =
   | 'neue_anfrage'
+  | 'hm_befund_freigabe'
   | 'handwerker_update'
   | 'handwerker_angenommen'
   | 'handwerker_abgelehnt'
   | 'handwerker_einreichung'
   | 'hw_rechnung_eingegangen'
+  | 'hw_auftrag_erledigt'
   | 'vorgang_angenommen'
   | 'vorgang_abgelehnt'
   | 'angebot_entscheidung'
@@ -55,8 +57,10 @@ function typLabel(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'Neue Anfrage'
+    case 'hm_befund_freigabe':
+      return 'Hausmeister-Vorbefund'
     case 'handwerker_update':
-      return 'Neues Update Handwerker'
+      return 'Update zu Leistung'
     case 'handwerker_angenommen':
       return 'Handwerker hat zugesagt'
     case 'handwerker_abgelehnt':
@@ -65,6 +69,8 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Handwerker-Angebot eingereicht'
     case 'hw_rechnung_eingegangen':
       return 'HW-Rechnung eingegangen'
+    case 'hw_auftrag_erledigt':
+      return 'Auftrag erledigt gemeldet'
     case 'vorgang_angenommen':
       return 'Vorgang angenommen'
     case 'vorgang_abgelehnt':
@@ -98,6 +104,8 @@ function typIcon(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'inbox'
+    case 'hm_befund_freigabe':
+      return 'clipboard-check'
     case 'handwerker_update':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
@@ -108,6 +116,7 @@ function typIcon(typ: CrmNotificationTyp): string {
     case 'projektvertrag_bestaetigt':
     case 'abnahme_bestaetigt':
     case 'auftrag_abgeschlossen':
+    case 'hw_auftrag_erledigt':
       return 'check'
     case 'abnahme_freigabe_ausstehend':
       return 'clipboard-check'
@@ -127,9 +136,10 @@ function typIcon(typ: CrmNotificationTyp): string {
 function ctaLabel(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
+    case 'hm_befund_freigabe':
       return 'Anfrage öffnen'
     case 'handwerker_update':
-      return 'Bautagebuch öffnen'
+      return 'Leistungen öffnen'
     case 'handwerker_angenommen':
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
@@ -145,6 +155,7 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'abnahme_bestaetigt':
     case 'abnahme_freigabe_ausstehend':
     case 'auftrag_abgeschlossen':
+    case 'hw_auftrag_erledigt':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
     case 'partner_compliance_pruefung':
@@ -159,8 +170,10 @@ function typHint(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'Neue Anfrage aus dem Meldeformular oder Portal. Öffne die Anfrage, um Kontakt und Details zu prüfen.'
+    case 'hm_befund_freigabe':
+      return 'Der Hausmeister hat die Prüfung abgeschlossen und an Bärenwald übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.'
     case 'handwerker_update':
-      return 'Eintrag vom Partner im Bautagebuch. Im Auftrag siehst du den vollständigen Eintrag.'
+      return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen siehst du den Eintrag.'
     case 'handwerker_angenommen':
       return 'Der Partner hat die Angebots-Anfrage im Portal angenommen.'
     case 'handwerker_abgelehnt':
@@ -169,6 +182,8 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Der Partner hat ein Angebot / Konditionen im Portal eingereicht — bitte prüfen.'
     case 'hw_rechnung_eingegangen':
       return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Vorgänge → Rechnung → Eingehend prüfen.'
+    case 'hw_auftrag_erledigt':
+      return 'Partner meldet Auftrag erledigt. Abnahme ist optional — du kannst den Auftrag direkt abschließen.'
     case 'vorgang_angenommen':
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
@@ -246,6 +261,10 @@ function pushLead(
 
   // Mieter-Meldung: CRM-Glocke erst nach HV-Freigabe (oder sofort bei Akut)
   if (isMieterMeldung && !istAkut && (hvStatus === 'neu' || hvStatus === '')) {
+    return
+  }
+  // Während / nach reiner HM-Prüfung ohne Freigabe an BW — eigene Quelle hm_befund_freigabe
+  if (hvStatus === 'hm_pruefung' || hvStatus === 'hm_erledigt') {
     return
   }
 
@@ -375,6 +394,7 @@ async function collectCrmNotificationItems(opts?: {
 
   const [
     leadsRes,
+    hmBefundRes,
     peRes,
     hwAntwortRes,
     hwEinreichungRes,
@@ -382,6 +402,7 @@ async function collectCrmNotificationItems(opts?: {
     pvRes,
     abnahmeTlRes,
     freigabeRes,
+    hwErledigtRes,
     auftraegeRes,
     posMelRes,
     waRes,
@@ -401,11 +422,23 @@ async function collectCrmNotificationItems(opts?: {
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
     supabase
+      .from('lead_befunde')
+      .select(
+        `id, lead_id, ergebnis, abgeschlossen_at,
+         leads:lead_id(id, kontakt_name, melder_name, situation, plz)`
+      )
+      .in('ergebnis', ['fachfirma_angebot', 'fachfirma_akut'])
+      .not('abgeschlossen_at', 'is', null)
+      .gte('abgeschlossen_at', since)
+      .order('abgeschlossen_at', { ascending: false })
+      .limit(PER_SOURCE_LIMIT),
+    supabase
       .from('position_eintraege')
       .select(
         'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
       )
       .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
+      .neq('typ', 'weitere_arbeit')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
@@ -454,6 +487,15 @@ async function collectCrmNotificationItems(opts?: {
       .eq('ebene', 'handwerker')
       .gte('updated_at', since)
       .order('updated_at', { ascending: false })
+      .limit(PER_SOURCE_LIMIT),
+    supabase
+      .from('auftrag_handwerker')
+      .select(
+        'id, auftrag_id, erledigt_gemeldet_am, handwerker:handwerker_id(name, firma), auftraege:auftrag_id(titel)'
+      )
+      .not('erledigt_gemeldet_am', 'is', null)
+      .gte('erledigt_gemeldet_am', since)
+      .order('erledigt_gemeldet_am', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
     supabase
       .from('auftraege')
@@ -546,6 +588,69 @@ async function collectCrmNotificationItems(opts?: {
   }
   for (const row of leadRows) pushLead(items, row)
 
+  // ── Hausmeister-Vorbefund an Bärenwald (Angebot / Akut) ───────
+  if (!hmBefundRes.error) {
+    for (const row of hmBefundRes.data ?? []) {
+      const lead = one(
+        row.leads as
+          | {
+              id?: string
+              kontakt_name?: string | null
+              melder_name?: string | null
+              situation?: string | null
+              plz?: string | null
+            }
+          | {
+              id?: string
+              kontakt_name?: string | null
+              melder_name?: string | null
+              situation?: string | null
+              plz?: string | null
+            }[]
+          | null
+      )
+      const leadId = String(row.lead_id ?? lead?.id ?? '').trim()
+      if (!leadId) continue
+      const ergebnis = String(row.ergebnis ?? '').trim().toLowerCase()
+      const istAkut = ergebnis === 'fachfirma_akut'
+      const name =
+        lead?.melder_name?.trim() ||
+        lead?.kontakt_name?.trim() ||
+        null
+      const meta = [lead?.situation?.trim(), lead?.plz?.trim()]
+        .filter(Boolean)
+        .join(' · ')
+      const title = istAkut
+        ? name
+          ? `HM-Vorbefund — Akut (${name})`
+          : 'HM-Vorbefund — Akut'
+        : name
+          ? `HM-Vorbefund — Angebot erstellen (${name})`
+          : 'HM-Vorbefund — Angebot erstellen'
+      items.push({
+        sourceKey: `hm_befund_freigabe:${row.id}`,
+        typ: 'hm_befund_freigabe',
+        title,
+        subtitle: meta || null,
+        href: `/anfragen/${leadId}`,
+        createdAt: String(row.abgeschlossen_at ?? since),
+        gelesen: false,
+      })
+    }
+    // Keine doppelte „Neue Anfrage“ für denselben Lead nach HM-Übergabe
+    const hmLeadHrefs = new Set(
+      items
+        .filter((i) => i.typ === 'hm_befund_freigabe')
+        .map((i) => i.href)
+    )
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i]
+      if (it?.typ === 'neue_anfrage' && hmLeadHrefs.has(it.href)) {
+        items.splice(i, 1)
+      }
+    }
+  }
+
   // ── HW-Eingangsrechnung ──────────────────────────────────────
   if (!hwRechnungRes.error) {
     for (const row of hwRechnungRes.data ?? []) {
@@ -594,7 +699,7 @@ async function collectCrmNotificationItems(opts?: {
     }
   }
 
-  // ── Bautagebuch (Partner-App) ────────────────────────────────
+  // ── Leistungs-Updates (Partner-App) ─────────────────────────
   if (!peRes.error) {
     for (const row of peRes.data ?? []) {
       const pos = one(
@@ -621,9 +726,11 @@ async function collectCrmNotificationItems(opts?: {
       items.push({
         sourceKey: `handwerker_update:${row.id}`,
         typ: 'handwerker_update',
-        title: leistung ? `${hwName}: Update zu ${leistung}` : `${hwName}: Update`,
+        title: leistung
+          ? `${hwName}: Update zu Leistung „${leistung}“`
+          : `${hwName}: Update zu Leistung`,
         subtitle: desc || null,
-        href: `/auftraege/${auftragId}?tab=bautagebuch${
+        href: `/auftraege/${auftragId}?tab=leistungen${
           row.position_id ? `&position=${encodeURIComponent(String(row.position_id))}` : ''
         }`,
         createdAt: row.created_at as string,
@@ -880,6 +987,31 @@ async function collectCrmNotificationItems(opts?: {
       createdAt: (row.updated_at as string) || (row.created_at as string) || since,
       gelesen: false,
     })
+  }
+
+  // ── Partner: Auftrag erledigt gemeldet ───────────────────────
+  if (!hwErledigtRes.error) {
+    for (const row of hwErledigtRes.data ?? []) {
+      const auftragId = (row.auftrag_id as string | null)?.trim()
+      if (!auftragId) continue
+      const hw = one(
+        row.handwerker as
+          | { name?: string | null; firma?: string | null }
+          | { name?: string | null; firma?: string | null }[]
+          | null
+      )
+      const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
+      const hwName = hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
+      items.push({
+        sourceKey: `hw_auftrag_erledigt:${row.id}`,
+        typ: 'hw_auftrag_erledigt',
+        title: `${hwName}: Auftrag erledigt`,
+        subtitle: auf?.titel?.trim() || 'Abnahme optional — Auftrag abschließen',
+        href: `/auftraege/${auftragId}?tab=leistungen`,
+        createdAt: (row.erledigt_gemeldet_am as string) || since,
+        gelesen: false,
+      })
+    }
   }
 
   // ── Auftrag abgeschlossen ────────────────────────────────────

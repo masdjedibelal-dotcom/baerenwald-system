@@ -42,7 +42,6 @@ export async function ensurePartnerEingangsRechnungVorgang(
       hw_rechnung_status,
       hw_rechnung_bezahlt_at,
       hw_rechnung_betrag_brutto,
-      hw_rechnung_reverse_charge_13b,
       hw_preis_brutto,
       handwerker:handwerker_id ( id, name, firma ),
       angebote:angebot_id ( id, kunde_id, angebotsnr, lead_id )
@@ -70,10 +69,12 @@ export async function ensurePartnerEingangsRechnungVorgang(
 
   let auftragId: string | null = null
   let auftragTitel: string | null = null
+  let leistungszeitraumVon: string | null = null
+  let leistungszeitraumBis: string | null = null
   if (angebotId) {
     const { data: auf } = await supabaseAdmin
       .from('auftraege')
-      .select('id, titel, kunde_id')
+      .select('id, titel, kunde_id, start_datum, end_datum')
       .eq('angebot_id', angebotId)
       .neq('status', 'storniert')
       .order('created_at', { ascending: false })
@@ -83,6 +84,8 @@ export async function ensurePartnerEingangsRechnungVorgang(
       auftragId = String(auf.id)
       auftragTitel = (auf.titel as string | null)?.trim() || null
       if (!kundeId) kundeId = String(auf.kunde_id ?? '').trim()
+      leistungszeitraumVon = String(auf.start_datum ?? '').trim().slice(0, 10) || null
+      leistungszeitraumBis = String(auf.end_datum ?? '').trim().slice(0, 10) || null
     }
   }
 
@@ -107,7 +110,9 @@ export async function ensurePartnerEingangsRechnungVorgang(
         : null
 
   const status = mapHwStatusToRechnungStatus(ah.hw_rechnung_status as string | null)
-  const reverseCharge13b = Boolean(ah.hw_rechnung_reverse_charge_13b)
+  const reverseCharge13b = Boolean(
+    (ah as { hw_rechnung_reverse_charge_13b?: boolean | null }).hw_rechnung_reverse_charge_13b
+  )
   const eingereichtAt =
     String(ah.hw_rechnung_eingereicht_at ?? '').trim() || new Date().toISOString()
   const rechnungsdatum = eingereichtAt.slice(0, 10)
@@ -116,6 +121,30 @@ export async function ensurePartnerEingangsRechnungVorgang(
     String(angebot?.angebotsnr ?? '').trim()
       ? `ER-${String(angebot?.angebotsnr).trim()}`
       : `ER-${nrSuffix}`
+
+  // Positions-Zeitraum des Partners, falls Auftrag keinen Zeitraum hat
+  if (auftragId && handwerkerId && (!leistungszeitraumVon || !leistungszeitraumBis)) {
+    const { data: posRows } = await supabaseAdmin
+      .from('auftrag_positionen')
+      .select('start_datum, end_datum')
+      .eq('auftrag_id', auftragId)
+      .eq('handwerker_id', handwerkerId)
+      .not('start_datum', 'is', null)
+      .order('start_datum', { ascending: true })
+      .limit(20)
+    const starts = (posRows ?? [])
+      .map((p) => String(p.start_datum ?? '').trim().slice(0, 10))
+      .filter(Boolean)
+      .sort()
+    const ends = (posRows ?? [])
+      .map((p) => String(p.end_datum ?? p.start_datum ?? '').trim().slice(0, 10))
+      .filter(Boolean)
+      .sort()
+    if (!leistungszeitraumVon && starts[0]) leistungszeitraumVon = starts[0]
+    if (!leistungszeitraumBis && ends.length) leistungszeitraumBis = ends[ends.length - 1]
+  }
+  if (!leistungszeitraumVon) leistungszeitraumVon = rechnungsdatum
+  if (!leistungszeitraumBis) leistungszeitraumBis = leistungszeitraumVon
 
   const payload: Record<string, unknown> = {
     richtung: 'eingehend',
@@ -130,13 +159,18 @@ export async function ensurePartnerEingangsRechnungVorgang(
     rechnung_art: 'voll',
     positionen: [
       {
-        bezeichnung: `Partner-Rechnung · ${hwName}`,
+        id: `er-${ahId.slice(0, 8)}`,
+        leistung: `Partner-Rechnung · ${hwName}`,
         menge: 1,
         einheit: 'Pauschale',
         lohn_netto: betragRaw ?? 0,
         material_netto: 0,
+        vk_netto: betragRaw ?? 0,
         gesamt_min: betragRaw ?? 0,
         gesamt_max: betragRaw ?? 0,
+        gewerk_id: '',
+        gewerk_name: '',
+        preis_typ: 'fix',
       },
     ],
     netto: betragRaw,
@@ -146,6 +180,8 @@ export async function ensurePartnerEingangsRechnungVorgang(
     reverse_charge_13b: reverseCharge13b,
     pdf_url: pdfPath,
     rechnungsdatum,
+    leistungszeitraum_von: leistungszeitraumVon,
+    leistungszeitraum_bis: leistungszeitraumBis,
     gesendet_at: eingereichtAt,
     bezahlt_at:
       status === 'bezahlt'

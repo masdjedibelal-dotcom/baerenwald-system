@@ -9,6 +9,7 @@ import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   berechneZahlungsplan,
   neueZahlungsplanZeile,
+  normalizeAbschlagsplanSchluss,
   validateZahlungsplanGegenGesamt,
   zahlungsplanVorlage30_40_30,
   zahlungsplanVorlage30_70,
@@ -52,8 +53,8 @@ function ratesToPlan(
   const frozen = new Set(frozenIds)
   const initialById = new Map((initial?.zeilen ?? []).map((z) => [z.id, z]))
   const zeilen: ZahlungsplanZeile[] = rates.map((r) => {
+    const orig = initialById.get(r.id)
     if (frozen.has(r.id)) {
-      const orig = initialById.get(r.id)
       if (orig) {
         // Eingefroren: Betrag/Typ fest, Titel/Fällig dürfen bleiben wie im Editor nur wenn nicht eingefroren —
         // Gates erlauben Titel-Änderung nicht am Server für typ/wert; Titel behalten wir aus orig.
@@ -70,9 +71,14 @@ function ratesToPlan(
       typ: r.typ,
       wert: r.typ === 'rest' ? 0 : Number(r.wert) || 0,
       faellig_am: r.faellig_am.trim() || null,
+      rechnung_id: orig?.rechnung_id ?? null,
+      position_ids: orig?.position_ids,
+      pdf_einleitung_vorlage: orig?.pdf_einleitung_vorlage,
+      mail_einleitung_vorlage: orig?.mail_einleitung_vorlage,
+      mail_betreff_vorlage: orig?.mail_betreff_vorlage,
     })
   })
-  return { modus: 'abschlagsplan', zeilen }
+  return normalizeAbschlagsplanSchluss({ modus: 'abschlagsplan', zeilen })
 }
 
 function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
@@ -127,6 +133,7 @@ export function AbschlagsplanEditorModal({
   onSave,
   saving,
   frozenIds = [],
+  frozenMeta = {},
 }: {
   open: boolean
   onClose: () => void
@@ -138,6 +145,8 @@ export function AbschlagsplanEditorModal({
   saving?: boolean
   /** Rate-IDs die gestellt/bezahlt sind — Betrag/Typ nicht änderbar/löschbar */
   frozenIds?: string[]
+  /** Optional: Rechnungsnr. für Hint „Gebunden an gesendete Rechnung …“ */
+  frozenMeta?: Record<string, { rechnungsnummer?: string | null }>
 }) {
   const frozen = new Set(frozenIds)
   const baseline = useMemo(
@@ -212,21 +221,60 @@ export function AbschlagsplanEditorModal({
 
   function add() {
     setRates((prev) => {
-      const withoutTrailingRest = [...prev]
-      const last = withoutTrailingRest[withoutTrailingRest.length - 1]
-      // Neue Zeile vor Rest einfügen, falls letzte Rest ist
+      if (prev.length === 0) {
+        return [
+          {
+            id: neueZahlungsplanZeile().id,
+            label: 'Anzahlung',
+            typ: 'prozent',
+            wert: 30,
+            faellig_am: '',
+          },
+          {
+            id: neueZahlungsplanZeile().id,
+            label: 'Schlussrechnung',
+            typ: 'rest',
+            wert: 0,
+            faellig_am: '',
+          },
+        ]
+      }
+      const abschlagCount = prev.filter((x) => x.typ !== 'rest').length
       const neue: EditorRate = {
         id: neueZahlungsplanZeile().id,
-        label: `${withoutTrailingRest.filter((x) => x.typ !== 'rest').length + 1}. Abschlag`,
+        label: `${abschlagCount + 1}. Abschlag`,
         typ: 'prozent',
         wert: 0,
         faellig_am: '',
       }
-      if (last?.typ === 'rest') {
-        withoutTrailingRest.splice(withoutTrailingRest.length - 1, 0, neue)
-        return withoutTrailingRest
-      }
-      return [...prev, neue]
+      // Immer vor der letzten Rate (Schluss) einfügen — auch bei %-Schluss ohne typ rest
+      const next = [...prev]
+      next.splice(Math.max(0, next.length - 1), 0, neue)
+      return next.map((r, i) => {
+        const isLast = i === next.length - 1
+        if (isLast) {
+          const looksSchluss =
+            r.typ === 'rest' ||
+            r.label.trim().toLowerCase().startsWith('schluss') ||
+            r.label.trim().toLowerCase() === 'schlussrechnung'
+          return {
+            ...r,
+            label: looksSchluss || !r.label.trim() ? 'Schlussrechnung' : r.label,
+          }
+        }
+        if (
+          r.label.trim().toLowerCase().startsWith('schluss') ||
+          r.label.trim().toLowerCase() === 'schlussrechnung'
+        ) {
+          return {
+            ...r,
+            typ: r.typ === 'rest' ? 'prozent' : r.typ,
+            label: i === 0 ? 'Anzahlung' : `${i + 1}. Abschlag`,
+            wert: r.typ === 'rest' ? 0 : r.wert,
+          }
+        }
+        return r
+      })
     })
   }
 
@@ -290,6 +338,10 @@ export function AbschlagsplanEditorModal({
         {rates.map((r) => {
           const betrag = bruttoById.get(r.id) ?? 0
           const isFrozen = frozen.has(r.id)
+          const frozenNr = frozenMeta[r.id]?.rechnungsnummer?.trim() || null
+          const frozenHint = frozenNr
+            ? `Gebunden an gesendete Rechnung ${frozenNr}`
+            : 'Gebunden an gesendete Rechnung'
           return (
             <article
               key={r.id}
@@ -307,8 +359,21 @@ export function AbschlagsplanEditorModal({
                   />
                 </label>
                 {isFrozen ? (
-                  <span className="zahlplan-rate-card__badge" title="Eingefroren">
-                    fest
+                  <span
+                    className="zahlplan-rate-card__frozen-actions"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <span className="zahlplan-rate-card__badge" title={frozenHint}>
+                      fest
+                    </span>
+                    <MockBtn
+                      sm
+                      kind="ghost"
+                      icon="trash"
+                      disabled
+                      title={frozenHint}
+                      aria-label={frozenHint}
+                    />
                   </span>
                 ) : (
                   <MockBtn

@@ -11,12 +11,17 @@ import {
   MockModal,
   MockPager,
   MockSortHead,
+  ListBulkBar,
 } from '@/components/mock-ui'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
+import {
+  groupVorgaengeByKorrekturKette,
+  korrekturKetteRoleLabel,
+} from '@/lib/vorgang/korrektur-kette-groups'
 import {
   runDeleteStandaloneRechnung,
   runDeleteVorgang,
@@ -28,14 +33,17 @@ import {
 import { bulkDeleteVorgaenge } from '@/app/(dashboard)/vorgaenge/actions'
 import { fachbegriff } from '@/lib/crm/fachbegriffe'
 import { toast } from '@/components/ui/app-toast'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import {
@@ -43,6 +51,10 @@ import {
   parseVorgangWertLabelEuro,
 } from '@/lib/vorgang/vorgaenge-liste-summe'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
+import {
+  matchesRechnungStatusFilterKey,
+  resolveRechnungKorrekturUi,
+} from '@/lib/rechnungen/rechnung-korrektur'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import {
@@ -97,8 +109,19 @@ function vorgaengeEmptyHint(opts: {
   return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
 }
 
+/** Original mit laufender Korrektur (noch nicht storniert). */
+function isKorrekturPendingOriginal(row: VorgangListeRow): boolean {
+  return (
+    Boolean(row.ersetzt_durch) &&
+    row.unterstatus.toLowerCase() !== 'storniert' &&
+    row.unterstatus.toLowerCase() !== 'ersetzt'
+  )
+}
+
 function isErsetzt(row: VorgangListeRow): boolean {
-  return row.unterstatus.toLowerCase() === 'ersetzt' || Boolean(row.ersetzt_durch)
+  if (isKorrekturPendingOriginal(row)) return false
+  const st = row.unterstatus.toLowerCase()
+  return st === 'ersetzt' || (Boolean(row.ersetzt_durch) && st === 'storniert')
 }
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
@@ -106,6 +129,14 @@ const VORGAENGE_CHECK_COL: ResizableColDef = {
   defaultWidth: 36,
   minWidth: 36,
   maxWidth: 36,
+  fixed: true,
+}
+
+const VORGAENGE_MENU_COL: ResizableColDef = {
+  id: 'menu',
+  defaultWidth: 40,
+  minWidth: 40,
+  maxWidth: 40,
   fixed: true,
 }
 
@@ -133,6 +164,8 @@ type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 function statusKind(row: VorgangListeRow): string {
   const u = row.unterstatus.toLowerCase()
+  // Storno-Gutschrift: eigener Badge-Look unter Erledigt
+  if (row.belegTyp === 'gutschrift') return 'storniert'
   // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
   if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
   if (row.phase === 'rechnung') {
@@ -151,7 +184,9 @@ function statusKind(row: VorgangListeRow): string {
   ) {
     return 'storniert'
   }
-  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') return 'fertig'
+  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen' || u === 'hm_erledigt') {
+    return 'fertig'
+  }
   if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
   if (u === 'gesendet' || u === 'abnahme' || u === 'kontaktiert' || u === 'termin') return 'warten'
   return 'aktiv'
@@ -162,7 +197,31 @@ function statusFilterKey(row: VorgangListeRow): string {
 }
 
 function statusLabel(row: VorgangListeRow): string {
+  const ui = resolveRechnungKorrekturUi({
+    status: row.unterstatus,
+    korrektur_von: row.korrektur_von,
+    korrektur_art: row.korrektur_art,
+  })
+  if (ui.dualBadges) return ui.dualBadges.secondary
   return row.unterstatusLabel
+}
+
+function rowMatchesStatusFilter(row: VorgangListeRow, selected: string[]): boolean {
+  if (!selected.length) return true
+  if (row.phase === 'rechnung') {
+    return selected.some((f) =>
+      matchesRechnungStatusFilterKey(
+        {
+          status: row.unterstatus,
+          unterstatus: row.unterstatus,
+          korrektur_von: row.korrektur_von,
+          korrektur_art: row.korrektur_art,
+        },
+        f
+      )
+    )
+  }
+  return selected.includes(statusFilterKey(row))
 }
 
 function dateKey(row: VorgangListeRow): string {
@@ -171,6 +230,10 @@ function dateKey(row: VorgangListeRow): string {
 
 /** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
 function isVorgangErledigt(row: VorgangListeRow): boolean {
+  // Storno-Gutschrift-Entwurf gehört zur offenen Korrektur
+  if (row.belegTyp === 'gutschrift') {
+    return String(row.unterstatus).toLowerCase() !== 'entwurf'
+  }
   const kind = statusKind(row)
   return kind === 'storniert' || kind === 'fertig'
 }
@@ -241,6 +304,8 @@ export function VorgaengeListeClient({
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
+  /** Aufgeklappte Korrektur-Ketten (rootId). */
+  const [ketteOpen, setKetteOpen] = useState<Record<string, boolean>>({})
   const visibleCols: Record<DataColId, boolean> = {
     kunde: true,
     titel: true,
@@ -254,10 +319,10 @@ export function VorgaengeListeClient({
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const colDefs = useMemo(() => {
     const data = VORGAENGE_DATA_COLS.filter((c) => visibleCols[c.id as DataColId])
-    return [VORGAENGE_CHECK_COL, ...data]
+    return [VORGAENGE_CHECK_COL, ...data, VORGAENGE_MENU_COL]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v5.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v6.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -273,6 +338,11 @@ export function VorgaengeListeClient({
   useEffect(() => {
     setSelected({})
   }, [lifecycle])
+
+  /** F-178: Selektion bei Suche/Filter/Phase leeren — keine unsichtbaren Häkchen. */
+  useEffect(() => {
+    setSelected({})
+  }, [query, filter, statusFilter, fKunde, fTitel, fWertVon, fWertBis, fDatumVon, fDatumBis, rechnungRichtung])
 
   const syncPhaseToUrl = useCallback(
     (
@@ -572,18 +642,31 @@ export function VorgaengeListeClient({
   }, [lifecycleRows, filter, showHwEingang])
 
   const counts = useMemo(() => {
+    // Phasen-Chips immer über alle Phasen zählen — nicht über den aktiven Phasen-Filter
+    // (sonst sind bei „Rechnung“ Anfrage/Angebot/Auftrag fälschlich 0).
+    const ausgehend = baseRows.filter(
+      (v) => (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend'
+    )
+    const offen = ausgehend.filter((v) => !isVorgangErledigt(v))
+    const imLifecycle = ausgehend.filter((v) =>
+      lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+    )
     const c: Record<string, number> = {}
     for (const p of VORGANG_FILTERS) {
       if (p === 'alle') {
-        c[p] = lifecycleRows.length
+        c[p] = imLifecycle.length
       } else if (p === 'bestand') {
-        c[p] = lifecycleRows.filter((v) => v.ist_wiederkehrend).length
+        // Bestand-Tab zeigt nur offene Wiederkehr-Vorgänge
+        c[p] = offen.filter((v) => v.ist_wiederkehrend).length
+      } else if (p === 'rechnung') {
+        c[p] = imLifecycle.filter((v) => v.phase === 'rechnung').length
       } else {
-        c[p] = lifecycleRows.filter((v) => v.phase === p).length
+        // Anfrage / Angebot / Auftrag: Tab erzwingt Offen → immer Offen-Zähler
+        c[p] = offen.filter((v) => v.phase === p).length
       }
     }
     return c
-  }, [lifecycleRows])
+  }, [baseRows, lifecycle])
 
   const filteredBase = useMemo(() => {
     return lifecycleRows.filter((v) => {
@@ -592,7 +675,7 @@ export function VorgaengeListeClient({
       } else if (filter !== 'alle' && v.phase !== filter) {
         return false
       }
-      if (statusFilter.length && !statusFilter.includes(statusFilterKey(v))) return false
+      if (statusFilter.length && !rowMatchesStatusFilter(v, statusFilter)) return false
       if (
         query &&
         !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId)
@@ -785,17 +868,36 @@ export function VorgaengeListeClient({
 
   const isMobile = useIsMobile()
   const displayItems = isMobile ? infiniteItems : pageItems
+  const displayGroups = useMemo(
+    () => groupVorgaengeByKorrekturKette(displayItems).groups,
+    [displayItems]
+  )
 
   const allPageSelected =
     displayItems.length > 0 && displayItems.every((v) => selected[rowKey(v)])
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((v) => selected[rowKey(v)])
+  const showSelectAllFilteredLink =
+    filtered.length > displayItems.length && !allFilteredSelected
 
-  const toggleSelectAll = () => {
-    if (allFilteredSelected) {
-      setSelected({})
+  /** Header: nur sichtbare Zeilen der aktuellen Ansicht (Seite / Infinite-Chunk). */
+  const toggleSelectVisible = () => {
+    if (allPageSelected) {
+      setSelected((prev) => {
+        const n = { ...prev }
+        for (const v of displayItems) delete n[rowKey(v)]
+        return n
+      })
       return
     }
+    setSelected((prev) => {
+      const n = { ...prev }
+      for (const v of displayItems) n[rowKey(v)] = true
+      return n
+    })
+  }
+
+  const selectAllFiltered = () => {
     const n: Record<string, boolean> = {}
     filtered.forEach((v) => {
       n[rowKey(v)] = true
@@ -807,7 +909,7 @@ export function VorgaengeListeClient({
 
   const filterFooter = (
     <div className="sheet-footer-actions">
-      <MockBtn kind="secondary" onClick={resetFilters}>
+      <MockBtn kind="ghost" onClick={resetFilters}>
         Zurücksetzen
       </MockBtn>
       <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
@@ -1097,32 +1199,18 @@ export function VorgaengeListeClient({
       )}
 
       {selectedCount > 0 ? (
-        <div className="bulkbar">
-          <span className="bulkbar-count">
-            <b>{selectedCount}</b> ausgewählt
-          </span>
-          <div style={{ flex: 1 }} />
-          <MockBtn kind="ghost" sm icon="download" onClick={bulkExport}>
-            Export
-          </MockBtn>
-          <MockBtn
-            kind="danger"
-            sm
-            icon="trash"
-            onClick={() => setBulkDeleteOpen(true)}
-            disabled={bulkDeletePending}
-          >
-            Löschen
-          </MockBtn>
-          <MockBtn
-            kind="ghost"
-            sm
-            className="qa-btn bulkbar-clear"
-            icon="x"
-            onClick={() => setSelected({})}
-            title="Auswahl aufheben"
-          />
-        </div>
+        <ListBulkBar
+          selectedCount={selectedCount}
+          onClear={() => setSelected({})}
+          onExport={bulkExport}
+          onDelete={() => setBulkDeleteOpen(true)}
+          deleteDisabled={bulkDeletePending}
+          deletePending={bulkDeletePending}
+          selectAllFilteredLabel={
+            showSelectAllFilteredLink ? `Alle ${filtered.length} Treffer auswählen` : undefined
+          }
+          onSelectAllFiltered={showSelectAllFilteredLink ? selectAllFiltered : undefined}
+        />
       ) : null}
 
       <MockModal
@@ -1132,9 +1220,9 @@ export function VorgaengeListeClient({
         }}
         icon="trash"
         title={
-          selectedCount === 1
+          selectedRows.length === 1
             ? 'Vorgang löschen?'
-            : `${selectedCount} Vorgänge löschen?`
+            : `${selectedRows.length} Vorgänge löschen?`
         }
         sub="Dauerhaft entfernen — Kunde bleibt erhalten."
         size="sm"
@@ -1147,7 +1235,7 @@ export function VorgaengeListeClient({
             <MockBtn
               kind="danger"
               icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
+              disabled={bulkDeletePending || selectedRows.length === 0}
               onClick={() => void runBulkDelete()}
             >
               {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
@@ -1156,11 +1244,37 @@ export function VorgaengeListeClient({
         }
       >
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-          {bulkDeletePending
-            ? 'Bitte warten…'
-            : selectedCount === 1
-              ? 'Der ausgewählte Vorgang wird unwiderruflich gelöscht.'
-              : `${selectedCount} ausgewählte Vorgänge werden unwiderruflich gelöscht.`}
+          {bulkDeletePending ? (
+            'Bitte warten…'
+          ) : selectedRows.length === 0 ? (
+            <p className="m-0">
+              Keine der ausgewählten Zeilen ist im aktuellen Filter sichtbar — bitte Filter
+              anpassen oder Auswahl aufheben.
+            </p>
+          ) : (
+            <>
+              <p className="m-0 mb-2">
+                {selectedRows.length === 1
+                  ? 'Dieser Vorgang wird unwiderruflich gelöscht:'
+                  : 'Diese Vorgänge werden unwiderruflich gelöscht:'}
+              </p>
+              <ul className="m-0 mb-0 pl-5" style={{ listStyle: 'disc' }}>
+                {selectedRows.slice(0, 10).map((v) => (
+                  <li key={rowKey(v)}>
+                    {(v.titel || 'Ohne Titel').trim()}
+                    {v.kundeName ? (
+                      <span style={{ color: 'var(--text-3)' }}> · {v.kundeName}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {selectedRows.length > 10 ? (
+                <p className="m-0 mt-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+                  + {selectedRows.length - 10} weitere
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </MockModal>
 
@@ -1170,20 +1284,18 @@ export function VorgaengeListeClient({
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
-          <div
-            className="vg-check"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleSelectAll()
-            }}
-            title={allFilteredSelected ? 'Auswahl aufheben' : 'Alle auswählen'}
-          >
-            <span className={cn('vg-box', allFilteredSelected && 'on', allPageSelected && !allFilteredSelected && 'partial')}>
-              {allFilteredSelected || allPageSelected ? (
-                <MockIcon ctx="default" n="check" size={12} />
-              ) : null}
-            </span>
-          </div>
+          <ListRowCheck
+            checked={allPageSelected}
+            partial={
+              !allPageSelected && displayItems.some((v) => selected[rowKey(v)])
+            }
+            onToggle={toggleSelectVisible}
+            title={
+              allPageSelected
+                ? 'Auswahl dieser Ansicht aufheben'
+                : 'Sichtbare Zeilen auswählen'
+            }
+          />
           {visibleCols.kunde ? (
           <MockSortHead
             col="kunde"
@@ -1280,11 +1392,23 @@ export function VorgaengeListeClient({
             }
           />
         ) : (
-          displayItems.map((v) => {
+          displayGroups.map((group) => {
+            const hasKette = group.members.length > 1
+            const open = Boolean(ketteOpen[group.rootId]) || (hasKette && group.pending)
+            const v = group.head
             const key = rowKey(v)
             const kind = statusKind(v)
             const label = statusLabel(v)
+            const korrekturUi =
+              v.phase === 'rechnung'
+                ? resolveRechnungKorrekturUi({
+                    status: v.unterstatus,
+                    korrektur_von: v.korrektur_von,
+                    korrektur_art: v.korrektur_art,
+                  })
+                : null
             const ersetzt = isErsetzt(v)
+            const pendingOrig = isKorrekturPendingOriginal(v)
             const del = () => {
               if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
               else runDeleteVorgang(v.leadId, router)
@@ -1298,6 +1422,13 @@ export function VorgaengeListeClient({
               else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
             }
             const edit = () => openDetail(v)
+            const rowMenu: EntityMenuItem[] = [
+              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(v) },
+              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
+              { icon: 'copy', label: 'Duplizieren', onClick: copy },
+              'sep',
+              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+            ]
             const row = (
               <div
                 className={cn(
@@ -1316,17 +1447,10 @@ export function VorgaengeListeClient({
                   }
                 }}
               >
-                <div
-                  className="vg-check"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleSel(key)
-                  }}
-                >
-                  <span className={cn('vg-box', selected[key] && 'on')}>
-                    {selected[key] ? <MockIcon ctx="default" n="check" size={12} /> : null}
-                  </span>
-                </div>
+                <ListRowCheck
+                  checked={Boolean(selected[key])}
+                  onToggle={() => toggleSel(key)}
+                />
                 {visibleCols.kunde ? (
                 <div className="vg-kunde">
                   <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
@@ -1336,10 +1460,41 @@ export function VorgaengeListeClient({
                 ) : null}
                 {visibleCols.titel ? (
                 <div className="vg-vorgang">
-                  <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
-                    {v.titel}
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+                  >
+                    {hasKette ? (
+                      <button
+                        type="button"
+                        className="vg-kette-toggle"
+                        aria-expanded={open}
+                        aria-label={open ? 'Kette zuklappen' : 'Kette aufklappen'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setKetteOpen((prev) => ({
+                            ...prev,
+                            [group.rootId]: !open,
+                          }))
+                        }}
+                      >
+                        <MockIcon
+                          ctx="default"
+                          n={open ? 'chevron-down' : 'chevron-right'}
+                          size={14}
+                        />
+                      </button>
+                    ) : null}
+                    <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
+                      {hasKette && group.pending ? group.label : v.titel}
+                    </div>
                   </div>
-                  {ersetzt ? <span className="vg-chip-ersetzt">ersetzt</span> : null}
+                  {pendingOrig ? (
+                    <span className="vg-chip-ersetzt">Korrektur läuft</span>
+                  ) : ersetzt ? (
+                    <span className="vg-chip-ersetzt">ersetzt</span>
+                  ) : hasKette && !group.pending ? (
+                    <span className="vg-chip-ersetzt">Korrektur-Kette</span>
+                  ) : null}
                 </div>
                 ) : null}
                 {visibleCols.phase ? (
@@ -1369,32 +1524,151 @@ export function VorgaengeListeClient({
                 </div>
                 ) : null}
                 {visibleCols.status ? (
-                <div className="vg-status">
-                  <MockBadge kind={kind}>{label}</MockBadge>
+                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                  {v.badges?.notfall ? (
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title="Notfall"
+                      aria-label="Notfall"
+                    >
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          background: 'var(--danger, #c0392b)',
+                          display: 'inline-block',
+                          flexShrink: 0,
+                        }}
+                      />
+                    </span>
+                  ) : null}
+                  {hasKette && group.pending ? (
+                    <MockBadge kind="neu">Korrektur Entwurf</MockBadge>
+                  ) : korrekturUi?.dualBadges ? (
+                    <>
+                      <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
+                      <MockBadge kind="neu">{korrekturUi.dualBadges.secondary}</MockBadge>
+                    </>
+                  ) : v.badges?.wartet_freigabe ? (
+                    <>
+                      <MockBadge kind="warten">Warte auf HV</MockBadge>
+                      <MockBadge kind={kind}>{label}</MockBadge>
+                    </>
+                  ) : (
+                    <MockBadge kind={kind}>{label}</MockBadge>
+                  )}
                 </div>
                 ) : null}
+                <div
+                  className="vg-row-menu"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+                </div>
               </div>
             )
+            const childRows =
+              hasKette && open
+                ? group.members
+                    .filter((m) => m.row.entityId !== v.entityId)
+                    .map((m) => {
+                      const child = m.row
+                      const cKey = rowKey(child)
+                      const cKind = statusKind(child)
+                      const cLabel = statusLabel(child)
+                      return (
+                        <div
+                          key={cKey}
+                          className={cn('vg-row', 'vg-row--kette-child', selected[cKey] && 'sel')}
+                          onClick={() => openDetail(child)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openDetail(child)
+                            }
+                          }}
+                        >
+                          <ListRowCheck
+                            checked={Boolean(selected[cKey])}
+                            onToggle={() => toggleSel(cKey)}
+                          />
+                          {visibleCols.kunde ? <div className="vg-kunde" /> : null}
+                          {visibleCols.titel ? (
+                            <div className="vg-vorgang">
+                              <div className="t" title={child.titel}>
+                                <span className="vg-kette-role">
+                                  {korrekturKetteRoleLabel(m.role)}
+                                </span>{' '}
+                                {child.titel}
+                              </div>
+                            </div>
+                          ) : null}
+                          {visibleCols.phase ? (
+                            <div className="vg-phase">
+                              <span className="ph-neutral">
+                                <MockIcon ctx="default" n="receipt" size={13} />
+                                Rechnung
+                              </span>
+                            </div>
+                          ) : null}
+                          {visibleCols.wert ? (
+                            <div
+                              className="vg-wert"
+                              style={{
+                                textAlign: 'right',
+                                fontWeight: 500,
+                                fontVariantNumeric: 'tabular-nums',
+                                fontSize: 'var(--fs-text)',
+                              }}
+                            >
+                              {child.wertLabel ?? '—'}
+                            </div>
+                          ) : null}
+                          {visibleCols.datum ? (
+                            <div
+                              className="vg-datum"
+                              style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
+                            >
+                              {formatDatum(child.updatedAt)}
+                            </div>
+                          ) : null}
+                          {visibleCols.status ? (
+                            <div className="vg-status">
+                              <MockBadge kind={cKind}>{cLabel}</MockBadge>
+                            </div>
+                          ) : null}
+                          <div className="vg-row-menu" />
+                        </div>
+                      )
+                    })
+                : null
             return (
-              <SwipeRow
-                key={key}
-                disabled={!isMobile}
-                leftActions={
-                  isMobile
-                    ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
-                    : undefined
-                }
-                rightActions={
-                  isMobile
-                    ? [
-                        { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
-                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
-                      ]
-                    : undefined
-                }
-              >
-                {row}
-              </SwipeRow>
+              <div key={`kette:${group.rootId}`} className={hasKette ? 'vg-kette' : undefined}>
+                <SwipeRow
+                  disabled={!isMobile}
+                  leftActions={
+                    isMobile
+                      ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
+                      : undefined
+                  }
+                  rightActions={
+                    isMobile
+                      ? [
+                          { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
+                          { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
+                        ]
+                      : undefined
+                  }
+                >
+                  {row}
+                </SwipeRow>
+                {childRows}
+              </div>
             )
           })
         )}

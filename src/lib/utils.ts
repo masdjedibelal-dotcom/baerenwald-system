@@ -66,19 +66,26 @@ export function formatPreis(fix?: number | null, min?: number | null, max?: numb
 }
 
 export function formatDatum(datum: string): string {
-  const d = new Date(datum)
+  const raw = (datum ?? '').trim()
+  if (!raw) return '—'
+  // YYYY-MM-DD → lokal mittags parsen (kein UTC-Tagesversatz)
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
+  const d = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
+    : new Date(raw)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}.${mm}.${yyyy}`
 }
 
 export function formatDatumZeit(datum: string): string {
   const d = new Date(datum)
   if (Number.isNaN(d.getTime())) return '—'
+  // Feste Zone — sonst Hydration-Mismatch SSR (UTC) vs. Browser (lokal)
   return d.toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -174,10 +181,10 @@ export const FORMULAR_PHASE_LABELS: Record<string, string> = {
 
 export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
   entwurf: 'Entwurf',
-  gesendet_handwerker: 'Gesendet Handwerker',
-  handwerker_akzeptiert: 'Handwerker akzeptiert',
-  gesendet_kunde: 'Gesendet Kunde',
-  kunde_akzeptiert: 'Kunde akzeptiert',
+  gesendet_handwerker: 'An Partner gesendet',
+  handwerker_akzeptiert: 'Partner akzeptiert',
+  gesendet_kunde: 'Gesendet',
+  kunde_akzeptiert: 'Angenommen',
   abgelehnt: 'Abgelehnt',
 }
 
@@ -260,6 +267,32 @@ export const FACHDETAIL_TO_LEISTUNG: Record<string, string> = {
   'elektro_kaputt.strom_weg': 'Stromausfall beheben',
   'elektro_kaputt.steckdose': 'Steckdose reparieren',
   'elektro_kaputt.fehlersuche': 'Fehlersuche Elektrik',
+  'elektro_kaputt.kein_strom': 'Stromausfall beheben',
+  'elektro_kaputt.fi_sicherung': 'Sicherung / FI',
+  'elektro_kaputt.einzelner_punkt': 'Steckdose / Licht / Schalter',
+  'elektro_kaputt.klingel': 'Klingel / Türsprecher',
+  'elektro_kaputt.garagentor': 'Garagentor',
+  'elektro_kaputt.sonstiges': 'Elektrik — Sonstiges',
+  'sanitaer_kaputt.wasser_austritt': 'Wasseraustritt / Leck',
+  'sanitaer_kaputt.von_decke_wand': 'Wasser aus Decke oder Wand',
+  'sanitaer_kaputt.verstopfung': 'Verstopfung beheben',
+  'sanitaer_kaputt.feucht_ohne_lauf': 'Feuchtigkeit ohne laufendes Wasser',
+  'sanitaer_kaputt.sonstiges': 'Sanitär — Sonstiges',
+  'heizung_kaputt.wohnung_kalt': 'Heizung / Wohnung kalt',
+  'heizung_kaputt.kein_warmwasser': 'Kein Warmwasser',
+  'heizung_kaputt.wasser_am_hk': 'Leck am Heizkörper',
+  'heizung_kaputt.geraeusche': 'Heizung — Geräusche',
+  'heizung_kaputt.sonstiges': 'Heizung — Sonstiges',
+  'fenster_kaputt.fenster_klemmt_undicht': 'Fenster klemmt / undicht',
+  'fenster_kaputt.scheibe_kaputt': 'Fensterscheibe defekt',
+  'fenster_kaputt.tuer_schloss': 'Tür / Schloss',
+  'fenster_kaputt.sonstiges': 'Fenster / Tür — Sonstiges',
+  'dach_kaputt.regenrinne_ueber': 'Regenrinne übergelaufen',
+  'dach_kaputt.wasser_fassade': 'Wasser an der Fassade',
+  'dach_kaputt.ziegel_boden': 'Dachziegel defekt / fehlen',
+  'dach_kaputt.sonstiges': 'Dach — Sonstiges',
+  'schimmel_kaputt.schimmel_feucht': 'Schimmel / Feuchtigkeit',
+  'schimmel_kaputt.sonstiges': 'Schimmel — Sonstiges',
   'fenster.standard': 'Fenster 2-fach erneuern',
   'fenster.premium': 'Fenster 3-fach erneuern',
   'fenster.haustuere': 'Haustür erneuern',

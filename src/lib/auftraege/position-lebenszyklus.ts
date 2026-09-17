@@ -52,6 +52,8 @@ export type PositionEintrag = {
   ereignis_zeit?: string | null
   created_at?: string | null
   eintrag_fotos?: EintragFoto[] | null
+  /** Junction 0..n Leistungen (zusätzlich zu position_id). */
+  leistung_position_ids?: string[]
 }
 
 export type EintragFoto = {
@@ -105,19 +107,18 @@ export function lebenszyklusLabel(status: string | null | undefined): string {
 }
 
 export function eintragTypLabel(typ: string | null | undefined): string {
-  switch (typ) {
+  switch (String(typ ?? '').toLowerCase()) {
     case 'start':
-      return 'Start'
     case 'fortschritt':
-      return 'Fortschritt'
     case 'ergebnis':
-      return 'Ergebnis'
+      // Leistungs-Updates: einheitlich „Update“ (kein Start/Fortschritt mehr)
+      return 'Update'
     case 'weitere_arbeit':
       return 'Weitere Arbeit'
     case 'notiz':
       return 'Notiz'
     default:
-      return typ?.trim() || 'Eintrag'
+      return 'Update'
   }
 }
 

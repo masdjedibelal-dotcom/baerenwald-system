@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import {
@@ -16,6 +17,8 @@ import {
 } from '@/components/vorgang/RateDrawer'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { loadRechnungWizardBootstrap as loadWizardBootstrap, loadRechnungWizardBootstrapStandalone } from '@/app/(dashboard)/rechnungen/wizard-actions'
+import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
+import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   abschlagWeichtVonAktuellerAuftragssummeAb,
@@ -27,6 +30,7 @@ import {
   rechnungenZuAbschlagZeile,
   zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
+  zahlplanZeileVorherigeRechnungGeloescht,
   type RechnungAbschlagLink,
   type ZahlplanRateStatus,
   type Zahlungsplan,
@@ -85,8 +89,9 @@ function mahnungenFromRechnung(r: RechnungAuswahlZeile | null | undefined): Rate
 
 function rateBadgeMeta(
   st: ZahlplanRateStatus,
-  r: RechnungAuswahlZeile | null | undefined
-): { label: string; tone: StatusTone; status: string } {
+  r: RechnungAuswahlZeile | null | undefined,
+  opts?: { vorherigeRechnungGeloescht?: boolean }
+): { label: string; tone: StatusTone; status: string; hint?: string } {
   if (r?.reklamation_am) {
     return { label: 'Reklamiert', tone: 'rot', status: 'reklamiert' }
   }
@@ -110,6 +115,14 @@ function rateBadgeMeta(
   }
   if (r && String(r.status) === 'entwurf') {
     return { label: 'Entwurf', tone: 'grau', status: 'entwurf' }
+  }
+  if (opts?.vorherigeRechnungGeloescht) {
+    return {
+      label: 'Geplant',
+      tone: 'grau',
+      status: 'geplant',
+      hint: 'vorherige Rechnung gelöscht',
+    }
   }
   return { label: 'Geplant', tone: 'grau', status: 'geplant' }
 }
@@ -233,7 +246,15 @@ export function VorgangZahlungTab({
         const link = rechnungFuerAbschlagZeile(z.id, abschlagLinks)
         const r = link?.id ? rechnungById.get(link.id) ?? null : null
         const related = rechnungenZuAbschlagZeile(z.id, rechnungen)
-        const badge = rateBadgeMeta(st, r)
+        const planZeile = plan.zeilen.find((pz) => pz.id === z.id)
+        const vorherigeRechnungGeloescht =
+          st === 'geplant' &&
+          !r &&
+          zahlplanZeileVorherigeRechnungGeloescht(
+            { id: z.id, rechnung_id: planZeile?.rechnung_id ?? z.rechnung_id },
+            rechnungen
+          )
+        const badge = rateBadgeMeta(st, r, { vorherigeRechnungGeloescht })
         // Schluss: immer Plan-Rest nach Abschlägen — nicht DB-Brutto (oft volle Leistungssumme)
         const betrag = z.istSchluss
           ? Number(z.brutto) || 0
@@ -298,6 +319,7 @@ export function VorgangZahlungTab({
             [
               pct != null ? `${pct} % der Auftragssumme` : z.istSchluss ? 'Restbetrag nach Abschlägen' : null,
               related.length === 1 ? r?.rechnungsnummer?.trim() || null : null,
+              badge.hint ?? null,
             ]
               .filter(Boolean)
               .join(' · ') || 'Abschlag',
@@ -458,6 +480,14 @@ export function VorgangZahlungTab({
         .map((z) => z.id),
     [plan.zeilen, abschlagLinks]
   )
+  const frozenMeta = useMemo(() => {
+    const m: Record<string, { rechnungsnummer?: string | null }> = {}
+    for (const id of frozenRateIds) {
+      const link = rechnungFuerAbschlagZeile(id, abschlagLinks)
+      m[id] = { rechnungsnummer: link?.rechnungsnummer ?? null }
+    }
+    return m
+  }, [frozenRateIds, abschlagLinks])
 
   function speichern(next: Zahlungsplan) {
     if (!auftragId) {
@@ -476,7 +506,16 @@ export function VorgangZahlungTab({
       }
       setPlan(next)
       setEditorOpen(false)
-      toast.success('Gespeichert')
+      const teile: string[] = []
+      if (res.aktualisiert > 0) teile.push(`${res.aktualisiert} Entwurf(e) neu berechnet`)
+      if (res.erstellt > 0) teile.push(`${res.erstellt} neu`)
+      if (res.storniertOrphan > 0) teile.push(`${res.storniertOrphan} verwaiste Entwürfe storniert`)
+      if (res.gestellteUnveraendert > 0) {
+        teile.push(
+          `${res.gestellteUnveraendert} gestellte Rate(n) unverändert — ggf. korrigieren & erneut senden`
+        )
+      }
+      toast.success(teile.length ? `Plan gespeichert · ${teile.join(' · ')}` : 'Plan gespeichert')
       onRefresh?.()
       router.refresh()
     })
@@ -489,15 +528,34 @@ export function VorgangZahlungTab({
       return
     }
     startTransition(async () => {
+      const row = rechnungById.get(rechnungId)
+      const modus = rechnungKorrekturModus(row?.status)
+      let targetId = rechnungId
+
+      if (modus === 'storno_neu') {
+        const korr = await korrigiereRechnung(rechnungId)
+        if (!korr.ok) {
+          toast.error(korr.message)
+          return
+        }
+        if (korr.mode === 'storno_neu') {
+          targetId = korr.neuId
+          toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+        }
+      } else if (modus === 'gesperrt') {
+        toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+        return
+      }
+
       const boot = auftragId
-        ? await loadWizardBootstrap(rechnungId, auftragId)
-        : await loadRechnungWizardBootstrapStandalone(rechnungId)
+        ? await loadWizardBootstrap(targetId, auftragId)
+        : await loadRechnungWizardBootstrapStandalone(targetId)
       if (boot.ok && onOpenWizard) {
         onOpenWizard(boot.bootstrap)
       } else if (!boot.ok) {
         toast.error(boot.message)
       } else {
-        router.push(`/rechnungen/${rechnungId}?tab=leistungen`)
+        router.push(`/rechnungen/${targetId}?tab=leistungen`)
       }
     })
   }
@@ -542,19 +600,7 @@ export function VorgangZahlungTab({
             openRechnungBearbeiten(editId)
           },
         })
-        ctas.push({
-          id: 'open',
-          label: 'Öffnen',
-          icon: 'eye',
-          onClick: () => {
-            setOpenRateId(null)
-            if (aktuelleRechnungId === editId) {
-              router.push(`/rechnungen/${editId}?tab=uebersicht`)
-              return
-            }
-            router.push(`/rechnungen/${editId}`)
-          },
-        })
+        // Keine Vorschau/Öffnen hier — PDF-Vorschau erst im Wizard nach Senden.
         ctas.push({
           id: 'edit',
           label: 'Bearbeiten',
@@ -591,7 +637,7 @@ export function VorgangZahlungTab({
       })
       ctas.push({
         id: 'edit',
-        label: 'Bearbeiten',
+        label: 'Korrigieren',
         icon: 'pencil',
         onClick: () => openRechnungBearbeiten(rechnungId),
       })
@@ -677,11 +723,12 @@ export function VorgangZahlungTab({
             canEditPlan ? (
               <MockBtn
                 sm
-                kind="ghost"
+                kind="secondary"
                 icon="plus"
-                title="Abschlagsplan anlegen"
                 onClick={() => setEditorOpen(true)}
-              />
+              >
+                Abschlagsplan
+              </MockBtn>
             ) : null
           }
         >
@@ -703,11 +750,6 @@ export function VorgangZahlungTab({
                 </>
               )}
             </div>
-            {canEditPlan ? (
-              <MockBtn kind="primary" icon="plus" onClick={() => setEditorOpen(true)}>
-                Abschlagsplan anlegen
-              </MockBtn>
-            ) : null}
           </div>
           {afterTable}
         </MockCard>
@@ -721,6 +763,7 @@ export function VorgangZahlungTab({
             onSave={speichern}
             saving={pending}
             frozenIds={frozenRateIds}
+            frozenMeta={frozenMeta}
           />
         ) : null}
       </>
@@ -737,11 +780,13 @@ export function VorgangZahlungTab({
           canEditPlan ? (
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="pencil"
               title="Abschlagsplan bearbeiten"
               onClick={() => setEditorOpen(true)}
-            />
+            >
+              Bearbeiten
+            </MockBtn>
           ) : variant === 'angebot' ? (
             <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>Vorschlag</span>
           ) : null
@@ -749,10 +794,10 @@ export function VorgangZahlungTab({
       >
         {variant === 'angebot' ? (
           <div className="zahlung-tab-hint" style={{ marginBottom: 14 }}>
-            <MockIcon ctx="btn" n="info" size={15} />
-            <span>
-              Unverbindlicher Zahlungsvorschlag — Raten werden bei der Rechnung festgelegt.
-            </span>
+            <MockInfoTip
+              label="Zahlungsvorschlag"
+              tip="Unverbindlicher Vorschlag — Raten werden bei der Rechnung festgelegt."
+            />
           </div>
         ) : null}
 
@@ -775,27 +820,23 @@ export function VorgangZahlungTab({
 
         {abschlagSummeAbweichungen.length > 0 ? (
           <div className="zahlung-tab-hint">
-            <MockIcon ctx="btn" n="info" size={15} />
-            <span>
-              {abschlagSummeAbweichungen.length === 1 ? (
-                <>
-                  {abschlagSummeAbweichungen[0]!.rechnungsnummer
-                    ? `${abschlagSummeAbweichungen[0]!.rechnungsnummer} `
-                    : 'Dieser Abschlag '}
-                  bleibt bei {formatEurBetrag(abschlagSummeAbweichungen[0]!.gestelltBrutto)}{' '}
-                  — laut aktueller Auftragssumme wären es{' '}
-                  {formatEurBetrag(abschlagSummeAbweichungen[0]!.sollBrutto)}. Gestellte
-                  Rechnungen werden nicht umgeschrieben. Schlussrechnung gleicht die Differenz
-                  aus. Soll der Abschlag selbst passen: stornieren und die Rate neu stellen.
-                </>
-              ) : (
-                <>
-                  {abschlagSummeAbweichungen.length} gestellte Abschläge sitzen noch auf der
-                  alten Auftragssumme. Gestellte Rechnungen bleiben. Schlussrechnung gleicht
-                  ab — oder betroffene Abschläge stornieren und die Rate neu stellen.
-                </>
-              )}
-            </span>
+            <MockInfoTip
+              label="Abweichende Abschläge"
+              tip={
+                abschlagSummeAbweichungen.length === 1
+                  ? `${abschlagSummeAbweichungen[0]!.rechnungsnummer ?? 'Abschlag'} bleibt bei ${formatEurBetrag(abschlagSummeAbweichungen[0]!.gestelltBrutto)} (Soll ${formatEurBetrag(abschlagSummeAbweichungen[0]!.sollBrutto)}). Gestellte Rechnungen bleiben; Schlussrechnung gleicht ab.`
+                  : `${abschlagSummeAbweichungen.length} gestellte Abschläge auf alter Summe. Schlussrechnung gleicht ab — oder stornieren und Rate neu stellen.`
+              }
+            />
+          </div>
+        ) : null}
+
+        {variant === 'auftrag' && frozenRateIds.length > 0 ? (
+          <div className="zahlung-tab-hint">
+            <MockInfoTip
+              label="Gestellte Raten eingefroren"
+              tip="Bereits versendete Abschläge ändern sich nicht automatisch. Plan-Änderung aktualisiert nur Entwürfe (Betrag, Schluss vs. Abschlag, PDF). Gestellte Raten: über „Korrigieren“ Storno + neu, dann erneut senden."
+            />
           </div>
         ) : null}
 
@@ -888,6 +929,7 @@ export function VorgangZahlungTab({
           onSave={speichern}
           saving={pending}
           frozenIds={frozenRateIds}
+          frozenMeta={frozenMeta}
         />
       ) : null}
     </>

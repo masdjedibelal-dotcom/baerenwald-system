@@ -20,6 +20,8 @@ import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels
 import { findeNeuestenEntwurf } from '@/lib/angebote/angebot-lebenszyklus'
 import { ANGEBOT_STATUS_LABELS, formatRelativeDate } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 
 export type AngebotAuswahlZeile = {
   id: string
@@ -72,10 +74,16 @@ export function AngebotAuswahlPanel({
       const nr =
         offenerEntwurf.angebotsnr?.trim() ||
         `AN-${offenerEntwurf.id.slice(0, 8).toUpperCase()}`
-      const ok = window.confirm(
-        `Es gibt bereits einen offenen Entwurf (${nr}). Wirklich ein neues Angebot anlegen? Der Entwurf wird dabei als „Ersetzt“ markiert, sobald das neue Angebot gespeichert wird.`
-      )
-      if (!ok) return
+      confirmAction({
+        title: 'Neues Angebot anlegen?',
+        body: `Es gibt bereits einen offenen Entwurf (${nr}). Wirklich ein neues Angebot anlegen? Der Entwurf wird dabei als „Ersetzt“ markiert, sobald das neue Angebot gespeichert wird.`,
+        confirmLabel: 'Neues Angebot',
+        cancelLabel: 'Abbrechen',
+        onConfirm: () => {
+          onNeuesAngebot()
+        },
+      })
+      return
     }
     onNeuesAngebot()
   }
@@ -104,17 +112,19 @@ export function AngebotAuswahlPanel({
   }
 
   function handleLoeschen(angebotId: string) {
-    if (!window.confirm('Angebot wirklich löschen?')) return
-    setLoadingId(angebotId)
-    startTransition(async () => {
-      const r = await deleteAngebot(angebotId)
-      setLoadingId(null)
-      if ('error' in r) {
-        toast.error(r.error)
-        return
+    confirmDelete('Angebot löschen?', async () => {
+      setLoadingId(angebotId)
+      try {
+        const r = await deleteAngebot(angebotId)
+        if ('error' in r) {
+          toast.error(r.error)
+          throw new Error(r.error)
+        }
+        toast.success('Angebot gelöscht')
+        router.refresh()
+      } finally {
+        setLoadingId(null)
       }
-      toast.success('Angebot gelöscht')
-      router.refresh()
     })
   }
 

@@ -4,15 +4,47 @@ export const PROJEKT_PHASEN = ['Anfrage', 'Angebot', 'Auftrag', 'Abnahme', 'Fert
 
 export type ProjektPhase = (typeof PROJEKT_PHASEN)[number]
 
-export function aktuellePhaseIndex(leadStatus: LeadStatus | null, aufStatus: AuftragStatus): number {
+export type ProjektPhasenEntities = {
+  /** true wenn mindestens ein Angebot zur Anfrage existiert */
+  hasAngebot?: boolean
+  /** true wenn ein Auftrag existiert (Token-/Detail-Seite) */
+  hasAuftrag?: boolean
+  aufStatus: AuftragStatus
+  /** nur Fallback / Drift-Diagnose — nicht als Phasenquelle */
+  leadStatus?: LeadStatus | null
+}
+
+/**
+ * Phasenindex aus EXISTIERENDEN Entitäten (Auftrag/Angebot), nicht aus Lead-status allein.
+ * Drift (Lead sagt „auftrag“, aber kein Auftrag) wird geloggt.
+ */
+export function aktuellePhaseIndexFromEntities(e: ProjektPhasenEntities): number {
+  const { aufStatus, hasAngebot, hasAuftrag, leadStatus } = e
   if (aufStatus === 'abgeschlossen') return 4
   if (aufStatus === 'abnahme') return 3
   if (aufStatus === 'storniert') return 0
-  if (aufStatus === 'offen' || aufStatus === 'in_arbeit') return 2
-  if (leadStatus === 'angebot') return 1
+  if (aufStatus === 'offen' || aufStatus === 'in_arbeit' || hasAuftrag) return 2
+  if (hasAngebot) return 1
+
+  // Drift: Lead behauptet Auftrag/Angebot ohne Entity
+  if (leadStatus === 'auftrag' || leadStatus === 'abgeschlossen') {
+    console.warn('[projekt-phasen] Drift: leadStatus=%s ohne Auftrag — Phase Anfrage', leadStatus)
+  } else if (leadStatus === 'angebot' && !hasAngebot) {
+    console.warn('[projekt-phasen] Drift: leadStatus=angebot ohne Angebot-Entity')
+  }
+
   if (leadStatus === 'neu' || leadStatus === 'kontaktiert' || leadStatus === 'termin') return 0
-  if (leadStatus === 'auftrag') return 2
-  return 2
+  return 0
+}
+
+/** @deprecated Prefer aktuellePhaseIndexFromEntities — Lead-status ist driftanfällig */
+export function aktuellePhaseIndex(leadStatus: LeadStatus | null, aufStatus: AuftragStatus): number {
+  return aktuellePhaseIndexFromEntities({
+    leadStatus,
+    aufStatus,
+    hasAuftrag: aufStatus === 'offen' || aufStatus === 'in_arbeit' || aufStatus === 'abnahme' || aufStatus === 'abgeschlossen',
+    hasAngebot: leadStatus === 'angebot' || leadStatus === 'auftrag' || leadStatus === 'abgeschlossen',
+  })
 }
 
 export function auftragStatusLabelDe(status: AuftragStatus): string {
@@ -31,7 +63,7 @@ export function aktuelleAuftragPhaseLabel(status: AuftragStatus): string {
   if (status === 'abnahme') return 'Abnahme'
   if (status === 'abgeschlossen') return 'Fertigstellung'
   if (status === 'storniert') return 'Storniert'
-  return status
+  return auftragStatusLabelDe(status)
 }
 
 /** HTML für E-Mail: 5 Phasen als Step-Leiste (schlicht, table-safe) */

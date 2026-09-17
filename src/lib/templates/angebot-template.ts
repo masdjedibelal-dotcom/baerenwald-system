@@ -151,6 +151,10 @@ export type AngebotHtmlInput = {
   /** Rechnung: voll | abschlag | schluss — steuert PDF-Überschrift */
   rechnung_typ?: 'voll' | 'abschlag' | 'schluss' | null
   rechnung_abschlag_index?: number | null
+  /** rechnung | gutschrift — steuert Titel „Gutschrift“ / Storno */
+  beleg_typ?: 'rechnung' | 'gutschrift' | null
+  /** Bezug-Rechnungsnummer (Storno-Gutschrift) */
+  bezug_rechnungsnummer?: string | null
   /**
    * Schlussrechnung (v. a. Privatkunde): klarer Summenblock
    * Netto → MwSt → Brutto → bereits gezahlt → Restsumme
@@ -581,19 +585,27 @@ export function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
   </div>`
 }
 
+/** Dokumenttitel für Rechnungs-PDF (Gutschrift / Storno / Abschlag / Schluss). */
+export function rechnungDokumentTitel(props: AngebotHtmlInput): string {
+  const bezug = props.bezug_rechnungsnummer?.trim() || ''
+  if (props.beleg_typ === 'gutschrift') {
+    return bezug ? `Stornorechnung zu ${bezug}` : 'Gutschrift'
+  }
+  if (props.rechnung_typ === 'schluss') return 'Schlussrechnung'
+  if (props.rechnung_typ === 'abschlag') {
+    return props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
+      ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
+      : 'Abschlagsrechnung'
+  }
+  return 'Rechnung'
+}
+
 /** Rechnungs-Briefkopf — gleiches Layout wie Projektangebot (Logo + grüner Kopfbalken). */
 function rechnungBriefkopfHtml(props: AngebotHtmlInput): string {
   const projektTitel =
     props.projekt_titel?.trim() || props.leistungsumfang?.trim() || 'Rechnung'
   const teamLabel = `${firmennameZeile(props)} Team`
-  const dokumentLabel =
-    props.rechnung_typ === 'schluss'
-      ? 'Schlussrechnung'
-      : props.rechnung_typ === 'abschlag'
-        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
-          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
-          : 'Abschlagsrechnung'
-        : 'Rechnung'
+  const dokumentLabel = rechnungDokumentTitel(props)
   return `<header style="border-bottom:3px solid ${PROJEKT_ACCENT};padding-bottom:14px;margin-bottom:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
       <div style="flex:1;min-width:0;">
@@ -649,8 +661,11 @@ function briefMetaHtml(props: AngebotHtmlInput): string {
   if (props.dokument_art === 'rechnung') {
     const lz = props.leistungszeitraum_text?.trim() || '—'
     const ld = props.leistungsdatum_text?.trim() || props.datum || '—'
+    const bezug = props.bezug_rechnungsnummer?.trim()
+    const nrLabel = props.beleg_typ === 'gutschrift' ? 'Belegnr.:' : 'Rechnungsnr.:'
     return `<div style="text-align:right;min-width:200px;">
-      ${zeile('Rechnungsnr.:', props.angebotsnr)}
+      ${zeile(nrLabel, props.angebotsnr)}
+      ${bezug ? zeile('Bezug Rechnung:', bezug) : ''}
       ${zeile('Kundennr.:', props.kundennr)}
       ${zeile('Rechnungsdatum:', props.datum)}
       ${zeile('Leistungsdatum:', ld)}
@@ -728,8 +743,6 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
     .map(
       (b) => `<tr>
         <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:10pt;color:#111;">${esc(b.titel)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;text-align:right;font-size:10pt;white-space:nowrap;">${euro(b.summen.netto)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;text-align:right;font-size:10pt;font-weight:600;white-space:nowrap;">${euro(b.summen.brutto)}</td>
       </tr>`
     )
     .join('')
@@ -738,8 +751,6 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
       <thead>
         <tr style="background:#F3F4F6;font-size:9pt;text-transform:uppercase;letter-spacing:0.04em;color:${TEXT_PRIMARY};">
           <th style="padding:8px 10px;text-align:left;font-weight:600;">Gewerk</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:600;width:96px;">Netto</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:600;width:96px;">Brutto</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -818,7 +829,6 @@ function projektBlockHtml(
     <h2 style="font-size:13pt;font-weight:700;color:${PROJEKT_ACCENT};margin:0 0 12px;line-height:1.35;padding-bottom:6px;border-bottom:2px solid ${PROJEKT_ACCENT};">${esc(titel)}</h2>
     ${bullets}
     ${inhalt}
-    ${summenBlockKompaktHtml(block.summen)}
   </section>`
 }
 
@@ -1133,16 +1143,7 @@ export function buildAngebotHtml(
   }
 
   const istRechnung = props.dokument_art === 'rechnung'
-  const dokumentTitel =
-    props.rechnung_typ === 'schluss'
-      ? 'Schlussrechnung'
-      : props.rechnung_typ === 'abschlag'
-        ? props.rechnung_abschlag_index && props.rechnung_abschlag_index > 0
-          ? `Abschlagsrechnung ${props.rechnung_abschlag_index}`
-          : 'Abschlagsrechnung'
-        : istRechnung
-          ? 'Rechnung'
-          : 'Angebot'
+  const dokumentTitel = istRechnung ? rechnungDokumentTitel(props) : 'Angebot'
 
   const einl = richTextToSafePdfHtml(props.einleitung?.trim() || '')
   const begr = esc(props.begruessung.trim() || 'Guten Tag,')

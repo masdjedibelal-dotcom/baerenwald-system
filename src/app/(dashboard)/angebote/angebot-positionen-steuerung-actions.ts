@@ -10,7 +10,11 @@ import {
 } from '@/lib/angebot-positionen'
 import { splitNettoStueck, type KostenVerteilung } from '@/lib/angebot-kosten-split'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
+import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund } from '@/lib/angebote/angebot-wizard-types'
+import {
+  resolveGewerkForAngebotPositionen,
+} from '@/lib/angebote/resolve-position-gewerk'
+import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { syncAngebotPositionenZuAuftrag } from '@/lib/auftraege/sync-angebot-zu-auftrag'
 import { istFreitextPosition, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
@@ -30,7 +34,13 @@ async function assertAngebotEditable(angebotId: string) {
 
   if (error || !data) return { ok: false as const, message: 'Angebot nicht gefunden', supabase: null }
   if (!angebotDarfImWizardBearbeitetWerden(String(data.status))) {
-    return { ok: false as const, message: 'Dieses Angebot kann nicht mehr bearbeitet werden.', supabase: null }
+    return {
+      ok: false as const,
+      message:
+        angebotWizardBearbeitenSperrgrund(String(data.status)) ??
+        'Dieses Angebot kann nicht mehr bearbeitet werden.',
+      supabase: null,
+    }
   }
 
   return {
@@ -73,7 +83,7 @@ function vkLineFromInput(
 }
 
 function ekStueckFromInput(ekNetto: number | null | undefined, menge: number): number | undefined {
-  if (ekNetto == null || !Number.isFinite(ekNetto) || ekNetto <= 0) return undefined
+  if (ekNetto == null || !Number.isFinite(ekNetto) || ekNetto < 0) return undefined
   const m = Math.max(menge, 0.0001)
   return Math.round((ekNetto / m) * 100) / 100
 }
@@ -172,7 +182,7 @@ export async function updateAngebotPositionSteuerung(
 
   const ekInput =
     data.ek_netto !== undefined
-      ? data.ek_netto != null && Number.isFinite(data.ek_netto) && data.ek_netto > 0
+      ? data.ek_netto != null && Number.isFinite(data.ek_netto) && data.ek_netto >= 0
         ? data.ek_netto
         : null
       : current.einkaufspreis != null
@@ -342,12 +352,19 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     'Handwerker'
 
   const ekGlobal =
-    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
+    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
       ? Math.round(input.ekNetto * 100) / 100
       : null
   const ekById = input.ekNettoByPositionId ?? null
 
-  const next = [...gate.positionen]
+  const gewerke = await loadGewerkeAusfuehrung(gate.supabase!)
+  const positionenResolved = await resolveGewerkForAngebotPositionen(
+    gate.supabase!,
+    gate.positionen,
+    gewerke
+  )
+
+  const next = [...positionenResolved]
   let updated = 0
   const gewerkIds = new Set<string>()
 
@@ -365,10 +382,10 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
         : 1
     const fromMap = ekById?.[posId]
     const ekLine =
-      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+      fromMap != null && Number.isFinite(fromMap) && fromMap >= 0
         ? Math.round(fromMap * 100) / 100
         : ekGlobal
-    if (ekLine == null || ekLine <= 0) {
+    if (ekLine == null || ekLine < 0) {
       return {
         ok: false,
         message: `Partner-EK fehlt für „${current.leistung_name?.trim() || current.leistung || 'Leistung'}“.`,
@@ -395,7 +412,7 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     }
     updated++
 
-    const gid = current.gewerk_id?.trim()
+    const gid = next[idx]!.gewerk_id?.trim()
     if (!gid) {
       return {
         ok: false,

@@ -5,6 +5,8 @@ import {
   DndContext,
   PointerSensor,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
   useSensor,
   useSensors,
@@ -41,6 +43,8 @@ export type PosTableItem = {
   /** Rohwert für Inline-Edit */
   menge?: number
   einheit?: string
+  /** false = kein Mengen-Input (Nachlass/Freitext) — nur Label oder leer */
+  mengeEditable?: boolean
   preisLabel?: string
   badge?: PosTableBadge | null
 }
@@ -83,6 +87,28 @@ function groupSortId(gewerk: string) {
 
 function parseGroupSortId(id: string): string | null {
   return id.startsWith('group:') ? id.slice(6) : null
+}
+
+/** Items bevorzugen; Gruppen nur wenn kein Item getroffen (leeres Gewerk). */
+const posTableCollision: CollisionDetection = (args) => {
+  const activeId = String(args.active.id)
+  const draggingGroup = activeId.startsWith('group:')
+  const pointer = pointerWithin(args)
+  const center = closestCenter(args)
+
+  if (draggingGroup) {
+    const groupHits = (pointer.length ? pointer : center).filter((c) =>
+      String(c.id).startsWith('group:')
+    )
+    if (groupHits.length) return groupHits
+    return center
+  }
+
+  const itemPointer = pointer.filter((c) => !String(c.id).startsWith('group:'))
+  if (itemPointer.length) return itemPointer
+  const itemCenter = center.filter((c) => !String(c.id).startsWith('group:'))
+  if (itemCenter.length) return itemCenter
+  return pointer.length ? pointer : center
 }
 
 function SortableGroupHeader({
@@ -258,8 +284,8 @@ function PosRowContent({
         {it.beschreibung ? (
           <div className="pt-desc pt-desc--clamp2">{it.beschreibung}</div>
         ) : null}
-        <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !onMengeChange}>
-          {onMengeChange ? (
+        <div className="pt2-meta" aria-hidden={!it.mengeLabel && !it.preisLabel && !(onMengeChange && it.mengeEditable !== false)}>
+          {onMengeChange && it.mengeEditable !== false ? (
             <span className="pt2-menge pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
               <ClearableNumberInput
                 className="pt2-menge-input"
@@ -278,7 +304,7 @@ function PosRowContent({
         </div>
       </div>
       <div className="pt2-menge pt2-menge--desk">
-        {onMengeChange ? (
+        {onMengeChange && it.mengeEditable !== false ? (
           <span className="pt2-menge--inline" onClick={(e) => e.stopPropagation()}>
             <ClearableNumberInput
               className="pt2-menge-input"
@@ -449,13 +475,17 @@ export function PosTable({
   ust,
   brutto,
   disabledAddKinds,
+  /** Unter Gewerk-Plus: nur diese Kinds (Komplex: Freitext + Nachlass) */
+  gewerkAddKinds,
+  /** Dokument-Toolbar unter den Gruppen (Komplex: Position/Freitext/Nachlass ohne Gewerk) */
+  documentAddKinds,
   /** Mobil: keine Inline-Add-Row/Gewerk-+ — ein zentraler Plus-Button außen */
   unifiedAdd = false,
 }: {
   groups: PosTableGroup[]
   /** @deprecated Prefer onAddKind — kept for per-group fallback */
   onAddItem?: (group: PosTableGroup) => void
-  /** 4 Optionen; optional mit Ziel-Gewerk (bei Plus pro Gruppe) */
+  /** Optionen; optional mit Ziel-Gewerk (bei Plus pro Gruppe) */
   onAddKind?: (kind: PosAddKind, gewerk?: string) => void
   onAddGroup?: () => void
   groupActions?: (group: PosTableGroup) => EntityMenuItem[]
@@ -477,6 +507,8 @@ export function PosTable({
   ust?: number
   brutto?: number
   disabledAddKinds?: Partial<Record<PosAddKind, boolean>>
+  gewerkAddKinds?: PosAddKind[]
+  documentAddKinds?: PosAddKind[]
   unifiedAdd?: boolean
 }) {
   const isMobile = useIsMobile()
@@ -523,26 +555,21 @@ export function PosTable({
     const activeGroup = parseGroupSortId(activeId)
     const overGroup = parseGroupSortId(overId)
 
-    if (activeGroup && overGroup && onReorderGroup) {
-      onReorderGroup(activeGroup, overGroup)
-      return
-    }
-    if (activeGroup) return
-
-    const overAsGroup = overGroup
-    if (overAsGroup && onDropToGroup) {
-      onDropToGroup(activeId, overAsGroup)
+    // Gewerk-Blöcke verschieben (Drop auf Header oder Position im Ziel-Gewerk)
+    if (activeGroup) {
+      const targetGewerk = overGroup ?? itemGroupById.get(overId) ?? null
+      if (targetGewerk && onReorderGroup) onReorderGroup(activeGroup, targetGewerk)
       return
     }
 
+    // Position auf leeres / anderes Gewerk (Header)
+    if (overGroup && onDropToGroup) {
+      onDropToGroup(activeId, overGroup)
+      return
+    }
+
+    // Position vor/nach anderer Position (inkl. Gewerk-Wechsel — ein atomarer onReorder)
     if (onReorder && itemIds.includes(overId)) {
-      const fromGewerk = itemGroupById.get(activeId)
-      const toGewerk = itemGroupById.get(overId)
-      if (fromGewerk && toGewerk && fromGewerk !== toGewerk && onDropToGroup) {
-        onDropToGroup(activeId, toGewerk)
-        queueMicrotask(() => onReorder(activeId, overId))
-        return
-      }
       onReorder(activeId, overId)
     }
   }
@@ -606,6 +633,7 @@ export function PosTable({
             {addOpen && !unifiedAdd ? (
               <div className="pt2-gewerk-add-panel">
                 <PosAddRow
+                  kinds={gewerkAddKinds}
                   onAdd={(kind) => {
                     onAddKind?.(kind, g.gewerk)
                     setAddOpenFor(null)
@@ -684,9 +712,18 @@ export function PosTable({
           </div>
         )
       })}
-      {onAddKind && !hasGroups && !unifiedAdd ? (
+      {onAddKind && !hasGroups && !unifiedAdd && !documentAddKinds ? (
         <div style={{ padding: '12px 0 4px' }}>
           <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
+        </div>
+      ) : null}
+      {onAddKind && documentAddKinds && !unifiedAdd ? (
+        <div style={{ padding: '12px 0 4px' }}>
+          <PosAddRow
+            kinds={documentAddKinds}
+            onAdd={(kind) => onAddKind(kind)}
+            disabledKinds={disabledAddKinds}
+          />
         </div>
       ) : null}
       {onAddGroup && !unifiedAdd ? (
@@ -725,7 +762,7 @@ export function PosTable({
   return (
     <div className={unifiedAdd ? 'postable2 postable2--unified-add' : 'postable2'}>
       {enableDnd ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={posTableCollision} onDragEnd={onDragEnd}>
           <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             {body}
           </SortableContext>

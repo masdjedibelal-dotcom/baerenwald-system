@@ -19,7 +19,8 @@ import type {
 export type LeistungenTabBulkAction = {
   id: 'zuweisen' | 'erledigt' | 'termin' | string
   label: string
-  onClick: (selectedIds: string[]) => void
+  /** Nach Erfolg (Toast) `clearSelection` aufrufen — Auswahl aufheben. */
+  onClick: (selectedIds: string[], clearSelection: () => void) => void
 }
 
 type ColId = 'bezeichnung' | 'menge' | 'preis' | 'status' | 'gewerk' | 'handwerker' | 'ek'
@@ -30,7 +31,7 @@ const COL_LABELS: Record<ColId, string> = {
   bezeichnung: 'Bezeichnung',
   menge: 'Menge',
   preis: 'Preis',
-  status: 'Status',
+  status: 'Fortschritt',
   gewerk: 'Gewerk',
   handwerker: 'Handwerker',
   ek: 'EK',
@@ -179,6 +180,7 @@ export function LeistungenTab({
   }
 
   const selectedCount = selectedIds.size
+  const clearSelection = () => setSelectedIds(new Set())
 
   function renderLeistungCard(row: LeistungRow) {
     const selected = selectedIds.has(row.id)
@@ -407,12 +409,12 @@ export function LeistungenTab({
               key={a.id}
               type="button"
               variant="secondary"
-              onClick={() => a.onClick(Array.from(selectedIds))}
+              onClick={() => a.onClick(Array.from(selectedIds), clearSelection)}
             >
               {a.label}
             </Button>
           ))}
-          <Button type="button" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+          <Button type="button" variant="ghost" onClick={clearSelection}>
             Aufheben
           </Button>
         </div>

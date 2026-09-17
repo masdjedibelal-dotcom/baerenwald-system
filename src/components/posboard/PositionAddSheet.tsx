@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -16,11 +15,12 @@ import {
   type KatalogVariante,
 } from '@/lib/katalog/katalog-types'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 import { Toggle } from '@/components/ui/Toggle'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { cn } from '@/lib/utils'
 import type { KatalogPickResult } from '@/components/posboard/KatalogPickModal'
 
@@ -46,7 +46,7 @@ export type FreitextDraft = {
 
 export type NachlassDraft = {
   name: string
-  nachlassModus: 'prozent' | 'betrag'
+  nachlassModus: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
   preis: number
 }
 
@@ -57,14 +57,14 @@ const emptyFrei = (gewerk: string): FreiePositionDraft => ({
   einheit: 'Stück',
   preis: 0,
   ust: 19,
-  gewerk: gewerk.trim() || 'Allgemein',
+  gewerk: gewerk.trim(),
   regie: false,
 })
 
 const emptyFreitext = (gewerk: string): FreitextDraft => ({
   name: '',
   beschreibung: '',
-  gewerk: gewerk.trim() || 'Allgemein',
+  gewerk: gewerk.trim(),
 })
 
 const emptyNachlass = (): NachlassDraft => ({
@@ -75,7 +75,7 @@ const emptyNachlass = (): NachlassDraft => ({
 
 /**
  * Position hinzufügen: Desktop Split-over · mobil Bottom Sheet.
- * Chips: Preisliste | Frei | Freitext | Nachlass | (optional) Gewerk.
+ * Chips: Preisliste | Frei — Freitext/Nachlass/Gewerk laufen über PosAddRow.
  */
 export function PositionAddSheet({
   open,
@@ -84,8 +84,11 @@ export function PositionAddSheet({
   preferredGewerkName,
   gewerke = [],
   showUst = true,
-  allowGewerk = true,
-  allowNachlass = true,
+  allowGewerk = false,
+  allowNachlass = false,
+  allowOhneGewerk = false,
+  artikelNetto = 0,
+  artikelBrutto = 0,
   onPickKatalog,
   onAddFrei,
   onAddFreitext,
@@ -98,9 +101,14 @@ export function PositionAddSheet({
   preferredGewerkName?: string | null
   gewerke?: string[]
   showUst?: boolean
-  /** Gewerk-Chip (komplexe Dokumente) */
+  /** Gewerk-Chip (meist aus) — Gewerk läuft über „Gewerk hinzufügen“ */
   allowGewerk?: boolean
   allowNachlass?: boolean
+  /** Leeres Gewerk = „Ohne Gewerk“ (Komplex) */
+  allowOhneGewerk?: boolean
+  /** Für Nachlass „Neuer Gesamtbetrag“ */
+  artikelNetto?: number
+  artikelBrutto?: number
   onPickKatalog: (result: KatalogPickResult) => void
   onAddFrei: (draft: FreiePositionDraft) => void
   onAddFreitext?: (draft: FreitextDraft) => void
@@ -109,7 +117,7 @@ export function PositionAddSheet({
   onAddGewerk?: (name: string) => void
 }) {
   const [mode, setMode] = useState<PositionAddMode>(initialMode)
-  const [pending, startTransition] = useTransition()
+  const [katalogLoading, setKatalogLoading] = useState(false)
   const [rows, setRows] = useState<KatalogPosition[]>([])
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -145,27 +153,36 @@ export function PositionAddSheet({
     setGewerkPick('')
     setGewerkCustom('')
     setGewerkFilter(null)
-    if (initialMode !== 'preisliste') return
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: true })
-      setRows(list)
-      if (preferredGewerkName?.trim()) {
-        const hit = list.find(
-          (p) =>
-            (p.gewerk_name || '').toLowerCase() === preferredGewerkName.trim().toLowerCase()
-        )
-        if (hit) setGewerkFilter(hit.gewerk_id)
-      }
-    })
   }, [open, initialMode, preferredGewerkName])
 
+  /** Katalog lokal laden — kein globales action-busy (hängt sonst nach Gewerk-Sheet). */
   useEffect(() => {
-    if (!open || mode !== 'preisliste' || rows.length) return
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: true })
-      setRows(list)
-    })
-  }, [open, mode, rows.length])
+    if (!open) return
+    if (mode !== 'preisliste' && initialMode !== 'preisliste') return
+    let cancelled = false
+    setKatalogLoading(true)
+    void listKatalogPositionen({ nurAktiv: true })
+      .then((list) => {
+        if (cancelled) return
+        setRows(list)
+        const preferred = preferredGewerkName?.trim()
+        if (preferred) {
+          const hit = list.find(
+            (p) => (p.gewerk_name || '').toLowerCase() === preferred.toLowerCase()
+          )
+          if (hit) setGewerkFilter(hit.gewerk_id)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setKatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, mode, initialMode, preferredGewerkName])
 
   const katalogGewerke = useMemo(() => {
     const m = new Map<string, string>()
@@ -195,22 +212,33 @@ export function PositionAddSheet({
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0], 'de'))
   }, [filtered])
 
-  const gewerkOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...gewerke,
-            preferredGewerkName || '',
-            activeGewerk,
-            frei.gewerk,
-            freitext.gewerk,
-            'Allgemein',
-          ].filter(Boolean)
-        )
-      ),
-    [gewerke, preferredGewerkName, activeGewerk, frei.gewerk, freitext.gewerk]
-  )
+  const gewerkOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        [
+          ...gewerke,
+          preferredGewerkName || '',
+          activeGewerk,
+          frei.gewerk,
+          freitext.gewerk,
+          allowOhneGewerk ? '' : 'Allgemein',
+        ]
+          .map((g) => (g ?? '').trim())
+          .filter((g) => (allowOhneGewerk ? true : Boolean(g)))
+      )
+    )
+    if (allowOhneGewerk) {
+      return ['', ...names.filter(Boolean)]
+    }
+    return names.length ? names : ['Allgemein']
+  }, [
+    gewerke,
+    preferredGewerkName,
+    activeGewerk,
+    frei.gewerk,
+    freitext.gewerk,
+    allowOhneGewerk,
+  ])
 
   const stammdatenGewerke = useMemo(
     () =>
@@ -250,11 +278,18 @@ export function PositionAddSheet({
 
   function confirmFrei() {
     if (!frei.name.trim()) return
+    const fallbackGewerk = allowOhneGewerk
+      ? ''
+      : 'Allgemein'
     onAddFrei({
       ...frei,
       name: frei.name.trim(),
       beschreibung: frei.beschreibung.trim(),
-      gewerk: frei.gewerk.trim() || activeGewerk || preferredGewerkName?.trim() || 'Allgemein',
+      gewerk:
+        frei.gewerk.trim() ||
+        activeGewerk ||
+        preferredGewerkName?.trim() ||
+        fallbackGewerk,
       menge: Number.isFinite(frei.menge) && frei.menge > 0 ? frei.menge : 1,
     })
     onClose()
@@ -396,7 +431,7 @@ export function PositionAddSheet({
     return null
   })()
 
-  const headerConfirmDisabled = confirmDisabled || (mode === 'preisliste' && pending)
+  const headerConfirmDisabled = confirmDisabled || (mode === 'preisliste' && katalogLoading)
 
   return (
     <EditorSheet
@@ -429,8 +464,8 @@ export function PositionAddSheet({
             className="editor-sheet__confirm"
             disabled={headerConfirmDisabled}
             onClick={onConfirm}
-            aria-label="Übernehmen"
-            title="Übernehmen"
+            aria-label="Speichern"
+            title="Speichern"
           >
             <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
           </button>
@@ -479,9 +514,9 @@ export function PositionAddSheet({
             </div>
           ) : null}
 
-          {pending && !rows.length ? (
+          {katalogLoading && !rows.length ? (
             <p className="picker-sheet__empty">Lädt…</p>
-          ) : !pending && !filtered.length ? (
+          ) : !katalogLoading && !filtered.length ? (
             <p className="picker-sheet__empty">Keine Treffer.</p>
           ) : (
             <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">
@@ -580,8 +615,8 @@ export function PositionAddSheet({
               onChange={(e) => setFrei((f) => ({ ...f, gewerk: e.target.value }))}
             >
               {gewerkOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
+                <option key={g || '__ohne__'} value={g}>
+                  {g || 'Ohne Gewerk'}
                 </option>
               ))}
             </select>
@@ -733,36 +768,19 @@ export function PositionAddSheet({
               placeholder="Nachlass"
             />
           </div>
-          <div className="field">
-            <div className="field-label">Art</div>
-            <select
-              className="sel"
-              value={nachlass.nachlassModus}
-              onChange={(e) =>
-                setNachlass((n) => ({
-                  ...n,
-                  nachlassModus: e.target.value as 'prozent' | 'betrag',
-                }))
-              }
-            >
-              <option value="prozent">Prozent vom Netto</option>
-              <option value="betrag">Fester Betrag</option>
-            </select>
-          </div>
-          <div className="field">
-            <div className="field-label">
-              {nachlass.nachlassModus === 'prozent' ? 'Prozent' : 'Betrag netto'}
-            </div>
-            <div className="txt-prefix">
-              <span className="prefix">{nachlass.nachlassModus === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={nachlass.preis}
-                onValueChange={(preis) => setNachlass((n) => ({ ...n, preis }))}
-              />
-            </div>
-          </div>
+          <NachlassModusFields
+            modus={nachlass.nachlassModus as GesamtrabattModus}
+            wert={nachlass.preis}
+            artikelNetto={artikelNetto}
+            artikelBrutto={artikelBrutto}
+            onChange={(next) =>
+              setNachlass((n) => ({
+                ...n,
+                nachlassModus: (next.nachlassModus ?? n.nachlassModus) as NachlassDraft['nachlassModus'],
+                preis: next.preis ?? n.preis,
+              }))
+            }
+          />
         </div>
       ) : null}
 

@@ -62,11 +62,15 @@ export async function buildRechnungPdfBuffer(
     ust_id: kunde.ust_id ?? null,
   }
 
+  const isEingehend = String((row as { richtung?: string | null }).richtung ?? '') === 'eingehend'
+  const datumFallback = String(row.rechnungsdatum ?? '').trim().slice(0, 10) || null
+
   const validMsg = validateRechnungPflichtangaben(firm, kundePflicht, {
-    leistungszeitraum_von: row.leistungszeitraum_von,
-    leistungszeitraum_bis: row.leistungszeitraum_bis,
+    // Eingangsrechnung: Partner-PDF — Zeitraum aus Auftrag/Einreichung ableiten
+    leistungszeitraum_von: row.leistungszeitraum_von || (isEingehend ? datumFallback : null),
+    leistungszeitraum_bis: row.leistungszeitraum_bis || (isEingehend ? datumFallback : null),
     rechnungsdatum: String(row.rechnungsdatum),
-    positionenCount: artikelCount,
+    positionenCount: isEingehend ? Math.max(artikelCount, 1) : artikelCount,
   })
   if (validMsg) return { ok: false, message: validMsg }
 
@@ -77,7 +81,10 @@ export async function buildRechnungPdfBuffer(
   })
 
   try {
-    const buf = await renderRechnungPdfForDetail(row, firm, gewerke, { supabase })
+    const buf = await renderRechnungPdfForDetail(row, firm, gewerke, {
+      supabase,
+      bezugNr,
+    })
     return { ok: true, buffer: buf, rechnungsnummer: row.rechnungsnummer?.trim() || '' }
   } catch (e) {
     return {
@@ -87,16 +94,30 @@ export async function buildRechnungPdfBuffer(
   }
 }
 
+/**
+ * @param options.allocateNummer — Nummer vergeben (Versand / Storno-Gutschrift).
+ *   Default: nur wenn Status nicht Entwurf. Entwürfe ohne Nummer bekommen keine RE-Nr.
+ *   (Sonst Lücken/Kollisionen — Abschlag-PDF-Refresh darf keine Nummern belegen.)
+ */
 export async function persistPdfForRechnung(
-  rechnungId: string
+  rechnungId: string,
+  options?: { allocateNummer?: boolean }
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
   const { data: recMeta } = await supabaseAdmin
     .from('rechnungen')
-    .select('rechnungsnummer, beleg_typ, richtung')
+    .select('rechnungsnummer, beleg_typ, richtung, status')
     .eq('id', rechnungId)
     .maybeSingle()
 
-  if (String(recMeta?.richtung ?? '') !== 'eingehend') {
+  const isEingehend = String(recMeta?.richtung ?? '') === 'eingehend'
+  const isEntwurf =
+    String(recMeta?.status ?? '')
+      .trim()
+      .toLowerCase() === 'entwurf'
+  const allocate =
+    !isEingehend && (options?.allocateNummer === true || (!isEntwurf && options?.allocateNummer !== false))
+
+  if (allocate) {
     const numRes = await ensureRechnungsnummerFuerVersand(
       supabaseAdmin,
       rechnungId,

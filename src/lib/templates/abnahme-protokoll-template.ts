@@ -423,7 +423,6 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
     ${hinweiseHtml(p)}
     ${rechtHtml(p.meta.rechtshinweise)}
     ${unterschriftenHtml(p)}
-    <p style="margin:20px 0 0;font-size:8pt;color:${MUTED};text-align:center;">Qualität. Verlässlichkeit. Natur. — Vielen Dank für Ihr Vertrauen!</p>
   </div>
 </body>
 </html>`

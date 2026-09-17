@@ -5,7 +5,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
@@ -26,6 +26,7 @@ import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpar
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
+import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
@@ -44,10 +45,9 @@ import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { saveKundeCustomFieldValue, setKundeSpam, mergeKunden } from '@/app/actions/kunden'
+import { saveKundeCustomFieldValue, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
-import { runDeleteKunde } from '@/lib/list-actions'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
   buildPortalLoginLink,
@@ -117,6 +117,14 @@ export function KundeDetailClient({
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const t = searchParams.get('tab')?.trim()
+    if (t === 'organisation' || t === 'objekte' || t === 'akte' || t === 'uebersicht') {
+      setTab(t)
+    }
+  }, [searchParams])
   const [pending, startTransition] = useLocalTransition()
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -131,7 +139,6 @@ export function KundeDetailClient({
   const [portalHtml, setPortalHtml] = useState('')
   const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('sie')
 
-  const [spamPending, setSpamPending] = useState(false)
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
   const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
     null
@@ -139,34 +146,13 @@ export function KundeDetailClient({
   const istSpam = Boolean(kunde.ist_spam)
 
   const detailMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items: ActionsMenuItem[] = [
-      {
-        label: istSpam ? 'Spam aufheben' : 'Als Spam markieren',
-        onClick: () => toggleSpam(),
-      },
+    return [
       {
         label: 'Mit anderem Kunden zusammenführen',
         onClick: () => setMergePickerOpen(true),
       },
-      'sep',
-      {
-        label: 'Kunde löschen',
-        danger: true,
-        onClick: () => {
-          void (async () => {
-            try {
-              await runDeleteKunde(kunde.id, router, kundeDisplayName(kunde))
-              showRouteBusy('Kundenliste…')
-              router.push('/kunden')
-            } catch {
-              /* Toast kommt aus runDeleteKunde */
-            }
-          })()
-        },
-      },
     ]
-    return items
-  }, [istSpam, kunde, router])
+  }, [])
 
   useEffect(() => {
     void (async () => {
@@ -182,29 +168,6 @@ export function KundeDetailClient({
   useEffect(() => {
     setKunde(initialKunde)
   }, [initialKunde])
-
-  function toggleSpam() {
-    const next = !istSpam
-    const label = next
-      ? 'Als Spam markieren? Der Kunde kann dann keine Anfragen mehr über den Rechner stellen und sich nicht mehr mit dieser E-Mail anmelden oder registrieren.'
-      : 'Spam-Markierung aufheben? Rechner und Portal-Zugang sind danach wieder möglich.'
-    if (!confirm(label)) return
-    setSpamPending(true)
-    void setKundeSpam(kunde.id, next).then((r) => {
-      setSpamPending(false)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setKunde((k) => ({
-        ...k,
-        ist_spam: next,
-        spam_markiert_am: next ? new Date().toISOString() : null,
-      }))
-      toast.success(next ? 'Als Spam markiert' : 'Spam-Markierung aufgehoben')
-      refresh()
-    })
-  }
 
   function confirmMergeIntoCurrent(other: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>) {
     if (other.id === kunde.id) {
@@ -266,6 +229,22 @@ export function KundeDetailClient({
   }, [kunde, rechnungen])
 
   const zeigtOrganisationTab = istKundeHausverwaltungTyp(kunde.typ)
+
+  const freigabeSettingsValue = useMemo(
+    () => ({
+      notfall_direkt: kunde.notfall_direkt ?? true,
+      freigabe_schwelle_eur:
+        kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
+      hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
+      akut_fall_ids: normalizeAkutFallIds(kunde.akut_fall_ids),
+    }),
+    [
+      kunde.notfall_direkt,
+      kunde.freigabe_schwelle_eur,
+      kunde.hm_auto_zuweisen,
+      kunde.akut_fall_ids,
+    ]
+  )
 
   const kundenStamm = useMemo(() => kundeRechnungsempfaengerAusStammdaten(kunde), [kunde])
 
@@ -491,27 +470,45 @@ export function KundeDetailClient({
       />
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
+          kundeId={kunde.id}
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
           aushangPdfHref={`/api/kunden/${kunde.id}/aushang-pdf`}
+          impressumUrl={kunde.impressum_url}
+          datenschutzUrl={kunde.datenschutz_url}
+          onSaved={(next) => {
+            setKunde((prev) => ({
+              ...prev,
+              impressum_url: next.impressum_url,
+              datenschutz_url: next.datenschutz_url,
+            }))
+          }}
         />
       ) : null}
       {zeigtOrganisationTab ? (
         <FreigabeSettingsCard
           showHmAuto
-          value={{
-            notfall_direkt: kunde.notfall_direkt ?? true,
-            freigabe_schwelle_eur:
-              kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
-            hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
-          }}
-          onSave={async (next) =>
-            saveKundeFreigabeRegeln(kunde.id, {
+          showAkutFaelle
+          value={freigabeSettingsValue}
+          onSave={async (next) => {
+            const akutIds = normalizeAkutFallIds(next.akut_fall_ids)
+            const r = await saveKundeFreigabeRegeln(kunde.id, {
               notfall_direkt: Boolean(next.notfall_direkt),
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
               freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
               hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
+              akut_fall_ids: akutIds,
             })
-          }
+            if (r.ok) {
+              setKunde((prev) => ({
+                ...prev,
+                notfall_direkt: Boolean(next.notfall_direkt),
+                freigabe_schwelle_eur: next.freigabe_schwelle_eur ?? null,
+                hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
+                akut_fall_ids: akutIds,
+              }))
+            }
+            return r
+          }}
           onSaved={() => refresh()}
         />
       ) : null}

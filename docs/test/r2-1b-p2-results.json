@@ -1,0 +1,211 @@
+{
+  "results": [
+    {
+      "id": "P2-F161",
+      "status": "✅",
+      "note": "Amber-Banner sichtbar=true",
+      "fund": null
+    },
+    {
+      "id": "P2-F167",
+      "status": "❌",
+      "note": "9MB Toast/Error=false",
+      "fund": "F-177"
+    },
+    {
+      "id": "P2-F163",
+      "status": "✅",
+      "note": "confirm=true ref=true url=https://staging--baerenwald.netlify.app/melden/bestaetigung?org=Musterverwaltung+Nord&kennung=staging-muster-nord&token=7M-Ggl4k4X98t351HDicenX8gdPwGR6o&ref=024EEEAF&name=ZZTEST+P2deploy1&email=zztest.r2.1b.p2.deploy1%40example.test&telefon=08999993333",
+      "fund": null
+    },
+    {
+      "id": "P2-F162",
+      "status": "✅",
+      "note": "next staging/relativ=true",
+      "fund": null
+    },
+    {
+      "id": "P2-CTA",
+      "status": "✅",
+      "note": "neutral CTA=true"
+    },
+    {
+      "id": "P2-F170",
+      "status": "❌",
+      "note": "website-catch=false new=0",
+      "fund": "F-178"
+    },
+    {
+      "id": "P2-F176",
+      "status": "✅",
+      "note": "3× Redirect bestaetigung: #1=true, #2=true, #3=true",
+      "fund": null
+    },
+    {
+      "id": "P2-DEL-23547a2c",
+      "status": "⚠️",
+      "note": "modal=true toast=true dbGone=false"
+    },
+    {
+      "id": "P2-DEL-130d4aa3",
+      "status": "⚠️",
+      "note": "modal=true toast=true dbGone=false"
+    },
+    {
+      "id": "P2-4a-HV",
+      "status": "⚠️",
+      "note": "Übergabe-Button nicht gefunden — evtl. bereits übergeben"
+    },
+    {
+      "id": "P2-4a-CRM",
+      "status": "⚠️",
+      "note": "Angebot-CTA nach HV=false"
+    },
+    {
+      "id": "P2-4a-wizard",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A1",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A2",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A3",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A4",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A5",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A6",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A7",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4b-A8",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B1",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B2",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B3",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B4",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B5",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4c-B6",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C1",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C2",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C3",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C4",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C5",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4d-C6",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4e-E2E",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4f-E8",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4f-E9",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4f-F7",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4f-F9",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4g-N",
+      "status": "🚫",
+      "note": "In Teil-2-Automation nicht vollständig durchgespielt — Nachlauf"
+    },
+    {
+      "id": "P2-4f-E8",
+      "status": "🚫",
+      "note": "E8 Fehler: locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('input[type=password]') to be visible\n    - waiting for \"https://staging--baerenwald-backend.netlify.app/\" navigation to finish...\n    - navigated to \"https://staging--baerenwald-backend.netlify.app/\"\n"
+    }
+  ],
+  "fundNext": 179,
+  "f176Runs": [
+    true,
+    true,
+    true
+  ]
+}

@@ -59,11 +59,53 @@ function prepareAbnahmePayload(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
 }): { punkte: AbnahmePunkt[]; maengel: AbnahmeMangel[] } {
+  const punkteNorm = input.punkte.map((p) => {
+    const st = String(p.status ?? 'offen').toLowerCase()
+    const status =
+      st === 'ok' || st === 'mangel' || st === 'offen' ? (st as AbnahmePunkt['status']) : 'offen'
+    return { ...p, status }
+  })
   const maengel = normalizeMaengel(
-    input.maengel.length > 0 ? input.maengel : mergeMaengelFromPunkte(input.punkte, [])
+    input.maengel.length > 0 ? input.maengel : mergeMaengelFromPunkte(punkteNorm, [])
   )
-  const punkte = applyPunktStatusFromMaengel(input.punkte, maengel)
+  const punkte = applyPunktStatusFromMaengel(punkteNorm, maengel)
   return { punkte, maengel }
+}
+
+/** Data-URL-Signaturen → Storage (kleinere Meta, zuverlässiges PDF). */
+async function persistAbnahmeSignatureUrls(
+  auftragId: string,
+  meta: AbnahmeProtokollMeta
+): Promise<AbnahmeProtokollMeta> {
+  async function one(
+    raw: string | null | undefined,
+    kind: 'hw' | 'kunde'
+  ): Promise<string | null> {
+    const s = (raw ?? '').trim()
+    if (!s) return null
+    if (!s.startsWith('data:image/')) return s
+    const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i.exec(s)
+    if (!m) return s
+    const mime = m[1]!.toLowerCase()
+    const buf = Buffer.from(m[2]!, 'base64')
+    const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png'
+    const path = `${auftragId}/abnahme-signatur-${kind}-${Date.now()}.${ext}`
+    const { error } = await supabaseAdmin.storage
+      .from('protokolle')
+      .upload(path, buf, { contentType: mime, upsert: true })
+    if (error) {
+      console.warn('[persistAbnahmeSignatureUrls]', kind, error.message)
+      return s
+    }
+    const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
+    return pub.publicUrl || s
+  }
+
+  const [signature_hw_url, signature_kunde_url] = await Promise.all([
+    one(meta.signature_hw_url, 'hw'),
+    one(meta.signature_kunde_url, 'kunde'),
+  ])
+  return { ...meta, signature_hw_url, signature_kunde_url }
 }
 
 async function afterAbnahmePersist(input: {
@@ -177,14 +219,22 @@ async function buildPdfBuffer(input: {
   if (!detail?.kunden) return { ok: false as const, message: 'Auftrag/Kunde nicht gefunden' }
 
   const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-  const buffer = await renderAbnahmeProtokollPdfBuffer(detail, firm, {
-    abnahmeDatum: input.abnahmeDatum,
+  let meta = input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null
+  if (meta) {
+    meta = await persistAbnahmeSignatureUrls(input.auftragId, meta)
+  }
+  const prepared = prepareAbnahmePayload({
     punkte: input.punkte,
     maengel: input.maengel,
-    notizen: input.notizen,
-    meta: input.meta ?? null,
   })
-  return { ok: true as const, buffer, detail }
+  const buffer = await renderAbnahmeProtokollPdfBuffer(detail, firm, {
+    abnahmeDatum: input.abnahmeDatum,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    notizen: input.notizen,
+    meta,
+  })
+  return { ok: true as const, buffer, detail, meta, punkte: prepared.punkte, maengel: prepared.maengel }
 }
 
 async function persistPdf(auftragId: string, buffer: Buffer): Promise<
@@ -291,13 +341,9 @@ async function buildAbnahmeMail(input: {
     input.anrede === 'du' ? `Hallo ${vorname},` : `Guten Tag ${kunde.name?.trim() || vorname},`
   const textHtml = escapeHtml(input.nachricht.trim()).replace(/\n/g, '<br/>')
   const branding = await getMailBranding(supabaseAdmin)
-  const anhangHinweis = mailText(
-    input.anrede,
-    'Das Abnahmeprotokoll findest du im PDF-Anhang.',
-    'Das Abnahmeprotokoll finden Sie im PDF-Anhang.'
-  )
   const html = mailHtmlBase(
-    `${anredeLine}<br/><br/>${textHtml}<p style="font-size:13px;color:#6B7280;margin:16px 0 0;">${anhangHinweis}</p>`,
+    `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 14px;">${escapeHtml(anredeLine)}</p>
+    <p style="font-size:15px;color:#374151;line-height:1.6;margin:0;">${textHtml}</p>`,
     input.betreff.trim(),
     branding,
     undefined,
@@ -508,7 +554,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   const firm = await fetchFirmenEinstellungen(supabaseAdmin)
 
   // Stammdaten + KI-Freitexte (Leistungsumfang / Hinweis) vor PDF
-  const meta = await resolveAbnahmeProtokollMetaForSave(detail, firm, {
+  let meta = await resolveAbnahmeProtokollMetaForSave(detail, firm, {
     meta: input.meta ?? null,
     previousMeta: existing?.meta ?? null,
     punkte: prepared.punkte,
@@ -527,10 +573,15 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   })
   if (!built.ok) return built
 
+  // Signatur-URLs ggf. nach Storage-Upload
+  if (built.meta) meta = built.meta
+  const punktePersist = built.punkte ?? prepared.punkte
+  const maengelPersist = built.maengel ?? prepared.maengel
+
   const stored = await persistPdf(input.auftragId, built.buffer)
   if (!stored.ok) return stored
 
-  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
+  const hatMaengel = countOffeneMaengel(maengelPersist) > 0
   const ebene: AbnahmeProtokollEbene =
     input.ebene ?? (input.handwerkerId?.trim() ? 'handwerker' : 'gesamt')
   const freigabeStatus: AbnahmeFreigabeStatus =
@@ -543,8 +594,8 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   const rowPatch = {
     abnahme_datum: input.abnahmeDatum.slice(0, 10),
     notizen: input.notizen?.trim() || null,
-    punkte: prepared.punkte,
-    maengel: prepared.maengel,
+    punkte: punktePersist,
+    maengel: maengelPersist,
     meta,
     pdf_url: stored.publicUrl,
     protokoll_typ: protokollTyp,
@@ -606,8 +657,8 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   await afterAbnahmePersist({
     auftragId: input.auftragId,
     protokollId,
-    punkte: prepared.punkte,
-    maengel: prepared.maengel,
+    punkte: punktePersist,
+    maengel: maengelPersist,
     prevOffeneMaengel: existing ? countOffeneMaengel(existing.maengel) : 0,
   })
 
@@ -1534,23 +1585,23 @@ export type AbschliessenHwProtokollVorschau = {
   ort: string | null
 }
 
-/** Abschluss-UI: HW-Vorschau wenn Partner-Protokoll vorliegt, sonst manuelle Checkliste. */
+/** Abschluss-UI: HW-Vorschau wenn Partner-Protokoll vorliegt — Abnahme bleibt optional. */
 export async function getAbschliessenKontext(auftragId: string): Promise<{
   mode: 'hw' | 'manual'
   zeilen: AbnahmeHwFreigabeZeile[]
   protokolle: AbschliessenHwProtokollVorschau[]
+  /** Legacy: Freigabe-Gate blockiert Abschluss ohne Abnahme nicht mehr. */
   gateOk: boolean
   gateMessage?: string
 }> {
   const zeilen = await loadAbnahmeHwFreigabeZeilen(auftragId)
-  const gate = kannGesamtabnahmeErzeugen(zeilen)
+  // gateOk immer true — CRM darf ohne HW-Teilabnahme schließen; Abnahme optional.
   if (!hatHwAbnahmeZurAbschlussVorschau(zeilen)) {
     return {
       mode: 'manual',
       zeilen,
       protokolle: [],
-      gateOk: gate.ok,
-      gateMessage: gate.message,
+      gateOk: true,
     }
   }
 
@@ -1584,8 +1635,7 @@ export async function getAbschliessenKontext(auftragId: string): Promise<{
     mode: protokolle.length ? 'hw' : 'manual',
     zeilen,
     protokolle,
-    gateOk: gate.ok,
-    gateMessage: gate.message,
+    gateOk: true,
   }
 }
 

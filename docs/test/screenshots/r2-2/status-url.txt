@@ -1,0 +1,1 @@
+/portal/registrieren?from=melde&meldeToken=dkMROqEiyrxnOHnLQuRjkOGNHNNxiA0-&name=ZZTEST+R2E2E&email=zztest.r2.e2e%40example.test&telefon=08999992222&next=https%3A%2F%2Fbaerenwald.netlify.app%2Fmelden%2Fstatus%2FdkMROqEiyrxnOHnLQuRjkOGNHNNxiA0-

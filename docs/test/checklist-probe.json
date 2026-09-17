@@ -1,0 +1,57 @@
+[
+  {
+    "id": "melde-url",
+    "st": "ok",
+    "note": "MN |  | Musterverwaltung Nord |  | Verwaltung |  | BEREICH |  | Was ist betroffen? |  | Wasser / Rohr / WC |  | tropft, läuft aus, verstopft, vo"
+  },
+  {
+    "id": "branding-bw-leak",
+    "st": "ok",
+    "note": "BW-Text irgendwo"
+  },
+  {
+    "id": "adresse-voraus",
+    "st": "warn",
+    "note": "MN |  | Musterverwaltung Nord |  | Verwaltung |  | BEREICH |  | Was ist betroffen? |  | Wasser / Rohr / WC |  | tropft, läuf"
+  },
+  {
+    "id": "status-bad",
+    "st": "ok",
+    "note": "HTTP 200 · ST |  | Status |  | Verwaltung |  | ! | Link nicht verfügbar |  | Dieser Link ist ungültig oder nicht mehr aktiv. |  | Coo"
+  },
+  {
+    "id": "projekt-bad",
+    "st": "ok",
+    "note": "HTTP 200 · ! | Link nicht verfügbar |  | Dieser Link ist ungültig oder nicht mehr aktiv. |  | Datenschutz · Impressum"
+  },
+  {
+    "id": "nachtrag-bad",
+    "st": "ok",
+    "note": "HTTP 200 · ! | Link nicht verfügbar |  | Dieser Link ist ungültig oder nicht mehr aktiv. |  | Datenschutz · Impressum"
+  },
+  {
+    "id": "suche-leopold",
+    "st": "ok",
+    "note": "Bärenwald | ARBEIT | Dashboard | Vorgänge | Kunden | Handwerker | ORGANISATION | Kalender | KI Analytics | Einstellung"
+  },
+  {
+    "id": "rechner",
+    "st": "ok",
+    "note": "Abbrechen | Bärenwald | 08980955726 | UNSERE VISION | Handwerk neu gedacht. |  | Ein Ansprechpartner der alles koordiniert. Volle Pr"
+  },
+  {
+    "id": "gpt-route",
+    "st": "warn",
+    "note": "https://staging--baerenwald.netlify.app/gpt · Bärenwald | Wie es funktioniert | Leistungen | Ratgeber | FAQ | Information | Kontakt aufnehmen |  | 404 |  | Diese Seit"
+  },
+  {
+    "id": "hv-portal",
+    "st": "ok",
+    "note": "M | MeinBärenwald | VERWALTUNG | Abmelden |  | MUSTERVERWALTUNG NORD |  | + Neuer Vorgang | Dashboard | Vorgänge | 2 | Objekte | Serviceabos | IN "
+  },
+  {
+    "id": "partner-maler",
+    "st": "ok",
+    "note": "B | MeinBärenwald | PARTNER-PORTAL | Abmelden |  | MALER WEISS & SOHN |  | Start | Vorgänge | Firmendaten |  | HANDWERKER |  | Maler Weiß & Sohn |  | Offen: Han"
+  }
+]

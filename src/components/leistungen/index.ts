@@ -1,5 +1,6 @@
 export { LeistungenTab, type LeistungenTabBulkAction } from './LeistungenTab'
 export { LeistungDrawer } from './LeistungDrawer'
+export { LeistungHandwerkerUpdatesAccordion } from './LeistungHandwerkerUpdatesAccordion'
 export { LeistungenMaengelCard } from './LeistungenMaengelCard'
 export {
   leistungenFromAnfrage,

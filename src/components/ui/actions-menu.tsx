@@ -15,6 +15,8 @@ export type ActionsMenuItem =
       icon?: ReactNode
       hint?: string
       danger?: boolean
+      /** Deaktiviert-mit-Grund: sichtbar, nicht klickbar; Grund in `hint` */
+      disabled?: boolean
       onClick: () => void
     }
 
@@ -103,8 +105,11 @@ export function ActionsMenu({
         key={it.label}
         type="button"
         role="menuitem"
-        className={cn('menu-item', it.danger && 'danger')}
+        disabled={it.disabled}
+        title={it.disabled && it.hint ? it.hint : undefined}
+        className={cn('menu-item', it.danger && 'danger', it.disabled && 'opacity-50')}
         onClick={() => {
+          if (it.disabled) return
           setOpen(false)
           it.onClick()
         }}

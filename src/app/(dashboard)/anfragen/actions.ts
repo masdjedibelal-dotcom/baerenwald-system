@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin, LeadDetail, LeadKanal, LeadStatus } from '@/lib/types'
 import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
@@ -32,10 +33,10 @@ export async function updateLeadStatus(
   neuerStatus: LeadStatus,
   notiz?: string | null
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
+  const user = gate.user
 
   const { data: lead, error: fetchErr } = await supabase
     .from('leads')
@@ -65,7 +66,7 @@ export async function updateLeadStatus(
     lead_id: leadId,
     status_alt: alterStatus,
     status_neu: neuerStatus,
-    user_id: user?.id ?? null,
+    user_id: user.id,
     notiz: notiz ?? null,
   })
 
@@ -79,7 +80,7 @@ export async function updateLeadStatus(
     typ: 'status_change',
     titel,
     beschreibung: notiz ?? null,
-    erstellt_von: user?.id ?? null,
+    erstellt_von: user.id,
   })
   if (tlErr) {
     console.warn('lead_timeline:', tlErr.message)
@@ -251,6 +252,8 @@ export type NeueAnfragePayload = {
   auftraggeber_kunde_id?: string | null
   /** HV: Gebäude/Objekt der Meldung */
   kunde_objekt_id?: string | null
+  /** HV: Anlage/Teil am Objekt */
+  objekt_anlage_id?: string | null
   /** HV: Mieter-/Meldername (Vor- + Nachname) */
   melder_name?: string | null
   melder_email?: string | null
@@ -507,10 +510,14 @@ export async function createAnfrage(
   const plzFinal = plz || adresseDb.plz || null
 
   if (!kundeId) {
+    const insertName = (namen.name ?? '').trim()
+    if (!insertName) {
+      return { ok: false, message: 'Bitte Name oder Vor-/Nachname angeben.' }
+    }
     const { data: kundeRow, error: kundeErr } = await supabase
       .from('kunden')
       .insert({
-        name: namen.name,
+        name: insertName,
         vorname: namen.vorname,
         nachname: namen.nachname,
         email: email || null,
@@ -530,7 +537,13 @@ export async function createAnfrage(
       return { ok: false, message: kundeErr?.message ?? 'Kunde konnte nicht angelegt werden.' }
     }
     kundeId = kundeRow.id
-  } else if (hatAnfrageAdresse(adresseFelder)) {
+  } else if (
+    hatAnfrageAdresse(adresseFelder) &&
+    /* HV-Meldung: Leistungsort ist Objekt — HV-Büroadresse nicht überschreiben. */
+    !istHausverwaltung &&
+    !payload.auftraggeber_kunde_id?.trim() &&
+    !payload.kunde_objekt_id?.trim()
+  ) {
     const { error: kUpdErr } = await supabase
       .from('kunden')
       .update({
@@ -574,7 +587,7 @@ export async function createAnfrage(
       const { data: neu, error: neuErr } = await supabase
         .from('kunden')
         .insert({
-          name: null,
+          name: melderName,
           vorname: v || null,
           nachname: n || null,
           email: melderEmail || null,
@@ -620,6 +633,8 @@ export async function createAnfrage(
     }
   }
 
+  const isHvMeldung = istHausverwaltung && Boolean(hvAuftraggeberId)
+
   const { data: leadRow, error: leadErr } = await supabase
     .from('leads')
     .insert({
@@ -627,11 +642,13 @@ export async function createAnfrage(
       ansprechpartner_id: ansprechpartnerId,
       auftraggeber_kunde_id: hvAuftraggeberId,
       kunde_objekt_id: objektId,
+      objekt_anlage_id: payload.objekt_anlage_id?.trim() || null,
       melder_name: melderName,
       melder_email: melderEmail,
       melder_telefon: melderTelefon,
       melder_einheit: melderEinheit,
-      anlass: payload.anlass === 'meldung' ? 'meldung' : 'projekt',
+      anlass: payload.anlass === 'meldung' || isHvMeldung ? 'meldung' : 'projekt',
+      erfassung_von: isHvMeldung ? 'crm' : null,
       kanal: payload.kanal,
       status: 'neu',
       situation: situationFinal,
@@ -641,6 +658,8 @@ export async function createAnfrage(
       preis_min: payload.preis_min ?? null,
       preis_max: payload.preis_max ?? null,
       plz: plzFinal,
+      strasse: adresseDb.strasse,
+      hausnummer: adresseDb.hausnummer,
       zeitraum: payload.zeitraum?.trim() || null,
       zeitraum_von: payload.zeitraum_von?.trim() || null,
       zeitraum_bis: payload.zeitraum_bis?.trim() || null,
@@ -653,6 +672,14 @@ export async function createAnfrage(
       notizen: payload.notizen.trim() || null,
       funnel_daten: funnelDaten,
       freigabe_bypass_grund: freigabeBypassGrund,
+      /** Wie Portal-Mieter-Meldung: HV sieht Ablehnen / Hausmeister / Direkt. */
+      ...(isHvMeldung
+        ? {
+            hv_meldung_status: 'neu',
+            org_freigabe_status: 'nicht_noetig',
+            vorgang_phase: 'eingegangen',
+          }
+        : {}),
       ist_bauprojekt: payload.ist_bauprojekt === true,
       ist_wiederkehrend: payload.ist_wiederkehrend === true,
       wiederkehr_turnus:
@@ -793,12 +820,18 @@ export async function updateAnfrageAusNeuForm(
       nachname: namen.nachname,
       email: email || null,
       telefon: telefon || null,
-      plz: plzFinal,
       typ: kundentyp,
       updated_at: new Date().toISOString(),
     }
-    if (hatAnfrageAdresse(adresseFelder)) {
+    /* HV: Leistungsort nicht auf Kunden-/HV-Adresse schreiben. */
+    if (
+      hatAnfrageAdresse(adresseFelder) &&
+      !istHausverwaltung &&
+      !payload.auftraggeber_kunde_id?.trim() &&
+      !payload.kunde_objekt_id?.trim()
+    ) {
       Object.assign(kundePatch, adresseDb)
+      kundePatch.plz = plzFinal
     }
     const { error: kErr } = await supabase.from('kunden').update(kundePatch).eq('id', kundeId)
     if (kErr) return { ok: false, message: kErr.message }
@@ -812,6 +845,8 @@ export async function updateAnfrageAusNeuForm(
     preis_min: payload.preis_min ?? null,
     preis_max: payload.preis_max ?? null,
     plz: plzFinal,
+    strasse: adresseDb.strasse,
+    hausnummer: adresseDb.hausnummer,
     zeitraum: payload.zeitraum?.trim() || null,
     kundentyp: payload.kundentyp?.trim() || kundentyp,
     kontakt_name: namen.name,
@@ -891,11 +926,9 @@ export async function setLeadAlsAkut(
   const id = leadId?.trim()
   if (!id) return { ok: false, message: 'Anfrage fehlt.' }
 
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet.' }
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
 
   const { data: lead, error: fetchErr } = await supabase
     .from('leads')
@@ -1004,6 +1037,7 @@ export async function updateLeadMelderUndLeistungsort(
     melder_telefon?: string | null
     melder_einheit?: string | null
     kunde_objekt_id?: string | null
+    objekt_anlage_id?: string | null
     /** Optional: Angebot mit gleichem Objekt synchronisieren */
     angebotId?: string | null
   }
@@ -1016,6 +1050,10 @@ export async function updateLeadMelderUndLeistungsort(
     data.kunde_objekt_id === undefined
       ? undefined
       : data.kunde_objekt_id?.trim() || null
+  const anlageId =
+    data.objekt_anlage_id === undefined
+      ? undefined
+      : data.objekt_anlage_id?.trim() || null
 
   const patch: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -1029,11 +1067,12 @@ export async function updateLeadMelderUndLeistungsort(
     patch.melder_einheit = data.melder_einheit?.trim() || null
   }
   if (objektId !== undefined) patch.kunde_objekt_id = objektId
+  if (anlageId !== undefined) patch.objekt_anlage_id = anlageId
 
   // HV-Pipeline sicherstellen, falls Lead aus CRM-FAB ohne Auftraggeber kam
   const { data: leadRow } = await supabase
     .from('leads')
-    .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass')
+    .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass, funnel_daten')
     .eq('id', id)
     .maybeSingle()
   if (!leadRow) return { ok: false, message: 'Anfrage nicht gefunden.' }
@@ -1048,15 +1087,59 @@ export async function updateLeadMelderUndLeistungsort(
     }
   }
 
+  /* Wie Portal-Melde: Lead-Adresse = Objekt-Leistungsort. */
+  if (objektId) {
+    const { data: obj } = await supabase
+      .from('kunden_objekte')
+      .select('strasse, hausnummer, plz, ort')
+      .eq('id', objektId)
+      .maybeSingle()
+    if (obj) {
+      const strasse = (obj.strasse as string | null)?.trim() || null
+      const hausnummer = (obj.hausnummer as string | null)?.trim() || null
+      const plz = (obj.plz as string | null)?.trim() || null
+      const ort = (obj.ort as string | null)?.trim() || null
+      patch.strasse = strasse
+      patch.hausnummer = hausnummer
+      if (plz) patch.plz = plz
+      const prevFd =
+        leadRow.funnel_daten &&
+        typeof leadRow.funnel_daten === 'object' &&
+        !Array.isArray(leadRow.funnel_daten)
+          ? { ...(leadRow.funnel_daten as Record<string, unknown>) }
+          : {}
+      patch.funnel_daten = {
+        ...prevFd,
+        strasse,
+        hausnummer,
+        plz,
+        ort,
+        objekt_strasse: strasse,
+        objekt_hausnummer: hausnummer,
+        objekt_plz: plz,
+        objekt_ort: ort,
+      }
+    }
+  }
+
   const { error } = await supabase.from('leads').update(patch).eq('id', id)
   if (error) return { ok: false, message: error.message }
 
   const angebotId = data.angebotId?.trim()
-  if (angebotId && objektId !== undefined) {
-    await supabase
-      .from('angebote')
-      .update({ kunde_objekt_id: objektId, updated_at: new Date().toISOString() })
-      .eq('id', angebotId)
+  const angebotPatch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  let syncAngebot = false
+  if (objektId !== undefined) {
+    angebotPatch.kunde_objekt_id = objektId
+    syncAngebot = true
+  }
+  if (anlageId !== undefined) {
+    angebotPatch.objekt_anlage_id = anlageId
+    syncAngebot = true
+  }
+  if (angebotId && syncAngebot) {
+    await supabase.from('angebote').update(angebotPatch).eq('id', angebotId)
     revalidatePath(`/angebote/${angebotId}`)
   }
 
@@ -1596,7 +1679,9 @@ export async function softDeleteAnfrage(
   const id = leadId.trim()
   if (!id) return { ok: false, message: 'Anfrage-ID fehlt.' }
 
-  const supabase = createClient()
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const supabase = gate.db
   const [{ count: angCount }, { count: aufCount }] = await Promise.all([
     supabase
       .from('angebote')
@@ -1638,8 +1723,9 @@ export async function deleteAnfrage(
 export async function restoreAnfrage(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { error } = await gate.db
     .from('leads')
     .update({ geloescht_am: null, updated_at: new Date().toISOString() })
     .eq('id', leadId)

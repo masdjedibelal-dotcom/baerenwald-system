@@ -41,6 +41,20 @@ type Props = {
   defaultAdresse?: string | null
   onSaved?: () => void
   typFixed?: KalenderTermin['typ']
+  /** HV-Kanäle: Bestätigungs-Mail standardmäßig aus */
+  defaultMailOff?: boolean
+  leadKanal?: string | null
+}
+
+function isHvKanal(kanal: string | null | undefined): boolean {
+  const k = (kanal ?? '').trim().toLowerCase()
+  return (
+    k === 'hv_melder_link' ||
+    k === 'hv_einladung' ||
+    k === 'hv_direkt' ||
+    k === 'hv_manuell' ||
+    k.startsWith('hv_')
+  )
 }
 
 export function TerminModal({
@@ -55,8 +69,12 @@ export function TerminModal({
   defaultAdresse,
   onSaved,
   typFixed,
+  defaultMailOff,
+  leadKanal,
 }: Props) {
   const initialAdresse = (defaultAdresse?.trim() || defaultPlz?.trim() || '').trim()
+  const mailOff =
+    defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))
   const [typ, setTyp] = useState<KalenderTermin['typ']>(typFixed ?? 'besichtigung')
   const [datum, setDatum] = useState('')
   const [von, setVon] = useState('')
@@ -66,7 +84,7 @@ export function TerminModal({
   const [mitarbeiterId, setMitarbeiterId] = useState('')
   const [team, setTeam] = useState<CrmTeamMitglied[]>([])
   const [teamLoading, setTeamLoading] = useState(false)
-  const [mailToggle, setMailToggle] = useState(true)
+  const [mailToggle, setMailToggle] = useState(!mailOff)
   const [mailDraft, setMailDraft] = useState<TerminMailDraft | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -75,11 +93,13 @@ export function TerminModal({
   useEffect(() => {
     if (!open) return
     setAdresse((defaultAdresse?.trim() || defaultPlz?.trim() || '').trim())
+    setMailToggle(!(defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))))
+    setMailDraft(null)
     setTeamLoading(true)
     void loadCrmTeamFuerTermin()
       .then((list) => setTeam(list))
       .finally(() => setTeamLoading(false))
-  }, [open, defaultAdresse, defaultPlz])
+  }, [open, defaultAdresse, defaultPlz, defaultMailOff, leadKanal])
 
   function reset() {
     setTyp('besichtigung')
@@ -89,7 +109,7 @@ export function TerminModal({
     setAdresse((defaultAdresse?.trim() || defaultPlz?.trim() || '').trim())
     setNotiz('')
     setMitarbeiterId('')
-    setMailToggle(true)
+    setMailToggle(!(defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))))
   }
 
   async function save(sendMail: boolean) {

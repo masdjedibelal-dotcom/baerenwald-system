@@ -140,7 +140,7 @@ export function AbnahmeMaengelBearbeitenFlow({
         Schließen
       </Button>
       <Button type="button" variant="primary" onClick={onDone} disabled={pending}>
-        Fertig
+        Speichern
       </Button>
     </div>
   )
@@ -213,7 +213,8 @@ export function AbnahmeMaengelBearbeitenFlow({
                 extraHint="Mangel-Beschreibung für Abnahme/PDF (kundensichtbar)."
               >
                 <Textarea
-                  rows={2}
+                  long
+                  plain
                   value={m.beschreibung}
                   onChange={(e) => {
                     const next = maengel.map((x) =>

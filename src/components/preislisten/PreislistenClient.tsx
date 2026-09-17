@@ -12,7 +12,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
 import type { Gewerk, Preisliste } from '@/lib/types'
-import { createPreisliste, updatePreisliste } from '@/app/(dashboard)/preislisten/actions'
+import { createPreisliste, updatePreisliste, softDeletePreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { sortPreislistenRows } from '@/lib/preislisten-sort'
 import {
   EINHEIT_CUSTOM,
@@ -22,8 +22,11 @@ import {
 } from '@/lib/preislisten-einheiten'
 import { PreislistenCsvImportModal } from '@/components/preislisten/PreislistenCsvImportModal'
 import type { PreislistenImportResponse } from '@/lib/preislisten-import'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { confirmDelete } from '@/components/ui/confirm-delete'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 
-const COLS = 'minmax(0, 1.6fr) 120px 140px'
+const COLS = 'minmax(0, 1.6fr) 120px 140px auto'
 
 function isPresetEinheit(e: string): boolean {
   return (EINHEIT_VORSCHLAEGE as readonly string[]).includes(e)
@@ -224,6 +227,40 @@ export function PreislistenClient({
     })
   }
 
+  function softDeleteLeistung(row: Preisliste) {
+    confirmDelete(
+      'Leistung löschen?',
+      async () => {
+        const res = await softDeletePreisliste(row.id)
+        if (!res.ok) {
+          toast.error(res.message)
+          throw new Error(res.message)
+        }
+        setRows((prev) => prev.filter((r) => r.id !== row.id))
+        toast.success('Leistung gelöscht')
+        router.refresh()
+      },
+      { sub: row.leistung?.trim() || 'Leistung' }
+    )
+  }
+
+  function leistungMenu(row: Preisliste): EntityMenuItem[] {
+    return [
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openEditLeistung(row),
+      },
+      'sep',
+      {
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        onClick: () => softDeleteLeistung(row),
+      },
+    ]
+  }
+
   function onImportDone(r: PreislistenImportResponse) {
     const fehlerN = r.fehler.length
     toast.success(
@@ -284,6 +321,7 @@ export function PreislistenClient({
                 <div>Leistung</div>
                 <div>Einheit</div>
                 <div>Preis</div>
+                <div />
               </div>
             )}
             {filtered.map((r) => {
@@ -333,6 +371,12 @@ export function PreislistenClient({
                         {preis}
                       </span>
                     </div>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <MockEntityRowMenu items={leistungMenu(r)} title="Leistung" />
+                    </div>
                   </div>
                 )
               }
@@ -351,6 +395,12 @@ export function PreislistenClient({
                   </div>
                   <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>{einheit}</div>
                   <div style={{ color: 'var(--text-2)', fontSize: 'var(--fs-text)' }}>{preis}</div>
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <MockEntityRowMenu items={leistungMenu(r)} title="Leistung" />
+                  </div>
                 </div>
               )
             })}

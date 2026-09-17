@@ -120,7 +120,8 @@ export function gewerkById(gewerke: Gewerk[], gewerkId: string | undefined): Gew
 export async function loadGewerkeAusfuehrung(supabase: SupabaseClient): Promise<Gewerk[]> {
   const { data } = await supabase
     .from('gewerke')
-    .select('id, name, slug, aktiv, ausfuehrung, fachbetrieb_hinweis, ist_bauleistung')
+    .select('id, name, slug, aktiv, ausfuehrung, fachbetrieb_hinweis, ist_bauleistung, sort_order')
+    .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
   return (data ?? []) as Gewerk[]
 }

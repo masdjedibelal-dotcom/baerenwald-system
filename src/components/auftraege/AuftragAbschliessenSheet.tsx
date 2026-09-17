@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   AbnahmeBegehListe,
@@ -21,6 +22,7 @@ import {
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import { emptyAbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
+  buildAbnahmePunkteInitial,
   maengelFromCheckItems,
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
@@ -32,9 +34,10 @@ import type { AuftragPosition } from '@/lib/types'
 type Step = 'loading' | 'hw' | 'frage' | 'checkliste'
 
 /**
- * Auftrag abschließen:
- * - Mit HW-Abnahmeprotokoll: Vorschau + Speichern / Speichern und senden
- * - Ohne HW-Protokoll: Frage → optionale manuelle Checkliste
+ * Auftrag abschließen (Abnahme optional):
+ * - Mit HW-Protokoll: Vorschau übernehmen oder ohne Abnahme schließen
+ * - Ohne HW-Protokoll: Frage → optional manuelle Checkliste oder direkt schließen
+ * Abschluss ohne Abnahme wird nie durch fehlende HW-Teilabnahme blockiert.
  */
 export function AuftragAbschliessenSheet({
   open,
@@ -52,6 +55,7 @@ export function AuftragAbschliessenSheet({
   /** Nach Abschluss ohne Abnahme — z. B. Rechnung öffnen */
   onNachRechnung?: () => void
 }) {
+  const router = useRouter()
   const [pending, setPending] = useState(false)
   const [pendingKind, setPendingKind] = useState<'save' | 'send' | null>(null)
   const [step, setStep] = useState<Step>('loading')
@@ -71,6 +75,7 @@ export function AuftragAbschliessenSheet({
     let cancelled = false
     void getAbschliessenKontext(auftragId).then((ctx) => {
       if (cancelled) return
+      // Nur wenn tatsächlich HW-Protokolle vorliegen — sonst nie Freigabe-Pipeline erzwingen.
       if (ctx.mode === 'hw' && ctx.protokolle.length) {
         setHwProtokolle(ctx.protokolle)
         setStep('hw')
@@ -85,27 +90,17 @@ export function AuftragAbschliessenSheet({
 
   const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
+  function openAbnahmeWizard() {
+    // Kein onClose() vor push: EditorSheet-Cleanup macht sonst history.back()
+    // und frisst die neue URL (wirkt mobil wie „Abnahme starten tut nichts“).
+    router.push(`/auftraege/${auftragId}/abnahme/erstellen`)
+  }
+
   function abschliessenOhneAbnahme() {
     if (pending) return
     setPending(true)
     void actionBusy
       .run('Auftrag wird abgeschlossen…', async () => {
-        const ctx = await getAbschliessenKontext(auftragId)
-        if (ctx.mode === 'hw') {
-          toast.error(
-            'Es liegt ein Handwerker-Abnahmeprotokoll vor — bitte darüber speichern oder senden.'
-          )
-          setHwProtokolle(ctx.protokolle)
-          setStep('hw')
-          return
-        }
-        if (ctx.zeilen.length > 0 && !ctx.gateOk) {
-          toast.error(
-            ctx.gateMessage ||
-              'Eingereichte Teilabnahmen zuerst freigeben, dann abschließen.'
-          )
-          return
-        }
         const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
         if (!r.ok) {
           toast.error(r.message)
@@ -140,8 +135,8 @@ export function AuftragAbschliessenSheet({
           } else {
             toast.success(
               r.sentToKunde
-                ? 'Abnahmeprotokoll an den Kunden gesendet — Auftrag abgeschlossen'
-                : 'Auftrag abgeschlossen (Handwerker-Abnahmeprotokoll)'
+                ? 'Protokoll gesendet — Auftrag abgeschlossen'
+                : 'Auftrag abgeschlossen'
             )
           }
           onClose()
@@ -156,6 +151,17 @@ export function AuftragAbschliessenSheet({
 
   function speichernMitAbnahme(sendToKunde: boolean) {
     if (pending) return
+    const readyPunkte =
+      punkte.length > 0
+        ? punkte
+        : buildAbnahmePunkteInitial({ positionen }).map((p) => ({
+            ...p,
+            status: 'ok' as const,
+          }))
+    if (!readyPunkte.some((p) => p.status === 'ok' || p.status === 'mangel')) {
+      toast.error('Mindestens eine Leistung für die Abnahme auswählen.')
+      return
+    }
     setPendingKind(sendToKunde ? 'send' : 'save')
     setPending(true)
     void actionBusy
@@ -170,7 +176,7 @@ export function AuftragAbschliessenSheet({
           const r = await saveAbnahmeAndAbschliessen({
             auftragId,
             abnahmeDatum: heuteYmd(),
-            punkte,
+            punkte: readyPunkte,
             maengel,
             notizen: notizen.trim() || null,
             meta,
@@ -187,8 +193,8 @@ export function AuftragAbschliessenSheet({
           } else {
             toast.success(
               r.sentToKunde
-                ? 'Abnahmeprotokoll gespeichert und an den Kunden gesendet — Auftrag abgeschlossen'
-                : 'Gesamtabnahme gespeichert — Auftrag abgeschlossen'
+                ? 'Protokoll gesendet — Auftrag abgeschlossen'
+                : 'Abnahme gespeichert — Auftrag abgeschlossen'
             )
           }
           onClose()
@@ -203,7 +209,13 @@ export function AuftragAbschliessenSheet({
 
   if (step === 'loading') {
     return (
-      <EditorSheet open={open} onClose={onClose} title="Auftrag abschließen" size="md">
+      <EditorSheet
+        open={open}
+        onClose={onClose}
+        title="Auftrag abschließen"
+        size="md"
+        manageHistory={false}
+      >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] m-0">Wird geladen…</p>
       </EditorSheet>
     )
@@ -216,8 +228,17 @@ export function AuftragAbschliessenSheet({
         onClose={onClose}
         title="Auftrag abschließen"
         size="lg"
+        manageHistory={false}
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              onClick={abschliessenOhneAbnahme}
+            >
+              Ohne Abnahme
+            </Button>
             <Button
               type="button"
               variant="secondary"
@@ -234,15 +255,22 @@ export function AuftragAbschliessenSheet({
               loading={pending && pendingKind === 'send'}
               onClick={() => speichernMitHwProtokoll(true)}
             >
-              Speichern und senden
+              Senden
             </Button>
           </div>
         }
       >
         <div className="space-y-5">
+          <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed">
+            Handwerker-Protokoll vorhanden — optional übernehmen. Auftrag kann auch ohne
+            Abnahme geschlossen werden.
+          </p>
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}
+          <Button type="button" variant="secondary" onClick={openAbnahmeWizard}>
+            Eigenes Abnahmeprotokoll erstellen
+          </Button>
         </div>
       </EditorSheet>
     )
@@ -255,6 +283,7 @@ export function AuftragAbschliessenSheet({
         onClose={onClose}
         title="Auftrag abschließen"
         size="md"
+        manageHistory={false}
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
             <Button
@@ -263,24 +292,17 @@ export function AuftragAbschliessenSheet({
               disabled={pending}
               onClick={abschliessenOhneAbnahme}
             >
-              Speichern
+              Ohne Abnahme
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              disabled={pending}
-              loading={pending}
-              onClick={() => setStep('checkliste')}
-            >
-              Erstellen
+            <Button type="button" variant="primary" disabled={pending} onClick={openAbnahmeWizard}>
+              Abnahme erstellen
             </Button>
           </div>
         }
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-          Kein Handwerker-Abnahmeprotokoll vorhanden. Soll ein Abnahmeprotokoll mit
-          Leistungs-Checkliste und Mängeln erstellt und in den Dokumenten abgelegt werden?
-          Signatur erfolgt vor Ort / im Portal — nicht hier.
+          Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
+          Abnahmeprotokoll mit Leistungen, Mängeln und Unterschriften erstellen.
         </p>
       </EditorSheet>
     )
@@ -292,6 +314,7 @@ export function AuftragAbschliessenSheet({
       onClose={onClose}
       title="Abnahmeprotokoll"
       size="lg"
+      manageHistory={false}
       dirty={!pending}
       footer={
         <div className="sheet-footer-actions zahlplan-editor-footer">
@@ -311,19 +334,26 @@ export function AuftragAbschliessenSheet({
             loading={pending && pendingKind === 'send'}
             onClick={() => speichernMitAbnahme(true)}
           >
-            Speichern und senden
+            Senden
           </Button>
         </div>
       }
     >
       <div className="space-y-5">
-        <AbnahmeProgressBar done={progress.done} total={progress.total} />
+        <AbnahmeProgressBar done={progress.done} total={progress.total || positionen.length} />
         <div>
           <h3 className="m-0 mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[var(--text-3)]">
             Leistungen
           </h3>
           <AbnahmeBegehListe
-            punkte={punkte}
+            punkte={
+              punkte.length
+                ? punkte
+                : buildAbnahmePunkteInitial({ positionen }).map((p) => ({
+                    ...p,
+                    status: 'ok' as const,
+                  }))
+            }
             onChange={setPunkte}
             katalogPositionen={positionen}
           />
@@ -337,12 +367,16 @@ export function AuftragAbschliessenSheet({
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>
           <Textarea
-            rows={2}
+            long
+            plain
             value={notizen}
             onChange={(e) => setNotizen(e.target.value)}
             placeholder="Optional"
           />
         </label>
+        <Button type="button" variant="ghost" size="sm" onClick={openAbnahmeWizard}>
+          Vollständiges Protokoll mit Unterschriften…
+        </Button>
       </div>
     </EditorSheet>
   )

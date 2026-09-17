@@ -12,18 +12,27 @@ export type KundeListeZeile = Kunde & {
 
 /** Aggregiert nur für die geladenen Kunden-IDs — kein Full-Table-Scan. */
 export async function loadKundenListe(): Promise<KundeListeZeile[]> {
+  try {
+    return await loadKundenListeInner()
+  } catch (e) {
+    console.error('loadKundenListe', e)
+    return []
+  }
+}
+
+async function loadKundenListeInner(): Promise<KundeListeZeile[]> {
   const kundenRes = await withCrmReadFallback(async (db) =>
     db
       .from('kunden')
       .select(
-        'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
+        'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, org_anzeigename, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
       )
       .order('created_at', { ascending: false })
       .limit(500)
   )
   if (kundenRes.error) {
-    // Ältere DBs ohne portal_modus
-    if (/portal_modus/i.test(kundenRes.error.message)) {
+    // Ältere DBs ohne portal_modus / org_anzeigename
+    if (/portal_modus|org_anzeigename/i.test(kundenRes.error.message)) {
       const retry = await withCrmReadFallback(async (db) =>
         db
           .from('kunden')
@@ -65,7 +74,7 @@ async function finalizeKundenListe(kunden: Kunde[]): Promise<KundeListeZeile[]> 
       .select(
         `
         kunde_id, status,
-        angebote(gesamt_fix, gesamt_min, gesamt_max, positionen)
+        angebote(gesamt_fix, gesamt_min, gesamt_max)
       `
       )
       .in('kunde_id', ids)

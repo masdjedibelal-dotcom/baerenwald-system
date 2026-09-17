@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { toast } from '@/components/ui/app-toast'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   deleteKalenderTermin,
   loadTerminLinkAdresse,
@@ -335,12 +336,11 @@ export function KalenderTerminEditorSheet({
 
   function onDelete() {
     if (!termin) return
-    if (!confirm('Termin wirklich löschen?')) return
-    startTransition(async () => {
+    confirmDelete('Termin löschen?', async () => {
       const res = await deleteKalenderTermin(termin.id)
       if (!res.ok) {
         toast.error(res.message)
-        return
+        throw new Error(res.message)
       }
       toast.success('Termin gelöscht')
       onClose()

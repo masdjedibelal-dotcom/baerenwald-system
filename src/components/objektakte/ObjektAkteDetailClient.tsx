@@ -5,23 +5,29 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
 import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeisterCard'
+import { ObjektAnlagenSection } from '@/components/objektakte/ObjektAnlagenSection'
+import { ObjektHistorieSection } from '@/components/objektakte/ObjektHistorieSection'
+import { ObjektUebersichtKpiCard } from '@/components/objektakte/ObjektUebersichtKpiCard'
+import { VersammlungsberichtDialog } from '@/components/objektakte/VersammlungsberichtDialog'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
+import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
-import type { ObjektAkteDetailPayload } from '@/lib/objektakte/types'
-import type { Kunde, KundenObjekt } from '@/lib/types'
+import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
+import type { ObjektAkteDetailPayload, ObjektHistorieRow } from '@/lib/objektakte/types'
+import type { Gewerk, Kunde, KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
-type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'vorgaenge' | 'akte'
+type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'akte'
 
 function objektErbtFreigabe(o: KundenObjekt): boolean {
   return o.freigabe_schwelle_eur == null && o.notfall_direkt == null
@@ -31,7 +37,11 @@ export function ObjektAkteDetailClient({
   kunde,
   objekt,
   akte,
+  historieRows = [],
+  objektLeadIds = [],
+  kpis,
   vorgaengeRows = [],
+  gewerke = [],
 }: {
   kunde: Pick<
     Kunde,
@@ -40,23 +50,48 @@ export function ObjektAkteDetailClient({
     | 'vorname'
     | 'nachname'
     | 'org_kennung'
+    | 'impressum_url'
+    | 'datenschutz_url'
     | 'freigabe_schwelle_eur'
     | 'notfall_direkt'
   >
   objekt: KundenObjekt
   akte: ObjektAkteDetailPayload
+  historieRows?: ObjektHistorieRow[]
+  objektLeadIds?: string[]
+  kpis?: ObjektKpiSnapshot
   vorgaengeRows?: VorgangListeRow[]
+  gewerke?: Gewerk[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
+  const [berichtOpen, setBerichtOpen] = useState(false)
+  const [objektModalOpen, setObjektModalOpen] = useState(false)
+  const jahr = new Date().getFullYear()
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
+  const [objektState, setObjektState] = useState(objekt)
+  const [legalUrls, setLegalUrls] = useState({
+    impressum_url: kunde.impressum_url ?? null,
+    datenschutz_url: kunde.datenschutz_url ?? null,
+  })
 
   useEffect(() => {
     setFreigabeErben(objektErbtFreigabe(objekt))
   }, [objekt.id, objekt.freigabe_schwelle_eur, objekt.notfall_direkt])
 
+  useEffect(() => {
+    setObjektState(objekt)
+  }, [objekt])
+
+  useEffect(() => {
+    setLegalUrls({
+      impressum_url: kunde.impressum_url ?? null,
+      datenschutz_url: kunde.datenschutz_url ?? null,
+    })
+  }, [kunde.id, kunde.impressum_url, kunde.datenschutz_url])
+
   const orgSlug = kunde.org_kennung?.trim().toLowerCase() || null
-  const objektMeldeSlug = objekt.melde_slug?.trim() || null
+  const objektMeldeSlug = objektState.melde_slug?.trim() || null
   const zeigtMeldeLinks = Boolean(orgSlug && objektMeldeSlug)
   const zeigtFreigabe = Boolean(orgSlug)
 
@@ -66,7 +101,10 @@ export function ObjektAkteDetailClient({
       kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
   }
 
-  const adresse = [kundenObjektStrasseZeile(objekt), [objekt.plz, objekt.ort].filter(Boolean).join(' ')]
+  const adresse = [
+    kundenObjektStrasseZeile(objektState),
+    [objektState.plz, objektState.ort].filter(Boolean).join(' '),
+  ]
     .filter(Boolean)
     .join(', ')
 
@@ -94,21 +132,40 @@ export function ObjektAkteDetailClient({
   )
 
   const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
+  const anlagenAnzahl = akte.anlagen.length
 
   const kundeVorgaenge = useMemo(
-    () => vorgaengeRows.filter((r) => r.kundeId === kunde.id),
-    [vorgaengeRows, kunde.id]
+    () =>
+      objektLeadIds.length
+        ? vorgaengeRows.filter((r) => objektLeadIds.includes(r.leadId))
+        : vorgaengeRows.filter((r) => r.kundeId === kunde.id),
+    [vorgaengeRows, kunde.id, objektLeadIds]
   )
 
   const overview = (
     <div className="space-y-4">
+      {kpis ? (
+        <ObjektUebersichtKpiCard
+          kpis={kpis}
+          jahr={jahr}
+          onHistorieClick={() => setTab('historie')}
+          onBerichtClick={() => setBerichtOpen(true)}
+        />
+      ) : null}
       <div className="card">
         <div className="card-h">
           <div className="card-title title">Objektdaten</div>
+          <MockBtn
+            sm
+            kind="ghost"
+            icon="pencil"
+            title="Objektdaten bearbeiten"
+            onClick={() => setObjektModalOpen(true)}
+          />
         </div>
         <div className="card-b">
           <div className="vgid">
-            <div className="vgid-name">{objekt.titel}</div>
+            <div className="vgid-name">{objektState.titel}</div>
             {adresse ? <div className="vgid-meta">{adresse}</div> : null}
             <div className="vgid-chips" style={{ marginTop: 10 }}>
               <span className="vgid-chip ghost">
@@ -138,9 +195,13 @@ export function ObjektAkteDetailClient({
 
       {zeigtMeldeLinks && orgSlug && objektMeldeSlug ? (
         <MeldeLinksCard
+          kundeId={kunde.id}
           orgSlug={orgSlug}
           meldeSlug={objektMeldeSlug}
-          aushangPdfHref={`/api/objekte/${objekt.id}/aushang-pdf`}
+          aushangPdfHref={`/api/objekte/${objektState.id}/aushang-pdf`}
+          impressumUrl={legalUrls.impressum_url}
+          datenschutzUrl={legalUrls.datenschutz_url}
+          onSaved={(next) => setLegalUrls(next)}
         />
       ) : null}
 
@@ -151,12 +212,12 @@ export function ObjektAkteDetailClient({
               ? { notfall_direkt: null, freigabe_schwelle_eur: null }
               : {
                   notfall_direkt:
-                    objekt.notfall_direkt != null
-                      ? Boolean(objekt.notfall_direkt)
+                    objektState.notfall_direkt != null
+                      ? Boolean(objektState.notfall_direkt)
                       : kundeFreigabeDefaults.notfall_direkt,
                   freigabe_schwelle_eur:
-                    objekt.freigabe_schwelle_eur != null
-                      ? Number(objekt.freigabe_schwelle_eur)
+                    objektState.freigabe_schwelle_eur != null
+                      ? Number(objektState.freigabe_schwelle_eur)
                       : null,
                 }
           }
@@ -164,7 +225,7 @@ export function ObjektAkteDetailClient({
           erben={freigabeErben}
           onErbenChange={setFreigabeErben}
           onSave={async (next) =>
-            updateKundenObjektFreigabe(objekt.id, kunde.id, {
+            updateKundenObjektFreigabe(objektState.id, kunde.id, {
               notfall_direkt: next.notfall_direkt,
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
             })
@@ -175,7 +236,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektHausmeisterCard
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         liste={akte.orgHausmeisterListe}
         amObjekt={akte.hausmeisterAmObjekt}
         onChanged={refresh}
@@ -183,7 +244,7 @@ export function ObjektAkteDetailClient({
 
       <ObjektKontakteSection
         kundeId={kunde.id}
-        objektId={objekt.id}
+        objektId={objektState.id}
         kontakte={akte.kontakte.filter((k) => k.rolle !== 'hausmeister')}
         onChanged={refresh}
       />
@@ -205,10 +266,41 @@ export function ObjektAkteDetailClient({
       render: () => (
         <ObjektEinheitenSection
           kundeId={kunde.id}
-          objektId={objekt.id}
+          objektId={objektState.id}
           einheiten={akte.einheiten}
           bewohner={akte.bewohner}
+          verwaltungName={kunde.name}
+          objektLabel={objektState.titel}
           onChanged={refresh}
+        />
+      ),
+    },
+    {
+      id: 'anlagen',
+      label: 'Anlagen & Teile',
+      icon: 'tool',
+      count: anlagenAnzahl || undefined,
+      render: () => (
+        <ObjektAnlagenSection
+          kundeId={kunde.id}
+          objektId={objektState.id}
+          anlagen={akte.anlagen}
+          einheiten={einheiten}
+          gewerke={gewerke}
+          onChanged={refresh}
+        />
+      ),
+    },
+    {
+      id: 'historie',
+      label: 'Historie',
+      icon: 'history',
+      count: historieRows.length || undefined,
+      render: () => (
+        <ObjektHistorieSection
+          rows={historieRows}
+          einheiten={einheiten.map((e) => ({ id: e.id, bezeichnung: e.bezeichnung }))}
+          anlagen={akte.anlagen.map((a) => ({ id: a.id, bezeichnung: a.bezeichnung }))}
         />
       ),
     },
@@ -223,6 +315,7 @@ export function ObjektAkteDetailClient({
             rows={vorgaengeRows}
             embedded
             restrictKundeId={kunde.id}
+            restrictLeadIds={objektLeadIds.length ? objektLeadIds : undefined}
           />
         </Suspense>
       ),
@@ -241,7 +334,7 @@ export function ObjektAkteDetailClient({
       crumbBackHref={`/kunden/${kunde.id}`}
       crumbBackLabel="Zurück zu Details"
       head={{
-        title: objekt.titel,
+        title: objektState.titel,
         titleBadges:
           einheitenAnzahl > 0 ? (
             <MockBadge kind="aktiv">
@@ -255,6 +348,24 @@ export function ObjektAkteDetailClient({
         groups={detailShellGroups}
         value={tab}
         onChange={(id) => setTab(id as ObjektAkteTab)}
+      />
+      <VersammlungsberichtDialog
+        open={berichtOpen}
+        onClose={() => setBerichtOpen(false)}
+        objektId={objektState.id}
+        kundeId={kunde.id}
+      />
+      <KundenObjektModal
+        open={objektModalOpen}
+        onClose={() => setObjektModalOpen(false)}
+        kundeId={kunde.id}
+        verwaltungName={kunde.name}
+        editObjekt={objektState}
+        onSaved={(saved) => {
+          setObjektState(saved)
+          setObjektModalOpen(false)
+          refresh()
+        }}
       />
     </EntityDetailLayout>
   )

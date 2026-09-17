@@ -4,8 +4,9 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Toggle } from '@/components/ui/Toggle'
+import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
@@ -47,45 +48,79 @@ export function PositionModal({
   position,
   onChange,
   onClose,
-  onRemove,
   showUst = true,
   gewerke = [],
+  artikelNetto = 0,
+  artikelBrutto = 0,
 }: {
   position: PosBoardLine
   onChange: (patch: Partial<PosBoardLine>) => void
   onClose: () => void
-  onRemove?: () => void
   showUst?: boolean
   gewerke?: string[]
+  /** Summe der Positionen vor Nachlass (für Zielbetrag) */
+  artikelNetto?: number
+  artikelBrutto?: number
 }) {
   const p = position
   const kind = p.kind ?? 'position'
+  const isFreitext = kind === 'freitext'
   const gewerkOptions = ['', ...Array.from(new Set([...gewerke, p.gewerk, 'Allgemein'].filter(Boolean)))]
+
   const line = posBoardLineNetto(p)
 
   const title =
-    kind === 'freitext'
-      ? p.name || 'Freitext'
-      : kind === 'nachlass'
-        ? p.name || 'Nachlass'
+    kind === 'nachlass'
+      ? p.name || 'Nachlass'
+      : isFreitext
+        ? p.name || 'Freitext'
         : p.name || 'Position'
 
   return (
-    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose}>
-      {onRemove ? (
-        <button
-          type="button"
-          className="mb-3 text-[length:var(--fs-text)] font-medium text-status-cancel-text"
-          onClick={() => {
-            onRemove()
-            onClose()
-          }}
-        >
-          Entfernen
-        </button>
-      ) : null}
-      {kind === 'freitext' ? (
+    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose} confirmLabel="Übernehmen">
+      {kind === 'nachlass' ? (
         <div className="form-grid">
+          <Field label="Bezeichnung" full required>
+            <input
+              className="txt"
+              value={p.name}
+              onChange={(e) => onChange({ name: e.target.value })}
+              placeholder="Nachlass"
+              autoFocus
+            />
+          </Field>
+          <NachlassModusFields
+            modus={(p.nachlassModus ?? 'prozent') as GesamtrabattModus}
+            wert={p.preis}
+            artikelNetto={artikelNetto}
+            artikelBrutto={artikelBrutto}
+            onChange={(next) => {
+              const modus = (next.nachlassModus ?? p.nachlassModus ?? 'prozent') as GesamtrabattModus
+              onChange({
+                ...next,
+                nachlassModus: modus,
+                einheit: modus === 'prozent' ? '%' : '€',
+              })
+            }}
+          />
+        </div>
+      ) : isFreitext ? (
+        <div className="form-grid">
+          <Field label="Gewerk">
+            <select
+              className="sel"
+              value={p.gewerk || ''}
+              onChange={(e) => onChange({ gewerk: e.target.value })}
+            >
+              <option value="">Gewerk wählen…</option>
+              {gewerkOptions.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div />
           <Field label="Überschrift" full>
             <input
               className="txt"
@@ -100,49 +135,10 @@ export function PositionModal({
             value={richTextToEditablePlain(p.beschreibung)}
             onSave={(beschreibung) => onChange({ beschreibung })}
             multiline
-            rows={3}
-            placeholder="z. B. Hinweis zu Ablauf oder Garantie"
+            rows={4}
+            placeholder="Hinweis ohne Preis — z. B. Ablauf oder Garantie"
             sheetContext="detail"
           />
-        </div>
-      ) : kind === 'nachlass' ? (
-        <div className="form-grid">
-          <Field label="Bezeichnung" full required>
-            <input
-              className="txt"
-              value={p.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              placeholder="Nachlass"
-              autoFocus
-            />
-          </Field>
-          <Field label="Art des Nachlasses">
-            <select
-              className="sel"
-              value={p.nachlassModus ?? 'prozent'}
-              onChange={(e) => {
-                const modus = e.target.value as 'prozent' | 'betrag'
-                onChange({
-                  nachlassModus: modus,
-                  einheit: modus === 'prozent' ? '%' : '€',
-                })
-              }}
-            >
-              <option value="prozent">Prozent vom Netto</option>
-              <option value="betrag">Fester Betrag</option>
-            </select>
-          </Field>
-          <Field label={(p.nachlassModus ?? 'prozent') === 'prozent' ? 'Prozent' : 'Betrag netto'}>
-            <div className="txt-prefix">
-              <span className="prefix">{(p.nachlassModus ?? 'prozent') === 'prozent' ? '%' : '€'}</span>
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={p.preis}
-                onValueChange={(preis) => onChange({ preis })}
-              />
-            </div>
-          </Field>
         </div>
       ) : (
         <div className="form-grid">
@@ -239,41 +235,37 @@ export function PositionModal({
             </div>
           </Field>
           <div className="field pos-add-preis-ust">
-            <div className="pos-add-preis-ust__labels">
-              <div className="field-label">
-                {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
-              </div>
-              {showUst !== false ? <div className="field-label">USt.</div> : null}
+            <div className="field-label">
+              {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
             </div>
             <div className="pos-add-preis-ust__row">
-              <div className="txt-prefix pos-add-preis-ust__preis">
+              <div className="input-prefix">
                 <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
                 <ClearableNumberInput
                   className="txt"
                   value={p.preis}
                   onValueChange={(preis) => onChange({ preis })}
-                  min={0}
                 />
               </div>
-              {showUst !== false ? (
+              {showUst ? (
                 <select
-                  className="sel pos-add-preis-ust__ust"
-                  value={String(p.ust != null ? p.ust : 19)}
+                  className="sel"
+                  value={String(p.ust ?? 19)}
                   onChange={(e) => onChange({ ust: Number(e.target.value) })}
-                  aria-label="USt."
+                  aria-label="USt %"
                 >
-                  <option value="19">19%</option>
-                  <option value="7">7%</option>
-                  <option value="0">0%</option>
+                  <option value="19">19 %</option>
+                  <option value="7">7 %</option>
+                  <option value="0">0 %</option>
                 </select>
               ) : null}
             </div>
           </div>
-          <Field label="Zeilensumme">
-            <div style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--green)' }}>
-              {formatEurBetrag(line)}
+          <div className="field full">
+            <div className="field-hint">
+              Zeilensumme netto: <strong>{formatEurBetrag(line)}</strong>
             </div>
-          </Field>
+          </div>
         </div>
       )}
     </EditorSheet>

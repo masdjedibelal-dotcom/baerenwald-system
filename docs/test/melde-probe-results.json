@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://staging--baerenwald.netlify.app/melden/staging-muster-nord",
+    "status": 200,
+    "text": "MN Musterverwaltung Nord Verwaltung BEREICH Was ist betroffen? Wasser / Rohr / WC tropft, läuft aus, verstopft, von oben Heizung / Warmwasser kalt, geht nicht, kein Warmwasser Strom / Sicherung kein Strom, fliegt raus, steckt nicht Fenster / Tür klemmt, undicht, Schlo"
+  },
+  {
+    "url": "https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10",
+    "status": 200,
+    "text": "MN Musterverwaltung Nord Verwaltung BEREICH Was ist betroffen? Wasser / Rohr / WC tropft, läuft aus, verstopft, von oben Heizung / Warmwasser kalt, geht nicht, kein Warmwasser Strom / Sicherung kein Strom, fliegt raus, steckt nicht Fenster / Tür klemmt, undicht, Schlo"
+  },
+  {
+    "url": "https://staging--baerenwald.netlify.app/melden/baerenwald-muenchen/haus-muenchen",
+    "status": 200,
+    "text": "BM Bärenwald München Verwaltung BEREICH Was ist betroffen? Wasser / Rohr / WC tropft, läuft aus, verstopft, von oben Heizung / Warmwasser kalt, geht nicht, kein Warmwasser Strom / Sicherung kein Strom, fliegt raus, steckt nicht Fenster / Tür klemmt, undicht, Schloss, "
+  },
+  {
+    "url": "https://staging--baerenwald.netlify.app/melden/staging-muster-sued/staging-tegernseer-40",
+    "status": 200,
+    "text": "MS Musterverwaltung Süd Verwaltung BEREICH Was ist betroffen? Wasser / Rohr / WC tropft, läuft aus, verstopft, von oben Heizung / Warmwasser kalt, geht nicht, kein Warmwasser Strom / Sicherung kein Strom, fliegt raus, steckt nicht Fenster / Tür klemmt, undicht, Schlos"
+  }
+]

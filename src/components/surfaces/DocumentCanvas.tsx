@@ -8,7 +8,7 @@ import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
-import { editorSheetStackDepth } from '@/lib/surfaces/editor-sheet-history'
+import { editorSheetStackDepth, shouldIgnoreSuppressedEditorSheetPop } from '@/lib/surfaces/editor-sheet-history'
 import { cn } from '@/lib/utils'
 
 export type DocumentCanvasProps = {
@@ -48,6 +48,8 @@ export type DocumentCanvasProps = {
    * Auf eigenen Routes (`/angebote/neu`) aus — sonst kämpft die History mit PickerSheets.
    */
   manageHistory?: boolean
+  /** Ungespeicherte Änderungen — beforeunload + Confirm bei Browser-Zurück */
+  draftDirty?: boolean
   /** Vollflächiger Lade-Overlay (z. B. Versand) */
   busy?: boolean
   busyLabel?: string
@@ -55,7 +57,8 @@ export type DocumentCanvasProps = {
 
 /**
  * Surface A — Dokument-Flow (Angebot/RE/Abnahme).
- * S9: X = schließen (Caller speichert Entwurf); Verwerfen nur über DocBar + Confirm.
+ * S9: X = schließen (Caller speichert Entwurf still); Caller zeigt `toast.autoSaved` bei Erfolg.
+ * Verwerfen nur über DocBar + Confirm.
  * S10: Back schließt Canvas wenn History gesetzt.
  */
 export function DocumentCanvas({
@@ -77,6 +80,7 @@ export function DocumentCanvas({
   className,
   portal = true,
   manageHistory = true,
+  draftDirty = false,
   busy,
   busyLabel,
 }: DocumentCanvasProps) {
@@ -89,10 +93,23 @@ export function DocumentCanvas({
   const bodyRef = useRef<HTMLDivElement>(null)
   const historyPushed = useRef(false)
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftDirtyRef = useRef(draftDirty)
+  draftDirtyRef.current = draftDirty
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  /* Tab schließen / Reload bei ungespeicherten Änderungen */
+  useEffect(() => {
+    if (!open || !draftDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [open, draftDirty])
 
   /* Speichern/Laden: Soft-Keyboard zu — sonst bleibt Fokus im Feld unter dem Overlay */
   useEffect(() => {
@@ -126,29 +143,57 @@ export function DocumentCanvas({
   }, [])
 
   useEffect(() => {
-    if (!open || !mounted || !portal || !manageHistory) return
-    window.history.pushState({ documentCanvas: true }, '')
-    historyPushed.current = true
+    if (!open || !mounted || !portal) return
+
     const onPop = (e: PopStateEvent) => {
+      if (shouldIgnoreSuppressedEditorSheetPop()) return
       // Sheet geschlossen → wir landen wieder auf Canvas-State → offen lassen
-      const st = e.state as { documentCanvas?: boolean } | null
+      const st = e.state as { documentCanvas?: boolean; editorSheet?: string } | null
       if (st?.documentCanvas) {
         historyPushed.current = true
         return
       }
+      // Offenes EditorSheet (Kunde/Kontakt/…) besitzt den Back — Canvas nicht stehlen
       if (editorSheetStackDepth() > 0) return
-      historyPushed.current = false
+
+      /*
+       * History-Eintrag ist weg (Back). Parent (Wizard) zeigt bei Dirty das
+       * Speichern-Confirm — History wiederherstellen, sonst wirkt „Übernehmen“
+       * im Kind-Sheet wie Wizard-Schließen.
+       */
+      window.history.pushState({ documentCanvas: true }, '')
+      historyPushed.current = true
       handleCloseRef.current()
     }
+
     window.addEventListener('popstate', onPop)
+
+    if (manageHistory || draftDirtyRef.current) {
+      window.history.pushState({ documentCanvas: true }, '')
+      historyPushed.current = true
+    }
+
     return () => {
       window.removeEventListener('popstate', onPop)
       if (historyPushed.current) {
         historyPushed.current = false
-        window.history.back()
+        // Nicht backen solange Sheets offen — sonst schließt deren History den Canvas
+        if (editorSheetStackDepth() === 0) {
+          window.history.back()
+        }
       }
     }
+    // draftDirty absichtlich nicht in deps: sonst Cleanup+back bei Kontakt-Übernehmen
   }, [open, mounted, portal, manageHistory])
+
+  /* Spät dirty geworden (z. B. Feld geändert) — History nachziehen, ohne Re-Init */
+  useEffect(() => {
+    if (!open || !mounted || !portal || manageHistory) return
+    if (!draftDirty || historyPushed.current) return
+    if (editorSheetStackDepth() > 0) return
+    window.history.pushState({ documentCanvas: true }, '')
+    historyPushed.current = true
+  }, [open, mounted, portal, manageHistory, draftDirty])
 
   useOverlayChromeLock(Boolean(open && mounted))
 

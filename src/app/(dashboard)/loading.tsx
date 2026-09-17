@@ -1,5 +1,5 @@
 import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
 
 export default function DashboardLoading() {
-  return <CrmPageLoading />
+  return <CrmPageLoading variant="list" label="Dashboard wird geladen …" />
 }

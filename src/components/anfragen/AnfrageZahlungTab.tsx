@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
@@ -28,14 +29,14 @@ export function AnfrageZahlungTab({
 
   const cta =
     onWeitereRechnung != null ? (
-      <button
-        type="button"
-        className="btn ghost sm"
+      <MockBtn
+        sm
+        kind="secondary"
         disabled={weitereRechnungDisabled}
         onClick={onWeitereRechnung}
       >
         Weitere Rechnung
-      </button>
+      </MockBtn>
     ) : null
 
   if (aktiv.length === 0) {
@@ -54,16 +55,6 @@ export function AnfrageZahlungTab({
               ? 'Weitere Rechnung legt eine neue Rechnung am Vorgang an — ohne Umweg über den Auftrag.'
               : 'Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten Schritt fest.'}
           </div>
-          {onWeitereRechnung ? (
-            <button
-              type="button"
-              className="btn primary mt-3"
-              disabled={weitereRechnungDisabled}
-              onClick={onWeitereRechnung}
-            >
-              Weitere Rechnung
-            </button>
-          ) : null}
         </div>
       </MockCard>
     )

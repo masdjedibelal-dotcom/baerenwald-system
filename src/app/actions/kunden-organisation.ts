@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
+import { normalizeOrgHttpUrl } from '@/lib/org/melde-legal-urls'
 import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
 import type { FreigabeModus, PortalModus } from '@/lib/types'
 
@@ -11,6 +12,8 @@ export type SaveKundeOrganisationInput = {
   org_kennung?: string | null
   org_anzeigename?: string | null
   org_logo_url?: string | null
+  impressum_url?: string | null
+  datenschutz_url?: string | null
   freigabe_modus: FreigabeModus
   freigabe_schwelle_eur?: number | null
   notfall_direkt: boolean
@@ -73,6 +76,40 @@ export async function saveKundeOrganisation(
   if (!unique.ok) return unique
 
   const freigabeModus: FreigabeModus = input.freigabe_modus === 'direkt' ? 'direkt' : 'freigabe'
+
+  let impressumUrl: string | null | undefined
+  let datenschutzUrl: string | null | undefined
+  if (input.impressum_url !== undefined) {
+    const raw = input.impressum_url?.trim() || ''
+    if (!raw) {
+      impressumUrl = null
+    } else {
+      const n = normalizeOrgHttpUrl(raw)
+      if (!n) {
+        return {
+          ok: false,
+          message: 'Impressum-URL ungültig (z. B. www.firma.de/impressum).',
+        }
+      }
+      impressumUrl = n
+    }
+  }
+  if (input.datenschutz_url !== undefined) {
+    const raw = input.datenschutz_url?.trim() || ''
+    if (!raw) {
+      datenschutzUrl = null
+    } else {
+      const n = normalizeOrgHttpUrl(raw)
+      if (!n) {
+        return {
+          ok: false,
+          message: 'Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).',
+        }
+      }
+      datenschutzUrl = n
+    }
+  }
+
   const payload: Record<string, unknown> = {
     portal_modus: 'organisation',
     org_kennung: slug,
@@ -83,6 +120,8 @@ export async function saveKundeOrganisation(
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
     kleinreparaturen_ohne_angebot: Boolean(input.kleinreparaturen_ohne_angebot),
   }
+  if (impressumUrl !== undefined) payload.impressum_url = impressumUrl
+  if (datenschutzUrl !== undefined) payload.datenschutz_url = datenschutzUrl
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {
@@ -108,6 +147,56 @@ export async function saveKundeOrganisation(
   return { ok: true }
 }
 
+/** Nur Impressum-/Datenschutz-URLs (HV-Übersicht Links-Card). */
+export async function saveKundeMeldeLegalUrls(
+  kundeId: string,
+  input: {
+    impressum_url: string | null
+    datenschutz_url: string | null
+  }
+): Promise<
+  | { ok: true; impressum_url: string | null; datenschutz_url: string | null }
+  | { ok: false; message: string }
+> {
+  const id = kundeId?.trim()
+  if (!id) return { ok: false, message: 'Kunde fehlt.' }
+
+  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
+    db.from('kunden').select('typ').eq('id', id).maybeSingle()
+  )
+  if (kundeErr) return { ok: false, message: kundeErr.message }
+  if (!istKundeHausverwaltungTyp((kundeRow as { typ?: string } | null)?.typ)) {
+    return { ok: false, message: 'Legal-Links nur für Hausverwaltung.' }
+  }
+
+  const impressumRaw = input.impressum_url?.trim() || ''
+  const datenschutzRaw = input.datenschutz_url?.trim() || ''
+  const impressumUrl = impressumRaw ? normalizeOrgHttpUrl(impressumRaw) : null
+  const datenschutzUrl = datenschutzRaw ? normalizeOrgHttpUrl(datenschutzRaw) : null
+
+  if (impressumRaw && !impressumUrl) {
+    return { ok: false, message: 'Impressum-URL ungültig (z. B. www.firma.de/impressum).' }
+  }
+  if (datenschutzRaw && !datenschutzUrl) {
+    return { ok: false, message: 'Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).' }
+  }
+
+  const { error } = await withCrmReadFallback(async (db) =>
+    db
+      .from('kunden')
+      .update({
+        impressum_url: impressumUrl,
+        datenschutz_url: datenschutzUrl,
+      })
+      .eq('id', id)
+  )
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/kunden')
+  revalidatePath(`/kunden/${id}`)
+  return { ok: true, impressum_url: impressumUrl, datenschutz_url: datenschutzUrl }
+}
+
 /** Nur Freigabe-Regeln (HV-Übersicht) — ohne Org-Kennung/Logo. */
 export async function saveKundeFreigabeRegeln(
   kundeId: string,
@@ -116,6 +205,7 @@ export async function saveKundeFreigabeRegeln(
     notfall_direkt: boolean
     freigabe_modus?: FreigabeModus
     hm_auto_zuweisen?: boolean
+    akut_fall_ids?: string[] | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = kundeId?.trim()
@@ -137,6 +227,8 @@ export async function saveKundeFreigabeRegeln(
         ? 'direkt'
         : 'freigabe'
 
+  const { normalizeAkutFallIds } = await import('@/lib/org/sofortmassnahme-faelle')
+
   const payload: Record<string, unknown> = {
     freigabe_modus: freigabeModus,
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
@@ -145,14 +237,30 @@ export async function saveKundeFreigabeRegeln(
   if (input.hm_auto_zuweisen !== undefined) {
     payload.hm_auto_zuweisen = Boolean(input.hm_auto_zuweisen)
   }
+  if (input.akut_fall_ids !== undefined) {
+    payload.akut_fall_ids = normalizeAkutFallIds(input.akut_fall_ids)
+  }
 
   const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
   if (error) {
-    if (/hm_auto_zuweisen/i.test(error.message)) {
-      const { hm_auto_zuweisen: _drop, ...withoutHm } = payload
+    const msg = error.message ?? ''
+    // akut_fall_ids nie still droppen — sonst Toast „ok“, Liste nach Reload leer
+    if (/akut_fall_ids/i.test(msg)) {
+      return {
+        ok: false,
+        message:
+          'Sofortmaßnahme-Fälle konnten nicht gespeichert werden (Spalte akut_fall_ids fehlt oder Schema-Cache). Bitte Migration anwenden bzw. API neu laden.',
+      }
+    }
+    let nextPayload = payload
+    if (/hm_auto_zuweisen/i.test(msg)) {
+      const { hm_auto_zuweisen: _drop, ...withoutHm } = nextPayload
       void _drop
+      nextPayload = withoutHm
+    }
+    if (nextPayload !== payload) {
       const retry = await withCrmReadFallback(async (db) =>
-        db.from('kunden').update(withoutHm).eq('id', id)
+        db.from('kunden').update(nextPayload).eq('id', id)
       )
       if (retry.error) return { ok: false, message: retry.error.message }
     } else {

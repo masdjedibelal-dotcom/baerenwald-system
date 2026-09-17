@@ -1,12 +1,13 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { fachbegriff, type FachbegriffKey } from '@/lib/crm/fachbegriffe'
 import { cn } from '@/lib/utils'
 
 /**
- * Inline-Label mit nativem Tooltip (title) aus dem Fachbegriff-Glossar.
- * Für Chips, Badges und kurze Labels — kein Overlay-Modal.
+ * Inline-Label mit MockInfoTip aus dem Fachbegriff-Glossar.
+ * Für Chips, Badges und kurze Labels.
  */
 export function FachbegriffHint({
   term,
@@ -20,8 +21,9 @@ export function FachbegriffHint({
   as?: 'span' | 'div'
 }) {
   return (
-    <Comp className={cn(className)} title={fachbegriff(term)}>
+    <Comp className={cn('inline-flex items-center gap-1', className)}>
       {children}
+      <MockInfoTip tip={fachbegriff(term)} label={`Hinweis zu ${term}`} />
     </Comp>
   )
 }

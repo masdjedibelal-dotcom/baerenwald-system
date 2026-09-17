@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { LIST } from '@/lib/crm-labels'
+import { exportSimpleCsv } from '@/lib/mock-list-export'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -14,11 +19,13 @@ import {
   deleteEinheitBewohner,
   updateEinheitBewohner,
 } from '@/app/actions/objektakte-actions'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { EinheitBewohner, ObjektEinheit } from '@/lib/objektakte/types'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
+import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
-const COLS = 'minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr) 44px'
+const BEWOHNER_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px'
 
 export function ObjektBewohnerSection({
   kundeId,
@@ -33,6 +40,7 @@ export function ObjektBewohnerSection({
   bewohner: EinheitBewohner[]
   onChanged: () => void
 }) {
+  const isMobile = useIsMobile()
   const [liste, setListe] = useState(initial)
   const [modalOpen, setModalOpen] = useState(false)
   const [edit, setEdit] = useState<EinheitBewohner | null>(null)
@@ -44,6 +52,11 @@ export function ObjektBewohnerSection({
   const [email, setEmail] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<EinheitBewohner | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   const einheitOptions = useMemo(
     () => [
@@ -56,6 +69,47 @@ export function ObjektBewohnerSection({
   useEffect(() => {
     setListe(initial)
   }, [initial])
+
+  useEffect(() => {
+    setSelected((prev) => {
+      const ids = new Set(liste.map((b) => b.id))
+      let changed = false
+      const next: Record<string, boolean> = {}
+      for (const [id, on] of Object.entries(prev)) {
+        if (!ids.has(id)) {
+          changed = true
+          continue
+        }
+        if (on) next[id] = true
+      }
+      return changed ? next : prev
+    })
+  }, [liste])
+
+  const selectedIds = useMemo(
+    () => Object.keys(selected).filter((id) => selected[id]),
+    [selected]
+  )
+  const selectedCount = selectedIds.length
+  const selectedRows = useMemo(
+    () => liste.filter((b) => selected[b.id]),
+    [liste, selected]
+  )
+  const allSelected = liste.length > 0 && selectedCount === liste.length
+
+  function toggleSel(id: string) {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected({})
+      return
+    }
+    const next: Record<string, boolean> = {}
+    for (const b of liste) next[b.id] = true
+    setSelected(next)
+  }
 
   function openNeu() {
     setEdit(null)
@@ -77,6 +131,11 @@ export function ObjektBewohnerSection({
     setErr(null)
     setDirty(false)
     setModalOpen(true)
+  }
+
+  function openBearbeitenBulk() {
+    if (selectedRows.length !== 1) return
+    openBearbeiten(selectedRows[0]!)
   }
 
   function speichern() {
@@ -121,38 +180,145 @@ export function ObjektBewohnerSection({
       }
       setDirty(false)
       setModalOpen(false)
+      setSelected({})
       onChanged()
     })
   }
 
-  function entfernen(b: EinheitBewohner) {
-    if (!confirm(`Bewohner „${b.name}“ entfernen?`)) return
-    startTransition(async () => {
-      const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
+  function bulkExport() {
+    exportSimpleCsv(
+      'bewohner-auswahl',
+      selectedRows.map((b) => ({
+        Name: b.name,
+        Einheit: b.objekt_einheiten?.bezeichnung ?? '',
+        Telefon: b.telefon ?? '',
+        Email: b.email ?? '',
+      }))
+    )
+  }
+
+  async function runBulkDelete() {
+    if (!selectedRows.length || bulkDeletePending) return
+    setBulkDeletePending(true)
+    try {
+      const failed: string[] = []
+      for (const b of selectedRows) {
+        const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
+        if (!r.ok) {
+          failed.push(b.name)
+          continue
+        }
+        setListe((prev) => prev.filter((x) => x.id !== b.id))
+      }
+      setSelected({})
+      setBulkDeleteOpen(false)
+      if (failed.length) {
+        toast.error(
+          failed.length === 1
+            ? `„${failed[0]}“ konnte nicht gelöscht werden.`
+            : `${failed.length} Bewohner konnten nicht gelöscht werden.`
+        )
+      } else {
+        toast.success(
+          selectedRows.length === 1
+            ? 'Bewohner gelöscht'
+            : `${selectedRows.length} Bewohner gelöscht`
+        )
+      }
+      onChanged()
+    } finally {
+      setBulkDeletePending(false)
+    }
+  }
+
+  async function runSingleDelete() {
+    if (!deleteTarget || deletePending) return
+    setDeletePending(true)
+    try {
+      const r = await deleteEinheitBewohner(kundeId, objektId, deleteTarget.id)
       if (!r.ok) {
         toast.error(r.message)
         return
       }
-      setListe((prev) => prev.filter((x) => x.id !== b.id))
-      toast.success('Bewohner entfernt')
+      setListe((prev) => prev.filter((x) => x.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      setSelected((prev) => {
+        const next = { ...prev }
+        delete next[deleteTarget.id]
+        return next
+      })
+      toast.success('Bewohner gelöscht')
       onChanged()
-    })
+    } finally {
+      setDeletePending(false)
+    }
   }
 
-  function rowMenuItems(b: EinheitBewohner): EntityMenuItem[] {
+  function bewohnerRowMenu(b: EinheitBewohner): EntityMenuItem[] {
     return [
-      { icon: 'pencil', label: 'Bearbeiten', onClick: () => openBearbeiten(b) },
+      {
+        icon: 'pencil',
+        label: 'Bearbeiten',
+        onClick: () => openBearbeiten(b),
+      },
       'sep',
       {
         icon: 'trash',
         label: 'Löschen',
         danger: true,
-        onClick: () => {
-          if (pending) return
-          entfernen(b)
-        },
+        onClick: () => setDeleteTarget(b),
       },
     ]
+  }
+
+  function rowBody(b: EinheitBewohner) {
+    const kontaktZeile = [b.telefon?.trim(), b.email?.trim()].filter(Boolean).join(' · ') || '—'
+    const einheitLabel = b.objekt_einheiten?.bezeichnung ?? 'Einheit'
+    const isChecked = Boolean(selected[b.id])
+    return (
+      <div
+        key={b.id}
+        className={cn(
+          isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row ap-list__row--select',
+          isChecked && 'is-checked'
+        )}
+        style={isMobile ? undefined : { gridTemplateColumns: BEWOHNER_LIST_COLS }}
+      >
+        <ListRowCheck
+          checked={isChecked}
+          onToggle={() => toggleSel(b.id)}
+          title={`${b.name} auswählen`}
+        />
+        <button
+          type="button"
+          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
+          onClick={() => openBearbeiten(b)}
+        >
+          {isMobile ? (
+            <>
+              <div className="ap-mobile-card__top">
+                <span className="ap-mobile-card__name">{b.name}</span>
+              </div>
+              <div className="ap-mobile-card__meta">{einheitLabel}</div>
+              <div className="ap-mobile-card__meta">{kontaktZeile}</div>
+            </>
+          ) : (
+            <>
+              <span className="ap-list__name-cell">{b.name}</span>
+              <span className="ap-list__dim">{einheitLabel}</span>
+              <span className="ap-list__dim">{kontaktZeile}</span>
+            </>
+          )}
+        </button>
+        <div
+          className="row-actions always"
+          onClick={(e) => e.stopPropagation()}
+          style={{ justifyContent: 'flex-end' }}
+        >
+          <MockEntityRowMenu items={bewohnerRowMenu(b)} title={b.name} />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -161,65 +327,134 @@ export function ObjektBewohnerSection({
         title={liste.length ? `Bewohner · ${liste.length}` : 'Bewohner'}
         icon="users"
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openNeu} disabled={einheiten.length === 0}>
-            Hinzufügen
+          <MockBtn
+            sm
+            kind="primary"
+            icon="plus"
+            onClick={openNeu}
+            disabled={einheiten.length === 0}
+          >
+            {LIST.hinzufuegen}
           </MockBtn>
         }
       >
         <p className="mb-3 text-[length:var(--fs-meta)] leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Bewohner je Einheit — Einheiten werden im HV-Portal gepflegt.
         </p>
+
+        {selectedCount > 0 ? (
+          <ListBulkBar
+            selectedCount={selectedCount}
+            onClear={() => setSelected({})}
+            onExport={bulkExport}
+            onDelete={() => setBulkDeleteOpen(true)}
+            onToggleAll={toggleAll}
+            allSelected={allSelected}
+            onEdit={openBearbeitenBulk}
+            deleteDisabled={bulkDeletePending || pending}
+            deletePending={bulkDeletePending}
+            className="mb-3"
+          />
+        ) : null}
+
         {einheiten.length === 0 ? (
           <MockEmpty
             icon="users"
             title="Noch keine Einheiten"
-            hint="Bitte im Auftraggeber-Portal unter „Einheiten“ anlegen"
+            hint="Bitte zuerst Einheiten anlegen"
           />
         ) : liste.length === 0 ? (
-          <MockEmpty icon="users" title="Noch keine Bewohner" hint="Bewohner hinzufügen" />
+          <MockEmpty
+            icon="users"
+            title="Noch keine Bewohner"
+            hint="Über „+“ oben hinzufügen."
+          />
+        ) : isMobile ? (
+          <div className="ap-cards vg-selectmode">{liste.map(rowBody)}</div>
         ) : (
-          <div className="listcard">
-            <div className="list-row head" style={{ gridTemplateColumns: COLS }} aria-hidden>
-              <div>Name</div>
-              <div>Einheit</div>
-              <div>Kontakt</div>
-              <div />
+          <div className="ap-list vg-selectmode">
+            <div
+              className="ap-list__head ap-list__head--select"
+              style={{ gridTemplateColumns: BEWOHNER_LIST_COLS }}
+            >
+              <span aria-hidden />
+              <span>Name</span>
+              <span>Einheit</span>
+              <span>Kontakt</span>
+              <span aria-hidden />
             </div>
-            {liste.map((b) => {
-              const kontaktZeile = [b.telefon?.trim(), b.email?.trim()].filter(Boolean).join(' · ') || '—'
-              return (
-                <div key={b.id} className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
-                  <div className="lc-title" style={{ fontWeight: 600 }}>
-                    {b.name}
-                  </div>
-                  <div className="lc-sub" style={{ color: 'var(--text-2)' }}>
-                    {b.objekt_einheiten?.bezeichnung ?? 'Einheit'}
-                  </div>
-                  <div
-                    className="lc-sub"
-                    style={{
-                      color: 'var(--text-2)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={kontaktZeile}
-                  >
-                    {kontaktZeile}
-                  </div>
-                  <div
-                    className="row-actions always"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ justifyContent: 'flex-end' }}
-                  >
-                    <MockEntityRowMenu items={rowMenuItems(b)} title="Bewohner" />
-                  </div>
-                </div>
-              )
-            })}
+            {liste.map(rowBody)}
           </div>
         )}
       </MockCard>
+
+      <MockModal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!bulkDeletePending) setBulkDeleteOpen(false)
+        }}
+        icon="trash"
+        title={selectedCount === 1 ? 'Bewohner löschen?' : `${selectedCount} Bewohner löschen?`}
+        sub="Dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={bulkDeletePending ? undefined : 'trash'}
+              disabled={bulkDeletePending}
+              onClick={() => void runBulkDelete()}
+            >
+              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {bulkDeletePending
+            ? 'Bitte warten…'
+            : selectedCount === 1
+              ? `„${selectedRows[0]?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`
+              : `${selectedCount} ausgewählte Bewohner werden unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
+
+      <MockModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        icon="trash"
+        title="Bewohner löschen?"
+        sub="Dauerhaft entfernen."
+        size="sm"
+        footer={
+          <>
+            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
+              Abbrechen
+            </MockBtn>
+            <div style={{ flex: 1 }} />
+            <MockBtn
+              kind="danger"
+              icon={deletePending ? undefined : 'trash'}
+              disabled={deletePending}
+              onClick={() => void runSingleDelete()}
+            >
+              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
+            </MockBtn>
+          </>
+        }
+      >
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          {deletePending
+            ? 'Bitte warten…'
+            : `„${deleteTarget?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`}
+        </div>
+      </MockModal>
 
       <EditorSheet
         open={modalOpen}

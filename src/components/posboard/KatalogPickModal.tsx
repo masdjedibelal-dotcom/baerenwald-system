@@ -1,5 +1,4 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
 import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
@@ -35,7 +34,7 @@ export function KatalogPickModal({
   onPick: (result: KatalogPickResult) => void
   preferredGewerkName?: string | null
 }) {
-  const [pending, startTransition] = useTransition()
+  const [katalogLoading, setKatalogLoading] = useState(false)
   const [rows, setRows] = useState<KatalogPosition[]>([])
   const [q, setQ] = useState('')
   const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
@@ -54,17 +53,30 @@ export function KatalogPickModal({
     setPicked(null)
     setMenge('1')
     setBeschreibung('')
-    startTransition(async () => {
-      const list = await listKatalogPositionen({ nurAktiv: true })
-      setRows(list)
-      if (preferredGewerkName?.trim()) {
-        const hit = list.find(
-          (p) =>
-            (p.gewerk_name || '').toLowerCase() === preferredGewerkName.trim().toLowerCase()
-        )
-        if (hit) setGewerkFilter(hit.gewerk_id)
-      }
-    })
+    let cancelled = false
+    setKatalogLoading(true)
+    void listKatalogPositionen({ nurAktiv: true })
+      .then((list) => {
+        if (cancelled) return
+        setRows(list)
+        if (preferredGewerkName?.trim()) {
+          const hit = list.find(
+            (p) =>
+              (p.gewerk_name || '').toLowerCase() ===
+              preferredGewerkName.trim().toLowerCase()
+          )
+          if (hit) setGewerkFilter(hit.gewerk_id)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setKatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [open, preferredGewerkName])
 
   const gewerke = useMemo(() => {
@@ -159,9 +171,9 @@ export function KatalogPickModal({
         })),
       ]}
       empty={
-        pending && !rows.length ? (
+        katalogLoading && !rows.length ? (
           <p className="picker-sheet__empty">Lädt…</p>
-        ) : !pending && !filtered.length ? (
+        ) : !katalogLoading && !filtered.length ? (
           <p className="picker-sheet__empty">Keine Treffer.</p>
         ) : undefined
       }
@@ -251,7 +263,7 @@ export function KatalogPickModal({
               sm
               kind="primary"
               icon="check"
-              disabled={!picked || pending}
+              disabled={!picked || katalogLoading}
               onClick={confirm}
             >
               Übernehmen

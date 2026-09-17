@@ -24,7 +24,8 @@ import {
   angebotTitelFuerKopie,
   type AngebotWizardBootstrap,
   type AngebotVariantenPersistJson,
-  angebotDarfImWizardBearbeitetWerden,
+  angebotStatusErlaubtImWizard,
+  angebotWizardBearbeitenSperrgrund,
 } from '@/lib/angebote/angebot-wizard-types'
 import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
@@ -81,6 +82,31 @@ async function persistAngebotPdfNachEntwurfSpeichern(
   leadId: string | null,
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  // Bereits versendet: PDF + Portal-Snapshot bleiben bis erneut „Versenden“
+  const { data: stRow } = await supabaseAdmin
+    .from('angebote')
+    .select('gesendet_kunde_at, gesendet_am, status, status_einfach')
+    .eq('id', angebotId)
+    .maybeSingle()
+  const alreadySent = Boolean(
+    String(
+      (stRow as { gesendet_kunde_at?: string | null } | null)?.gesendet_kunde_at ??
+        (stRow as { gesendet_am?: string | null } | null)?.gesendet_am ??
+        ''
+    ).trim()
+  )
+  if (alreadySent) {
+    if (!opts?.asSystem) {
+      revalidatePath('/angebote')
+      revalidatePath(`/angebote/${angebotId}`)
+      if (leadId) {
+        revalidatePath(`/anfragen/${leadId}`)
+        revalidatePath('/anfragen')
+      }
+    }
+    return { ok: true }
+  }
+
   const pdf = await persistPdfForAngebot(angebotId, { skipRevalidate: true })
   if (!opts?.asSystem) {
     revalidatePath('/angebote')
@@ -137,6 +163,23 @@ export async function finalizeAngebotWizardWithoutMail(
 }
 
 export async function saveAngebotWizardDraft(
+  input: SaveAngebotWizardDraftPayload,
+  opts?: { asSystem?: boolean }
+): Promise<
+  { ok: true; angebotId: string; angebotsnr: string | null } | { ok: false; message: string }
+> {
+  try {
+    return await saveAngebotWizardDraftInner(input, opts)
+  } catch (e) {
+    console.error('[saveAngebotWizardDraft]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Speichern fehlgeschlagen',
+    }
+  }
+}
+
+async function saveAngebotWizardDraftInner(
   input: SaveAngebotWizardDraftPayload,
   opts?: { asSystem?: boolean }
 ): Promise<
@@ -226,36 +269,47 @@ export async function saveAngebotWizardDraft(
         }
 
   const kundeObjektId = input.meta.kunde_objekt_id?.trim() || null
+  const objektAnlageId = input.meta.objekt_anlage_id?.trim() || null
+  const ansprechpartnerId = input.meta.ansprechpartner_id?.trim() || null
 
   if (input.angebotId) {
-    const upd = await updateAngebot(input.angebotId, {
-      lead_id: input.lead_id,
-      kunde_id: input.kunde_id,
-      kunde_objekt_id: kundeObjektId,
-      positionen,
-      notizen,
-      preis_typ: 'range',
-      gesamt_min: summen.nettoMin,
-      gesamt_max: summen.nettoMax,
-      leistungsumfang: input.meta.leistungsumfang,
-      einleitung: input.meta.einleitung,
-      hinweise: projektFelder.hinweise,
-      zahlungsbedingungen: input.meta.zahlungsbedingungen,
-      gueltig_bis: input.meta.gueltig_bis,
-      zahlungsplan:
-        input.meta.zahlungsbedingungen === 'abschlagsplan' ||
-        input.meta.zahlungsbedingungen === 'anzahlung_50'
-          ? input.zahlungsplan ?? null
-          : null,
-      dokument_typ: projektFelder.dokument_typ,
-      projektbeschreibung: projektFelder.projektbeschreibung,
-      fotos_urls: projektFelder.fotos_urls,
-      wichtige_hinweise: projektFelder.wichtige_hinweise,
-      varianten: projektFelder.varianten,
-      handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
-      ist_wiederkehrend: input.ist_wiederkehrend,
-      wiederkehr_turnus: input.wiederkehr_turnus,
-    }, { asSystem: opts?.asSystem })
+    const upd = await updateAngebot(
+      input.angebotId,
+      {
+        lead_id: input.lead_id,
+        kunde_id: input.kunde_id,
+        kunde_objekt_id: kundeObjektId,
+        objekt_anlage_id: objektAnlageId,
+        ansprechpartner_id: ansprechpartnerId,
+        positionen,
+        notizen,
+        preis_typ: 'range',
+        gesamt_min: summen.nettoMin,
+        gesamt_max: summen.nettoMax,
+        leistungsumfang: input.meta.leistungsumfang,
+        einleitung: input.meta.einleitung,
+        hinweise: projektFelder.hinweise,
+        zahlungsbedingungen: input.meta.zahlungsbedingungen,
+        gueltig_bis: input.meta.gueltig_bis,
+        zahlungsplan:
+          input.meta.zahlungsbedingungen === 'abschlagsplan' ||
+          input.meta.zahlungsbedingungen === 'anzahlung_50'
+            ? input.zahlungsplan ?? null
+            : null,
+        dokument_typ: projektFelder.dokument_typ,
+        projektbeschreibung: projektFelder.projektbeschreibung,
+        fotos_urls: projektFelder.fotos_urls,
+        wichtige_hinweise: projektFelder.wichtige_hinweise,
+        varianten: projektFelder.varianten,
+        handwerker_aufgabe_notizen: input.handwerker_aufgabe_notizen,
+        ist_wiederkehrend: input.ist_wiederkehrend,
+        wiederkehr_turnus: input.wiederkehr_turnus,
+      },
+      {
+        asSystem: opts?.asSystem,
+        forAuftragKorrektur: Boolean(input.auftragKorrekturId?.trim()),
+      }
+    )
     if (!upd.ok) return upd
     const db = opts?.asSystem ? supabaseAdmin : createClient()
     const { data: nrRow } = await db
@@ -290,6 +344,8 @@ export async function saveAngebotWizardDraft(
     lead_id: input.lead_id,
     kunde_id: input.kunde_id,
     kunde_objekt_id: kundeObjektId,
+    objekt_anlage_id: objektAnlageId,
+    ansprechpartner_id: ansprechpartnerId,
     positionen,
     notizen,
     preis_typ: 'range',
@@ -344,22 +400,38 @@ export async function sendAngebotWizard(input: {
   /** Angenommenes Angebot: Korrektur senden ohne Status-Rücksetzung */
   auftragKorrektur?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const sent = await sendAngebotToKunde(input.angebotId, {
-    to: input.mailTo,
-    cc: input.mailCc,
-    betreff: input.betreff?.trim() || undefined,
-    statusBeibehalten: input.auftragKorrektur,
-    skipHandwerkerGate: input.auftragKorrektur,
-  })
-  if (!sent.ok) return sent
-  if (input.auftragKorrektur) {
-    revalidatePath(`/auftraege`)
+  try {
+    const sent = await sendAngebotToKunde(input.angebotId, {
+      to: input.mailTo,
+      cc: input.mailCc,
+      betreff: input.betreff?.trim() || undefined,
+      statusBeibehalten: input.auftragKorrektur,
+      skipHandwerkerGate: input.auftragKorrektur,
+    })
+    if (!sent?.ok) {
+      return {
+        ok: false,
+        message:
+          sent && 'message' in sent && sent.message
+            ? sent.message
+            : 'Versand fehlgeschlagen',
+      }
+    }
+    if (input.auftragKorrektur) {
+      revalidatePath(`/auftraege`)
+    }
+    revalidatePath(`/anfragen/${input.lead_id}`)
+    revalidatePath('/anfragen')
+    revalidatePath('/angebote')
+    revalidatePath(`/angebote/${input.angebotId}`)
+    return { ok: true }
+  } catch (e) {
+    console.error('[sendAngebotWizard]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Versand fehlgeschlagen',
+    }
   }
-  revalidatePath(`/anfragen/${input.lead_id}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${input.angebotId}`)
-  return { ok: true }
 }
 
 function normalizeVariantenFromDb(raw: unknown): AngebotVariantenPersistJson | null {
@@ -383,7 +455,7 @@ function normalizeVariantenFromDb(raw: unknown): AngebotVariantenPersistJson | n
 export async function loadAngebotWizardBootstrap(
   angebotId: string,
   leadId: string,
-  opts?: { asSystem?: boolean }
+  opts?: { asSystem?: boolean; /** Angenommenes Angebot für Auftrags-Korrektur/Nachtrag laden */ forAuftragKorrektur?: boolean }
 ): Promise<{ ok: true; bootstrap: AngebotWizardBootstrap } | { ok: false; message: string }> {
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
 
@@ -409,6 +481,7 @@ export async function loadAngebotWizardBootstrap(
       hinweise,
       varianten,
       kunde_objekt_id,
+      ansprechpartner_id,
       gesendet_kunde_at,
       ist_wiederkehrend,
       wiederkehr_turnus,
@@ -463,8 +536,14 @@ export async function loadAngebotWizardBootstrap(
   if (ang.lead_id !== leadId) {
     return { ok: false, message: 'Angebot gehört nicht zu dieser Anfrage.' }
   }
-  if (!angebotDarfImWizardBearbeitetWerden(ang.status)) {
-    return { ok: false, message: 'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.' }
+  if (!angebotStatusErlaubtImWizard(ang.status, opts)) {
+    return {
+      ok: false,
+      message: opts?.forAuftragKorrektur
+        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        : angebotWizardBearbeitenSperrgrund(ang.status) ??
+          'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.',
+    }
   }
 
   const kundeTyp = resolveAngebotKundeTyp(
@@ -489,9 +568,11 @@ export async function loadAngebotWizardBootstrap(
     hinweise: ang.hinweise,
   }, kundeTyp)
   const angObjektId = (ang as { kunde_objekt_id?: string | null }).kunde_objekt_id
+  const angApId = (ang as { ansprechpartner_id?: string | null }).ansprechpartner_id
   const meta = {
     ...metaParsed,
     kunde_objekt_id: angObjektId?.trim() || metaParsed.kunde_objekt_id || null,
+    ansprechpartner_id: angApId?.trim() || metaParsed.ansprechpartner_id || null,
   }
 
   const zahlungsplanParsed = parseZahlungsplan(ang.zahlungsplan)
@@ -533,7 +614,11 @@ export async function loadAngebotWizardBootstrap(
   return { ok: true, bootstrap }
 }
 
-/** 1:1-Kopie für neuen Wizard-Entwurf: gleiche Inhalte, Titel mit (2), (3), … — keine Angebots-ID. */
+/**
+ * 1:1-Kopie für neuen Wizard-Entwurf: gleiche Inhalte, Titel mit (2), (3), … — keine Angebots-ID.
+ * Positionen inkl. Preise (vk/lohn/material/gesamt) unverändert übernehmen —
+ * nicht wie Partner-LV-Vorgabe auf 0 setzen.
+ */
 export async function loadAngebotWizardBootstrapKopie(
   quelleAngebotId: string,
   leadId: string,
@@ -561,6 +646,7 @@ export async function loadAngebotWizardBootstrapKopie(
       hinweise,
       varianten,
       kunde_objekt_id,
+      ansprechpartner_id,
       ist_wiederkehrend,
       wiederkehr_turnus,
       leads(plz, bereiche, situation, kundentyp, kunden!kunde_id(typ)),
@@ -578,6 +664,7 @@ export async function loadAngebotWizardBootstrapKopie(
     id: string
     lead_id: string | null
     kunde_objekt_id?: string | null
+    ansprechpartner_id?: string | null
     notizen: string | null
     positionen: unknown
     dokument_typ: string | null
@@ -635,6 +722,12 @@ export async function loadAngebotWizardBootstrapKopie(
     titel: angebotTitelFuerKopie(metaParsed.titel),
     kunde_objekt_id:
       ang.kunde_objekt_id?.trim() || metaParsed.kunde_objekt_id || null,
+    objekt_anlage_id:
+      (ang as { objekt_anlage_id?: string | null }).objekt_anlage_id?.trim() ||
+      metaParsed.objekt_anlage_id ||
+      null,
+    ansprechpartner_id:
+      ang.ansprechpartner_id?.trim() || metaParsed.ansprechpartner_id || null,
   }
 
   const zahlungsplanParsed = parseZahlungsplan(ang.zahlungsplan)
@@ -648,6 +741,7 @@ export async function loadAngebotWizardBootstrapKopie(
   const variantenPersist =
     dokumentTyp === 'projekt' ? normalizeVariantenFromDb(ang.varianten) : null
 
+  // Preise 1:1 aus Quelle — repair füllt fehlendes vk nur aus lohn/gesamt, setzt nie alles auf 0
   const posNorm = repairAngebotPositionen(
     rebindLooseAnfahrtPositionen(normalizeAngebotPositionen(ang.positionen))
   )

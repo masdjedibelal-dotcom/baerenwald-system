@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
+import { confirmAction } from '@/components/ui/confirm-action'
+import { confirmDelete } from '@/components/ui/confirm-delete'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
@@ -143,23 +145,25 @@ function ZuweisungCard({
                 size="sm"
                 loading={actionPending}
                 onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Anfrage von ${z.handwerker?.name ?? 'Partner'} im CRM als akzeptiert markieren?`
-                    )
-                  ) {
-                    return
-                  }
-                  startAction(async () => {
-                    const r = await crmBestaetigeHandwerkerAnfrage({
-                      angebotId,
-                      zuweisungId: z.id,
-                    })
-                    if (!r.ok) toast.error(r.message)
-                    else {
-                      toast.success('Anfrage bestätigt')
-                      onRefresh()
-                    }
+                  confirmAction({
+                    title: 'Anfrage bestätigen?',
+                    body: `Anfrage von ${z.handwerker?.name ?? 'Partner'} im CRM als akzeptiert markieren?`,
+                    confirmLabel: 'Bestätigen',
+                    cancelLabel: 'Abbrechen',
+                    busyLabel: null,
+                    onConfirm: () => {
+                      startAction(async () => {
+                        const r = await crmBestaetigeHandwerkerAnfrage({
+                          angebotId,
+                          zuweisungId: z.id,
+                        })
+                        if (!r.ok) toast.error(r.message)
+                        else {
+                          toast.success('Anfrage bestätigt')
+                          onRefresh()
+                        }
+                      })
+                    },
                   })
                 }}
               >
@@ -187,24 +191,24 @@ function ZuweisungCard({
                 loading={actionPending}
                 className="text-danger"
                 onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Handwerker-Anfrage an ${z.handwerker?.name ?? 'Partner'} wirklich löschen?`
-                    )
-                  ) {
-                    return
-                  }
-                  startAction(async () => {
-                    const r = await loescheHandwerkerAnfrage({
-                      angebotId,
-                      zuweisungId: z.id,
-                    })
-                    if (!r.ok) toast.error(r.message)
-                    else {
+                  confirmDelete(
+                    'Handwerker-Anfrage löschen?',
+                    async () => {
+                      const r = await loescheHandwerkerAnfrage({
+                        angebotId,
+                        zuweisungId: z.id,
+                      })
+                      if (!r.ok) {
+                        toast.error(r.message)
+                        throw new Error(r.message)
+                      }
                       toast.success('Anfrage gelöscht')
                       onRefresh()
+                    },
+                    {
+                      body: `Handwerker-Anfrage an ${z.handwerker?.name ?? 'Partner'} wirklich löschen?`,
                     }
-                  })
+                  )
                 }}
               >
                 <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden />
@@ -304,26 +308,33 @@ function ZuweisungCard({
                   className="w-full justify-start"
                   disabled={replacePending}
                   onClick={() => {
-                    if (
-                      !abgelehnt &&
-                      !window.confirm(
-                        `Partner wechseln zu ${h.name}? Die bisherige Anfrage endet — ${h.name} muss neu annehmen.`
-                      )
-                    ) {
+                    const runReplace = () => {
+                      startReplace(async () => {
+                        const r = await replaceAngebotHandwerkerUndSenden({
+                          angebotId,
+                          alteZuweisungId: z.id,
+                          neuerHandwerkerId: h.id,
+                        })
+                        if (!r.ok) toast.error(r.message)
+                        else {
+                          toast.success(`Anfrage an ${h.name} gesendet — muss neu annehmen.`)
+                          setReplaceOpen(false)
+                          onRefresh()
+                        }
+                      })
+                    }
+                    if (abgelehnt) {
+                      runReplace()
                       return
                     }
-                    startReplace(async () => {
-                      const r = await replaceAngebotHandwerkerUndSenden({
-                        angebotId,
-                        alteZuweisungId: z.id,
-                        neuerHandwerkerId: h.id,
-                      })
-                      if (!r.ok) toast.error(r.message)
-                      else {
-                        toast.success(`Anfrage an ${h.name} gesendet — muss neu annehmen.`)
-                        setReplaceOpen(false)
-                        onRefresh()
-                      }
+                    confirmAction({
+                      title: 'Partner wechseln?',
+                      body: `Partner wechseln zu ${h.name}? Die bisherige Anfrage endet — ${h.name} muss neu annehmen.`,
+                      confirmLabel: 'Wechseln',
+                      cancelLabel: 'Abbrechen',
+                      danger: true,
+                      busyLabel: null,
+                      onConfirm: runReplace,
                     })
                   }}
                 >

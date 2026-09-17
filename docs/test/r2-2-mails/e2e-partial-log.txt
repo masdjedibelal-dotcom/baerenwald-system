@@ -1,0 +1,29 @@
+funnel step0: MN |  | Musterverwaltung Nord |  | Verwaltung |  | BEREICH |  | Was ist betroffen? |  | Wasser, Heizung, Strom & Co. — Dringlichkeit setzen wir automatisch |  | Was
+funnel picked: Wasser / Rohr / WC
+
+tropft, läuft aus, verstopft, von oben
+funnel step1: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 1/2 |  | Was ist das Problem? |  | Wasser tritt aus / läuft / tropft |  | Leck, tropfender Hahn, nasse Ste
+funnel picked: Wasser tritt aus / läuft / tropft
+
+Leck, tropfender Hahn, nasse Stelle
+funnel step2: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 2/3 |  | Wo befindet sich der Schaden? |  | Küche |  | Bad |  | WC |  | Keller |  | Sonstiges |  | ← Zurück | Weiter → | Impre
+funnel picked: Küche
+funnel step3: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 3/3 |  | Kommt gerade aktiv Wasser? |  | Ja |  | Nein |  | Weiß nicht |  | ← Zurück | Weiter → | Impressum | · | Datenschu
+funnel picked: Ja
+funnel step4: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 4/5 |  | Können Sie das Wasser abstellen? |  | Ja |  | Nein |  | Weiß nicht |  | ← Zurück | Weiter → | Impressum | · | Dat
+funnel picked: Ja
+funnel step5: MN |  | Musterverwaltung Nord |  | Verwaltung |  | DETAIL 5/5 |  | Besteht Gefahr? |  | Rutschgefahr |  | Strom betroffen |  | Keine Gefahr |  | ← Zurück | Weiter → | Impressum
+funnel picked: Rutschgefahr
+funnel step6: MN |  | Musterverwaltung Nord |  | Verwaltung |  | FOTOS |  | Fotos hinzufügen |  | Optional — hilft bei der Einschätzung |  | Fotos hochladen |  | Fotos vom Schaden — 
+foto uploaded
+funnel step7: MN |  | Musterverwaltung Nord |  | Verwaltung |  | BESCHREIBUNG |  | Was ist passiert? |  | Mindestens 10 Zeichen |  | Beschreibung | ← Zurück | Weiter → | Impressum | · | Da
+funnel step8: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ORT & KONTAKT |  | Ihre Adresse und Kontaktdaten | Ich stimme der Verarbeitung meiner Angaben zur Bearbeitu
+funnel step9: MN |  | Musterverwaltung Nord |  | Verwaltung |  | ABSCHLUSS |  | Prüfen & absenden |  | Alle Angaben prüfen und absenden |  | IHRE ANGABEN |  | Objekt | WEG Leopold 10 (
+after absenden url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
+CONFIRM url=https://staging--baerenwald.netlify.app/melden/staging-muster-nord/staging-leopold-10
+CONFIRM CTA bw=false konto=false
+CONFIRM ref=false
+CONFIRM text=MN |  | Musterverwaltung Nord |  | Verwaltung |  | Meldung wird gesendet… |  | Einen Moment — Fotos und Angaben werden übermittelt.
+crm login https://staging--baerenwald-backend.netlify.app/
+LEAD url=https://staging--baerenwald-backend.netlify.app/vorgaenge
+LEAD HV-Meldung=false Leopold=false

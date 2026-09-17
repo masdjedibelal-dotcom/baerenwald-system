@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
@@ -10,17 +10,16 @@ import {
   leistungenFromAuftragPositionen,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
-import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
-import { TagebuchAnfordernSheet } from '@/components/auftraege/TagebuchAnfordernSheet'
+import { CrmPositionEintragModal, type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
+import { clearAuftragHandwerkerPositionen } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
-import { AuftragAbnahmeFreigabeBanner } from '@/components/auftraege/AuftragAbnahmeFreigabeBanner'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -30,7 +29,7 @@ import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AngebotDetail, AngebotHandwerkerRow, AuftragDetail, Lead } from '@/lib/types'
+import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -163,10 +162,12 @@ export function AuftragLeistungenTab({
 }) {
   const [pendingNachtrag, setPendingNachtrag] = useState(false)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
+  const clearBulkSelAfterZuweisung = useRef<(() => void) | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
-  const [anfordernOpen, setAnfordernOpen] = useState(false)
+  const [tagebuchEdit, setTagebuchEdit] = useState<CrmTagebuchEditSeed | null>(null)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
+  const [btRefreshKey, setBtRefreshKey] = useState(0)
   const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
     initialLeistungenView
   )
@@ -210,15 +211,28 @@ export function AuftragLeistungenTab({
 
   const rows = useMemo(() => {
     return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [], {
-      eintraege: bautagebuchEintraege.map((e) => ({
-        position_id: e.position_id,
-        typ: e.typ,
-        beschreibung: e.beschreibung,
-        zeit_minuten: e.zeit_minuten,
-        created_at: e.created_at,
-        erfasst_von: e.erfasst_von,
-        fotoCount: e.eintrag_fotos?.length ?? 0,
-      })),
+      eintraege: bautagebuchEintraege.map((e) => {
+        const fotoUrls = (e.eintrag_fotos ?? [])
+          .map((f) => f.display_url)
+          .filter((u): u is string => Boolean(u?.trim()))
+        return {
+          id: e.id,
+          position_id: e.position_id,
+          position_ids:
+            e.leistung_position_ids?.length
+              ? e.leistung_position_ids
+              : e.position_id
+                ? [e.position_id]
+                : [],
+          typ: e.typ,
+          beschreibung: e.beschreibung,
+          zeit_minuten: e.zeit_minuten,
+          created_at: e.ereignis_zeit || e.created_at,
+          erfasst_von: e.erfasst_von,
+          fotoCount: fotoUrls.length || (e.eintrag_fotos?.length ?? 0),
+          fotoUrls,
+        }
+      }),
     })
   }, [detail.auftrag_positionen, bautagebuchEintraege])
 
@@ -228,11 +242,22 @@ export function AuftragLeistungenTab({
       if (cancelled) return
       const enriched: BautagebuchListenEintrag[] = []
       for (const e of list) {
-        const meta = e.position_id ? posMetaById.get(e.position_id) : null
+        const ids =
+          e.leistung_position_ids?.length
+            ? e.leistung_position_ids
+            : e.position_id
+              ? [e.position_id]
+              : []
+        const names = ids
+          .map((id) => posMetaById.get(id)?.name)
+          .filter((n): n is string => Boolean(n?.trim()))
+        const hw =
+          ids.map((id) => posMetaById.get(id)?.handwerkerName).find((n) => n?.trim()) ?? null
         enriched.push({
           ...e,
-          leistungName: meta?.name ?? null,
-          handwerkerName: meta?.handwerkerName ?? null,
+          leistungName: names[0] ?? null,
+          leistungNames: names,
+          handwerkerName: hw,
         })
       }
       setBautagebuchEintraege(enriched)
@@ -240,14 +265,26 @@ export function AuftragLeistungenTab({
     return () => {
       cancelled = true
     }
-  }, [detail.id, detail.updated_at, posMetaById])
+  }, [detail.id, detail.updated_at, posMetaById, btRefreshKey])
 
   function openTagebuch(positionId?: string | null) {
+    setTagebuchEdit(null)
     setTagebuchPositionId(positionId ?? null)
     setTagebuchOpen(true)
   }
 
-  function markErledigt(ids: string[]) {
+  function openTagebuchEdit(seed: CrmTagebuchEditSeed) {
+    setTagebuchPositionId(null)
+    setTagebuchEdit(seed)
+    setTagebuchOpen(true)
+  }
+
+  function refreshBautagebuch() {
+    setBtRefreshKey((n) => n + 1)
+    onSaved?.()
+  }
+
+  function markErledigt(ids: string[], clearSelection?: () => void) {
     if (disabled || !ids.length) return
     void actionBusy.run('Leistungen werden aktualisiert…', async () => {
       for (const positionId of ids) {
@@ -262,6 +299,28 @@ export function AuftragLeistungenTab({
         }
       }
       toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
+      clearSelection?.()
+      onSaved?.()
+    })
+  }
+
+  function abwaehlenZuweisung(ids: string[], clearSelection?: () => void) {
+    if (disabled || !ids.length) return
+    void actionBusy.run('Zuweisung wird zurückgezogen…', async () => {
+      const r = await clearAuftragHandwerkerPositionen({
+        auftragId: detail.id,
+        positionIds: ids,
+      })
+      if (!r.ok) {
+        toast.error(r.message)
+        throw new Error(r.message)
+      }
+      toast.success(
+        r.cleared === 1
+          ? 'Zuweisung zurückgezogen — Partner sieht die Leistung nicht mehr.'
+          : `${r.cleared} Zuweisungen zurückgezogen.`
+      )
+      clearSelection?.()
       onSaved?.()
     })
   }
@@ -305,19 +364,57 @@ export function AuftragLeistungenTab({
           onClick={() => setLeistungenView('bautagebuch')}
         >
           Bautagebuch
-          {bautagebuchEintraege.length > 0 ? (
-            <span className="lt-view-seg__count">{bautagebuchEintraege.length}</span>
-          ) : null}
+          {(() => {
+            const n = bautagebuchEintraege.filter(
+              (e) => String(e.typ).toLowerCase() !== 'weitere_arbeit'
+            ).length
+            return n > 0 ? <span className="lt-view-seg__count">{n}</span> : null
+          })()}
         </button>
       </div>
 
       {leistungenView === 'leistungen' ? (
         <>
-          <AuftragAbnahmeFreigabeBanner
-            auftragId={detail.id}
-            disabled={disabled}
-            onChanged={onSaved}
-          />
+          {(() => {
+            const hwErledigt = (detail.auftrag_handwerker ?? []).filter(
+              (z) =>
+                Boolean(z.erledigt_gemeldet_am) &&
+                String(z.status ?? '').toLowerCase() !== 'ersetzt'
+            )
+            const posErledigtHw = new Map<string, string>()
+            for (const p of detail.auftrag_positionen ?? []) {
+              const hwId = p.handwerker_id?.trim()
+              if (!hwId) continue
+              if (String(p.handwerker_status ?? '').toLowerCase() !== 'erledigt') continue
+              if (hwErledigt.some((z) => z.handwerker_id === hwId)) continue
+              const name = p.handwerker?.name?.trim() || 'Handwerker'
+              posErledigtHw.set(hwId, name)
+            }
+            if (!hwErledigt.length && !posErledigtHw.size) return null
+            return (
+              <div className="flex flex-wrap gap-2" aria-label="Handwerker erledigt">
+                {hwErledigt.map((z) => (
+                  <span
+                    key={z.id}
+                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                  >
+                    HW erledigt
+                    {z.handwerker?.name?.trim() || z.handwerker?.firma?.trim()
+                      ? ` · ${z.handwerker?.firma?.trim() || z.handwerker?.name?.trim()}`
+                      : ''}
+                  </span>
+                ))}
+                {Array.from(posErledigtHw.entries()).map(([hwId, name]) => (
+                  <span
+                    key={hwId}
+                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                  >
+                    HW erledigt · {name}
+                  </span>
+                ))}
+              </div>
+            )
+          })()}
           <AuftragPartnerPositionsPruefungPanel
             auftragId={detail.id}
             disabled={disabled}
@@ -334,8 +431,24 @@ export function AuftragLeistungenTab({
               disabled
                 ? undefined
                 : [
-                    { id: 'zuweisen', label: 'Zuweisen', onClick: (ids) => setZuweisungIds(ids) },
-                    { id: 'erledigt', label: 'Erledigt', onClick: markErledigt },
+                    {
+                      id: 'zuweisen',
+                      label: 'Zuweisen',
+                      onClick: (ids, clearSelection) => {
+                        clearBulkSelAfterZuweisung.current = clearSelection
+                        setZuweisungIds(ids)
+                      },
+                    },
+                    {
+                      id: 'abwaehlen',
+                      label: 'Abwählen',
+                      onClick: (ids, clearSelection) => abwaehlenZuweisung(ids, clearSelection),
+                    },
+                    {
+                      id: 'erledigt',
+                      label: 'Erledigt',
+                      onClick: (ids, clearSelection) => markErledigt(ids, clearSelection),
+                    },
                   ]
             }
             drawerActionsForRow={
@@ -345,6 +458,16 @@ export function AuftragLeistungenTab({
                     row.brauchtFreigabe
                       ? []
                       : [
+                          ...(row.handwerkerId
+                            ? [
+                                {
+                                  id: 'abwaehlen',
+                                  label: 'Abwählen',
+                                  icon: 'user-x',
+                                  onClick: () => abwaehlenZuweisung([row.id]),
+                                },
+                              ]
+                            : []),
                           {
                             id: 'zuweisen',
                             label: 'Zuweisen',
@@ -360,16 +483,21 @@ export function AuftragLeistungenTab({
       ) : (
         <AuftragBautagebuchSection
           eintraege={bautagebuchEintraege}
+          auftragId={detail.id}
           disabled={disabled}
           onAdd={() => openTagebuch(null)}
-          onAnfordern={() => setAnfordernOpen(true)}
+          onEdit={openTagebuchEdit}
+          onChanged={refreshBautagebuch}
         />
       )}
 
       {zuweisungIds ? (
         <AuftragLeistungZuweisungModal
           open
-          onClose={() => setZuweisungIds(null)}
+          onClose={() => {
+            clearBulkSelAfterZuweisung.current = null
+            setZuweisungIds(null)
+          }}
           auftragId={detail.id}
           angebotId={detail.angebot_id}
           projektName={angebotTitel}
@@ -377,6 +505,8 @@ export function AuftragLeistungenTab({
           positionen={detail.auftrag_positionen ?? []}
           gewerke={[]}
           onDone={() => {
+            clearBulkSelAfterZuweisung.current?.()
+            clearBulkSelAfterZuweisung.current = null
             setZuweisungIds(null)
             onSaved?.()
           }}
@@ -385,24 +515,15 @@ export function AuftragLeistungenTab({
 
       <CrmPositionEintragModal
         open={tagebuchOpen}
-        onClose={() => setTagebuchOpen(false)}
+        onClose={() => {
+          setTagebuchOpen(false)
+          setTagebuchEdit(null)
+        }}
         auftragId={detail.id}
         positionen={detail.auftrag_positionen ?? []}
-        initialPositionId={tagebuchPositionId}
-        onSaved={() => onSaved?.()}
-      />
-
-      <TagebuchAnfordernSheet
-        open={anfordernOpen}
-        onClose={() => setAnfordernOpen(false)}
-        auftragId={detail.id}
-        auftragHandwerker={detail.auftrag_handwerker ?? []}
-        positionen={detail.auftrag_positionen ?? []}
-        angebotHandwerker={
-          (detail.angebote as { angebot_handwerker?: AngebotHandwerkerRow[] | null } | null)
-            ?.angebot_handwerker ?? null
-        }
-        onSent={() => onSaved?.()}
+        initialPositionId={tagebuchEdit ? null : tagebuchPositionId}
+        editEintrag={tagebuchEdit}
+        onSaved={refreshBautagebuch}
       />
     </div>
   )

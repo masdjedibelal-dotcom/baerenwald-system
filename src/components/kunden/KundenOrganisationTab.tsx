@@ -6,8 +6,14 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockModal } from '@/components/mock-ui/MockModal'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { FreigabeRegelnEditor } from '@/components/org/FreigabeRegelnEditor'
+import {
+  normalizeOrgHttpUrl,
+  orgMeldeLegalUrlsReady,
+  ORG_MELDE_LEGAL_REQUIRED_HINT,
+} from '@/lib/org/melde-legal-urls'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { suggestOrgKennungFromName } from '@/lib/org/slug'
 import { toast } from '@/components/ui/app-toast'
@@ -21,6 +27,8 @@ type Props = {
     | 'org_kennung'
     | 'org_anzeigename'
     | 'org_logo_url'
+    | 'impressum_url'
+    | 'datenschutz_url'
     | 'freigabe_modus'
     | 'freigabe_schwelle_eur'
     | 'notfall_direkt'
@@ -36,17 +44,22 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   const [orgKennung, setOrgKennung] = useState(kunde.org_kennung ?? '')
   const [orgAnzeigename, setOrgAnzeigename] = useState(kunde.org_anzeigename ?? '')
   const [orgLogoUrl, setOrgLogoUrl] = useState(kunde.org_logo_url ?? '')
+  const [impressumUrl, setImpressumUrl] = useState(kunde.impressum_url ?? '')
+  const [datenschutzUrl, setDatenschutzUrl] = useState(kunde.datenschutz_url ?? '')
   const [freigabeModus, setFreigabeModus] = useState<FreigabeModus>(kunde.freigabe_modus ?? 'freigabe')
   const [schwelle, setSchwelle] = useState(
     kunde.freigabe_schwelle_eur != null ? String(Math.round(Number(kunde.freigabe_schwelle_eur))) : '500'
   )
   const [notfallDirekt, setNotfallDirekt] = useState(kunde.notfall_direkt !== false)
   const [err, setErr] = useState<string | null>(null)
+  const [aushangWarnOpen, setAushangWarnOpen] = useState(false)
 
   useEffect(() => {
     setOrgKennung(kunde.org_kennung ?? '')
     setOrgAnzeigename(kunde.org_anzeigename ?? '')
     setOrgLogoUrl(kunde.org_logo_url ?? '')
+    setImpressumUrl(kunde.impressum_url ?? '')
+    setDatenschutzUrl(kunde.datenschutz_url ?? '')
     setFreigabeModus(kunde.freigabe_modus ?? 'freigabe')
     setSchwelle(
       kunde.freigabe_schwelle_eur != null
@@ -57,6 +70,13 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   }, [kunde])
 
   const meldeBasisLink = orgKennung.trim() ? buildMeldeLink(orgKennung) : null
+  const legalReady = orgMeldeLegalUrlsReady({
+    impressum_url: impressumUrl,
+    datenschutz_url: datenschutzUrl,
+  })
+  const kennungChanged =
+    orgKennung.trim().toLowerCase() !== String(kunde.org_kennung ?? '').trim().toLowerCase() &&
+    Boolean(String(kunde.org_kennung ?? '').trim())
 
   function vorschlagKennung() {
     const basis = orgAnzeigename.trim() || kunde.org_anzeigename?.trim() || kunde.name?.trim() || ''
@@ -64,8 +84,31 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
     setOrgKennung(suggestOrgKennungFromName(basis))
   }
 
+  function requestSpeichern() {
+    if (kennungChanged) {
+      setAushangWarnOpen(true)
+      return
+    }
+    speichern()
+  }
+
   function speichern() {
+    setAushangWarnOpen(false)
     setErr(null)
+    const impressumNorm = impressumUrl.trim()
+      ? normalizeOrgHttpUrl(impressumUrl)
+      : null
+    const datenschutzNorm = datenschutzUrl.trim()
+      ? normalizeOrgHttpUrl(datenschutzUrl)
+      : null
+    if (impressumUrl.trim() && !impressumNorm) {
+      setErr('Impressum-URL ungültig (z. B. www.firma.de/impressum).')
+      return
+    }
+    if (datenschutzUrl.trim() && !datenschutzNorm) {
+      setErr('Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).')
+      return
+    }
     startTransition(async () => {
       const schwelleNum = schwelle.trim() ? Number(schwelle.replace(',', '.')) : null
       const r = await saveKundeOrganisation(kunde.id, {
@@ -73,6 +116,8 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         org_kennung: orgKennung,
         org_anzeigename: orgAnzeigename || null,
         org_logo_url: orgLogoUrl || null,
+        impressum_url: impressumNorm,
+        datenschutz_url: datenschutzNorm,
         freigabe_modus: freigabeModus,
         freigabe_schwelle_eur: schwelleNum,
         notfall_direkt: notfallDirekt,
@@ -121,11 +166,12 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   }
 
   return (
+    <>
       <MockCard
         title="Organisation & Portal"
         icon="building"
         actions={
-          <MockBtn kind="primary" sm disabled={pending || logoUploading} onClick={speichern}>
+          <MockBtn kind="primary" sm disabled={pending || logoUploading} onClick={requestSpeichern}>
             {pending ? 'Speichern…' : 'Speichern'}
           </MockBtn>
         }
@@ -152,7 +198,11 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             </div>
           </MockField>
 
-          <MockField label="Anzeigename" full>
+          <MockField
+            label="Anzeigename"
+            full
+            hint="Erscheint in den Portalen (HV, Melde, Mieter) — nicht nur der CRM-Kundenname."
+          >
             <input
               className="txt"
               placeholder="z. B. Muster Hausverwaltung GmbH"
@@ -222,8 +272,40 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             </div>
           </MockField>
 
+          <MockField label="Impressum-URL (Mieter)" required full>
+            <input
+              className="txt"
+              placeholder="www.ihre-verwaltung.de/impressum"
+              value={impressumUrl}
+              onChange={(e) => setImpressumUrl(e.target.value)}
+              disabled={pending}
+              autoComplete="url"
+            />
+          </MockField>
+          <MockField label="Datenschutz-URL (Mieter)" required full>
+            <input
+              className="txt"
+              placeholder="www.ihre-verwaltung.de/datenschutz"
+              value={datenschutzUrl}
+              onChange={(e) => setDatenschutzUrl(e.target.value)}
+              disabled={pending}
+              autoComplete="url"
+            />
+          </MockField>
+          <p
+            className="text-[12px] leading-relaxed"
+            style={{ color: 'var(--text-3)', margin: '0 0 8px', gridColumn: '1 / -1' }}
+          >
+            Beide Links sind Pflicht für Melde-Link, QR und Aushang. www.… reicht — https:// wird
+            ergänzt.
+          </p>
+
           <MockField label="Melde-Link (Organisation)" full>
-            {meldeBasisLink ? (
+            {!legalReady ? (
+              <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
+                {ORG_MELDE_LEGAL_REQUIRED_HINT}
+              </p>
+            ) : meldeBasisLink ? (
               <div
                 className="txt"
                 style={{
@@ -294,5 +376,33 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
           </p>
         ) : null}
       </MockCard>
+
+      {aushangWarnOpen ? (
+        <MockModal
+          open
+          icon="alert-triangle"
+          title="Org-Kennung ändern?"
+          sub="Gedruckte Aushänge werden ungültig."
+          size="sm"
+          onClose={() => setAushangWarnOpen(false)}
+          footer={
+            <>
+              <MockBtn kind="ghost" onClick={() => setAushangWarnOpen(false)}>
+                Abbrechen
+              </MockBtn>
+              <div style={{ flex: 1 }} />
+              <MockBtn kind="danger" icon="check" onClick={speichern} disabled={pending}>
+                Kennung ändern
+              </MockBtn>
+            </>
+          }
+        >
+          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+            Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
+            drucken.
+          </div>
+        </MockModal>
+      ) : null}
+    </>
   )
 }

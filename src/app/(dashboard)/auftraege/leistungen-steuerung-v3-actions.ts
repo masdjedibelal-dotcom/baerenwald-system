@@ -16,6 +16,7 @@ import {
 import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
+import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import type { AuftragPosition } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
@@ -103,6 +104,9 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   ekNetto?: number | null
   /** Pro Position eigener Partner-EK (Mehrfachzuweisung). */
   ekNettoByPositionId?: Record<string, number | null | undefined>
+  /** Ausführungszeitraum (Pflicht für PDF/Leistungszeitraum später). */
+  startDatum?: string | null
+  endDatum?: string | null
 }): Promise<{ ok: true; updated: number } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
@@ -121,7 +125,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
 
   const ekGlobal =
-    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto > 0
+    input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
       ? Math.round(input.ekNetto * 100) / 100
       : null
   const ekById = input.ekNettoByPositionId ?? null
@@ -143,7 +147,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     const posId = String(row.id)
     const fromMap = ekById?.[posId]
     const ekPos =
-      fromMap != null && Number.isFinite(fromMap) && fromMap > 0
+      fromMap != null && Number.isFinite(fromMap) && fromMap >= 0
         ? Math.round(fromMap * 100) / 100
         : ekGlobal
     const partnerPatch =
@@ -159,6 +163,12 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     if (ekPos == null && current.preis_partner != null) {
       // EK unverändert — nicht überschreiben
       delete patch.preis_partner
+    }
+    const startYmd = input.startDatum?.trim().slice(0, 10) || null
+    const endYmd = input.endDatum?.trim().slice(0, 10) || startYmd
+    if (startYmd) {
+      patch.start_datum = startYmd
+      patch.end_datum = endYmd
     }
 
     const { error } = await gate.supabase!
@@ -256,6 +266,9 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
+  const freigabeGate = await assertPartnerVersandOrgFreigabe({ auftragId: input.auftragId })
+  if (!freigabeGate.ok) return freigabeGate
+
   const gewerke = input.gewerke ?? []
 
   const { data: posRows, error: pErr } = await gate.supabase!
@@ -284,7 +297,8 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
   }
 
   for (const p of zuSenden) {
-    if (p.preis_partner == null || Number(p.preis_partner) <= 0) {
+    const ek = p.preis_partner == null ? null : Number(p.preis_partner)
+    if (ek == null || !Number.isFinite(ek) || ek < 0) {
       return {
         ok: false,
         message: `„${String(p.leistung_name ?? 'Leistung')}“: preis_partner (Netto-Zeile) fehlt — Handwerker kann nicht annehmen.`,

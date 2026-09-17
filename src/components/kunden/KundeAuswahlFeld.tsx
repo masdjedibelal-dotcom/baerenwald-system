@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { searchKunden } from '@/app/(dashboard)/angebote/actions'
+import { searchKunden, getKundeKurz } from '@/app/(dashboard)/angebote/actions'
 import { Input } from '@/components/ui/Input'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
@@ -56,6 +56,14 @@ export function KundeAuswahlFeld({
     if (bekannterKunde?.id === kundeId) {
       setAusgewaehlt(bekannterKunde)
       return
+    }
+    let cancelled = false
+    void getKundeKurz(kundeId).then((k) => {
+      if (cancelled || !k) return
+      setAusgewaehlt(k)
+    })
+    return () => {
+      cancelled = true
     }
   }, [kundeId, ausgewaehlt?.id, bekannterKunde])
 

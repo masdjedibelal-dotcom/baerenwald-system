@@ -29,7 +29,8 @@ function startNummerFuerJahr(jahr: string): number {
   return jahr === '2026' ? RE_NUMMER_START_2026 : 1
 }
 
-/** Nächste Nummer per Abfrage (RE2026-2069, RE2026-2070, …). */
+/** Nächste Nummer per Abfrage (RE2026-2069, RE2026-2070, …).
+ * Auch Entwürfe mit Nummer zählen — sonst Kollision beim Versand. */
 export async function nextRechnungsnummerAusDb(
   supabase: SupabaseClient,
   typ: RechnungBelegNummerTyp = 'rechnung'
@@ -42,7 +43,6 @@ export async function nextRechnungsnummerAusDb(
     .from('rechnungen')
     .select('rechnungsnummer')
     .like('rechnungsnummer', `${prefix}%`)
-    .neq('status', 'entwurf')
 
   if (error) {
     console.warn('[nextRechnungsnummerAusDb]', error.message)
@@ -106,8 +106,37 @@ export async function allocateRechnungsnummer(
 }
 
 /**
+ * Nach fehlgeschlagenem Versand (vor erfolgreicher Mail): Nummer wieder freigeben.
+ * Status bleibt Entwurf — so entstehen keine Lücken und keine Unique-Kollisionen.
+ */
+export async function releaseRechnungsnummerWennEntwurf(
+  rechnungId: string,
+  supabase: SupabaseClient = supabaseAdmin
+): Promise<void> {
+  const id = rechnungId.trim()
+  if (!id) return
+  const { data } = await supabase
+    .from('rechnungen')
+    .select('status, rechnungsnummer')
+    .eq('id', id)
+    .maybeSingle()
+  if (!data) return
+  if (String(data.status ?? '').trim().toLowerCase() !== 'entwurf') return
+  if (!String(data.rechnungsnummer ?? '').trim()) return
+  const { error } = await supabase
+    .from('rechnungen')
+    .update({ rechnungsnummer: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'entwurf')
+  if (error) {
+    console.warn('[releaseRechnungsnummerWennEntwurf]', id, error.message)
+  }
+}
+
+/**
  * Offizielle Belegnummer erst beim Versand / PDF-Ausstellung.
  * Entwürfe bleiben ohne Nummer, damit ungesendete Entwürfe keine Lücken erzeugen.
+ * Bei Unique-Konflikt: nächste freie Nummer erneut vergeben (inkl. belegter Entwürfe).
  */
 export async function ensureRechnungsnummerFuerVersand(
   _supabase: SupabaseClient,
@@ -116,20 +145,42 @@ export async function ensureRechnungsnummerFuerVersand(
   belegTyp: RechnungBelegNummerTyp = 'rechnung'
 ): Promise<{ ok: true; nummer: string } | { ok: false; message: string }> {
   const nr = current?.trim() ?? ''
-  if (nr && isRe2026FormatNummer(nr, belegTyp)) return { ok: true, nummer: nr }
-
-  const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
-  if (!numRes.ok) return numRes
-
-  const { error } = await supabaseAdmin
-    .from('rechnungen')
-    .update({ rechnungsnummer: numRes.nummer, updated_at: new Date().toISOString() })
-    .eq('id', rechnungId)
-
-  if (error) {
-    return { ok: false, message: error.message }
+  if (nr && isRe2026FormatNummer(nr, belegTyp)) {
+    const frei = await rechnungsnummerIstFrei(supabaseAdmin, nr, rechnungId)
+    if (frei.ok) return { ok: true, nummer: nr }
+    // Nummer schon an anderer RE → neu vergeben
   }
-  return { ok: true, nummer: numRes.nummer }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // Erster Versuch: RPC (ignoriert Entwürfe — korrekt, solange Entwürfe null sind).
+    // Nach Unique-Konflikt: JS-Pfad zählt alle belegten Nummern mit (hängende Entwürfe).
+    let nummer: string
+    if (attempt === 0) {
+      const numRes = await allocateRechnungsnummer(belegTyp, supabaseAdmin)
+      if (!numRes.ok) return numRes
+      nummer = numRes.nummer
+    } else {
+      nummer = await nextRechnungsnummerAusDb(supabaseAdmin, belegTyp)
+    }
+
+    const { error } = await supabaseAdmin
+      .from('rechnungen')
+      .update({ rechnungsnummer: nummer, updated_at: new Date().toISOString() })
+      .eq('id', rechnungId)
+
+    if (!error) return { ok: true, nummer }
+
+    const msg = error.message ?? ''
+    if (
+      /rechnungen_rechnungsnummer_key|duplicate key|unique constraint/i.test(msg) &&
+      attempt < 4
+    ) {
+      continue
+    }
+    return { ok: false, message: msg }
+  }
+
+  return { ok: false, message: 'Rechnungsnummer konnte nicht vergeben werden.' }
 }
 
 /** @deprecated Nicht beim Öffnen von Entwürfen aufrufen — sonst Lücken in der Nummernfolge. */

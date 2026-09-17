@@ -38,7 +38,7 @@ export const CRM_PUSH_SWITCHES: {
   {
     key: 'handwerker_updates',
     label: 'Handwerker-Updates',
-    desc: 'Annahme, Ablehnung, Einreichung, Positionsmeldungen',
+    desc: 'Leistungs-Updates, Annahme, Ablehnung, Einreichung, Positionsmeldungen',
   },
   {
     key: 'angebot_entscheidungen',
@@ -73,12 +73,14 @@ export function pushPrefKeyForNotificationTyp(
 ): CrmPushPrefKey | null {
   switch (typ) {
     case 'neue_anfrage':
+    case 'hm_befund_freigabe':
       return 'neue_anfragen'
     case 'handwerker_update':
     case 'handwerker_angenommen':
     case 'handwerker_abgelehnt':
     case 'handwerker_einreichung':
     case 'hw_rechnung_eingegangen':
+    case 'hw_auftrag_erledigt':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
     case 'partner_compliance_pruefung':

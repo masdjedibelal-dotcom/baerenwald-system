@@ -1,0 +1,112 @@
+{
+  "results": [
+    {
+      "id": "P3-SEND",
+      "status": "✅",
+      "note": "E-Mail senden via Wizard"
+    },
+    {
+      "id": "P3-ANG-STATUS",
+      "status": "⚠️",
+      "note": "status=entwurf"
+    },
+    {
+      "id": "P3-A1-UI",
+      "status": "✅",
+      "note": "Freigabe-Hinweis auf Angebot=true"
+    },
+    {
+      "id": "P3-A1-btns",
+      "status": "⚠️",
+      "note": "partner-ish buttons=0 blockedish=0"
+    },
+    {
+      "id": "P3-A-banner",
+      "status": "✅",
+      "note": "Anfrage Freigabe-UI"
+    },
+    {
+      "id": "P3-A3-btn",
+      "status": "⚠️",
+      "note": "erneut anfordern visible=0"
+    },
+    {
+      "id": "P3-A2",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-A4",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-A5",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-A6",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-A7",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-A8",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-B",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-C",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-E2E-rest",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-E8",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-E9",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-F7",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-F9",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    },
+    {
+      "id": "P3-N",
+      "status": "🚫",
+      "note": "Nachlauf — Zeit/Abhängigkeit"
+    }
+  ],
+  "ang": {
+    "id": "40f62e2e-6f1f-4dc7-ad3c-8b3c076f77c7",
+    "status": "entwurf"
+  },
+  "lead": {
+    "org_freigabe_status": "ausstehend",
+    "status": "angebot"
+  }
+}

@@ -1,11 +1,12 @@
 # Wizard-UI-Muster — Apple-Style (Mobile Sheet · Desktop Inline)
 
-**Stand:** Juli 2026  
-**Zweck:** Ein klares Muster für **alle** CRM-Wizards — mobil wie eine App durchklicken, desktop genauso einfach, ohne zwei Produktphilosophien.
+**Stand:** 2026-08-25 (Name: Shell = **DocumentCanvas**; alter Docs-Name WizardShell obsolet)  
+**Zweck:** Ein klares Muster für **alle** CRM-Dokument-/Wizard-Flows — mobil wie eine App durchklicken, desktop genauso einfach, ohne zwei Produktphilosophien.  
+**Verbindlich:** [`ui-audit/PATTERN-LEITFADEN.md`](./ui-audit/PATTERN-LEITFADEN.md)
 
 Verwandt: **Lexware-Canvas:** [WIZARD-LEXWARE-KONZEPT.md](./WIZARD-LEXWARE-KONZEPT.md) · [DESIGN_KONZEPT §9](./DESIGN_KONZEPT_CRM_UI_UX.md)
 
-> **Update Juli 2026:** Für Angebot/Rechnung ist das Zielbild nicht mehr nur „Stepper + Weiter“, sondern **eine Dokument-Seite + Bottom Sheets** (Lexware). Details im Lexware-Konzept.
+> **Update:** Für Angebot/Rechnung ist das Zielbild **DocumentCanvas** (eine Dokument-Seite + Bottom Sheets), nicht ein paralleles WizardShell-Chrome.
 
 ---
 
@@ -21,7 +22,7 @@ Verwandt: **Lexware-Canvas:** [WIZARD-LEXWARE-KONZEPT.md](./WIZARD-LEXWARE-KONZE
 
 ---
 
-## 2. Pflicht-Shell: `WizardShell`
+## 2. Pflicht-Shell: `DocumentCanvas`
 
 **Nutzen:** Angebot, Rechnung, Anfrage, **Abnahme** (ab Juli 2026).
 
@@ -66,11 +67,11 @@ Pattern aus Angebot (`AngebotWizardAngebotDetailsCard` …):
 
 | Wizard | Shell | MobileEditableBlock | Urteil |
 |--------|-------|---------------------|--------|
-| **Angebot** | `WizardShell` ✅ | Cards Finalisieren ✅ | Referenz |
-| **Rechnung** | `WizardShell` ✅ | Details/Zahlung ✅ | Referenz |
-| **Anfrage** | `WizardShell` ✅ | dünn | ok |
-| **Abnahme** | `WizardShell` ✅ (Juli 2026) | Meta-Steps ✅ | angeglichen |
-| **Projektvertrag** | `AppFlowScreen` | nein | → auf `WizardShell` + Cards migrieren |
+| **Angebot** | `DocumentCanvas` ✅ | Cards Finalisieren ✅ | Referenz |
+| **Rechnung** | `DocumentCanvas` ✅ | Details/Zahlung ✅ | Referenz |
+| **Anfrage** | `DocumentCanvas` ✅ | dünn | ok |
+| **Abnahme** | `DocumentCanvas` ✅ (Juli 2026) | Meta-Steps ✅ | angeglichen |
+| **Projektvertrag** | `AppFlowScreen` | nein | → auf `DocumentCanvas` + Cards migrieren |
 | **Rahmenvertrag** | `AppFlowScreen` | nein | → wie Vertrag |
 | **Visualisierung** | `AppFlowScreen` | nein | Sonderfall ok |
 | **Staff-Funnel** | eigene | — | Funnel, getrennt prüfen |
@@ -80,7 +81,7 @@ Pattern aus Angebot (`AngebotWizardAngebotDetailsCard` …):
 ## 5. Desktop: so sollen Steps aussehen
 
 ```
-┌─ WizardShell ─────────────────────────────────────────┐
+┌─ DocumentCanvas ─────────────────────────────────────────┐
 │ [X]  Titel · Untertitel     ①──②──③     [Zurück][Weiter]│
 ├───────────────────────────────────────────────────────┤
 │  Step-Titel (17px semibold)                           │
@@ -123,7 +124,7 @@ Sheet: Titel · Formular · **Fertig** (schließt Sheet, nicht den Wizard).
 
 ## 7. Checkliste für neue / umgebaute Wizards
 
-1. [ ] Nur `WizardShell` (kein paralleler Header-Bau)
+1. [ ] Nur `DocumentCanvas` (kein paralleler Header-Bau)
 2. [ ] `mobileFooter` = Primary; Toolbar nur Secondary (Zurück)
 3. [ ] Meta-Felder in `Card` + `MobileEditableBlock`
 4. [ ] Listen/DnD als Step-Inhalt (kein Sheet um die ganze Liste)
@@ -136,6 +137,6 @@ Sheet: Titel · Formular · **Fertig** (schließt Sheet, nicht den Wizard).
 ## 8. Nächste Migrationen
 
 1. **Welle 11 (SoTA):** Create-Einstiege + Aktionen als Bottom Sheets + Meta-Steps Overview→Sheet — siehe `AUDIT-TODOS.md` W11 / Umsetzungsplan Block B2  
-2. **ProjektvertragWizard** / **RahmenvertragWizard** → `WizardShell` (W10)  
+2. **ProjektvertragWizard** / **RahmenvertragWizard** → `DocumentCanvas` (W10)  
 3. Abnahme Steps von 7 → 3 (W9-02)  
 4. Staff-Funnel an Shell angleichen wo sinnvoll (W10-03)  
