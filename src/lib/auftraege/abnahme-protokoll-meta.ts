@@ -26,6 +26,8 @@ export type AbnahmeProtokollMeta = {
   /** Portal: Partner hat Protokoll bestätigt (ohne Mail). */
   handwerker_bestaetigt_at?: string | null
   handwerker_bestaetigt_von?: string | null
+  /** CRM: PDF ohne Kunden-/HW-Unterschrift (Kunde nicht vor Ort). */
+  ohne_unterschrift?: boolean
   /** Optional Signatur-Data-URLs oder Storage-Pfade */
   signature_kunde_url?: string | null
   signature_hw_url?: string | null
@@ -70,6 +72,7 @@ export function emptyAbnahmeProtokollMeta(
     unterschrift_ort_datum_anwesend: '',
     handwerker_bestaetigt_at: null,
     handwerker_bestaetigt_von: null,
+    ohne_unterschrift: false,
     signature_kunde_url: null,
     signature_hw_url: null,
     kunde_unterschrift_name: null,
@@ -84,7 +87,7 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
   const abnahme_ergebnis: AbnahmeErgebnis =
     ergebnis === 'mit_vorbehalt' || ergebnis === 'verweigert' ? ergebnis : 'abgenommen'
   const fotos = Array.isArray(o.uebergabe_foto_urls)
-    ? o.uebergabe_foto_urls.map((u) => String(u ?? '').trim()).filter(Boolean).slice(0, 4)
+    ? o.uebergabe_foto_urls.map((u) => String(u ?? '').trim()).filter(Boolean).slice(0, 8)
     : []
   const captionsRaw = Array.isArray(o.uebergabe_foto_captions)
     ? o.uebergabe_foto_captions.map((c) => String(c ?? '').trim())
@@ -115,6 +118,7 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
     handwerker_bestaetigt_von: o.handwerker_bestaetigt_von
       ? String(o.handwerker_bestaetigt_von).trim() || null
       : null,
+    ohne_unterschrift: Boolean(o.ohne_unterschrift),
     signature_kunde_url: o.signature_kunde_url
       ? String(o.signature_kunde_url).trim() || null
       : null,

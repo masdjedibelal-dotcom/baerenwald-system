@@ -53,6 +53,8 @@ type MobileEditableBlockProps = {
   onOpenChange?: (open: boolean) => void
   overviewClassName?: string
   hideEditButton?: boolean
+  /** Über DocumentCanvas: `canvas` (z-index 500), sonst `detail`. */
+  sheetContext?: 'detail' | 'canvas'
 }
 
 /**
@@ -69,6 +71,7 @@ export function MobileEditableBlock({
   onOpenChange,
   overviewClassName,
   hideEditButton,
+  sheetContext = 'detail',
 }: MobileEditableBlockProps) {
   const isMobile = useIsMobile()
   const [internalOpen, setInternalOpen] = useState(false)
@@ -97,7 +100,7 @@ export function MobileEditableBlock({
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title={sheetTitle}
-        context="detail"
+        context={sheetContext}
         onConfirm={() => setSheetOpen(false)}
         confirmLabel="Übernehmen"
       >

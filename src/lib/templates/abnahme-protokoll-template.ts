@@ -130,7 +130,7 @@ function partyBox(
 function fotosHtml(urls: string[], captions: string[] = []): string {
   if (!urls.length) return ''
   const imgs = urls
-    .slice(0, 4)
+    .slice(0, 8)
     .map((u, i) => {
       const cap = (captions[i] ?? '').trim()
       return `<div style="margin:0 0 6px;border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">

@@ -20654,6 +20654,25 @@ body.has-blocking-overlay .app {
 .doccv-foot {
   display: none;
 }
+/* Abnahme: Footer mit Zurück/Weiter/Senden — Desktop + Mobil */
+.document-canvas.abnahme-canvas .document-canvas__footer-cta,
+.document-canvas.abnahme-canvas .doccv-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  border-top: 0.5px solid var(--app-separator, var(--border));
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background-color: var(--bw-material-bar, var(--card));
+  z-index: 25;
+}
+.document-canvas.abnahme-canvas .document-canvas__footer-cta .btn,
+.document-canvas.abnahme-canvas .doccv-foot .btn {
+  min-height: 44px;
+  font-size: var(--fs-text);
+  flex: 1 1 auto;
+}
 @media (max-width: 768px) {
   /*
    * Positionen-Wizard mobil: Body scrollt, DocBar (4 Icons) sticky unten.
@@ -20740,9 +20759,29 @@ body.has-blocking-overlay .app {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+  /* Abnahme: Footer-CTA (Zurück/Weiter/Speichern) muss sichtbar bleiben */
+  .document-canvas.wizard-flow.abnahme-canvas .document-canvas__footer-cta,
+  .document-canvas.wizard-flow.abnahme-canvas .doccv-foot {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    border-top: 0.5px solid var(--app-separator, var(--border));
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background-color: var(--bw-material-bar, var(--card));
+    z-index: 25;
+  }
+  .document-canvas.wizard-flow.abnahme-canvas .document-canvas__footer-cta .btn,
+  .document-canvas.wizard-flow.abnahme-canvas .doccv-foot .btn {
+    min-height: 46px;
+    font-size: var(--fs-text);
+    flex: 1 1 auto;
+  }
+
   /* Kein Speichern-CTA unter dem Wizard — Speichern ist DocBar-Icon */
-  .document-canvas.wizard-flow .document-canvas__footer-cta,
-  .document-canvas.wizard-flow .doccv-foot {
+  .document-canvas.wizard-flow:not(.abnahme-canvas) .document-canvas__footer-cta,
+  .document-canvas.wizard-flow:not(.abnahme-canvas) .doccv-foot {
     display: none !important;
   }
   .document-canvas.wizard-flow .document-canvas__docbar {

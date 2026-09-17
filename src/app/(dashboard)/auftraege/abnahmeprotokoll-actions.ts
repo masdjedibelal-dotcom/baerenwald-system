@@ -678,6 +678,19 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     sichtbar_fuer_kunde: false,
   })
 
+  // CRM-Dokumente (abnahme_protokoll_url) + Portal-/Kunden-Unterlagen
+  if (ebene === 'gesamt' && stored.publicUrl) {
+    try {
+      await verteileAbnahmeAnUnterlagen({
+        auftragId: input.auftragId,
+        pdfUrl: stored.publicUrl,
+        protokollId,
+      })
+    } catch (e) {
+      console.warn('[saveAbnahmeprotokollPdfOnly] Unterlagen-Verteilung:', e)
+    }
+  }
+
   revalidatePath(`/auftraege/${input.auftragId}`)
 
   return {

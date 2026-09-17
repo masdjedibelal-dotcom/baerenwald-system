@@ -341,7 +341,7 @@ export function AbnahmeprotokollCreateWizard({
     setUploading(true)
     try {
       const urls: string[] = []
-      const room = Math.max(0, 4 - meta.uebergabe_foto_urls.length)
+      const room = Math.max(0, 8 - meta.uebergabe_foto_urls.length)
       for (const file of Array.from(files).slice(0, room)) {
         const fd = new FormData()
         fd.set('file', file)
@@ -354,7 +354,7 @@ export function AbnahmeprotokollCreateWizard({
         if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
         urls.push(json.url)
       }
-      const nextUrls = [...meta.uebergabe_foto_urls, ...urls].slice(0, 4)
+      const nextUrls = [...meta.uebergabe_foto_urls, ...urls].slice(0, 8)
       const nextCaptions = nextUrls.map((_, i) => meta.uebergabe_foto_captions[i] ?? '')
       patchMeta({
         uebergabe_foto_urls: nextUrls,
@@ -427,8 +427,19 @@ export function AbnahmeprotokollCreateWizard({
       metaReady.abnahme_ergebnis = 'mit_vorbehalt'
     }
     setMeta(metaReady)
-    const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
+
+    const ohneUnterschrift = Boolean(metaReady.ohne_unterschrift)
+    const abschliessen = Boolean(opts?.abschliessen)
     const send = Boolean(opts?.send)
+
+    if (!hasSignatur && !ohneUnterschrift) {
+      toast.error(
+        'Unterschriften fehlen — bitte zeichnen oder „PDF ohne Unterschrift“ anhaken.'
+      )
+      setActiveSection('angaben')
+      return
+    }
+
     startTransition(async () => {
       const payload = {
         auftragId,
@@ -471,8 +482,8 @@ export function AbnahmeprotokollCreateWizard({
         } else {
           toast.success(
             r.sentToKunde
-              ? 'Abnahme gesendet — Auftrag abgeschlossen'
-              : 'Abnahme gespeichert — Auftrag abgeschlossen',
+              ? 'Abnahme an Kunden gesendet — Auftrag abgeschlossen · PDF in CRM & Portal-Unterlagen'
+              : 'Abnahme gespeichert — Auftrag abgeschlossen · PDF in CRM-Dokumenten',
             {
               action: {
                 label: 'Rückgängig',
@@ -489,7 +500,8 @@ export function AbnahmeprotokollCreateWizard({
             }
           )
         }
-        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        setDraftDirty(false)
+        router.push(`/auftraege/${auftragId}?tab=dokumente`)
         router.refresh()
         return
       }
@@ -509,8 +521,9 @@ export function AbnahmeprotokollCreateWizard({
           toast.error(r.message)
           return
         }
-        toast.success('Protokoll gesendet')
-        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        toast.success('Protokoll gesendet · PDF in CRM & Portal-Unterlagen')
+        setDraftDirty(false)
+        router.push(`/auftraege/${auftragId}?tab=dokumente`)
         router.refresh()
         return
       }
@@ -519,13 +532,17 @@ export function AbnahmeprotokollCreateWizard({
         toast.error(r.message)
         return
       }
+      setSessionProtokollId(r.protokollId)
+      setDraftDirty(false)
       downloadPdfFromBase64(r.pdfBase64, r.filename)
       toast.success(
-        r.updated || isEdit
-          ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
-          : 'Abnahmeprotokoll erstellt'
+        ohneUnterschrift
+          ? 'PDF ohne Unterschrift gespeichert — in CRM-Dokumenten & Unterlagen. Später an Kunden senden.'
+          : r.updated || isEdit
+            ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
+            : 'Abnahmeprotokoll erstellt'
       )
-      router.push(`/auftraege/${auftragId}?tab=leistungen`)
+      router.push(`/auftraege/${auftragId}?tab=dokumente`)
       router.refresh()
     })
   }
@@ -622,7 +639,7 @@ export function AbnahmeprotokollCreateWizard({
                   </p>
                   {fotos.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {fotos.slice(0, 4).map((url, i) => (
+                      {fotos.slice(0, 8).map((url, i) => (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           key={`${url}-${i}`}
@@ -672,6 +689,7 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Ergebnis">
         <MobileEditableBlock
           sheetTitle="Ergebnis bearbeiten"
+          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -696,6 +714,7 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Übergabe">
         <MobileEditableBlock
           sheetTitle="Übergabe bearbeiten"
+          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField label="Datum" value={abnahmeDatum || '—'} />
@@ -733,6 +752,7 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Personen">
         <MobileEditableBlock
           sheetTitle="Personen bearbeiten"
+          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an.trim() || '—'} />
@@ -772,6 +792,7 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Bauvorhaben">
         <MobileEditableBlock
           sheetTitle="Bauvorhaben bearbeiten"
+          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -803,7 +824,7 @@ export function AbnahmeprotokollCreateWizard({
               onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
               multiline
               rows={14}
-              sheetContext="detail"
+              sheetContext="canvas"
               placeholder="Leistungsumfang…"
             />
           </div>
@@ -824,12 +845,15 @@ export function AbnahmeprotokollCreateWizard({
           variant="secondary"
           size="sm"
           className="gap-1.5"
-          disabled={uploading || meta.uebergabe_foto_urls.length >= 4}
+          disabled={uploading || meta.uebergabe_foto_urls.length >= 8}
           onClick={() => fileRef.current?.click()}
         >
           <Plus className="h-3.5 w-3.5" />
           {uploading ? 'Lädt…' : 'Fotos hinzufügen'}
         </Button>
+        <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+          Max. 8 Fotos · erscheinen im PDF unter „Örtliche Situation“
+        </p>
         {meta.uebergabe_foto_urls.length > 0 ? (
           <div className="mt-3 space-y-3">
             {meta.uebergabe_foto_urls.map((url, i) => (
@@ -872,6 +896,7 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Unterschriften">
         <MobileEditableBlock
           sheetTitle="Unterschriften bearbeiten"
+          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -902,13 +927,35 @@ export function AbnahmeprotokollCreateWizard({
                   '—'
                 }
               />
+              {meta.ohne_unterschrift ? (
+                <MobileOverviewField label="Modus" value="Ohne Unterschrift" />
+              ) : null}
             </dl>
           }
         >
           <div className="space-y-6">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-bw-border bg-[var(--bg-2,var(--card))] p-3">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 shrink-0"
+                checked={Boolean(meta.ohne_unterschrift)}
+                onChange={(e) => patchMeta({ ohne_unterschrift: e.target.checked })}
+              />
+              <span className="min-w-0">
+                <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">
+                  PDF ohne Unterschrift erstellen
+                </span>
+                <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                  Kunde nicht vor Ort — Protokoll speichern und später manuell zusenden. Felder
+                  unten bleiben optional.
+                </span>
+              </span>
+            </label>
+
             <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-              Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer /
-              Auftraggeber. Ort/Datum leer = aus Übergabe.
+              {meta.ohne_unterschrift
+                ? 'Unterschriften optional — PDF kann ohne Zeichnung erzeugt werden.'
+                : 'Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer / Auftraggeber. Ort/Datum leer = aus Übergabe.'}
             </p>
 
             <div className="space-y-3">
@@ -926,7 +973,7 @@ export function AbnahmeprotokollCreateWizard({
                   })
                 }}
                 placeholder="Vor- und Nachname"
-                required
+                required={!meta.ohne_unterschrift}
               />
               <Input
                 label="Ort, Datum"
@@ -964,7 +1011,7 @@ export function AbnahmeprotokollCreateWizard({
                   })
                 }}
                 placeholder="Vor- und Nachname des Kunden"
-                required
+                required={!meta.ohne_unterschrift}
               />
               <Input
                 label="Ort, Datum"
@@ -1042,7 +1089,7 @@ export function AbnahmeprotokollCreateWizard({
         loading={draftSaving}
         onClick={() => void handleSaveDraftOnly()}
       >
-        Entwurf speichern
+        Entwurf
       </Button>
       {activeSection !== 'pruefen' ? (
         <Button
@@ -1075,9 +1122,9 @@ export function AbnahmeprotokollCreateWizard({
             className="gap-1.5"
             loading={pending}
             disabled={previewBusy || draftSaving}
-            onClick={() => erstellen({ abschliessen: hasSignatur, send: false })}
+            onClick={() => erstellen({ abschliessen: false, send: false })}
           >
-            Speichern
+            PDF speichern
           </Button>
           <Button
             type="button"
@@ -1086,10 +1133,10 @@ export function AbnahmeprotokollCreateWizard({
             className="gap-1.5"
             loading={pending}
             disabled={previewBusy || draftSaving}
-            onClick={() => erstellen({ abschliessen: hasSignatur, send: true })}
+            onClick={() => erstellen({ abschliessen: true, send: true })}
           >
             <Check className="h-4 w-4" />
-            Speichern und senden
+            An Kunden senden &amp; abschließen
           </Button>
         </>
       )}
@@ -1099,9 +1146,11 @@ export function AbnahmeprotokollCreateWizard({
   const phasePruefen = (
     <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-5">
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-        {hasSignatur
-          ? 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
-          : 'Beide Unterschriften (Auftragnehmer + Auftraggeber: Name und Zeichnung) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
+        {meta.ohne_unterschrift
+          ? 'Ohne Unterschrift: „PDF speichern“ legt das Protokoll in CRM-Dokumenten und Kunden-Unterlagen ab. „An Kunden senden & abschließen“ verschickt per E-Mail und schließt den Auftrag.'
+          : hasSignatur
+            ? 'Vorschau prüfen — „An Kunden senden & abschließen“ verschickt das PDF und schließt den Auftrag. „PDF speichern“ nur ablegen ohne Mail.'
+            : 'Unterschriften setzen oder unter Angaben „PDF ohne Unterschrift“ anhaken. Danach PDF speichern oder an den Kunden senden & abschließen.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
@@ -1148,7 +1197,7 @@ export function AbnahmeprotokollCreateWizard({
           placeholder="Rechtshinweise…"
         />
       </FieldCard>
-      <div className="hidden sm:block">{footerActions}</div>
+      <div className="sm:hidden">{footerActions}</div>
     </div>
   )
 
