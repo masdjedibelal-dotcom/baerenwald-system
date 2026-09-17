@@ -3,8 +3,9 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Eye, Plus } from 'lucide-react'
+import { Check, Eye, Plus, Trash2 } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
+import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   AbnahmeBegehListe,
@@ -340,6 +341,13 @@ export function AbnahmeprotokollCreateWizard({
         setActiveSection('angaben')
         return
       }
+      if (!hasSignatur && !meta.ohne_unterschrift) {
+        toast.error(
+          'Unterschrift fehlt — bitte Kunde unterschreiben lassen oder „PDF ohne Unterschrift“ anhaken.'
+        )
+        setActiveSection('angaben')
+        return
+      }
       setMeta((m) => ensureUnterschriftOrtDatum(m))
     }
     setActiveSection(id)
@@ -521,7 +529,11 @@ export function AbnahmeprotokollCreateWizard({
         return
       }
       if (send) {
-        const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId)
+        const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId, {
+          ohneUnterschrift: ohneUnterschrift,
+          kundeSigniert: Boolean(metaReady.signature_kunde_url?.trim()),
+          protokollId: sessionProtokollId,
+        })
         if (!mailDefaults.ok) {
           toast.error(mailDefaults.message)
           return
@@ -1079,7 +1091,7 @@ export function AbnahmeprotokollCreateWizard({
         {activeSection !== 'checkliste' ? (
           <button
             type="button"
-            className="btn ghost"
+            className="btn abnahme-canvas-footer__nav"
             disabled={pending || draftSaving}
             onClick={() =>
               goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
@@ -1091,10 +1103,11 @@ export function AbnahmeprotokollCreateWizard({
         {canDiscardEntwurf && sessionProtokollId ? (
           <button
             type="button"
-            className="btn ghost abnahme-canvas-footer__discard"
+            className="btn abnahme-canvas-footer__nav abnahme-canvas-footer__discard"
             disabled={pending || draftSaving}
             onClick={() => void handleDiscard()}
           >
+            <Trash2 className="h-4 w-4" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
             Verwerfen
           </button>
         ) : activeSection === 'checkliste' ? (
@@ -1180,7 +1193,7 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const headerEnd = (
-    <div className="flex items-center gap-1">
+    <>
       {activeSection === 'pruefen' ? (
         <button
           type="button"
@@ -1190,20 +1203,20 @@ export function AbnahmeprotokollCreateWizard({
           aria-label="PDF-Vorschau"
           title="PDF-Vorschau"
         >
-          <Eye className="h-5 w-5" aria-hidden />
+          <Eye className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
         </button>
       ) : null}
       <button
         type="button"
-        className="editor-sheet__confirm"
+        className={cn('editor-sheet__confirm', (pending || draftSaving) && 'opacity-50')}
         disabled={pending || draftSaving}
         onClick={() => void handleSaveDraftOnly()}
         aria-label="Entwurf speichern"
         title="Entwurf speichern"
       >
-        <Check className="h-5 w-5" aria-hidden />
+        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
       </button>
-    </div>
+    </>
   )
 
   return (

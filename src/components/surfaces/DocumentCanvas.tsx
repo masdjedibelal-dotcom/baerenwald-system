@@ -353,7 +353,7 @@ export function DocumentCanvas({
           disabled={interactionLocked}
           aria-label="Schließen"
         >
-          <X className="h-5 w-5" aria-hidden />
+          <X className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
         </button>
         <div className="document-canvas__title-block min-w-0 flex-1">
           <h1 className="document-canvas__title">{title}</h1>

@@ -274,7 +274,17 @@ export async function downloadAbnahmeprotokollPdf(input: {
   }
 }
 
-function defaultAbnahmeprotokollNachricht(anrede: MailAnrede): string {
+function defaultAbnahmeprotokollNachricht(
+  anrede: MailAnrede,
+  opts?: { bitteZurueckUnterschreiben?: boolean }
+): string {
+  if (opts?.bitteZurueckUnterschreiben) {
+    return mailText(
+      anrede,
+      'wir haben das Abnahmeprotokoll zu deinem Projekt erstellt. Das PDF findest du im Anhang. Bitte prüfe es, unterschreibe es und schicke uns die unterschriebene Fassung zurück.',
+      'wir haben das Abnahmeprotokoll zu Ihrem Projekt erstellt. Das PDF finden Sie im Anhang. Bitte prüfen Sie es, unterschreiben Sie es und schicken Sie uns die unterschriebene Fassung zurück.'
+    )
+  }
   return mailText(
     anrede,
     'wir haben das Abnahmeprotokoll zu deinem Projekt erstellt. Das vollständige Protokoll findest du im PDF-Anhang.',
@@ -282,7 +292,14 @@ function defaultAbnahmeprotokollNachricht(anrede: MailAnrede): string {
   )
 }
 
-export async function getAbnahmeprotokollMailDefaults(auftragId: string): Promise<
+export async function getAbnahmeprotokollMailDefaults(
+  auftragId: string,
+  opts?: {
+    ohneUnterschrift?: boolean
+    kundeSigniert?: boolean
+    protokollId?: string | null
+  }
+): Promise<
   | {
       ok: true
       defaultAnrede: MailAnrede
@@ -301,11 +318,32 @@ export async function getAbnahmeprotokollMailDefaults(auftragId: string): Promis
   const kunde = auf.kunden as { name?: string; typ?: string | null } | null
   const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
   const defaultAnrede: MailAnrede = 'sie'
+
+  let ohneUnterschrift = opts?.ohneUnterschrift
+  let kundeSigniert = opts?.kundeSigniert
+  if (ohneUnterschrift === undefined || kundeSigniert === undefined) {
+    const summary = await loadAbnahmeprotokollSummary(auftragId, opts?.protokollId)
+    if (summary?.meta) {
+      if (ohneUnterschrift === undefined) {
+        ohneUnterschrift = Boolean(summary.meta.ohne_unterschrift)
+      }
+      if (kundeSigniert === undefined) {
+        kundeSigniert = Boolean(summary.meta.signature_kunde_url?.trim())
+      }
+    }
+  }
+
+  /** Ohne Vor-Ort-Unterschrift: Kunde soll PDF prüfen, unterschreiben und zurückschicken. */
+  const bitteZurueckUnterschreiben =
+    Boolean(ohneUnterschrift) || kundeSigniert === false
+
   return {
     ok: true,
     defaultAnrede,
     defaultBetreff: `Abnahmeprotokoll — ${kundeName}`,
-    defaultNachricht: defaultAbnahmeprotokollNachricht(defaultAnrede),
+    defaultNachricht: defaultAbnahmeprotokollNachricht(defaultAnrede, {
+      bitteZurueckUnterschreiben,
+    }),
     kundeName,
   }
 }
@@ -772,7 +810,11 @@ export async function saveAbnahmeAndAbschliessen(input: {
   let sentToKunde = false
   let sendWarning: string | undefined
   if (input.sendToKunde) {
-    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId)
+    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId, {
+      ohneUnterschrift: Boolean(input.meta?.ohne_unterschrift),
+      kundeSigniert: Boolean(input.meta?.signature_kunde_url?.trim()),
+      protokollId: saved.protokollId,
+    })
     if (!mailDefaults.ok) {
       sendWarning = mailDefaults.message
     } else {
@@ -1836,7 +1878,11 @@ export async function abschliessenMitHwProtokoll(input: {
   let sendWarning: string | undefined
 
   if (input.sendToKunde) {
-    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId)
+    const mailDefaults = await getAbnahmeprotokollMailDefaults(input.auftragId, {
+      ohneUnterschrift: Boolean(summary.meta?.ohne_unterschrift),
+      kundeSigniert: Boolean(summary.meta?.signature_kunde_url?.trim()),
+      protokollId: summary.id,
+    })
     if (!mailDefaults.ok) {
       sendWarning = mailDefaults.message
     } else {

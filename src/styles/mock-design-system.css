@@ -20150,7 +20150,7 @@ body.has-blocking-overlay .app {
 }
 .editor-sheet__icon-btn {
   @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-bw-text-muted;
-  border: 0.5px solid var(--border-strong, var(--border));
+  border: 1px solid var(--border-strong, var(--border, #d6d3ce));
   background: var(--card, #fff);
   box-sizing: border-box;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
@@ -20596,6 +20596,8 @@ body.has-blocking-overlay .app {
 .document-canvas__header .editor-sheet__icon-btn {
   margin-left: 0;
   order: 0;
+  border: 1px solid var(--border-strong, var(--border, #d6d3ce));
+  background: var(--card, #fff);
 }
 .document-canvas__title {
   font-size: var(--fs-title);
@@ -20607,7 +20609,7 @@ body.has-blocking-overlay .app {
 .document-canvas__header-end {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   flex-shrink: 0;
 }
 .document-canvas__header .editor-sheet__confirm,
@@ -20706,11 +20708,21 @@ body.has-blocking-overlay .app {
   font-size: var(--fs-text);
   flex: 0 0 auto;
 }
+/* Zurück / Verwerfen: klarer Rahmen wie Listen-Action-Icons (nicht borderless ghost) */
+.abnahme-canvas-footer__nav {
+  border-color: var(--border-strong, var(--border));
+  background: var(--card, #fff);
+}
+.abnahme-canvas-footer__nav:hover {
+  background: var(--bg-soft);
+  border-color: var(--border-strong, var(--border));
+}
 .abnahme-canvas-footer__primary {
   min-width: 7.5rem;
 }
 .abnahme-canvas-footer__discard {
   color: var(--red, #c0392b) !important;
+  border-color: color-mix(in srgb, var(--red, #c0392b) 35%, var(--border)) !important;
 }
 /* Keine zweite DocBar unter dem Footer — Verwerfen sitzt im Footer */
 .document-canvas.abnahme-canvas .document-canvas__docbar {
