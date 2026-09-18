@@ -53,9 +53,19 @@ export async function updateLeadStatus(
 
   const alterStatus = lead.status as LeadStatus
 
+  const patch: Record<string, unknown> = {
+    status: neuerStatus,
+    updated_at: new Date().toISOString(),
+  }
+  // Portal zählt sonst abgebrochene Meldungen weiter als „Offen“ (hv_meldung_status/phase)
+  if (neuerStatus === 'abgebrochen') {
+    patch.vorgang_phase = 'abgelehnt'
+    patch.hv_meldung_status = 'abgelehnt'
+  }
+
   const { error: updErr } = await supabase
     .from('leads')
-    .update({ status: neuerStatus, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', leadId)
 
   if (updErr) {
