@@ -99,7 +99,13 @@ async function setAuftragStatus(
   const { error } = await supabase.from('auftraege').update(patch).eq('id', auftragId)
   if (error) return { ok: false, message: error.message }
 
-  if (status === 'abgeschlossen' || status === 'storniert') {
+  if (
+    status === 'abgeschlossen' ||
+    status === 'storniert' ||
+    status === 'in_arbeit' ||
+    status === 'offen' ||
+    status === 'abnahme'
+  ) {
     const { syncPortalLeadStatusAfterAuftragChange } = await import(
       '@/lib/portal/sync-portal-lead-status'
     )

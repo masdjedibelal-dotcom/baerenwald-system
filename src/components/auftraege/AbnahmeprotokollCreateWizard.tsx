@@ -1,5 +1,9 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
+import {
+  actionBusy,
+  showRouteBusy,
+  useLocalTransition,
+} from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -128,6 +132,7 @@ export function AbnahmeprotokollCreateWizard({
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
   const [pending, startTransition] = useLocalTransition('Wird gespeichert…')
+  const [sendBusy, setSendBusy] = useState(false)
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -137,6 +142,7 @@ export function AbnahmeprotokollCreateWizard({
   const [draftDirty, setDraftDirty] = useState(false)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
+  const interactionBusy = pending || draftSaving || sendBusy
   const skipDirtyRef = useRef(true)
   const canDiscardEntwurf =
     !initialFreigabeStatus ||
@@ -209,7 +215,7 @@ export function AbnahmeprotokollCreateWizard({
 
   /** Schließen = Entwurf speichern (Fotos/Mängel bleiben). */
   async function handleClose() {
-    if (draftSaving || pending) return
+    if (interactionBusy) return
     if (!draftDirty) {
       leaveWizard()
       return
@@ -230,7 +236,7 @@ export function AbnahmeprotokollCreateWizard({
 
   /** Verwerfen = Entwurf löschen, Stand weg — Auftrag läuft ohne Abnahme weiter. */
   async function handleDiscard() {
-    if (draftSaving || pending) return
+    if (interactionBusy) return
     setDraftSaving(true)
     try {
       if (sessionProtokollId && canDiscardEntwurf) {
@@ -251,7 +257,7 @@ export function AbnahmeprotokollCreateWizard({
   }
 
   async function handleSaveDraftOnly() {
-    if (draftSaving || pending) return
+    if (interactionBusy) return
     setDraftSaving(true)
     try {
       const id = await persistDraft({ notify: true })
@@ -508,16 +514,104 @@ export function AbnahmeprotokollCreateWizard({
       return
     }
 
-    startTransition(async () => {
-      const payload = {
-        auftragId,
-        abnahmeDatum,
-        punkte,
-        maengel,
-        notizen: notizen.trim() || null,
-        meta: metaReady,
-        protokollId: sessionProtokollId,
+    const payload = {
+      auftragId,
+      abnahmeDatum,
+      punkte,
+      maengel,
+      notizen: notizen.trim() || null,
+      meta: metaReady,
+      protokollId: sessionProtokollId,
+    }
+
+    async function afterAbschliessenSuccess(r: {
+      pdfBase64: string
+      filename: string
+      previousStatus: string
+      sentToKunde: boolean
+      sendWarning?: string
+    }) {
+      downloadPdfFromBase64(r.pdfBase64, r.filename)
+      const prev = r.previousStatus
+      if (r.sendWarning) {
+        toast.error(`Gespeichert — Versand fehlgeschlagen: ${r.sendWarning}`, {
+          action: {
+            label: 'Rückgängig',
+            onClick: () => {
+              void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
+                else {
+                  toast.success('Abschluss rückgängig')
+                  router.refresh()
+                }
+              })
+            },
+          },
+        })
+      } else {
+        toast.success(
+          r.sentToKunde
+            ? 'Abnahme an Kunden gesendet — Auftrag abgeschlossen · PDF heruntergeladen'
+            : 'Abnahme gespeichert — Auftrag abgeschlossen · PDF heruntergeladen',
+          {
+            action: {
+              label: 'Rückgängig',
+              onClick: () => {
+                void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                  if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
+                  else {
+                    toast.success('Abschluss rückgängig')
+                    router.refresh()
+                  }
+                })
+              },
+            },
+          }
+        )
       }
+      setDraftDirty(false)
+      showRouteBusy('Wird geschlossen…')
+      router.push(`/auftraege/${auftragId}?tab=dokumente`)
+      router.refresh()
+    }
+
+    /** An Kunden senden: globales Loading, PDF-Download, Wizard zu — Auftrag bleibt offen. */
+    if (send && !abschliessen) {
+      if (interactionBusy) return
+      setSendBusy(true)
+      void actionBusy
+        .run('Abnahme wird an Kunden gesendet…', async () => {
+          const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId, {
+            ohneUnterschrift: ohneUnterschrift,
+            kundeSigniert: Boolean(metaReady.signature_kunde_url?.trim()),
+            protokollId: sessionProtokollId,
+          })
+          if (!mailDefaults?.ok) {
+            toast.error(mailDefaults?.message ?? 'Mail-Defaults fehlgeschlagen')
+            return
+          }
+          const r = await saveAndSendAbnahmeprotokoll({
+            ...payload,
+            betreff: mailDefaults.defaultBetreff,
+            nachricht: mailDefaults.defaultNachricht,
+            anrede: mailDefaults.defaultAnrede,
+          })
+          if (!r?.ok) {
+            toast.error(r?.message ?? 'Senden fehlgeschlagen')
+            return
+          }
+          downloadPdfFromBase64(r.pdfBase64, r.filename)
+          toast.success('Abnahme an Kunden gesendet · PDF heruntergeladen')
+          setDraftDirty(false)
+          showRouteBusy('Wird geschlossen…')
+          router.push(`/auftraege/${auftragId}?tab=dokumente`)
+          router.refresh()
+        })
+        .finally(() => setSendBusy(false))
+      return
+    }
+
+    startTransition(async () => {
       if (abschliessen) {
         const r = await saveAbnahmeAndAbschliessen({
           ...payload,
@@ -527,76 +621,7 @@ export function AbnahmeprotokollCreateWizard({
           toast.error(r?.message ?? 'Speichern fehlgeschlagen')
           return
         }
-        downloadPdfFromBase64(r.pdfBase64, r.filename)
-        const prev = r.previousStatus
-        if (r.sendWarning) {
-          toast.error(
-            `Gespeichert — Versand fehlgeschlagen: ${r.sendWarning}`,
-            {
-              action: {
-                label: 'Rückgängig',
-                onClick: () => {
-                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                    if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
-                    else {
-                      toast.success('Abschluss rückgängig')
-                      router.refresh()
-                    }
-                  })
-                },
-              },
-            }
-          )
-        } else {
-          toast.success(
-            r.sentToKunde
-              ? 'Abnahme an Kunden gesendet — Auftrag abgeschlossen · PDF in CRM & Portal-Unterlagen'
-              : 'Abnahme gespeichert — Auftrag abgeschlossen · PDF in CRM-Dokumenten',
-            {
-              action: {
-                label: 'Rückgängig',
-                onClick: () => {
-                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                    if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
-                    else {
-                      toast.success('Abschluss rückgängig')
-                      router.refresh()
-                    }
-                  })
-                },
-              },
-            }
-          )
-        }
-        setDraftDirty(false)
-        router.push(`/auftraege/${auftragId}?tab=dokumente`)
-        router.refresh()
-        return
-      }
-      if (send) {
-        const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId, {
-          ohneUnterschrift: ohneUnterschrift,
-          kundeSigniert: Boolean(metaReady.signature_kunde_url?.trim()),
-          protokollId: sessionProtokollId,
-        })
-        if (!mailDefaults?.ok) {
-          toast.error(mailDefaults?.message ?? 'Mail-Defaults fehlgeschlagen')
-          return
-        }
-        const r = await saveAndSendAbnahmeprotokoll({
-          ...payload,
-          betreff: mailDefaults.defaultBetreff,
-          nachricht: mailDefaults.defaultNachricht,
-          anrede: mailDefaults.defaultAnrede,
-        })
-        if (!r?.ok) {
-          toast.error(r?.message ?? 'Senden fehlgeschlagen')
-          return
-        }
-        toast.success('Protokoll gesendet · PDF in CRM & Portal-Unterlagen')
-        setDraftDirty(false)
-        router.push(`/auftraege/${auftragId}?tab=dokumente`)
-        router.refresh()
+        afterAbschliessenSuccess(r)
         return
       }
       const r = await saveAbnahmeprotokollPdfOnly(payload)
@@ -614,6 +639,7 @@ export function AbnahmeprotokollCreateWizard({
             ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
             : 'Abnahmeprotokoll erstellt'
       )
+      showRouteBusy('Wird geschlossen…')
       router.push(`/auftraege/${auftragId}?tab=dokumente`)
       router.refresh()
     })
@@ -1137,7 +1163,7 @@ export function AbnahmeprotokollCreateWizard({
           <button
             type="button"
             className="btn abnahme-canvas-footer__nav"
-            disabled={pending || draftSaving}
+            disabled={interactionBusy}
             onClick={() =>
               goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
             }
@@ -1149,7 +1175,7 @@ export function AbnahmeprotokollCreateWizard({
           <button
             type="button"
             className="btn abnahme-canvas-footer__nav abnahme-canvas-footer__discard"
-            disabled={pending || draftSaving}
+            disabled={interactionBusy}
             onClick={() => void handleDiscard()}
           >
             <Trash2 className="h-4 w-4" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
@@ -1164,7 +1190,7 @@ export function AbnahmeprotokollCreateWizard({
           <button
             type="button"
             className="btn primary abnahme-canvas-footer__primary"
-            disabled={pending || draftSaving}
+            disabled={interactionBusy}
             onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
           >
             Weiter
@@ -1173,10 +1199,10 @@ export function AbnahmeprotokollCreateWizard({
           <button
             type="button"
             className="btn primary abnahme-canvas-footer__primary"
-            disabled={pending || draftSaving || previewBusy}
-            onClick={() => erstellen({ abschliessen: true, send: true })}
+            disabled={interactionBusy || previewBusy}
+            onClick={() => erstellen({ send: true })}
           >
-            {pending ? '…' : 'An Kunden senden'}
+            {sendBusy ? 'Wird gesendet…' : 'An Kunden senden'}
           </button>
         )}
       </div>
@@ -1243,7 +1269,7 @@ export function AbnahmeprotokollCreateWizard({
         <button
           type="button"
           className="editor-sheet__icon-btn"
-          disabled={pending || draftSaving || previewBusy}
+          disabled={interactionBusy || previewBusy}
           onClick={() => void vorschauPdf()}
           aria-label="PDF-Vorschau"
           title="PDF-Vorschau"
@@ -1253,8 +1279,8 @@ export function AbnahmeprotokollCreateWizard({
       ) : null}
       <button
         type="button"
-        className={cn('editor-sheet__confirm', (pending || draftSaving) && 'opacity-50')}
-        disabled={pending || draftSaving}
+        className={cn('editor-sheet__confirm', interactionBusy && 'opacity-50')}
+        disabled={interactionBusy}
         onClick={() => void handleSaveDraftOnly()}
         aria-label="Entwurf speichern"
         title="Entwurf speichern"
@@ -1274,7 +1300,7 @@ export function AbnahmeprotokollCreateWizard({
       onClose={() => void handleClose()}
       headerEnd={headerEnd}
       draftDirty={draftDirty}
-      saveBusy={pending || draftSaving}
+      saveBusy={interactionBusy}
       footerCta={footerActions}
       className="wizard-flow abnahme-canvas"
     >
@@ -1329,15 +1355,17 @@ export function AbnahmeprotokollCreateWizard({
 
         <AbnahmeProgressBar done={progress.done} total={progress.total} />
 
-        {pending || uploading || previewBusy || draftSaving ? (
+        {pending || uploading || previewBusy || draftSaving || sendBusy ? (
           <p className="abnahme-canvas-busy">
-            {draftSaving
-              ? 'Entwurf wird gespeichert…'
-              : pending
-                ? 'Erzeugt PDF…'
-                : previewBusy
-                  ? 'Vorschau…'
-                  : 'Lädt Fotos…'}
+            {sendBusy
+              ? 'Abnahme wird an Kunden gesendet…'
+              : draftSaving
+                ? 'Entwurf wird gespeichert…'
+                : pending
+                  ? 'Erzeugt PDF…'
+                  : previewBusy
+                    ? 'Vorschau…'
+                    : 'Lädt Fotos…'}
           </p>
         ) : null}
 

@@ -18534,10 +18534,16 @@ textarea.input:focus {
 /* Abnahme & Abschluss — DocumentCanvas (Mock 1:1) */
 .abnahme-canvas .document-canvas__paper {
   max-width: 720px;
-  /* Card-Bug: Höhe folgt dem Inhalt, Hintergrund nicht abschneiden */
+  /*
+   * Card-Bug: Body ist Flex-Spalte. min-height:0 + flex-shrink erlaubte dem Paper,
+   * unter die Content-Höhe zu schrumpfen — weißer Card-Rand schnitt Leistungen ab.
+   */
   height: auto !important;
-  min-height: 0 !important;
+  min-height: auto !important;
   max-height: none !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  align-self: flex-start;
   overflow: visible !important;
   display: flow-root;
   box-sizing: border-box;
@@ -18585,6 +18591,8 @@ textarea.input:focus {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: min-content;
+  flex-shrink: 0;
 }
 .abnahme-canvas-card__head {
   display: flex;
@@ -18721,6 +18729,8 @@ textarea.input:focus {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: min-content;
+  overflow: visible;
 }
 .abnahme-inline__item {
   display: flex;
@@ -18731,6 +18741,9 @@ textarea.input:focus {
   border-radius: 14px;
   background: var(--card);
   box-shadow: var(--shadow);
+  flex-shrink: 0;
+  min-height: min-content;
+  overflow: visible;
 }
 .abnahme-inline__item-actions {
   display: flex;
@@ -20734,8 +20747,11 @@ body.has-blocking-overlay .app {
 .document-canvas.wizard-flow.abnahme-canvas .document-canvas__paper {
   padding: 12px 14px 32px;
   height: auto !important;
-  min-height: 0 !important;
+  min-height: auto !important;
   max-height: none !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  align-self: flex-start;
   /* overflow-x:hidden von .wizard-flow würde overflow-y auf auto setzen und den Card-Rand abschneiden */
   overflow: visible !important;
 }
@@ -20824,13 +20840,17 @@ body.has-blocking-overlay .app {
     width: 100%;
     overflow-x: hidden;
   }
-  /* Abnahme/Abschluss: Card darf mit Inhalt mitwachsen (kein overflow-Clip) */
+  /* Abnahme/Abschluss: Card wächst mit Inhalt — kein Flex-Shrink unter Content */
   .document-canvas.wizard-flow.abnahme-canvas .document-canvas__paper,
   .document-canvas.wizard-flow.abschluss-canvas .document-canvas__paper {
     padding: 12px 14px 32px;
     overflow: visible !important;
     height: auto !important;
+    min-height: auto !important;
     max-height: none !important;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    align-self: flex-start;
     background: var(--bw-bg-paper, var(--card, #fff));
   }
   .document-canvas.wizard-flow .document-canvas__meta {
@@ -22719,8 +22739,11 @@ button.crow.crow--tap:hover {
 .abschluss-canvas .document-canvas__paper {
   max-width: 720px;
   height: auto !important;
-  min-height: 0 !important;
+  min-height: auto !important;
   max-height: none !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  align-self: flex-start;
   overflow: visible !important;
   display: flow-root;
   box-sizing: border-box;

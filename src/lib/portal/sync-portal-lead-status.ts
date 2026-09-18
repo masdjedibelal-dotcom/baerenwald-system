@@ -10,6 +10,8 @@ import type { AuftragStatus } from '@/lib/types'
 
 type SyncEvent =
   | 'angebot_gesendet'
+  | 'auftrag_beauftragt'
+  | 'auftrag_abnahme'
   | 'auftrag_abgeschlossen'
   | 'auftrag_storniert'
 
@@ -25,17 +27,26 @@ function partnerSiteBaseUrl(): string {
 function eventForStatus(status: string): SyncEvent | null {
   if (status === 'abgeschlossen') return 'auftrag_abgeschlossen'
   if (status === 'storniert') return 'auftrag_storniert'
+  if (status === 'in_arbeit' || status === 'offen') return 'auftrag_beauftragt'
+  if (status === 'abnahme') return 'auftrag_abnahme'
   return null
 }
 
 /** Gleiche Semantik wie Portal syncLeadFromCrm. */
 function leadPatchForEvent(event: SyncEvent): {
   vorgang_phase: string
-  hv_meldung_status?: string
+  hv_meldung_status?: string | null
+  clearHv?: boolean
   status?: string
 } {
   if (event === 'angebot_gesendet') {
     return { vorgang_phase: 'in_bearbeitung', status: 'angebot' }
+  }
+  if (event === 'auftrag_beauftragt') {
+    return { vorgang_phase: 'beauftragt', clearHv: true, hv_meldung_status: null }
+  }
+  if (event === 'auftrag_abnahme') {
+    return { vorgang_phase: 'abnahme', clearHv: true, hv_meldung_status: null }
   }
   if (event === 'auftrag_abgeschlossen') {
     return { vorgang_phase: 'abgeschlossen', hv_meldung_status: 'abgeschlossen' }
@@ -179,7 +190,9 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
       updated_at: new Date().toISOString(),
     }
     const prevHv = (lead.hv_meldung_status as string | null)?.trim()
-    if (event === 'auftrag_abgeschlossen' || prevHv) {
+    if (patch.clearHv && (prevHv === 'abgeschlossen' || prevHv === 'hm_erledigt' || !prevHv)) {
+      update.hv_meldung_status = null
+    } else if (event === 'auftrag_abgeschlossen' || event === 'auftrag_storniert' || prevHv) {
       if (patch.hv_meldung_status) update.hv_meldung_status = patch.hv_meldung_status
     }
 

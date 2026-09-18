@@ -17,7 +17,8 @@ export const AUFTRAEGE_LISTE_SELECT = `
       created_at,
       letzte_aktivitaet,
       kunden(id, name, email, telefon, adresse, plz, ort, vorname, nachname, typ),
-      angebote(id, gesamt_fix, gesamt_min, gesamt_max, zahlungsplan, zahlungsbedingungen)
+      angebote(id, gesamt_fix, gesamt_min, gesamt_max, zahlungsplan, zahlungsbedingungen),
+      auftrag_positionen(id, preis_fix, menge, aenderung_typ, gewerk_slug, leistung_name)
     `
 
 export async function loadAuftraegeListe(): Promise<{

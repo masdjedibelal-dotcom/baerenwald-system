@@ -476,7 +476,11 @@ export async function saveAndSendAbnahmeprotokoll(input: {
   nachricht: string
   anrede: 'du' | 'sie'
   protokollId?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+  meta?: AbnahmeProtokollMeta | null
+}): Promise<
+  | { ok: true; pdfBase64: string; filename: string; publicUrl: string }
+  | { ok: false; message: string }
+> {
   const existingGate = await loadAbnahmeprotokollSummary(
     input.auftragId,
     input.protokollId
@@ -502,13 +506,24 @@ export async function saveAndSendAbnahmeprotokoll(input: {
 
   const prepared = prepareAbnahmePayload(input)
   const existing = existingGate ?? (await loadAbnahmeprotokollSummary(input.auftragId))
+  const detail = await loadAuftragDetail(input.auftragId)
+  if (!detail?.kunden) return { ok: false, message: 'Auftrag/Kunde nicht gefunden' }
+  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
+  const meta = await resolveAbnahmeProtokollMetaForSave(detail, firm, {
+    meta: input.meta ?? null,
+    previousMeta: existing?.meta ?? null,
+    punkte: prepared.punkte,
+    maengel: prepared.maengel,
+    notizen: input.notizen,
+    abnahmeDatum: input.abnahmeDatum,
+  })
   const built = await buildPdfBuffer({
     auftragId: input.auftragId,
     abnahmeDatum: input.abnahmeDatum,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
     notizen: input.notizen,
-    meta: existing?.meta ?? null,
+    meta,
   })
   if (!built.ok) return built
 
@@ -523,7 +538,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     notizen: input.notizen?.trim() || null,
     punkte: prepared.punkte,
     maengel: prepared.maengel,
-    ...(existing?.meta ? { meta: existing.meta } : {}),
+    meta,
     pdf_url: stored.publicUrl,
     an_kunde_gesendet_at: new Date().toISOString(),
   }
@@ -571,7 +586,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
       abnahme_protokoll_url: stored.publicUrl,
       abnahme_datum: input.abnahmeDatum.slice(0, 10),
       updated_at: new Date().toISOString(),
-      ...(!hatMaengel ? { status: 'abnahme', fortschritt: 85 } : {}),
+      /* Kein Status-Bump: Abnahme-PDF an Kunden ≠ Auftrag erledigt/abgeschlossen */
     })
     .eq('id', input.auftragId)
 
@@ -616,7 +631,12 @@ export async function saveAndSendAbnahmeprotokoll(input: {
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true }
+  return {
+    ok: true,
+    pdfBase64: built.buffer.toString('base64'),
+    filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
+    publicUrl: stored.publicUrl,
+  }
 }
 
 export async function saveAbnahmeprotokollPdfOnly(input: {

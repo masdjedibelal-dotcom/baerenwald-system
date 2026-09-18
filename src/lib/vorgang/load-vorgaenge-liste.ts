@@ -6,7 +6,7 @@ import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { LeadKanal } from '@/lib/types'
-import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
+import { betragAnzeigeBrutto, nettoZuBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
   hatGestellteEndabrechnung,
@@ -287,7 +287,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ? withCrmReadFallback(async (db) =>
           db
             .from('auftrag_positionen')
-            .select('auftrag_id, handwerker_id, handwerker_status')
+            .select('auftrag_id, handwerker_id, handwerker_status, preis_fix, menge, aenderung_typ, gewerk_slug')
             .in('auftrag_id', auftragIds)
             .order('created_at', { ascending: false })
             .limit(scoped ? 800 : 2000)
@@ -525,6 +525,10 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       auftrag_id: string
       handwerker_id: string | null
       handwerker_status: string | null
+      preis_fix?: number | null
+      menge?: number | null
+      aenderung_typ?: string | null
+      gewerk_slug?: string | null
     }>,
     (p) => p.auftrag_id
   )
@@ -664,12 +668,24 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       }
       if (phase === 'auftrag') {
         const auf = (auftraegeByLead.get(lead.id) ?? []).find((a) => a.id === entityId)
+        const pos = positionenByAuftrag.get(entityId) ?? []
+        const posNetto = pos.reduce((s, p) => {
+          if (String(p.aenderung_typ ?? '').toLowerCase() === 'entfernt') return s
+          const slug = String(p.gewerk_slug ?? '')
+          if (slug.startsWith('_')) return s
+          const menge = Number(p.menge) > 0 ? Number(p.menge) : 1
+          const unit = Number(p.preis_fix) || 0
+          return s + unit * menge
+        }, 0)
+        if (posNetto > 0) {
+          const brutto = nettoZuBrutto(posNetto, 19)
+          return `${brutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+        }
         const leadAngs = angeboteByLead.get(lead.id) ?? []
         const linked = auf?.angebot_id
           ? leadAngs.find((a) => a.id === auf.angebot_id)
           : null
         if (linked) return angebotBetragLabel(linked)
-        // Fallback: neuestes Angebot mit Betrag
         for (const a of leadAngs) {
           const label = angebotBetragLabel(a)
           if (label) return label

@@ -4,7 +4,7 @@
  */
 import 'server-only'
 
-import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -17,7 +17,7 @@ import {
   type RechnungAbschlagLink,
 } from '@/lib/rechnungen/zahlungsplan'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
-
+import { revalidatePath } from 'next/cache'
 function normKey(s: string): string {
   return s.trim().toLowerCase()
 }
@@ -191,7 +191,37 @@ async function mergeAngebotPositionen(
   }
 
   const next = Array.from(byKey.values())
-  await supabaseAdmin.from('angebote').update({ positionen: next }).eq('id', angebotId)
+  const summen = summenAusPositionen(next, 19)
+  await supabaseAdmin
+    .from('angebote')
+    .update({
+      positionen: next,
+      // Listen (Vorgänge/Aufträge) lesen gesamt_* — nicht nur positionen-JSON
+      gesamt_min: summen.nettoMin,
+      gesamt_max: summen.nettoMax,
+      gesamt_fix: summen.nettoMin,
+    })
+    .eq('id', angebotId)
+}
+
+/** Angebots-Summenfelder an aktuelle Positionen anbinden (Listenanzeige). */
+async function syncAngebotGesamtFelder(angebotId: string): Promise<void> {
+  const { data: ang } = await supabaseAdmin
+    .from('angebote')
+    .select('positionen')
+    .eq('id', angebotId)
+    .maybeSingle()
+  if (!ang) return
+  const pos = normalizeAngebotPositionen(ang.positionen)
+  const summen = summenAusPositionen(pos, 19)
+  await supabaseAdmin
+    .from('angebote')
+    .update({
+      gesamt_min: summen.nettoMin,
+      gesamt_max: summen.nettoMax,
+      gesamt_fix: summen.nettoMin,
+    })
+    .eq('id', angebotId)
 }
 
 /**
@@ -239,6 +269,11 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
     }
   }
 
+  // Listen lesen angebote.gesamt_* — nach Positions-Anhebung immer nachziehen
+  if (angebotId) {
+    await syncAngebotGesamtFelder(angebotId)
+  }
+
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
     typ: 'notiz_intern',
@@ -246,6 +281,10 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
     beschreibung:
       'Schlussrechnung lag über der bisherigen Auftragssumme — Auftrag und Angebot wurden automatisch angehoben.',
   })
+
+  revalidatePath('/vorgaenge')
+  revalidatePath('/auftraege')
+  revalidatePath(`/auftraege/${auftragId}`)
 
   return { ok: true, vkNetto, adjusted: true }
 }
