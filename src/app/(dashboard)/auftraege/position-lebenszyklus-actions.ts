@@ -201,7 +201,7 @@ export async function listAuftragPositionEintraege(
     fotoIndexByRow.push(idxs)
   }
   const allDisplayUrls = await Promise.all(
-    allFotoPaths.map((path) => resolveEintragFotoDisplayUrl(path))
+    allFotoPaths.map((path) => resolveEintragFotoDisplayUrl(path, 604800))
   )
 
   const out: PositionEintrag[] = []

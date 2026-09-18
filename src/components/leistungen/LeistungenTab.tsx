@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 import { LeistungDrawer } from '@/components/leistungen/LeistungDrawer'
+import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
 import { LeistungenMaengelCard } from '@/components/leistungen/LeistungenMaengelCard'
 import type {
   LeistungDrawerAction,
@@ -258,6 +259,18 @@ export function LeistungenTab({
               <ChevronRight className="lt-card__chev h-4 w-4" aria-hidden />
             </span>
           </div>
+          {(row.handwerkerUpdates?.length ?? 0) > 0 ? (
+            <div
+              className="lt-upd"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <LeistungHandwerkerUpdatesAccordion
+                updates={row.handwerkerUpdates ?? []}
+                compact
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     )
@@ -265,9 +278,10 @@ export function LeistungenTab({
 
   function renderLeistungRow(row: LeistungRow) {
     const selected = selectedIds.has(row.id)
+    const hasUpdates = (row.handwerkerUpdates?.length ?? 0) > 0
     return (
+      <div key={row.id} className={cn('lt-row-wrap', hasUpdates && 'lt-row-wrap--upd')}>
       <div
-        key={row.id}
         className={cn('lt-row', selected && 'sel')}
         role="button"
         tabIndex={0}
@@ -360,6 +374,19 @@ export function LeistungenTab({
             </div>
           )
         })}
+      </div>
+      {hasUpdates ? (
+        <div
+          className="lt-upd"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <LeistungHandwerkerUpdatesAccordion
+            updates={row.handwerkerUpdates ?? []}
+            compact
+          />
+        </div>
+      ) : null}
       </div>
     )
   }

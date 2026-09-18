@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { MediaThumb, MediaThumbStrip } from '@/components/shared/MediaThumb'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { cn } from '@/lib/utils'
 import type { LeistungRow } from '@/components/leistungen/types'
@@ -29,32 +30,43 @@ function fmtDatumZeit(v?: string | null): string {
 }
 
 /**
- * Accordion unter einer Leistung: Handwerker-Updates mit Foto-Vorschau,
- * Aufklappen → Beschreibung + Fotostreifen.
+ * Accordion unter einer Leistung: Handwerker-Updates mit Foto-Vorschau.
+ * Collapsed: Count + Thumbs. Default offen bei ≥1 Update.
  */
 export function LeistungHandwerkerUpdatesAccordion({
   updates,
   className,
+  defaultOpen,
+  compact,
 }: {
   updates: Update[]
   className?: string
+  defaultOpen?: boolean
+  /** Kompakt in Listenzeile — weniger Padding. */
+  compact?: boolean
 }) {
-  const [listOpen, setListOpen] = useState(true)
+  const [listOpen, setListOpen] = useState(() => defaultOpen ?? updates.length > 0)
   const [openId, setOpenId] = useState<string | null>(null)
 
   if (updates.length === 0) return null
 
+  const headerThumbs = updates.flatMap((u) => u.fotoUrls ?? []).filter(Boolean)
+
   return (
-    <div className={cn('hw-upd', className)}>
+    <div className={cn('hw-upd', compact && 'hw-upd--compact', className)}>
       <button
         type="button"
         className="hw-upd__toggle"
         aria-expanded={listOpen}
-        onClick={() => setListOpen((o) => !o)}
+        onClick={(e) => {
+          e.stopPropagation()
+          setListOpen((o) => !o)
+        }}
       >
         <span className="hw-upd__toggle-label">
           {updates.length === 1 ? '1 Update' : `${updates.length} Updates`}
         </span>
+        {!listOpen ? <MediaThumbStrip urls={headerThumbs} max={3} size="sm" /> : null}
         <ChevronDown
           className={cn('hw-upd__chev', listOpen && 'hw-upd__chev--open')}
           aria-hidden
@@ -77,7 +89,10 @@ export function LeistungHandwerkerUpdatesAccordion({
                   type="button"
                   className="hw-upd__row"
                   aria-expanded={rowOpen}
-                  onClick={() => setOpenId(rowOpen ? null : key)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenId(rowOpen ? null : key)
+                  }}
                 >
                   <div className="hw-upd__row-main">
                     <div className="hw-upd__row-head">
@@ -87,14 +102,9 @@ export function LeistungHandwerkerUpdatesAccordion({
                         <span className="hw-upd__zeit">{u.zeitLabel} Std.</span>
                       ) : null}
                     </div>
-                    {!rowOpen ? (
-                      <p className="hw-upd__preview">{preview}</p>
-                    ) : null}
+                    {!rowOpen ? <p className="hw-upd__preview">{preview}</p> : null}
                   </div>
-                  {fotos[0] && !rowOpen ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={fotos[0]} alt="" className="hw-upd__thumb" />
-                  ) : null}
+                  {!rowOpen ? <MediaThumbStrip urls={fotos} max={2} size="sm" /> : null}
                   <ChevronDown
                     className={cn('hw-upd__chev', rowOpen && 'hw-upd__chev--open')}
                     aria-hidden
@@ -110,16 +120,13 @@ export function LeistungHandwerkerUpdatesAccordion({
                     {fotos.length > 0 ? (
                       <div className="hw-upd__fotos">
                         {fotos.map((url, fi) => (
-                          <a
+                          <MediaThumb
                             key={`${key}-f-${fi}`}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hw-upd__foto"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={`Foto ${fi + 1}`} />
-                          </a>
+                            src={url}
+                            alt={`Foto ${fi + 1}`}
+                            size="md"
+                            className="hw-upd__foto-img"
+                          />
                         ))}
                       </div>
                     ) : null}
