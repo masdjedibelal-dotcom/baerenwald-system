@@ -76,4 +76,4 @@ export default async function handler() {
 }
 
 /** Alle :00 und :30 UTC — deckt alle CRM-Cron-Zeitpunkte ab (Rechnungen 00:00) */
-export const config = { schedule: '0,30 * * * *' }
+export const config = { schedule: '0,30 * * * *', region: 'fra' }

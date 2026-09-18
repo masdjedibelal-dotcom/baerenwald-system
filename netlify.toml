@@ -28,3 +28,9 @@
     "node_modules/@sparticuz/chromium/build/**",
     "scripts/ki-analyse/**",
   ]
+
+# Region nur für handgeschriebene Functions (Cron).
+# Next.js-SSR: Site-UI „Functions region“ = fra (Frankfurt).
+# Docs: https://docs.netlify.com/build/functions/configuration
+[functions."cron-dispatcher"]
+  region = "fra"
