@@ -1071,6 +1071,22 @@ export async function saveRechnungWizardDraft(
 ): Promise<
   { ok: true; rechnungId: string; rechnungsnummer: string } | { ok: false; message: string }
 > {
+  try {
+    return await saveRechnungWizardDraftInner(input)
+  } catch (e) {
+    console.error('[saveRechnungWizardDraft]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Speichern fehlgeschlagen.',
+    }
+  }
+}
+
+async function saveRechnungWizardDraftInner(
+  input: SaveRechnungWizardDraftPayload
+): Promise<
+  { ok: true; rechnungId: string; rechnungsnummer: string } | { ok: false; message: string }
+> {
   const positionen = repairAngebotPositionen(normalizeAngebotPositionen(input.positionen))
   if (!positionen.length) {
     return { ok: false, message: 'Mindestens eine Position erforderlich.' }
@@ -1081,8 +1097,16 @@ export async function saveRechnungWizardDraft(
     if (!input.auftrag_id?.trim()) {
       return { ok: false, message: 'Abschlagsrechnungen erfordern einen Auftrag.' }
     }
-    const planSave = await saveAuftragZahlungsplan(input.auftrag_id, input.zahlungsplan)
-    if (!planSave.ok) return planSave
+    // Nur bei bewusstem Plan-Save — sonst überschreibt ensureAbschlagEntwuerfe Entwürfe
+    // bei jedem Draft/Versand und kann den Versand abbrechen.
+    if (input.zahlungsplanSpeichern) {
+      const planSave = await saveAuftragZahlungsplan(input.auftrag_id, input.zahlungsplan)
+      if (!planSave?.ok) {
+        return planSave?.ok === false
+          ? planSave
+          : { ok: false, message: 'Zahlungsplan speichern fehlgeschlagen.' }
+      }
+    }
   }
 
   await syncNeueLeistungenToPreisliste(syncInputsFromAngebotPositionen(positionen))
@@ -1139,27 +1163,23 @@ export async function saveRechnungWizardDraft(
       }
     }
     if (zeile) {
-      const wizardHatLeistungen =
-        positionen.length > 1 && !positionen.every((p) => istAbschlagPauschalPosition(p))
-      const leistungenQuelle = zeile.istSchluss
-        ? wizardHatLeistungen
-          ? positionen
-          : auftragPositionen
-        : wizardHatLeistungen
-          ? positionen
-          : auftragPositionen
-      positionenFuerBeleg = positionenFuerAbschlagRechnung({
-        zeile,
-        allePositionen: leistungenQuelle,
-        plan: input.zahlungsplan,
-        gesamtNetto,
-        auftragsReferenz: '',
-        projektTitel: '',
-        bereitsGestelltBrutto: berechneBereitsGestellt(links, input.rechnungId ?? null).brutto,
-        vorherigeAbschlaege: links,
-        ausserRechnungId: input.rechnungId ?? null,
-      })
+      // Abschlag-Rate: immer Plan-Pauschale (keine Wizard-Zusatzzeilen).
+      // Schluss: Wizard-Leistungen behalten, wenn vorhanden.
       if (zeile.istSchluss || rechnungArt === 'schluss') {
+        const wizardHatLeistungen =
+          positionen.length > 0 && !positionen.every((p) => istAbschlagPauschalPosition(p))
+        const leistungenQuelle = wizardHatLeistungen ? positionen : auftragPositionen
+        positionenFuerBeleg = positionenFuerAbschlagRechnung({
+          zeile,
+          allePositionen: leistungenQuelle,
+          plan: input.zahlungsplan,
+          gesamtNetto,
+          auftragsReferenz: '',
+          projektTitel: '',
+          bereitsGestelltBrutto: berechneBereitsGestellt(links, input.rechnungId ?? null).brutto,
+          vorherigeAbschlaege: links,
+          ausserRechnungId: input.rechnungId ?? null,
+        })
         const schluss = berechneSchlussAbrechnung(positionenFuerBeleg, links, {
           reverseCharge13b: input.meta.reverse_charge_13b,
           ausserRechnungId: input.rechnungId ?? null,
@@ -1179,6 +1199,17 @@ export async function saveRechnungWizardDraft(
               : [{ satz: 0, netto: schluss.rest_netto, mwst: 0 }],
         }
       } else {
+        positionenFuerBeleg = positionenFuerAbschlagRechnung({
+          zeile,
+          allePositionen: auftragPositionen,
+          plan: input.zahlungsplan,
+          gesamtNetto,
+          auftragsReferenz: '',
+          projektTitel: '',
+          bereitsGestelltBrutto: berechneBereitsGestellt(links, input.rechnungId ?? null).brutto,
+          vorherigeAbschlaege: links,
+          ausserRechnungId: input.rechnungId ?? null,
+        })
         liste_berechnung = rechnungBerechnungFuerAbschlagZeile(
           berechnungVoll,
           zeile,
@@ -1210,7 +1241,11 @@ export async function saveRechnungWizardDraft(
         ausserRechnungId: input.rechnungId ?? null,
         mwstSatz: Number(liste_berechnung.mwst_satz) || 19,
       })
-      if (!raised.ok) return raised
+      if (!raised?.ok) {
+        return raised?.ok === false
+          ? raised
+          : { ok: false, message: 'Auftragssumme anpassen fehlgeschlagen.' }
+      }
       vkNetto = raised.vkNetto
     }
     const vkGate = validateGestellteRechnungenGegenVk({
@@ -1316,7 +1351,11 @@ export async function saveRechnungWizardDraft(
       const gutschrift = await createGutschriftFromRechnung(input.rechnungId, {
         deferOriginalStorno: true,
       })
-      if (!gutschrift.ok) return gutschrift
+      if (!gutschrift?.ok) {
+        return gutschrift?.ok === false
+          ? gutschrift
+          : { ok: false, message: 'Storno anlegen fehlgeschlagen.' }
+      }
 
       const created = await createRechnungEntwurf({
         angebot_id: input.angebot_id ?? (existingRec.angebot_id as string | null) ?? null,
@@ -1326,7 +1365,11 @@ export async function saveRechnungWizardDraft(
         ist_wiederkehrend: input.ist_wiederkehrend,
         wiederkehr_turnus: input.wiederkehr_turnus,
       })
-      if (!created.ok) return created
+      if (!created?.ok) {
+        return created?.ok === false
+          ? created
+          : { ok: false, message: 'Korrektur-Entwurf anlegen fehlgeschlagen.' }
+      }
 
       await linkRechnungKorrekturKette(supabaseCheck, {
         originalId: input.rechnungId,
@@ -1357,7 +1400,9 @@ export async function saveRechnungWizardDraft(
       kunde_id: input.kunde_id,
       ...payload,
     })
-    if (!upd.ok) return upd
+    if (!upd?.ok) {
+      return upd?.ok === false ? upd : { ok: false, message: 'Entwurf speichern fehlgeschlagen.' }
+    }
 
     const supabase = createClient()
     const { data: nr } = await supabase
@@ -1386,7 +1431,11 @@ export async function saveRechnungWizardDraft(
     kunde_id: input.kunde_id,
     ...payload,
   })
-  if (!created.ok) return created
+  if (!created?.ok) {
+    return created?.ok === false
+      ? created
+      : { ok: false, message: 'Entwurf anlegen fehlgeschlagen.' }
+  }
 
   const supabase = createClient()
   const { data: nr } = await supabase
@@ -1623,46 +1672,54 @@ export async function syncRechnungWizardMetaToEntwurf(
     'kunde_id' | 'meta' | 'ansprechpartner_id' | 'kunde_objekt_id' | 'objekt_anlage_id'
   >
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
-  const { data: cur } = await supabase
-    .from('rechnungen')
-    .select('faellig_am')
-    .eq('id', rechnungId)
-    .maybeSingle()
+  try {
+    const supabase = createClient()
+    const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
+    const { data: cur } = await supabase
+      .from('rechnungen')
+      .select('faellig_am')
+      .eq('id', rechnungId)
+      .maybeSingle()
 
-  const { error } = await supabase
-    .from('rechnungen')
-    .update({
-      kunde_id: input.kunde_id,
-      ...(input.ansprechpartner_id !== undefined
-        ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
-        : {}),
-      ...(input.kunde_objekt_id !== undefined
-        ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
-        : {}),
-      ...(input.objekt_anlage_id !== undefined
-        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
-        : {}),
-      leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
-      leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
-      faellig_am: faelligNeu,
-      rechnungsdatum: input.meta.rechnungsdatum || null,
-      reverse_charge_13b: input.meta.reverse_charge_13b,
-      hinweis_35a: input.meta.hinweis_35a,
-      einleitung: input.meta.einleitung || null,
-      hinweise: input.meta.hinweise || null,
-      mail_einleitung: input.meta.mail_einleitung || null,
-      mail_betreff: input.meta.mail_betreff || null,
-      zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
-      ...mahnungFelderBeiFaelligkeitAenderung(faelligNeu, cur?.faellig_am as string | null),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', rechnungId)
+    const { error } = await supabase
+      .from('rechnungen')
+      .update({
+        kunde_id: input.kunde_id,
+        ...(input.ansprechpartner_id !== undefined
+          ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }
+          : {}),
+        ...(input.kunde_objekt_id !== undefined
+          ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
+          : {}),
+        ...(input.objekt_anlage_id !== undefined
+          ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
+          : {}),
+        leistungszeitraum_von: input.meta.leistungszeitraum_von || null,
+        leistungszeitraum_bis: input.meta.leistungszeitraum_bis || null,
+        faellig_am: faelligNeu,
+        rechnungsdatum: input.meta.rechnungsdatum || null,
+        reverse_charge_13b: input.meta.reverse_charge_13b,
+        hinweis_35a: input.meta.hinweis_35a,
+        einleitung: input.meta.einleitung || null,
+        hinweise: input.meta.hinweise || null,
+        mail_einleitung: input.meta.mail_einleitung || null,
+        mail_betreff: input.meta.mail_betreff || null,
+        zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
+        ...mahnungFelderBeiFaelligkeitAenderung(faelligNeu, cur?.faellig_am as string | null),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', rechnungId)
 
-  if (error) return { ok: false, message: error.message }
-  revalidatePath(`/rechnungen/${rechnungId}`)
-  return { ok: true }
+    if (error) return { ok: false, message: error.message }
+    revalidatePath(`/rechnungen/${rechnungId}`)
+    return { ok: true }
+  } catch (e) {
+    console.error('[syncRechnungWizardMetaToEntwurf]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Meta speichern fehlgeschlagen.',
+    }
+  }
 }
 
 export async function sendRechnungWizard(input: {
@@ -1671,16 +1728,28 @@ export async function sendRechnungWizard(input: {
   mailCc?: string[]
   mitAbschlussbericht?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const res = await sendRechnung(input.rechnungId, {
-    to: input.mailTo,
-    cc: input.mailCc,
-    mitAbschlussbericht: input.mitAbschlussbericht,
-  })
-  if (!res.ok) return res
-  revalidatePath('/rechnungen')
-  revalidatePath(`/rechnungen/${input.rechnungId}`)
-  revalidatePath('/vorgaenge')
-  return { ok: true }
+  try {
+    const res = await sendRechnung(input.rechnungId, {
+      to: input.mailTo,
+      cc: input.mailCc,
+      mitAbschlussbericht: input.mitAbschlussbericht,
+    })
+    if (!res?.ok) {
+      return res?.ok === false
+        ? res
+        : { ok: false, message: 'Versand fehlgeschlagen.' }
+    }
+    revalidatePath('/rechnungen')
+    revalidatePath(`/rechnungen/${input.rechnungId}`)
+    revalidatePath('/vorgaenge')
+    return { ok: true }
+  } catch (e) {
+    console.error('[sendRechnungWizard]', e)
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Versand fehlgeschlagen.',
+    }
+  }
 }
 
 /** PDF erzeugen und speichern — Status bleibt Entwurf (kein „gesendet“, kein Auftragsabschluss).

@@ -800,12 +800,13 @@ export function RechnungWizard({
                 }
               : null,
           zahlungsplan: planAktiv ? plan : null,
-          zahlungsplanSpeichern: planAktiv,
+          // Plan nur über persistPlan speichern — sonst überschreibt ensure Entwürfe bei jedem Draft/Versand
+          zahlungsplanSpeichern: false,
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
-        if (!res.ok) {
-          if (!silent) toast.error(res.message)
+        if (!res?.ok) {
+          if (!silent) toast.error(res?.message || 'Speichern fehlgeschlagen.')
           return null
         }
         const switched = Boolean(
@@ -896,8 +897,8 @@ export function RechnungWizard({
     if (manageBusy) setSaving(true)
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
-      if (!planSave.ok) {
-        if (!silent) toast.error(planSave.message)
+      if (!planSave?.ok) {
+        if (!silent) toast.error(planSave?.message || 'Zahlungsplan speichern fehlgeschlagen.')
         return null
       }
       const res = await createAllAbschlagRechnungenFromWizard({
@@ -914,8 +915,8 @@ export function RechnungWizard({
         ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
         wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
       })
-      if (!res.ok) {
-        if (!silent) toast.error(res.message)
+      if (!res?.ok) {
+        if (!silent) toast.error(res?.message || 'Abschläge anlegen fehlgeschlagen.')
         return null
       }
       setAbschlagRechnungen(res.rechnungen)
@@ -1057,15 +1058,15 @@ export function RechnungWizard({
         objekt_anlage_id: objektAnlageId,
         meta: nextMeta,
       })
-      if (!sync.ok) {
-        toast.error(sync.message)
+      if (!sync?.ok) {
+        toast.error(sync?.message || 'Meta speichern fehlgeschlagen.')
         return
       }
 
       if (!sendMail) {
         const res = await finalizeRechnungWizardWithoutMail(id)
-        if (!res.ok) {
-          toast.error(res.message)
+        if (!res?.ok) {
+          toast.error(res?.message || 'Speichern fehlgeschlagen.')
           return
         }
         toast.success(
@@ -1087,8 +1088,8 @@ export function RechnungWizard({
           abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
         ),
       })
-      if (!res.ok) {
-        toast.error(res.message)
+      if (!res?.ok) {
+        toast.error(res?.message || 'Versand fehlgeschlagen.')
         return
       }
       toast.success(
@@ -1207,12 +1208,19 @@ export function RechnungWizard({
         .filter(Boolean)
         .join(' · ')
 
+  /** Abschlag aus Plan: Positionen nur anzeigen — Betrag steuert der Plan, nur Versenden. */
+  const abschlagNurVersand = Boolean(
+    hasPlan && selBerechnet && !selBerechnet.istSchluss
+  )
+
   const wizardTitel =
     selBerechnet?.istSchluss
       ? 'Schlussrechnung'
       : rateLocked && selBerechnet
         ? 'Abschlagsrechnung'
-        : 'Rechnung'
+        : abschlagNurVersand
+          ? 'Abschlagsrechnung'
+          : 'Rechnung'
 
   const wizardSubtitle = kundeName?.trim() || undefined
 
@@ -1291,11 +1299,21 @@ export function RechnungWizard({
           'Rechnung'
         }
         positionen={posBoardLines}
-        onChange={onPosBoardChange}
+        onChange={abschlagNurVersand ? undefined : onPosBoardChange}
         showUst
         showTotals={false}
         gewerke={gewerkNamen}
-        preislisten={preislisten}
+        preislisten={abschlagNurVersand ? undefined : preislisten}
+        headerAction={
+          abschlagNurVersand ? (
+            <span
+              className="text-muted"
+              style={{ fontSize: 'var(--fs-meta)', maxWidth: 280, textAlign: 'right' }}
+            >
+              Betrag aus Abschlagsplan — Positionen nicht änderbar
+            </span>
+          ) : undefined
+        }
         badgeOf={(p) =>
           p.regieSchein
             ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
@@ -1908,8 +1926,8 @@ export function RechnungWizard({
                   setAbschlussBusy(true)
                   void createAbschlussberichtPdf(aid)
                     .then((r) => {
-                      if (!r.ok) {
-                        toast.error(r.message)
+                      if (!r?.ok) {
+                        toast.error(r?.message || 'Abschlussbericht fehlgeschlagen.')
                         return
                       }
                       setAbschlussHint({
