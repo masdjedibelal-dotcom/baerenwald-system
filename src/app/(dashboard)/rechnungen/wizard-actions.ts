@@ -73,6 +73,7 @@ import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungspla
 import { nextRechnungsnummerAusDb } from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
+import { raiseAuftragVkFuerSchlussrechnung } from '@/lib/rechnungen/sync-vk-nach-schlussrechnung'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -1198,6 +1199,19 @@ export async function saveRechnungWizardDraft(
       vkNetto = basis.gesamtNetto
     } catch {
       /* Wizard-Summe */
+    }
+    // Schlussrechnung teurer als VK → Auftrag + Angebot still anheben (nur hoch, nichts löschen)
+    if (rechnungArt === 'schluss') {
+      const raised = await raiseAuftragVkFuerSchlussrechnung({
+        auftragId,
+        wizardPositionen: positionen,
+        bestehende: links,
+        neueNetto: liste_berechnung.netto,
+        ausserRechnungId: input.rechnungId ?? null,
+        mwstSatz: Number(liste_berechnung.mwst_satz) || 19,
+      })
+      if (!raised.ok) return raised
+      vkNetto = raised.vkNetto
     }
     const vkGate = validateGestellteRechnungenGegenVk({
       bestehende: links,

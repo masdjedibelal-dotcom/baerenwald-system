@@ -288,54 +288,59 @@ export async function previewAbnahmeprotokollPdf(input: {
   meta?: AbnahmeProtokollMeta | null
   protokollId?: string | null
 }): Promise<
-  | { ok: true; url: string; protokollId: string; filename: string }
+  | { ok: true; url: string; protokollId: string; filename: string; meta: AbnahmeProtokollMeta }
   | { ok: false; message: string }
 > {
-  const draft = await saveAbnahmeprotokollDraft({
-    auftragId: input.auftragId,
-    abnahmeDatum: input.abnahmeDatum,
-    punkte: input.punkte,
-    maengel: input.maengel,
-    notizen: input.notizen,
-    meta: input.meta,
-    protokollId: input.protokollId,
-  })
-  if (!draft.ok) return draft
-
-  const built = await buildPdfBuffer({
-    auftragId: input.auftragId,
-    abnahmeDatum: input.abnahmeDatum,
-    punkte: input.punkte,
-    maengel: input.maengel,
-    notizen: input.notizen,
-    meta: input.meta ? normalizeAbnahmeProtokollMeta(input.meta) : null,
-  })
-  if (!built.ok) return built
-
-  const stored = await persistPdf(input.auftragId, built.buffer)
-  if (!stored.ok) return stored
-
-  // Entwurf mit Storage-Signaturen + PDF-URL aktualisieren (kein Status-Bump)
-  const metaPersisted = built.meta
-    ? normalizeAbnahmeProtokollMeta(built.meta)
-    : input.meta
-      ? normalizeAbnahmeProtokollMeta(input.meta)
-      : null
-  const { error } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({
-      ...(metaPersisted ? { meta: metaPersisted } : {}),
-      pdf_url: stored.publicUrl,
-      updated_at: new Date().toISOString(),
+  try {
+    const draft = await saveAbnahmeprotokollDraft({
+      auftragId: input.auftragId,
+      abnahmeDatum: input.abnahmeDatum,
+      punkte: input.punkte,
+      maengel: input.maengel,
+      notizen: input.notizen,
+      meta: input.meta,
+      protokollId: input.protokollId,
     })
-    .eq('id', draft.protokollId)
-  if (error) return { ok: false, message: error.message }
+    if (!draft.ok) return draft
 
-  return {
-    ok: true,
-    url: stored.publicUrl,
-    protokollId: draft.protokollId,
-    filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
+    const built = await buildPdfBuffer({
+      auftragId: input.auftragId,
+      abnahmeDatum: input.abnahmeDatum,
+      punkte: input.punkte,
+      maengel: input.maengel,
+      notizen: input.notizen,
+      meta: draft.meta,
+    })
+    if (!built.ok) return built
+
+    const stored = await persistPdf(input.auftragId, built.buffer)
+    if (!stored.ok) return stored
+
+    // Entwurf mit Storage-Signaturen + PDF-URL aktualisieren (kein Status-Bump)
+    const metaPersisted = built.meta
+      ? normalizeAbnahmeProtokollMeta(built.meta)
+      : draft.meta
+    const { error } = await supabaseAdmin
+      .from('auftrag_abnahmeprotokolle')
+      .update({
+        meta: metaPersisted,
+        pdf_url: stored.publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', draft.protokollId)
+    if (error) return { ok: false, message: error.message }
+
+    return {
+      ok: true,
+      url: stored.publicUrl,
+      protokollId: draft.protokollId,
+      filename: `Abnahmeprotokoll-${formatAuftragsNr(built.detail)}.pdf`,
+      meta: metaPersisted,
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Vorschau fehlgeschlagen'
+    console.error('[previewAbnahmeprotokollPdf]', message)
+    return { ok: false, message }
   }
 }
 
@@ -1163,103 +1168,114 @@ export async function saveAbnahmeprotokollDraft(input: {
   /** Bestehende Entwurfs-Zeile; sonst neuer Insert bzw. offener Entwurf. */
   protokollId?: string | null
   regeneratePdf?: boolean
-}): Promise<{ ok: true; protokollId: string } | { ok: false; message: string }> {
-  const wantedId = input.protokollId?.trim() || null
-  const existing = wantedId
-    ? await loadAbnahmeprotokollSummary(input.auftragId, wantedId)
-    : null
+}): Promise<
+  | { ok: true; protokollId: string; meta: AbnahmeProtokollMeta }
+  | { ok: false; message: string }
+> {
+  try {
+    const wantedId = input.protokollId?.trim() || null
+    const existing = wantedId
+      ? await loadAbnahmeprotokollSummary(input.auftragId, wantedId)
+      : null
 
-  // Nie freigegebene / zur Freigabe stehende Protokolle überschreiben
-  if (
-    existing &&
-    existing.freigabe_status !== 'entwurf' &&
-    existing.freigabe_status !== 'abgelehnt'
-  ) {
-    return {
-      ok: false,
-      message: 'Dieses Protokoll ist kein Entwurf mehr — bitte über Speichern/Senden aktualisieren.',
-    }
-  }
-
-  // Ohne explizite ID: offenen Entwurf laden (nicht blind das neueste Protokoll)
-  const target = wantedId ? existing : await loadOffenenAbnahmeEntwurf(input.auftragId)
-
-  const prepared = prepareAbnahmePayload({
-    punkte: input.punkte,
-    maengel:
-      input.maengel.length > 0
-        ? input.maengel
-        : mergeMaengelFromPunkte(input.punkte, target?.maengel ?? []),
-  })
-  const meta = input.meta
-    ? normalizeAbnahmeProtokollMeta(input.meta)
-    : target?.meta ?? normalizeAbnahmeProtokollMeta({})
-  const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
-  const now = new Date().toISOString()
-  const rowPatch = {
-    abnahme_datum: input.abnahmeDatum.slice(0, 10),
-    notizen: input.notizen?.trim() || null,
-    punkte: prepared.punkte,
-    maengel: prepared.maengel,
-    meta,
-    freigabe_status: 'entwurf' as const,
-    ebene: (target?.ebene ?? 'gesamt') as AbnahmeProtokollEbene,
-    updated_at: now,
-  }
-
-  let protokollId = target?.id ?? ''
-
-  if (target) {
-    const { error } = await supabaseAdmin
-      .from('auftrag_abnahmeprotokolle')
-      .update(rowPatch)
-      .eq('id', target.id)
-    if (error) return { ok: false, message: error.message }
-    protokollId = target.id
-  } else {
-    const { data: inserted, error: insErr } = await supabaseAdmin
-      .from('auftrag_abnahmeprotokolle')
-      .insert({
-        auftrag_id: input.auftragId,
-        ...rowPatch,
-        pdf_url: null,
-        protokoll_typ: hatMaengel ? 'nachabnahme' : 'erstabnahme',
-        handwerker_id: null,
-      })
-      .select('id')
-      .single()
-    if (insErr) {
-      if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
-        return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
+    // Nie freigegebene / zur Freigabe stehende Protokolle überschreiben
+    if (
+      existing &&
+      existing.freigabe_status !== 'entwurf' &&
+      existing.freigabe_status !== 'abgelehnt'
+    ) {
+      return {
+        ok: false,
+        message: 'Dieses Protokoll ist kein Entwurf mehr — bitte über Speichern/Senden aktualisieren.',
       }
-      return { ok: false, message: insErr.message }
     }
-    protokollId = (inserted as { id: string }).id
-  }
 
-  // Nur Datum merken — kein Status „abnahme“ / keine Punch-List beim reinen Entwurf
-  await supabaseAdmin
-    .from('auftraege')
-    .update({
-      abnahme_datum: input.abnahmeDatum.slice(0, 10),
-      updated_at: now,
+    // Ohne explizite ID: offenen Entwurf laden (nicht blind das neueste Protokoll)
+    const target = wantedId ? existing : await loadOffenenAbnahmeEntwurf(input.auftragId)
+
+    const prepared = prepareAbnahmePayload({
+      punkte: input.punkte,
+      maengel:
+        input.maengel.length > 0
+          ? input.maengel
+          : mergeMaengelFromPunkte(input.punkte, target?.maengel ?? []),
     })
-    .eq('id', input.auftragId)
-
-  if (input.regeneratePdf && protokollId) {
-    const pdf = await persistProtokollPdfForRow(input.auftragId, protokollId, {
-      abnahmeDatum: input.abnahmeDatum,
+    const metaRaw = input.meta
+      ? normalizeAbnahmeProtokollMeta(input.meta)
+      : target?.meta ?? normalizeAbnahmeProtokollMeta({})
+    // Data-URL-Signaturen → Storage, sonst bläht jeder Draft-Save den Action-Body auf
+    const meta = await persistAbnahmeSignatureUrls(input.auftragId, metaRaw)
+    const hatMaengel = countOffeneMaengel(prepared.maengel) > 0
+    const now = new Date().toISOString()
+    const rowPatch = {
+      abnahme_datum: input.abnahmeDatum.slice(0, 10),
+      notizen: input.notizen?.trim() || null,
       punkte: prepared.punkte,
       maengel: prepared.maengel,
-      notizen: input.notizen,
       meta,
-      protokollTyp: hatMaengel ? 'nachabnahme' : 'erstabnahme',
-    })
-    if (!pdf.ok) return pdf
-  }
+      freigabe_status: 'entwurf' as const,
+      ebene: (target?.ebene ?? 'gesamt') as AbnahmeProtokollEbene,
+      updated_at: now,
+    }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true, protokollId }
+    let protokollId = target?.id ?? ''
+
+    if (target) {
+      const { error } = await supabaseAdmin
+        .from('auftrag_abnahmeprotokolle')
+        .update(rowPatch)
+        .eq('id', target.id)
+      if (error) return { ok: false, message: error.message }
+      protokollId = target.id
+    } else {
+      const { data: inserted, error: insErr } = await supabaseAdmin
+        .from('auftrag_abnahmeprotokolle')
+        .insert({
+          auftrag_id: input.auftragId,
+          ...rowPatch,
+          pdf_url: null,
+          protokoll_typ: hatMaengel ? 'nachabnahme' : 'erstabnahme',
+          handwerker_id: null,
+        })
+        .select('id')
+        .single()
+      if (insErr) {
+        if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
+          return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
+        }
+        return { ok: false, message: insErr.message }
+      }
+      protokollId = (inserted as { id: string }).id
+    }
+
+    // Nur Datum merken — kein Status „abnahme“ / keine Punch-List beim reinen Entwurf
+    await supabaseAdmin
+      .from('auftraege')
+      .update({
+        abnahme_datum: input.abnahmeDatum.slice(0, 10),
+        updated_at: now,
+      })
+      .eq('id', input.auftragId)
+
+    if (input.regeneratePdf && protokollId) {
+      const pdf = await persistProtokollPdfForRow(input.auftragId, protokollId, {
+        abnahmeDatum: input.abnahmeDatum,
+        punkte: prepared.punkte,
+        maengel: prepared.maengel,
+        notizen: input.notizen,
+        meta,
+        protokollTyp: hatMaengel ? 'nachabnahme' : 'erstabnahme',
+      })
+      if (!pdf.ok) return pdf
+    }
+
+    revalidatePath(`/auftraege/${input.auftragId}`)
+    return { ok: true, protokollId, meta }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Entwurf speichern fehlgeschlagen'
+    console.error('[saveAbnahmeprotokollDraft]', message)
+    return { ok: false, message }
+  }
 }
 
 /** Neuester bearbeitbarer Entwurf (Gesamt bevorzugt) — blockiert den Wiedereinstieg nicht. */

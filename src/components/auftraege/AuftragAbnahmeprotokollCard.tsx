@@ -90,6 +90,7 @@ export function AuftragAbnahmeprotokollCard({
       setOffeneMaengel(s ? countOffeneMaengel(s.maengel) : 0)
     })
     void getGesamtabnahmeGate(auftragId).then((g) => {
+      if (!g) return
       setHwZeilen(g.zeilen)
       setGesamtOk(g.ok)
       setGesamtMsg(g.message)
@@ -112,9 +113,9 @@ export function AuftragAbnahmeprotokollCard({
   function loeschen(id: string) {
     confirmDelete('Abnahmeprotokoll löschen?', async () => {
       const r = await deleteAbnahmeprotokoll(id, auftragId)
-      if (!r.ok) {
-        toast.error(r.message)
-        throw new Error(r.message)
+      if (!r?.ok) {
+        toast.error(r?.message ?? 'Löschen fehlgeschlagen')
+        throw new Error(r?.message ?? 'Löschen fehlgeschlagen')
       }
       toast.success('Protokoll gelöscht')
       reload()
@@ -126,7 +127,7 @@ export function AuftragAbnahmeprotokollCard({
   function freigeben(id: string) {
     startTransition(async () => {
       const r = await freigebenAbnahmeprotokoll(id, auftragId)
-      if (!r.ok) toast.error(r.message)
+      if (!r?.ok) toast.error(r?.message ?? 'Freigabe fehlgeschlagen')
       else {
         toast.success('Freigegeben — Versand optional danach')
         reload()
@@ -144,7 +145,7 @@ export function AuftragAbnahmeprotokollCard({
         auftragId,
         notiz: notiz.trim() || null,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r?.ok) toast.error(r?.message ?? 'Ablehnen fehlgeschlagen')
       else {
         toast.success('Abgelehnt — Nacharbeit / Mängel')
         reload()

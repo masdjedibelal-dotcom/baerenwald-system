@@ -180,23 +180,31 @@ export function AbnahmeprotokollCreateWizard({
   }
 
   async function persistDraft(opts?: { notify?: boolean }): Promise<string | null> {
-    const r = await saveAbnahmeprotokollDraft({
-      auftragId,
-      abnahmeDatum,
-      punkte,
-      maengel: buildSaveMaengel(),
-      notizen: notizen.trim() || null,
-      meta: ensureUnterschriftOrtDatum(meta),
-      protokollId: sessionProtokollId,
-    })
-    if (!r.ok) {
-      if (opts?.notify !== false) toast.error(r.message)
+    try {
+      const r = await saveAbnahmeprotokollDraft({
+        auftragId,
+        abnahmeDatum,
+        punkte,
+        maengel: buildSaveMaengel(),
+        notizen: notizen.trim() || null,
+        meta: ensureUnterschriftOrtDatum(meta),
+        protokollId: sessionProtokollId,
+      })
+      if (!r?.ok) {
+        if (opts?.notify !== false) toast.error(r?.message ?? 'Entwurf speichern fehlgeschlagen')
+        return null
+      }
+      setSessionProtokollId(r.protokollId)
+      if (r.meta) setMeta(r.meta)
+      setDraftDirty(false)
+      if (opts?.notify) toast.success('Entwurf gespeichert')
+      return r.protokollId
+    } catch (e) {
+      if (opts?.notify !== false) {
+        toast.error(e instanceof Error ? e.message : 'Entwurf speichern fehlgeschlagen')
+      }
       return null
     }
-    setSessionProtokollId(r.protokollId)
-    setDraftDirty(false)
-    if (opts?.notify) toast.success('Entwurf gespeichert')
-    return r.protokollId
   }
 
   /** Schließen = Entwurf speichern (Fotos/Mängel bleiben). */
@@ -227,8 +235,8 @@ export function AbnahmeprotokollCreateWizard({
     try {
       if (sessionProtokollId && canDiscardEntwurf) {
         const r = await deleteAbnahmeprotokoll(sessionProtokollId, auftragId)
-        if (!r.ok) {
-          toast.error(r.message)
+        if (!r?.ok) {
+          toast.error(r?.message ?? 'Löschen fehlgeschlagen')
           return
         }
         toast.success('Abnahme-Entwurf entfernt')
@@ -360,12 +368,16 @@ export function AbnahmeprotokollCreateWizard({
         notizen: notizen.trim() || null,
         meta: ready,
         protokollId: sessionProtokollId,
-      }).then((r) => {
-        if (r.ok) {
-          setSessionProtokollId(r.protokollId)
-          setDraftDirty(false)
-        }
       })
+        .then((r) => {
+          if (!r?.ok) return
+          setSessionProtokollId(r.protokollId)
+          if (r.meta) setMeta(r.meta)
+          setDraftDirty(false)
+        })
+        .catch(() => {
+          /* Toast nur bei explizitem Speichern — hier still */
+        })
     }
     setActiveSection(id)
   }
@@ -449,12 +461,13 @@ export function AbnahmeprotokollCreateWizard({
         meta: metaReady,
         protokollId: sessionProtokollId,
       })
-      if (!r.ok) {
+      if (!r?.ok) {
         previewTab?.close()
-        toast.error(r.message)
+        toast.error(r?.message ?? 'Vorschau fehlgeschlagen')
         return
       }
       setSessionProtokollId(r.protokollId)
+      if (r.meta) setMeta(r.meta)
       setDraftDirty(false)
       if (previewTab && !previewTab.closed) {
         previewTab.location.href = r.url
@@ -510,8 +523,8 @@ export function AbnahmeprotokollCreateWizard({
           ...payload,
           sendToKunde: send,
         })
-        if (!r.ok) {
-          toast.error(r.message)
+        if (!r?.ok) {
+          toast.error(r?.message ?? 'Speichern fehlgeschlagen')
           return
         }
         downloadPdfFromBase64(r.pdfBase64, r.filename)
@@ -524,7 +537,7 @@ export function AbnahmeprotokollCreateWizard({
                 label: 'Rückgängig',
                 onClick: () => {
                   void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                    if (!u.ok) toast.error(u.message)
+                    if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
                     else {
                       toast.success('Abschluss rückgängig')
                       router.refresh()
@@ -544,7 +557,7 @@ export function AbnahmeprotokollCreateWizard({
                 label: 'Rückgängig',
                 onClick: () => {
                   void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                    if (!u.ok) toast.error(u.message)
+                    if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
                     else {
                       toast.success('Abschluss rückgängig')
                       router.refresh()
@@ -566,8 +579,8 @@ export function AbnahmeprotokollCreateWizard({
           kundeSigniert: Boolean(metaReady.signature_kunde_url?.trim()),
           protokollId: sessionProtokollId,
         })
-        if (!mailDefaults.ok) {
-          toast.error(mailDefaults.message)
+        if (!mailDefaults?.ok) {
+          toast.error(mailDefaults?.message ?? 'Mail-Defaults fehlgeschlagen')
           return
         }
         const r = await saveAndSendAbnahmeprotokoll({
@@ -576,8 +589,8 @@ export function AbnahmeprotokollCreateWizard({
           nachricht: mailDefaults.defaultNachricht,
           anrede: mailDefaults.defaultAnrede,
         })
-        if (!r.ok) {
-          toast.error(r.message)
+        if (!r?.ok) {
+          toast.error(r?.message ?? 'Senden fehlgeschlagen')
           return
         }
         toast.success('Protokoll gesendet · PDF in CRM & Portal-Unterlagen')
@@ -587,8 +600,8 @@ export function AbnahmeprotokollCreateWizard({
         return
       }
       const r = await saveAbnahmeprotokollPdfOnly(payload)
-      if (!r.ok) {
-        toast.error(r.message)
+      if (!r?.ok) {
+        toast.error(r?.message ?? 'Speichern fehlgeschlagen')
         return
       }
       setSessionProtokollId(r.protokollId)
