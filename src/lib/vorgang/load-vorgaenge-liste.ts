@@ -9,6 +9,7 @@ import type { LeadKanal } from '@/lib/types'
 import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
+  hatGestellteEndabrechnung,
   isPhaseWinningRechnung,
   mapAngebotStatusEinfach,
   resolveSatellitenRechnungVorgang,
@@ -690,7 +691,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       !hatAbschlagsplan &&
       resolved.phase === 'auftrag' &&
       resolved.unterstatus === 'abgeschlossen' &&
-      !leadRechnungenStamm.some(isPhaseWinningRechnung)
+      !leadRechnungenStamm.some(hatGestellteEndabrechnung)
 
     const listPhase: VorgangPhase = rechnungAusstehend ? 'rechnung' : resolved.phase
     const listUnterstatus = rechnungAusstehend ? 'ausstehend' : resolved.unterstatus
@@ -771,8 +772,8 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
             if (art !== 'abschlag' && art !== 'schluss') continue
             if (!istStorniert && !istRechnungGestelltOderBezahlt(r.status)) continue
           } else if (resolved.phase === 'auftrag' || rechnungAusstehend) {
-            // Bei Auftrag-Stamm / ausstehender Endabrechnung nur Abschläge als Satelliten
-            if (art !== 'abschlag') continue
+            // Bei Auftrag-Stamm: Abschläge + Schlussrechnung als Satelliten
+            if (art !== 'abschlag' && art !== 'schluss') continue
           }
         }
         const sat: ResolvedVorgang = resolveSatellitenRechnungVorgang(resolveInput, r)

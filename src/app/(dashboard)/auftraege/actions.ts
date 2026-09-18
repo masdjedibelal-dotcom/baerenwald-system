@@ -165,8 +165,9 @@ export async function updateAuftragStatusFromUi(
 }
 
 /**
- * Nach aktiver Voll- oder Schlussrechnung Auftrag auf „abgeschlossen“ setzen.
- * Abschläge und Gutschriften ändern den Auftragsstatus nicht.
+ * Nach aktiver Vollrechnung Auftrag auf „abgeschlossen“ setzen.
+ * Schlussrechnung, Abschläge und Gutschriften ändern den Auftragsstatus nicht —
+ * der Auftrag bleibt der Stamm (Satellit-Modell).
  */
 export async function completeAuftragNachEndabrechnung(input: {
   auftragId: string | null | undefined
@@ -181,7 +182,8 @@ export async function completeAuftragNachEndabrechnung(input: {
   if (beleg === 'gutschrift') return { ok: true, changed: false }
 
   const art = (input.rechnungArt ?? 'voll').trim().toLowerCase()
-  if (art !== 'voll' && art !== 'schluss') return { ok: true, changed: false }
+  // Schlussrechnung: Auftrag bleibt offen/in Arbeit — nur Vollrechnung schließt ab.
+  if (art !== 'voll') return { ok: true, changed: false }
 
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -199,11 +201,10 @@ export async function completeAuftragNachEndabrechnung(input: {
   if (st === 'abgeschlossen' || st === 'storniert') return { ok: true, changed: false }
 
   const nr = input.rechnungsnummer?.trim()
-  const label = art === 'schluss' ? 'Schlussrechnung' : 'Vollrechnung'
   const res = await setAuftragStatus(auftragId, 'abgeschlossen', {
     timelineBeschreibung: nr
-      ? `Automatisch nach ${label} ${nr}.`
-      : `Automatisch nach ${label}.`,
+      ? `Automatisch nach Vollrechnung ${nr}.`
+      : `Automatisch nach Vollrechnung.`,
   })
   if (!res.ok) return res
 

@@ -27,7 +27,7 @@ import type {
  * A7 Parität: Fixtures in `shared/crm-vorgang/resolve-vorgang.fixtures.json`
  * (+ Kopie `resolve-vorgang.fixtures.json` hier) — Portal und CRM byte-identisch halten.
  * Fine-Stages: `mapAngebotStatusEinfach` (status_einfach vor Legacy-status).
- * Rechnungs-Gewinn: `isPhaseWinningRechnung` (Voll/Schluss, keine Abschläge als Stamm).
+ * Rechnungs-Gewinn: `isPhaseWinningRechnung` (nur Voll; Abschlag/Schluss = Satelliten).
  */
 
 /** Actor-Priorität (höher = wichtiger). */
@@ -90,18 +90,17 @@ export function isRechnungStorniert(rechnung: VorgangRechnungInput): boolean {
 
 /**
  * Weitere Rechnungszeilen in der Liste (nicht der Stamm-Vorgang).
- * Nur laufende Abschläge sind Satelliten — Auftrag bleibt unter „Aufträge“ sichtbar.
- * Schlussrechnung ist Endabrechnung wie Vollrechnung (kein Satellit).
+ * Abschlag- und Schlussrechnung sind Satelliten — Auftrag bleibt unter „Aufträge“ sichtbar.
+ * Nur Vollrechnung (ohne Abschlagsplan) zieht den Stamm in die Rechnungsphase.
  */
 export function isSatellitenRechnung(rechnung: VorgangRechnungInput): boolean {
   const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
-  return art === 'abschlag'
+  return art === 'abschlag' || art === 'schluss'
 }
 
 /**
- * Vollrechnung und Schlussrechnung (versendet/bezahlt) ziehen den Stamm in die
- * Rechnungsphase — analog Endabrechnung. Abschläge allein lassen den offenen
- * Auftrag unter „Aufträge“ sichtbar.
+ * Gestellte Vollrechnung zieht den Stamm in die Rechnungsphase.
+ * Abschläge und Schlussrechnung bleiben Satelliten am Auftrag.
  */
 export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean {
   const st = (rechnung.status ?? '').trim().toLowerCase()
@@ -109,6 +108,15 @@ export function isPhaseWinningRechnung(rechnung: VorgangRechnungInput): boolean 
   if (String(rechnung.beleg_typ ?? '').toLowerCase() === 'gutschrift') return false
   if (isSatellitenRechnung(rechnung)) return false
   return true
+}
+
+/** Gestellte Endabrechnung vorhanden (Voll oder Schluss) — kein „Rechnung ausstehend“. */
+export function hatGestellteEndabrechnung(rechnung: VorgangRechnungInput): boolean {
+  const st = (rechnung.status ?? '').trim().toLowerCase()
+  if (!st || st === 'storniert' || st === 'entwurf') return false
+  if (String(rechnung.beleg_typ ?? '').toLowerCase() === 'gutschrift') return false
+  const art = (rechnung.rechnung_art ?? 'voll').trim().toLowerCase()
+  return art === 'voll' || art === 'schluss'
 }
 
 function pickNewestActive<T>(
@@ -218,7 +226,7 @@ type PhasePick = {
 }
 
 /** Storno-Regel: neueste nicht-stornierte Entität gewinnt (Kette Rechnung→Auftrag→Angebot→Anfrage).
- * Versendete Voll- und Schlussrechnung gewinnen die Stamm-Phase; Abschläge bleiben Satelliten. */
+ * Versendete Vollrechnung gewinnt die Stamm-Phase; Abschläge und Schlussrechnung bleiben Satelliten. */
 function resolvePhase(input: ResolveVorgangInput): PhasePick {
   const lead = input.lead
   const angebote = input.angebote ?? []
