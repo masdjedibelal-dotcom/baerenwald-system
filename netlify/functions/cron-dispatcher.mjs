@@ -75,5 +75,6 @@ export default async function handler() {
   )
 }
 
-/** Alle :00 und :30 UTC — deckt alle CRM-Cron-Zeitpunkte ab (Rechnungen 00:00) */
-export const config = { schedule: '0,30 * * * *', region: 'fra' }
+/** Alle :00 und :30 UTC — deckt alle CRM-Cron-Zeitpunkte ab (Rechnungen 00:00).
+ *  Kein `region` hier — Plan ohne Function-Regions (siehe netlify.toml). */
+export const config = { schedule: '0,30 * * * *' }
