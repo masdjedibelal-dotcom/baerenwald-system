@@ -107,7 +107,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
   return (
     <>
     <MockCard
-      title="Marketing & Sichtbarkeit"
+      title={isMobile ? 'Marketing' : 'Marketing & Sichtbarkeit'}
       icon="trending-up"
       actions={
         <div className="seg" role="group" aria-label="Marketing-Bereich">

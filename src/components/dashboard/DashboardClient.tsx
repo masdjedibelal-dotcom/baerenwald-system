@@ -70,7 +70,7 @@ function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter })
   }
 
   return (
-    <div className="flex min-w-0 flex-col items-end gap-2">
+    <div className="dash-zeitraum-chips">
       <div className="chiprow" role="group" aria-label="Zeitraum">
         {ZEITRAUM_PRESETS.map((o) => (
           <MockChip
@@ -86,7 +86,7 @@ function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter })
         </MockChip>
       </div>
       {customMode ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="dash-zeitraum-chips__custom">
           <DateInput
             size="sm"
             value={draftVon}
@@ -517,15 +517,15 @@ rankingHandwerker: RankingZeile[]
   }
 
   return (
-    <div className="dashboard-page min-w-0 overflow-x-hidden">
+    <div className="dashboard-page min-w-0">
       <header className="dash-hero mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <div className="text-[length:var(--fs-text)] text-[var(--text-3)]">{dateStr}</div>
           <div className="mt-0.5 text-[length:var(--fs-head)] font-semibold tracking-tight">
             {greeting}, {vorname}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="dash-hero__filters flex min-w-0 flex-wrap items-center justify-end gap-2">
           <DashboardZeitraumChips filter={zeitraumFilter} />
           <MockBtn className="ki-assist-icon-btn" type="button" title="KPIs mit KI analysieren" aria-label="KPIs mit KI analysieren" onClick={openKpiAnalyse}>
             <MockIcon ctx="btn" n="sparkles" size={16} />

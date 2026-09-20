@@ -85,7 +85,7 @@ export function SofortmassnahmeFaelleEditor({
         open={katalogOpen}
         onClose={() => setKatalogOpen(false)}
         title={SOFORTMASSNAHME_FAELLE_POPUP_TITLE}
-        size="md"
+        size="lg"
       >
         <div className="sofortmassnahme-faelle__katalog">
           {gruppen.map((g) => {

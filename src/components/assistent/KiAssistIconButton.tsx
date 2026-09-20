@@ -31,7 +31,7 @@ export function KiAssistIconButton({
 }) {
   const { openScoped } = useAssistent()
   const meta = getKiAssistScope(scope)
-  const label = title ?? `KI: ${meta.label}`
+  const label = title ?? `KI-Hilfe: ${meta.label}`
 
   return (
     <MockBtn className={cn('ki-assist-icon-btn', className)} type="button" title={label} aria-label={label} onClick={() => {
@@ -44,6 +44,7 @@ export function KiAssistIconButton({
         })
       }}>
       <MockIcon ctx="btn" n="sparkles" size={16} />
+      <span className="ki-assist-icon-btn__label">KI-Hilfe</span>
     </MockBtn>
   )
 }

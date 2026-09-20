@@ -1,6 +1,5 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
@@ -39,10 +38,16 @@ export function EinstellungenIntegrationenMock() {
               <div className="lbl">{it.name}</div>
               <div className="sub">{it.desc}</div>
             </div>
-            <MockBtn className={`switch${on ? ' on' : ''}`} type="button" aria-pressed={on} onClick={() => {
+            <button
+              type="button"
+              role="switch"
+              aria-checked={on}
+              className={on ? 'switch on' : 'switch'}
+              onClick={() => {
                 setState((s) => ({ ...s, [it.name]: !on }))
                 toast.success(`${it.name}${on ? ' deaktiviert' : ' aktiviert'} (Demo)`)
-              }} />
+              }}
+            />
           </div>
         )
       })}

@@ -4,6 +4,88 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## CRM Detail-Listen (Objekte etc.) App-like — 2026-09-20
+
+**Commit-Text:** `fix: ap-list/ap-mobile Hit ohne .btn-Border; Zeilen flach in Detail-Cards`
+
+### Analyse (Root Cause)
+`MockBtn` setzt immer `.btn` (Border, Höhe, nowrap). Hit-Klassen `ap-list__hit` / `ap-mobile-card__hit` hatten **kein Reset** → Box-in-Box, Titel+Adresse in einer Zeile, ⋯ nicht rechts. Zusätzlich `.ap-list` / `.ap-mobile-card` eigener Border in `MockCard`.
+
+### Betroffene Surfaces (geheilt per CSS)
+- KundenObjekteCard, KundenAnsprechpartnerCard
+- ObjektEinheiten/Kontakte/Bewohner/Hausmeister/Historie/Anlagen (Mobile-Hit)
+
+### Dateien
+- `src/styles/mock-design-system.css` — Hit-Reset, Subgrid Desktop, flache Mobile-Zeilen, Nested-Border weg
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+**Später (optional):** `DetailListRow`-Primitive statt 8× Copy-Paste-Markup.
+
+---
+
+## KI-Hilfe Label am Sparkles-Icon — 2026-09-20
+
+**Commit-Text CRM:** `UX: Sparkles-Button mit Label „KI-Hilfe“`  
+**Commit-Text Portal:** `UX: KI-Assist-Button mit Label „KI-Hilfe“`
+
+### CRM
+- `src/components/assistent/KiAssistIconButton.tsx` — Icon + „KI-Hilfe“
+- `src/components/assistent/KiAssistFieldLabel.tsx` — Icon + „KI-Hilfe“
+- `src/styles/mock-design-system.css` — Button-Breite auto (Pill mit Text)
+
+### Portal (baerenwald)
+- `src/components/shared/PortalKiAssistField.tsx` — Sparkles + „KI-Hilfe“ am Feldbutton
+
+---
+
+## Fälle-hinzufügen Sheet abgeschnitten — 2026-09-20
+
+**Commit-Text:** `fix: Fälle-Katalog-Sheet scrollt; Labels wrapen (kein .btn-nowrap)`
+
+### Dateien
+- `src/styles/mock-design-system.css` — `.editor-sheet--bottom` max-height + overflow; Katalog-Btn wrap
+- `src/components/org/SofortmassnahmeFaelleEditor.tsx` — Sheet `size="lg"`
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+**Ursache:** Bottom-Sheet ohne Höhenkappe → Content wächst über Viewport, Body scrollt nicht; `.btn` nowrap/min-height 44 → Text mit ….
+
+---
+
+## Switch/Slider Standard (Freigabe + Einstellungen) — 2026-09-20
+
+**Commit-Text:** `fix: Toggle/Slider wieder Standard-Pill (nicht MockBtn-Kreis)`
+
+### Dateien
+- `src/components/org/FreigabeSettingsCard.tsx` — native `button.switch` + native `input[type=range]` statt MockBtn/MockInput
+- `src/components/ui/Toggle.tsx` — Pill-Switch ohne MockBtn
+- `src/components/einstellungen/EinstellungenBenachrichtigungenClient.tsx` — native Switches
+- `src/components/einstellungen/EinstellungenIntegrationenMock.tsx` — native Switches
+- `src/styles/mock-design-system.css` — `.switch` Button-Reset + `.btn.switch`-Fallback; Range dünn mit rundem Thumb
+- `scripts/raw-element-allowlist.txt` — Switch/Range-Ausnahmen
+
+**Ursache:** Mobile `.btn { min-width/min-height: 44px }` + `.switch { border-radius: 999px }` → Kreise; MockInput `.input` → dicker Range.
+
+---
+
+## CRM Detail-Listen (Objekte etc.) App-like — 2026-09-20
+
+**Commit-Text:** `fix: ap-list/ap-mobile Hit ohne .btn-Border; Zeilen flach in Detail-Cards`
+
+### Analyse (Root Cause)
+`MockBtn` setzt immer `.btn` (Border, Höhe, nowrap). Hit-Klassen `ap-list__hit` / `ap-mobile-card__hit` hatten **kein Reset** → Box-in-Box, Titel+Adresse in einer Zeile, ⋯ nicht rechts. Zusätzlich `.ap-list` / `.ap-mobile-card` eigener Border in `MockCard`.
+
+### Betroffene Surfaces (geheilt per CSS)
+- KundenObjekteCard, KundenAnsprechpartnerCard
+- ObjektEinheiten/Kontakte/Bewohner/Hausmeister/Historie/Anlagen (Mobile-Hit)
+
+### Dateien
+- `src/styles/mock-design-system.css` — Hit-Reset, Subgrid Desktop, flache Mobile-Zeilen, Nested-Border weg
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+**Später (optional):** `DetailListRow`-Primitive statt 8× Copy-Paste-Markup.
+
+---
+
 ## O1–O6 — Freigaben 2026-09-20
 
 **Commit-Text CRM:** `O1–O6: ConfirmPopup, P4-1 <50, PDF-Service, P5-7 Kanon`  

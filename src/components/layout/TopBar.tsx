@@ -194,9 +194,9 @@ export function TopBar({ user }: TopBarProps) {
               </MockBtn>
             ) : null}
 
-            <MockBtn sm className={cn('btn-assistent', assistentOpen && 'is-open')} type="button" aria-label="KI-Assistent öffnen" aria-pressed={assistentOpen} onClick={() => toggleAssistent()} title="KI-Assistent">
+            <MockBtn sm className={cn('btn-assistent', assistentOpen && 'is-open')} type="button" aria-label="KI-Hilfe öffnen" aria-pressed={assistentOpen} onClick={() => toggleAssistent()} title="KI-Hilfe">
               <MockIcon ctx="btn" n="sparkles" size={14} />
-              <span className="topbar-cta-label">KI</span>
+              <span className="topbar-cta-label">KI-Hilfe</span>
             </MockBtn>
 
             <CrmNotificationsBell />

@@ -81,8 +81,9 @@ export function KiAssistFieldLabel({
           {label}
           {required ? <span className="req"> *</span> : null}
         </span>
-        <MockBtn className="ki-assist-icon-btn" type="button" title={`KI: ${labelText} umschreiben`} aria-label={`KI: ${labelText} umschreiben`} disabled={disabled || !assistent} onClick={openFieldChat}>
+        <MockBtn className="ki-assist-icon-btn" type="button" title={`KI-Hilfe: ${labelText} umschreiben`} aria-label={`KI-Hilfe: ${labelText} umschreiben`} disabled={disabled || !assistent} onClick={openFieldChat}>
           <MockIcon ctx="btn" n="sparkles" size={16} />
+          <span className="ki-assist-icon-btn__label">KI-Hilfe</span>
         </MockBtn>
       </div>
       {children}

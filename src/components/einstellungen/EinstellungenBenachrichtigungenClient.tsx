@@ -208,7 +208,14 @@ export function EinstellungenBenachrichtigungenClient() {
               Auf dem Home-Bildschirm, auch wenn die App zu ist. Tip ohne Login → Login-Screen.
             </div>
           </div>
-          <MockBtn className={`switch${masterOn ? ' on' : ''}`} type="button" aria-pressed={masterOn} disabled={pending || cap === 'unsupported'} onClick={() => toggleMaster(!masterOn)} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={masterOn}
+            disabled={pending || cap === 'unsupported'}
+            className={masterOn ? 'switch on' : 'switch'}
+            onClick={() => toggleMaster(!masterOn)}
+          />
         </div>
         {showStatus ? (
           <p className="mt-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
@@ -239,7 +246,14 @@ export function EinstellungenBenachrichtigungenClient() {
                 <div className="lbl">{sw.label}</div>
                 <div className="sub">{sw.desc}</div>
               </div>
-              <MockBtn className={`switch${on ? ' on' : ''}`} type="button" aria-pressed={on} disabled={eventsDisabled} onClick={() => toggleEvent(sw.key, !on)} />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                disabled={eventsDisabled}
+                className={on ? 'switch on' : 'switch'}
+                onClick={() => toggleEvent(sw.key, !on)}
+              />
             </div>
           )
         })}

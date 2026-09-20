@@ -1,6 +1,5 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 interface ToggleProps {
   checked: boolean
   onChange: (val: boolean) => void
@@ -9,6 +8,7 @@ interface ToggleProps {
   disabled?: boolean
 }
 
+/** Standard-Pill-Switch (ohne MockBtn — sonst wird daraus ein Kreis). */
 export function Toggle({ checked, onChange, label, hint, disabled = false }: ToggleProps) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -18,22 +18,16 @@ export function Toggle({ checked, onChange, label, hint, disabled = false }: Tog
           {hint ? <div className="text-xs text-bw-light">{hint}</div> : null}
         </div>
       ) : null}
-      <MockBtn className={cnToggle(disabled, checked)} type="button" role="switch" aria-checked={checked} onClick={() => !disabled && onChange(!checked)}>
-        <span className={cnKnob(checked)} />
-      </MockBtn>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        className={checked ? 'switch on' : 'switch'}
+        onClick={() => {
+          if (!disabled) onChange(!checked)
+        }}
+      />
     </div>
   )
-}
-
-function cnToggle(disabled: boolean, checked: boolean) {
-  const base =
-    'relative flex h-6 w-10 flex-shrink-0 rounded-pill transition-colors duration-200'
-  if (disabled) return `${base} cursor-not-allowed bg-bw-border opacity-40`
-  return `${base} cursor-pointer ${checked ? 'bg-bw-success' : 'bg-bw-border'}`
-}
-
-function cnKnob(checked: boolean) {
-  return `absolute top-1 h-4 w-4 rounded-pill bg-white shadow-sm transition-transform duration-200 ${
-    checked ? 'translate-x-5' : 'translate-x-1'
-  }`
 }

@@ -2,7 +2,6 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useRef, useState } from 'react'
 import { useTransition } from '@/components/ui/action-busy'
 import { SofortmassnahmeFaelleEditor } from '@/components/org/SofortmassnahmeFaelleEditor'
@@ -198,7 +197,14 @@ export function FreigabeSettingsCard({
               Aus = eigene Regeln nur für dieses Objekt
             </div>
           </div>
-          <MockBtn className={cn('switch', erben && 'on')} type="button" role="switch" aria-checked={erben} disabled={pending} onClick={() => onToggleErben(!erben)} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={erben}
+            disabled={pending}
+            className={cn('switch', erben && 'on')}
+            onClick={() => onToggleErben(!erben)}
+          />
         </div>
       ) : null}
 
@@ -219,7 +225,14 @@ export function FreigabeSettingsCard({
             <div className="freigabe-settings__label">Direktbeauftragung bei Sofortmaßnahmen</div>
             <div className="freigabe-settings__hint">{akutHint}</div>
           </div>
-          <MockBtn className={cn('switch', akut && 'on')} type="button" role="switch" aria-checked={akut} disabled={disabled} onClick={() => setAkut((v) => !v)} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={akut}
+            disabled={disabled}
+            className={cn('switch', akut && 'on')}
+            onClick={() => setAkut((v) => !v)}
+          />
         </div>
 
         {showAkutFaelle && !erben ? (
@@ -240,7 +253,14 @@ export function FreigabeSettingsCard({
               Unter der Schwelle: „Direkt Auftrag“ ohne HV-Freigabe
             </div>
           </div>
-          <MockBtn className={cn('switch', schwelleAn && 'on')} type="button" role="switch" aria-checked={schwelleAn} disabled={disabled} onClick={() => setSchwelleAn((v) => !v)} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={schwelleAn}
+            disabled={disabled}
+            className={cn('switch', schwelleAn && 'on')}
+            onClick={() => setSchwelleAn((v) => !v)}
+          />
         </div>
 
         {schwelleAn ? (
@@ -249,7 +269,17 @@ export function FreigabeSettingsCard({
               <span>Automatisch bis</span>
               <strong>{formatEuro(schwelle)}</strong>
             </div>
-            <MockInput type="range" className="freigabe-settings__range" min={SCHWELLE_MIN} max={SCHWELLE_MAX} step={SCHWELLE_STEP} value={schwelle} disabled={disabled} aria-label="Schwellenwert in Euro" onChange={(e) => setSchwelle(snapSchwelle(Number(e.target.value)))} />
+            <input
+              type="range"
+              className="freigabe-settings__range"
+              min={SCHWELLE_MIN}
+              max={SCHWELLE_MAX}
+              step={SCHWELLE_STEP}
+              value={schwelle}
+              disabled={disabled}
+              aria-label="Schwellenwert in Euro"
+              onChange={(e) => setSchwelle(snapSchwelle(Number(e.target.value)))}
+            />
             <div className="freigabe-settings__slider-ends">
               <span>0 €</span>
               <span>5.000 €</span>
@@ -267,7 +297,14 @@ export function FreigabeSettingsCard({
                   : 'Aus: Hausmeister-Pfad manuell am Vorgang starten.'}
               </div>
             </div>
-            <MockBtn className={cn('switch', hmAuto && 'on')} type="button" role="switch" aria-checked={hmAuto} disabled={pending} onClick={() => setHmAuto((v) => !v)} />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hmAuto}
+              disabled={pending}
+              className={cn('switch', hmAuto && 'on')}
+              onClick={() => setHmAuto((v) => !v)}
+            />
           </div>
         ) : null}
       </div>
