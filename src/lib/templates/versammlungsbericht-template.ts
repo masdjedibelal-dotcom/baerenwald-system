@@ -298,6 +298,7 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
     max-width: 240px;
     object-fit: contain;
     display: block;
+    background: #fff;
   }
   .cover-logo-fallback {
     font-size: 16pt;

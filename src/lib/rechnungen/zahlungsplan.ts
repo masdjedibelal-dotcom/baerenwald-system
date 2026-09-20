@@ -260,10 +260,19 @@ export function rechnungFuerAbschlagZeile(
   zeileId: string,
   rechnungen: RechnungAbschlagLink[]
 ): RechnungAbschlagLink | null {
+  const matches = rechnungen.filter(
+    (r) =>
+      r.zahlungsplan_abschlag_id === zeileId &&
+      r.status !== 'storniert' &&
+      String(r.beleg_typ ?? '') !== 'gutschrift'
+  )
+  if (matches.length === 0) return null
+  // Entwurf zuerst (fortsetzen), sonst erster aktiver Beleg
   return (
-    rechnungen.find(
-      (r) => r.zahlungsplan_abschlag_id === zeileId && r.status !== 'storniert'
-    ) ?? null
+    matches.find((r) => String(r.status) === 'entwurf') ??
+    matches.find((r) => istRechnungGestelltOderBezahlt(r.status)) ??
+    matches[0] ??
+    null
   )
 }
 

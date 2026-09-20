@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
 import {
   BRAND_ALT,
-  BRAND_LOGO_GREEN,
+  BRAND_LOGO_GREEN_ON_WHITE,
   resolveBrandLogoUrl,
   resolvePublicAppUrl,
 } from '@/lib/brand'
@@ -35,18 +35,29 @@ export function pathToFileUrl(absPath: string): string {
   return encoded.startsWith('/') ? `file://${encoded}` : `file:///${encoded}`
 }
 
+/**
+ * PDF-Logo als data:-URL — opakes Weiß hinter dem Grün-Mark
+ * (transparentes PNG → sonst oft schwarzer Hintergrund im Print-PDF).
+ */
 function localLogoDataUrl(): string | null {
+  const candidates = [
+    'logo-mark-green-on-white.png',
+    // Fallback falls Asset fehlt (sollte nicht)
+    'logo-mark-green.png',
+  ]
   for (const root of crmProjectRoots()) {
-    const file = join(root, 'public', 'brand', 'logo-mark-green.png')
-    if (existsSync(file)) {
-      const b64 = readFileSync(file).toString('base64')
-      return `data:image/png;base64,${b64}`
+    for (const name of candidates) {
+      const file = join(root, 'public', 'brand', name)
+      if (existsSync(file)) {
+        const b64 = readFileSync(file).toString('base64')
+        return `data:image/png;base64,${b64}`
+      }
     }
   }
   return null
 }
 
-/** Logo für Angebots-PDF — data:-URL (kein file://, stabiler in Headless-Chrome). */
+/** Logo für Angebots-/Rechnungs-PDF — data:-URL (kein file://, stabiler in Headless-Chrome). */
 export function resolveAngebotPdfLogoSrc(logoUrlOverride?: string | null): string {
   const custom = logoUrlOverride?.trim()
   if (custom && /^https?:\/\//i.test(custom)) return custom
@@ -63,7 +74,7 @@ export function resolveAngebotPdfLogoSrc(logoUrlOverride?: string | null): strin
   const websiteLogo = resolveBrandLogoUrl('green', null)
   if (/^https?:\/\//i.test(websiteLogo)) return websiteLogo
 
-  const fromApp = resolvePublicAppUrl(BRAND_LOGO_GREEN)
+  const fromApp = resolvePublicAppUrl(BRAND_LOGO_GREEN_ON_WHITE)
   if (/^https?:\/\//i.test(fromApp)) return fromApp
 
   return resolveBrandLogoUrl('green', custom)

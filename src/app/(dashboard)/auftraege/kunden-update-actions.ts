@@ -132,10 +132,28 @@ export async function createKundenUpdateAndSend(input: {
         const leadRaw = auf.leads as { status?: LeadStatus } | { status?: LeadStatus }[] | null
         const leadStatus = (Array.isArray(leadRaw) ? leadRaw[0]?.status : leadRaw?.status) ?? null
         const aufStatus = auf.status as AuftragStatus
+        const { data: rechnungKurz, error: reErr } = await supabaseAdmin
+          .from('rechnungen')
+          .select('id, beleg_typ, richtung')
+          .eq('auftrag_id', input.auftragId)
+          .in('status', ['gesendet', 'bezahlt'])
+          .limit(8)
+        if (reErr) logDbError('app/auftraege/kunden-update-actions:rechnungen', reErr)
+        const hasRechnung = (rechnungKurz ?? []).some((r) => {
+          const beleg = String((r as { beleg_typ?: string | null }).beleg_typ ?? 'rechnung')
+            .trim()
+            .toLowerCase()
+          if (beleg === 'gutschrift') return false
+          const richtung = String((r as { richtung?: string | null }).richtung ?? 'ausgehend')
+            .trim()
+            .toLowerCase()
+          return richtung !== 'eingehend'
+        })
         const phaseIdx = aktuellePhaseIndexFromEntities({
           aufStatus,
           hasAuftrag: true,
           hasAngebot: true,
+          hasRechnung,
           leadStatus,
         })
         const link = projektUrlFromToken(token)

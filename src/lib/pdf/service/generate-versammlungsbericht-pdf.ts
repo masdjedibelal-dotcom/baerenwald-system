@@ -89,7 +89,11 @@ function cell(v: string | null | undefined): string {
 }
 
 function loadBwLogoBytes(): Uint8Array | null {
-  for (const name of ["logo-mark-green.png", "mail-logo-green.png"]) {
+  for (const name of [
+    "brand/logo-mark-green-on-white.png",
+    "brand/logo-mark-green.png",
+    "brand/mail-logo-green.png",
+  ]) {
     try {
       const p = join(process.cwd(), "public", name);
       return new Uint8Array(readFileSync(p));

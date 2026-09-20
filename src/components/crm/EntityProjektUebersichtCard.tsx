@@ -9,7 +9,7 @@ import { InlineEditField, InlineEditSection } from '@/components/ui/InlineEditSe
 import { toast } from '@/components/ui/app-toast'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
-import { formatDatum, cn } from '@/lib/utils'
+import { formatDatum, formatDatumZeitraum, cn } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
 export type ProjektUebersichtExtraRow = {
@@ -85,11 +85,12 @@ export function EntityProjektUebersichtCard({
     (preisMin != null && preisMax != null ? formatEurRange(preisMin, preisMax) : null)
 
   const zeitraumView =
-    draft.startDatum && draft.endDatum
-      ? `${formatDatum(draft.startDatum)} – ${formatDatum(draft.endDatum)}`
-      : draft.startDatum
-        ? formatDatum(draft.startDatum)
-        : null
+    draft.startDatum || draft.endDatum
+      ? (() => {
+          const s = formatDatumZeitraum(draft.startDatum, draft.endDatum)
+          return s === '—' ? null : s
+        })()
+      : null
 
   function can(field: EditableKeys) {
     return editing && editableFields.includes(field)

@@ -1,6 +1,6 @@
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
-import { formatDatum, formatMonatNummerJahr } from '@/lib/utils'
+import { formatDatum, formatDatumZeitraum, formatMonatNummerJahr } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
 
@@ -109,11 +109,7 @@ function cell(v: string | null | undefined): string {
 }
 
 function fmtRange(von: string, bis: string): string {
-  const a = von?.trim()
-  const b = bis?.trim()
-  if (!a && !b) return '—'
-  if (a && b) return `${formatDatum(a)} – ${formatDatum(b)}`
-  return formatDatum(a || b)
+  return formatDatumZeitraum(von, bis)
 }
 
 function fmtDatumKurz(iso: string): string {

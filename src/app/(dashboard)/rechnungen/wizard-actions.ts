@@ -380,7 +380,7 @@ async function rechnungenAbschlagLinks(
   const { data, error } = await supabase
     .from('rechnungen')
     .select(
-      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung, ersetzt_durch, korrektur_von'
+      'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung, ersetzt_durch, korrektur_von, beleg_typ'
     )
     .eq('auftrag_id', auftragId)
   if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
@@ -557,6 +557,111 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
           })()
         : naechsteAbschlagZumVersenden(kontext, rechnungen)
       if (!versand) {
+        // Gestellte Rate: offenen Korrektur-Entwurf derselben Zeile fortsetzen
+        const zeileId = opts?.abschlagZeileId?.trim()
+        if (zeileId) {
+          const korrekturDraft = rechnungen.find(
+            (r) =>
+              r.zahlungsplan_abschlag_id === zeileId &&
+              String(r.status ?? '') === 'entwurf' &&
+              String(r.beleg_typ ?? '') !== 'gutschrift' &&
+              Boolean(String(r.korrektur_von ?? '').trim())
+          )
+          if (korrekturDraft) {
+            const zeile =
+              kontext.zeilen.find((z) => z.id === zeileId) ?? null
+            if (zeile) {
+              // wie normaler Abschlag-Bootstrap mit bestehender RE-ID
+              const draftVersand = { zeile, rechnungId: korrekturDraft.id }
+              meta = {
+                ...metaDefaults,
+                zahlungsart: 'abschlaege',
+                abschlag_zeile_id: zeile.id,
+                zahlungsbedingungen: zahlungstextFuerAbschlagZeile(
+                  gespeicherterPlan,
+                  basis.gesamtNetto,
+                  zt,
+                  zeile
+                ),
+                faellig_am:
+                  normalizeFaelligAmYmd(
+                    zeile.faellig_am?.trim()?.slice(0, 10) || metaDefaults.faellig_am
+                  ) ?? metaDefaults.faellig_am,
+              }
+              modus = 'abschlag'
+              zahlungsplan = gespeicherterPlan
+              zahlungsplanBearbeiten = false
+              abschlag = {
+                zeileId: zeile.id,
+                zeileIndex: zeile.index,
+                zeileTitel: zeile.titel,
+                rechnungArt: rechnungArtFuerZeile(zeile),
+                istSchluss: zeile.istSchluss,
+                gesamtNetto: kontext.gesamtNetto,
+                gesamtBrutto: kontext.gesamtBrutto,
+                bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+              }
+              let positionen = basis.positionen
+              const kontextPos = berechneZahlungsplanMitIst(
+                zahlungsplan,
+                basis.gesamtNetto,
+                rechnungen
+              )
+              const zeilePos = kontextPos.zeilen.find((z) => z.id === zeile.id) ?? null
+              if (zeilePos) {
+                positionen = positionenFuerAbschlagRechnung({
+                  zeile: zeilePos,
+                  allePositionen: basis.positionen,
+                  plan: zahlungsplan,
+                  gesamtNetto: basis.gesamtNetto,
+                  auftragsReferenz: basis.auftragsReferenz,
+                  projektTitel: basis.projektTitel ?? '',
+                  bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+                  vorherigeAbschlaege: rechnungen,
+                  ausserRechnungId: draftVersand.rechnungId,
+                })
+              }
+              const { data: nrRow, error } = await supabase
+                .from('rechnungen')
+                .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id, objekt_anlage_id')
+                .eq('id', draftVersand.rechnungId)
+                .maybeSingle()
+              if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
+              return {
+                ok: true,
+                bootstrap: {
+                  rechnungId: draftVersand.rechnungId,
+                  rechnungsnummer: nrRow?.rechnungsnummer
+                    ? String(nrRow.rechnungsnummer)
+                    : null,
+                  auftragId,
+                  angebotId: basis.angebot_id,
+                  kundeId: basis.kunde_id,
+                  ansprechpartnerId: (nrRow?.ansprechpartner_id as string | null) ?? null,
+                  kundeObjektId: nrRow?.kunde_objekt_id
+                    ? String(nrRow.kunde_objekt_id)
+                    : basis.kunde_objekt_id,
+                  objektAnlageId: nrRow?.objekt_anlage_id
+                    ? String(nrRow.objekt_anlage_id)
+                    : basis.objekt_anlage_id,
+                  kunde: kunde ?? null,
+                  positionen,
+                  meta,
+                  auftragsReferenz: basis.auftragsReferenz,
+                  projektTitel: basis.projektTitel,
+                  modus,
+                  abschlag,
+                  zahlungsplan,
+                  zahlungsplanBearbeiten,
+                  gesamtNetto: basis.gesamtNetto,
+                  rechnungenAbschlag: rechnungen,
+                  ist_wiederkehrend: basis.ist_wiederkehrend,
+                  wiederkehr_turnus: basis.wiederkehr_turnus,
+                },
+              }
+            }
+          }
+        }
         return {
           ok: false,
           message: opts?.abschlagZeileId?.trim()
@@ -1430,6 +1535,49 @@ async function saveRechnungWizardDraftInner(
 
   if (!input.kunde_id?.trim()) {
     return { ok: false, message: 'Bitte einen Kunden wählen.' }
+  }
+
+  // Offenen Abschlag-Entwurf derselben Rate fortsetzen (kein zweiter Entwurf)
+  if (
+    !input.rechnungId &&
+    input.auftrag_id?.trim() &&
+    (input.abschlag?.zeileId || abschlagZeileId)
+  ) {
+    const zeileKey = (input.abschlag?.zeileId || abschlagZeileId || '').trim()
+    if (zeileKey) {
+      const supabaseFind = createClient()
+      const { data: existingDraft, error: draftErr } = await supabaseFind
+        .from('rechnungen')
+        .select('id, rechnungsnummer')
+        .eq('auftrag_id', input.auftrag_id.trim())
+        .eq('zahlungsplan_abschlag_id', zeileKey)
+        .eq('status', 'entwurf')
+        .neq('beleg_typ', 'gutschrift')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (draftErr) logDbError('app/rechnungen/wizard-actions:rechnungen', draftErr)
+      if (existingDraft?.id) {
+        const upd = await updateRechnungEntwurf(String(existingDraft.id), {
+          ...payload,
+          kunde_id: input.kunde_id.trim(),
+          ist_wiederkehrend: input.ist_wiederkehrend,
+          wiederkehr_turnus: input.wiederkehr_turnus,
+        })
+        if (!upd?.ok) {
+          return upd?.ok === false
+            ? upd
+            : { ok: false, message: 'Entwurf speichern fehlgeschlagen.' }
+        }
+        revalidateRechnungDetail(String(existingDraft.id))
+        revalidateAuftragPfad(input.auftrag_id)
+        return {
+          ok: true,
+          rechnungId: String(existingDraft.id),
+          rechnungsnummer: String(existingDraft.rechnungsnummer ?? ''),
+        }
+      }
+    }
   }
 
   const created = await createRechnungEntwurf({

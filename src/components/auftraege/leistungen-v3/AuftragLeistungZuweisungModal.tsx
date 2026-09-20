@@ -567,20 +567,6 @@ auftragId?: string | null
                         setVon(v ? ymdToDisplay(v) : '')
                         if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
                       }} disabled={pending} />
-                    <MockBtn className="hw-anfrage-date-icon" type="button" tabIndex={-1} disabled={pending} aria-label="Kalender öffnen" onMouseDown={(e) => e.preventDefault()} onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const input = (e.currentTarget.parentElement?.querySelector(
-                          '.date-field__input'
-                        ) ?? null) as HTMLInputElement | null
-                        try {
-                          input?.showPicker?.()
-                        } catch {
-                          input?.focus()
-                        }
-                      }}>
-                      <MockIcon ctx="btn" n="calendar" size={15} />
-                    </MockBtn>
                   </div>
                 </label>
                 <label
@@ -588,6 +574,7 @@ auftragId?: string | null
                     'hw-anfrage-field',
                     zeitModus === 'tag' && 'hw-anfrage-date-bis--hidden'
                   )}
+                  aria-hidden={zeitModus === 'tag' || undefined}
                 >
                   <span className="hw-anfrage-label">Bis *</span>
                   <div className="hw-anfrage-date-field">
@@ -596,20 +583,6 @@ auftragId?: string | null
                         const v = e.target.value
                         setBis(v ? ymdToDisplay(v) : '')
                       }} disabled={pending || zeitModus === 'tag'} tabIndex={zeitModus === 'tag' ? -1 : undefined} />
-                    <MockBtn className="hw-anfrage-date-icon" type="button" tabIndex={-1} disabled={pending || zeitModus === 'tag'} aria-label="Kalender öffnen" onMouseDown={(e) => e.preventDefault()} onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const input = (e.currentTarget.parentElement?.querySelector(
-                          '.date-field__input'
-                        ) ?? null) as HTMLInputElement | null
-                        try {
-                          input?.showPicker?.()
-                        } catch {
-                          input?.focus()
-                        }
-                      }}>
-                      <MockIcon ctx="btn" n="calendar" size={15} />
-                    </MockBtn>
                   </div>
                 </label>
               </div>

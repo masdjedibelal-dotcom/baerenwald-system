@@ -82,7 +82,9 @@ export function RechnungKorrekturWahlModal({
           neuId: korr.neuId,
           originalStatus: korr.originalStatus,
         }
-        toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ers)
+        if (!korr.resumed) {
+          toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ers)
+        }
       }
       onClose()
       onKorrigieren(res.bootstrap)

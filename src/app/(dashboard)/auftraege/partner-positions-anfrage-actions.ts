@@ -180,8 +180,54 @@ async function auftragTitel(auftragId: string): Promise<string> {
  * Angenommene Partner-Nacharbeit auch ins verknüpfte Angebot schreiben,
  * damit „Angebot bearbeiten“ / Wizard die Position zum Kundenversand hat.
  */
+async function resolveAngebotIdForAuftrag(auftragId: string): Promise<string | null> {
+  const { data: auftrag, error } = await supabaseAdmin
+    .from('auftraege')
+    .select('angebot_id, lead_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftraege', error)
+
+  const direct = String(auftrag?.angebot_id ?? '').trim()
+  if (direct) return direct
+
+  const leadId = String(auftrag?.lead_id ?? '').trim()
+  if (!leadId) return null
+
+  const { data: ang, error: angErr } = await supabaseAdmin
+    .from('angebote')
+    .select('id')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (angErr) logDbError('app/auftraege/partner-positions-anfrage-actions:angebote', angErr)
+  const viaLead = String(ang?.id ?? '').trim()
+  return viaLead || null
+}
+
+function angebotPositionenGesamtNetto(positionen: AngebotPosition[]): number {
+  return Math.round(
+    positionen.reduce((sum, p) => {
+      const menge =
+        p.menge != null && Number.isFinite(Number(p.menge)) && Number(p.menge) > 0
+          ? Number(p.menge)
+          : 1
+      const vk = Number(p.vk_netto ?? 0)
+      if (vk > 0) return sum + vk * menge
+      const lohn = Number(p.lohn_netto ?? 0)
+      const mat = Number(p.material_netto ?? 0)
+      if (lohn > 0 || mat > 0) return sum + (lohn + mat) * menge
+      const g = Number(p.gesamt_min ?? p.gesamt_max ?? 0)
+      return sum + (g > 0 ? g : 0)
+    }, 0) * 100
+  ) / 100
+}
+
 async function appendLeistungZuAngebot(opts: {
   auftragId: string
+  /** Auftrag-Positions-ID — gleiche ID im Angebots-JSON → Portal-Preis-Lookup. */
+  positionId?: string | null
   titel: string
   beschreibung?: string | null
   gewerkName: string
@@ -191,13 +237,7 @@ async function appendLeistungZuAngebot(opts: {
   menge?: number | null
   einheit?: string | null
 }): Promise<boolean> {
-  const { data: auftrag, error } = await supabaseAdmin
-    .from('auftraege')
-    .select('angebot_id')
-    .eq('id', opts.auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftraege', error)
-  const angebotId = String(auftrag?.angebot_id ?? '').trim()
+  const angebotId = await resolveAngebotIdForAuftrag(opts.auftragId)
   if (!angebotId) return false
 
   const { data: ang, error: error2 } = await supabaseAdmin
@@ -209,14 +249,18 @@ async function appendLeistungZuAngebot(opts: {
   if (!ang) return false
 
   const existing = normalizeAngebotPositionen(ang.positionen)
+  const positionId = String(opts.positionId ?? '').trim()
   const titleKey = opts.titel.trim().toLowerCase()
   if (
-    existing.some(
-      (p) =>
+    existing.some((p) => {
+      const id = String(p.id ?? '').trim()
+      if (positionId && id === positionId) return true
+      return (
         String(p.leistung_name ?? p.leistung ?? '')
           .trim()
           .toLowerCase() === titleKey
-    )
+      )
+    })
   ) {
     return true
   }
@@ -228,9 +272,10 @@ async function appendLeistungZuAngebot(opts: {
   const menge =
     opts.menge != null && Number.isFinite(opts.menge) && opts.menge > 0 ? opts.menge : 1
   const einheit = opts.einheit?.trim() || (opts.menge && opts.menge > 1 ? 'Min' : 'pauschal')
+  const zeile = Math.round(preis * menge * 100) / 100
 
   const neu: AngebotPosition = {
-    id: neuePositionsId(),
+    id: positionId || neuePositionsId(),
     gewerk_id: '',
     gewerk_name: opts.gewerkName,
     gewerk_slug: opts.gewerkSlug,
@@ -240,8 +285,8 @@ async function appendLeistungZuAngebot(opts: {
     lohn_netto: preis,
     material_netto: 0,
     vk_netto: preis,
-    gesamt_min: Math.round(preis * menge * 100) / 100,
-    gesamt_max: Math.round(preis * menge * 100) / 100,
+    gesamt_min: zeile,
+    gesamt_max: zeile,
     menge,
     einheit,
     preis_typ: 'fix',
@@ -250,10 +295,16 @@ async function appendLeistungZuAngebot(opts: {
     notiz_intern: 'Aus Partner-Nacharbeit übernommen',
   }
 
+  const next = [...existing, neu]
+  const gesamtNetto = angebotPositionenGesamtNetto(next)
+
   const { error: error3 } = await supabaseAdmin
     .from('angebote')
     .update({
-      positionen: [...existing, neu],
+      positionen: next,
+      gesamt_preis: gesamtNetto,
+      gesamt_min: gesamtNetto,
+      gesamt_max: gesamtNetto,
       updated_at: new Date().toISOString(),
     })
     .eq('id', angebotId)
@@ -263,6 +314,15 @@ async function appendLeistungZuAngebot(opts: {
     console.error('[appendLeistungZuAngebot]', error3.message)
     return false
   }
+
+  // Auftrag ↔ Angebot verknüpfen, falls nur über Lead gefunden
+  const { error: linkErr } = await supabaseAdmin
+    .from('auftraege')
+    .update({ angebot_id: angebotId })
+    .eq('id', opts.auftragId)
+    .is('angebot_id', null)
+  if (linkErr) logDbError('app/auftraege/partner-positions-anfrage-actions:auftraege', linkErr)
+
   revalidateAngebotDetail(angebotId)
   return true
 }
@@ -383,6 +443,7 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
 
   await appendLeistungZuAngebot({
     auftragId,
+    positionId: String(pos.id),
     titel,
     beschreibung: anfrage.begruendung ? String(anfrage.begruendung) : null,
     gewerkName,
@@ -641,24 +702,30 @@ export async function decideWeitereArbeitMitNotify(input: {
       .trim()
 
     if (input.status === 'anerkannt') {
-      if (
-        (pos.preis_kunde == null || Number(pos.preis_kunde) <= 0) &&
-        preisNum != null
-      ) {
+      const unitPreis = preisNum
+      if (unitPreis != null) {
         const { error: __dbErr4 } = await supabaseAdmin
           .from('auftrag_positionen')
-          .update({ preis_kunde: preisNum })
+          .update({
+            preis_kunde:
+              pos.preis_kunde != null && Number(pos.preis_kunde) > 0
+                ? Number(pos.preis_kunde)
+                : unitPreis,
+            // Portal: lohn_fix × Menge (Regie speichert sonst nur stundensatz/preis_partner)
+            lohn_fix: unitPreis,
+          })
           .eq('id', pos.id)
         if (__dbErr4) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', __dbErr4)
       }
       await appendLeistungZuAngebot({
         auftragId: String(pos.auftrag_id),
+        positionId: String(pos.id),
         titel: name,
         beschreibung: begruendung || null,
         gewerkName: String(pos.gewerk_name ?? 'Regie').trim() || 'Regie',
         gewerkSlug: String(pos.gewerk_slug ?? 'regie').trim() || 'regie',
         handwerkerId: pos.handwerker_id ? String(pos.handwerker_id) : null,
-        preisNetto: preisNum,
+        preisNetto: unitPreis,
         menge: pos.menge != null ? Number(pos.menge) : 1,
         einheit: String(pos.einheit ?? 'Std'),
       })

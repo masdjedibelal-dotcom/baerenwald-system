@@ -915,7 +915,9 @@ export function AuftragDetailClient({
           }
           if (korr.mode === 'storno_neu') {
             targetId = korr.neuId
-            toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
+            if (!korr.resumed) {
+              toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
+            }
           }
         } else if (modus === 'gesperrt') {
           toast.error(TOAST.diese_rechnung_kann_nicht_mehr_bearbeitet_werden)

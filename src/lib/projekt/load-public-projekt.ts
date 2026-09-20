@@ -45,6 +45,8 @@ export type PublicProjektPayload = {
   timeline: PublicTimelineEintrag[]
   milestones: PublicMilestone[]
   nachtraegeAkzeptiert: Pick<NachtragRow, 'id' | 'grund' | 'gesamt_min' | 'gesamt_max'>[]
+  /** Gestellte Kundenrechnung → Live-Status Punkt 5 Fertig erledigt */
+  hasRechnung: boolean
 }
 
 export async function loadPublicProjektByToken(token: string): Promise<PublicProjektPayload | null> {
@@ -111,6 +113,25 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
     .eq('auftrag_id', auftragId)
     .eq('status', 'akzeptiert')
   if (error5) logDbError('lib/projekt/load-public-projekt:nachtraege', error5)
+
+  const { data: rechnungRows, error: error6 } = await supabaseAdmin
+    .from('rechnungen')
+    .select('id, status, beleg_typ, richtung')
+    .eq('auftrag_id', auftragId)
+    .in('status', ['gesendet', 'bezahlt'])
+    .limit(8)
+  if (error6) logDbError('lib/projekt/load-public-projekt:rechnungen', error6)
+
+  const hasRechnung = (rechnungRows ?? []).some((r) => {
+    const beleg = String((r as { beleg_typ?: string | null }).beleg_typ ?? 'rechnung')
+      .trim()
+      .toLowerCase()
+    if (beleg === 'gutschrift') return false
+    const richtung = String((r as { richtung?: string | null }).richtung ?? 'ausgehend')
+      .trim()
+      .toLowerCase()
+    return richtung !== 'eingehend'
+  })
 
   const row = auf as Record<string, unknown>
   const k = row.kunden as PublicProjektPayload['kunde'] | null
@@ -186,5 +207,6 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
     timeline,
     milestones,
     nachtraegeAkzeptiert,
+    hasRechnung,
   }
 }

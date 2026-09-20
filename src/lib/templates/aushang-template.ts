@@ -44,7 +44,7 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
   const logo = p.logoUrl?.trim()
   const logoHtml =
     logo && (logo.startsWith('data:') || /^https?:\/\//i.test(logo))
-      ? `<img src="${logo.replace(/"/g, '&quot;')}" alt="" style="height:40px;width:auto;max-width:140px;object-fit:contain;display:block;margin-bottom:8px;" />`
+      ? `<img src="${logo.replace(/"/g, '&quot;')}" alt="" style="height:40px;width:auto;max-width:140px;object-fit:contain;display:block;margin-bottom:8px;background:#fff;" />`
       : `<div style="width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:14pt;font-weight:700;color:${C.white};margin-bottom:8px;">${esc(org.slice(0, 2).toUpperCase())}</div>`
 
   const qr = p.qrDataUrl?.trim()

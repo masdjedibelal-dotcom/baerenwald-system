@@ -116,7 +116,7 @@ export function ProjektStatusClient({
     return <TokenLinkInvalid />
   }
 
-  const { auftrag, kunde, gewerkeLabels, angebote, timeline, nachtraegeAkzeptiert, leadStatus, milestones } = initial
+  const { auftrag, kunde, gewerkeLabels, angebote, timeline, nachtraegeAkzeptiert, leadStatus, milestones, hasRechnung } = initial
   const ortLine = [kunde.plz, kunde.ort].filter(Boolean).join(' ') || '—'
   const adresseLine = kunde.adresse?.trim() || ortLine
 
@@ -135,11 +135,17 @@ export function ProjektStatusClient({
     aufStatus: auftrag.status,
     hasAuftrag: true,
     hasAngebot: Boolean(angebote),
+    hasRechnung: Boolean(hasRechnung),
     leadStatus,
   })
+  const allPhasenErledigt = phaseIdx >= PHASEN.length
   const pctBase = statusProgress(auftrag.status)
   const pct =
-    typeof auftrag.fortschritt === 'number' && auftrag.fortschritt > 0 ? auftrag.fortschritt : pctBase
+    typeof auftrag.fortschritt === 'number' && auftrag.fortschritt > 0
+      ? auftrag.fortschritt
+      : allPhasenErledigt || hasRechnung
+        ? 100
+        : pctBase
 
   const updatesFirst = timeline.slice(0, 3)
   const updatesAnzeige = alleUpdates ? timeline : updatesFirst
@@ -173,7 +179,7 @@ export function ProjektStatusClient({
           <div className="flex min-w-[520px] items-start justify-between gap-1 px-1">
             {PHASEN.map((label, i) => {
               const done = i < phaseIdx
-              const active = i === phaseIdx
+              const active = !done && i === phaseIdx
               return (
                 <div key={label} className="flex flex-1 flex-col items-center text-center">
                   <div className="flex w-full items-center">
@@ -208,7 +214,7 @@ export function ProjektStatusClient({
                   </div>
                   <p
                     className={`mt-2 max-w-[72px] text-fs-caption font-medium leading-tight md:max-w-none md:text-xs ${
-                      active ? 'text-bw-dark' : 'text-bw-text-subtle'
+                      done || active ? 'text-bw-dark' : 'text-bw-text-subtle'
                     }`}
                   >
                     {label}

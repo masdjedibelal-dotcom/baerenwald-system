@@ -25,8 +25,8 @@ import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsor
 import {
   BEREICH_LABELS,
   anfragePreisDetailLabel,
-  formatDatum,
   formatDatumZeit,
+  formatDatumZeitraum,
   isCrmStaffFunnel,
   kanalLabel,
 } from '@/lib/utils'
@@ -53,10 +53,10 @@ function resolveZeitraumAnzeige(
   normZeitraumLabel: string | null,
   normDringlichkeitLabel: string | null
 ): string | null {
-  if (lead.zeitraum_von && lead.zeitraum_bis) {
-    return `${formatDatum(lead.zeitraum_von)} – ${formatDatum(lead.zeitraum_bis)}`
+  if (lead.zeitraum_von || lead.zeitraum_bis) {
+    const s = formatDatumZeitraum(lead.zeitraum_von, lead.zeitraum_bis)
+    return s === '—' ? null : s
   }
-  if (lead.zeitraum_von) return formatDatum(lead.zeitraum_von)
   if (normZeitraumLabel) return normZeitraumLabel
   if (normDringlichkeitLabel) return normDringlichkeitLabel
   const fromLead = zeitraumLabel(lead.zeitraum)

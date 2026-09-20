@@ -4,6 +4,151 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Zahlungserinnerung Doppelversand / Versand-Anker — 2026-09-21
+
+**Commit-Text:** `fix(mahnung): Claim vor Mail; Anker max(Fälligkeit,Versand); nie Folgetag-Doppel`
+
+**Befund (Prod RE2026-2135 Michael Koenig):** Schlussrechnung Fr 18.9. mit `faellig_am=Versandtag` → Cron Sa+So jeweils Stufe‑1. Ursache: (1) Mahnung nur an `faellig_am`, (2) `erinnerung_7_sent_at` oft erst nach Mail gesetzt → bei Abbruch Doppel am nächsten Tag. Systemisch (2132/2133 je 3× Stufe‑1).
+
+**Fix:**
+- Anker = max(effektive Fälligkeit, Versandtag)
+- Mindestabstand 2 Kalendertage zwischen Erinnerungen
+- Claim (`UPDATE … WHERE erinnerung_* IS NULL`) **vor** Mail
+- email_log-Backfill wenn Timestamp fehlt
+- Prod-Daten: Timestamps aus email_log nachgezogen
+
+**Dateien:**
+- `src/lib/rechnungen/mahnverlauf.ts` — Anker, Gap, Mail-Log-Flags
+- `src/app/actions/mails.ts` — Claim/Backfill/Cron
+- `scripts/test-mahnverlauf.ts` — Regression König-Fall
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Live-Status: Rechnung → Punkt 5 Fertig erledigt — 2026-09-21
+
+**Commit-Text:** `feat(live-status): gestellte Rechnung setzt Kunden-Punkt 5 Fertig auf erledigt`
+
+**Befund:** Phasenleiste auf der Kunden-Statusseite zeigte „Fertig“ nur bei `auftrag.status=abgeschlossen` (und dann nur aktiv ●, nicht ✓). Nach Rechnung blieb Punkt 5 oft offen.
+
+**Dateien:**
+- `src/lib/auftraege/projekt-phasen.ts` — `hasRechnung`; Index `PROJEKT_PHASEN.length` = alle inkl. Fertig ✓
+- `src/lib/projekt/load-public-projekt.ts` — lädt gestellte Kundenrechnungen → `hasRechnung`
+- `src/components/projekt/ProjektStatusClient.tsx` — verdrahtet `hasRechnung`, Fortschritt 100 %
+- `src/app/(dashboard)/auftraege/kunden-update-actions.ts` — gleiche Logik in Status-Update-Mail
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Rechnung Entwurf/Korrektur immer fortsetzen — 2026-09-21
+
+**Commit-Text:** `fix(rechnung): offenen Entwurf/Korrektur immer wieder in denselben Wizard öffnen`
+
+**Befund:** `korrigiereRechnung` blockierte mit „läuft bereits“ statt `neuId` zurückzugeben — Bearbeiten von überall kam nicht mehr in den begonnenen Vorgang.
+
+**Dateien:**
+- `src/app/(dashboard)/rechnungen/actions.ts` — Resume bestehender Korrektur-Entwurf (`resumed`)
+- `src/app/(dashboard)/rechnungen/wizard-actions.ts` — Abschlag-Draft wiederverwenden; Korrektur-Draft an Rate
+- `src/lib/rechnungen/zahlungsplan.ts` — `rechnungFuerAbschlagZeile` bevorzugt Entwurf
+- `AuftragDetailClient` / `VorgangZahlungTab` / `RechnungKorrekturWahlModal` — Toast nur bei neuem Entwurf
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## PDF Logo weißer Hintergrund — 2026-09-21
+
+**Commit-Text:** `fix(pdf): Bärenwald-Logo auf weißem Grund (kein schwarzes Alpha)`
+
+**Befund:** `logo-mark-green.png` ist RGBA-transparent — Headless-Chrome flacht Alpha im PDF oft schwarz.
+
+**Dateien:**
+- `public/brand/logo-mark-green-on-white.png` — neues opakes Asset
+- `src/lib/brand.ts` — `BRAND_LOGO_GREEN_ON_WHITE`
+- `src/lib/angebote/angebot-pdf-logo.ts` — PDF lädt on-white
+- `src/lib/templates/angebot-template.ts` / `aushang` / `versammlungsbericht` / `pdf/chrome` — `background:#fff` am Logo-Img
+- `src/lib/pdf/service/generate-versammlungsbericht-pdf.ts` — on-white Bytes
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Zahlung-Tab: Abschlag-Infoboxen weg — 2026-09-21
+
+**Commit-Text:** `fix(zahlung): Infoboxen über Abschlagsplan nach Versand entfernen`
+
+**Dateien:**
+- `src/components/vorgang/VorgangZahlungTab.tsx` — „Abweichende Abschläge“ + „Gestellte Raten eingefroren“ entfernt
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Abnahme ohne Vor-Ort-Unterschrift (Checkbox) — 2026-09-21
+
+**Commit-Text:** `feat(abnahme): Checkbox „kann hier nicht unterschreiben“ je AN/Kunde`
+
+**Dateien:**
+- `src/lib/auftraege/abnahme-protokoll-meta.ts` — `ohne_unterschrift_hw` / `_kunde`
+- `src/components/auftraege/AbnahmeprotokollCreateWizard.tsx` — Checkboxen je Tab, Gap-Logik
+- `src/lib/templates/abnahme-protokoll-template.ts` — PDF-Hinweis „Unterschrift folgt“
+- `src/lib/auftraege/abnahme-protokoll-html-payload.ts` — Meta-Merge
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Abnahme Vorschau schließt Wizard nicht — 2026-09-21
+
+**Commit-Text:** `fix(abnahme): PDF-Vorschau als Canvas-Sheet statt neuem Tab`
+
+**Befund:** `openPdfFromBase64` → iOS/Back navigiert weg und DocumentCanvas-popstate schließt den Wizard.
+
+**Dateien:**
+- `src/components/auftraege/AbnahmeprotokollCreateWizard.tsx` — PdfViewer `context=canvas`
+- `src/components/ui/PdfViewer.tsx` — `context`-Prop
+- `src/lib/download-pdf-base64.ts` — `pdfBlobUrlFromBase64`
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Abnahme Unterschriften Tabs + Landscape-Pad — 2026-09-21
+
+**Commit-Text:** `feat(abnahme): Unterschriften-Tabs AN/Kunde; Pad Querformat weiß/schwarz`
+
+**Dateien:**
+- `src/components/auftraege/AbnahmeprotokollCreateWizard.tsx` — Segment-Tabs Auftragnehmer|Kunde; Felder je Tab; expandOnLandscape
+- `src/components/ui/SignatureCanvas.tsx` — Querformat-Overlay; Canvas opakes Weiß + schwarzer Strich
+- `src/lib/templates/abnahme-protokoll-template.ts` — Signatur-Img Hintergrund weiß
+- `src/styles/mock-design-system.css` — `.signature-pad-sheet` / Stage weiß
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Abnahme-Wizard Footer/Header Chrome — 2026-09-21
+
+**Commit-Text:** `fix(abnahme): Footer nur Zurück+Weiter; Abnehmen letzte Seite; Speichern/Vorschau im Header`
+
+**Befund:** DocumentCanvas `draftAction`+`primaryAction` + `footerCta` stapelten drei Aktionszeilen; `.doccv-foot .btn { flex:1 }` machte „Weiter“ full-width.
+
+**Dateien:**
+- `src/components/auftraege/AbnahmeprotokollCreateWizard.tsx` — kein draft/primaryAction; Header ✓ + Auge (letzte Seite); Footer Zurück|Weiter bzw. Abnehmen; Gap-Banner lokal
+- `src/styles/mock-design-system.css` — Abnahme-Footer Override (kein flex:1-Katastrophe), Actions-Bar aus
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Regie anerkannt → Kunden-Angebot — 2026-09-21
+
+**Commit-Text:** `fix: Regie-Anerkennung schreibt lohn_fix + Angebot-JSON (Lead-Fallback)`
+
+**Befund:**
+- `appendLeistungZuAngebot` brach ab ohne `angebot_id` am Auftrag
+- Neue Angebotszeile hatte fremde ID → Portal-Lookup fehlte
+- Regie ohne `lohn_fix` → Portal zeigte 0 €
+
+**Dateien:**
+- `src/app/(dashboard)/auftraege/partner-positions-anfrage-actions.ts` — Lead-Fallback, positionId, lohn_fix, gesamt_preis
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
 ## CRM Detail-Listen (Objekte etc.) App-like — 2026-09-20
 
 **Commit-Text:** `fix: ap-list/ap-mobile Hit ohne .btn-Border; Zeilen flach in Detail-Cards`
@@ -1353,5 +1498,37 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 - Outline `sections` entfernt: Rechnung, Direkt beauftragen, Abnahme, Abschlussbericht, Staff-Funnel, Projekt-/Rahmenvertrag
 - Nested `sheetContext` detail→canvas: Angebot/Rechnung-Mailfelder, PositionAddSheet/Modal, KatalogPick, Abnahme MobileEditable, HandwerkerStep
 - `AngebotWizard` Foto-Lightbox → canvas
+
+---
+
+## Datumsfelder + Partner-Cards Zuweisen
+
+**Commit-Text:** `fix: Datums-Border/Ein-Tag; Partner-Cards größer (MockBtn-Override)`
+
+**Befund:**
+- Datumsrahmen zu blass (`--input-border` = `--border-strong`); in Zuweisung doppeltes DateInput-Icon + `border:none` auf dem Input
+- „Einzelner Tag“ zeigte weiter Von/Bis (Hide-Klasse ohne `!important` / doppeltes Feld)
+- Partner-Zeilen als `MockBtn` → `.btn { height:32; white-space:nowrap }` quetschte die Cards
+
+**Dateien:**
+- `src/app/globals.css` — `--input-border` kräftiger; `--sp-card` 22px
+- `src/styles/mock-design-system.css` — DateInput-Border 1.5px; Bis-Hide `!important`; `.hw-anfrage-row`/`hw-pick-row` height:auto + nowrap weg + größere Pads; doctype/neu/KPI etwas größer
+- `src/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal.tsx` — nur noch DateInput (kein zweites Kalender-Icon)
+- `src/components/auftraege/HandwerkerZuweisenModal.tsx` — Pick-Rows größer, Titel wrappt
+- `src/lib/format/geld-datum.ts` — `formatDatumZeitraum` gleicher Tag → ein Datum
+- `src/components/auftraege/leistungen-v3/utils.ts` — `formatZeitraumKurz` nutzt denselben Helfer; `preis_fix` korrekt
+
+---
+
+## Vorgangs-Titel: keine Bereich-Slugs — 2026-09-21
+
+**Commit-Text:** `fix: Vorgangs-Titel Situation·Bereich statt fenster_tuer-Slug`
+
+**Befund:** Titel `fenster_tuer – Belal GMBH` blieb stehen, weil En-Dash (U+2013) nicht als Trenner galt und `BEREICH_LABELS` `fenster_tuer` fehlte.
+
+**Dateien:**
+- `src/lib/vorgang/vorgang-anzeige-titel.ts` — En-/Em-Dash; Placeholder bei Slug—Rest; Bereiche nur als Label
+- `src/lib/utils.ts` — `BEREICH_LABELS` inkl. Melde-Slugs (`fenster_tuer`, …)
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
 
 

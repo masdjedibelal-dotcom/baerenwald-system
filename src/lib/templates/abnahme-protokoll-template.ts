@@ -397,13 +397,18 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
     title: string,
     name: string,
     ortDatum: string,
-    signatureSrc: string | null
+    signatureSrc: string | null,
+    ohneVorOrt?: boolean
   ) => {
     const sigArea = signatureSrc
       ? `<div style="border-bottom:1px solid ${TEXT};min-height:48px;margin:12px 0 4px;display:flex;align-items:flex-end;justify-content:flex-start;">
-          <img src="${signatureSrc}" alt="Unterschrift" style="max-height:46px;max-width:100%;width:auto;object-fit:contain;display:block;" />
+          <img src="${signatureSrc}" alt="Unterschrift" style="max-height:46px;max-width:100%;width:auto;object-fit:contain;display:block;background:#fff;" />
         </div>`
-      : `<div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>`
+      : ohneVorOrt
+        ? `<div style="border-bottom:1px solid ${TEXT};min-height:48px;margin:12px 0 4px;display:flex;align-items:flex-end;">
+            <span style="font-size:8.5pt;color:${MUTED};font-style:italic;">Nicht vor Ort — Unterschrift folgt</span>
+          </div>`
+        : `<div style="border-bottom:1px solid ${TEXT};height:36px;margin:16px 0 4px;"></div>`
     return `<div style="flex:1;min-width:0;page-break-inside:avoid;">
       <div style="font-size:8pt;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">${esc(title)}</div>
       <div style="border-bottom:1px solid ${TEXT};min-height:20px;margin-bottom:4px;font-size:9pt;color:${TEXT};">${esc(ortDatum.trim() || ' ')}</div>
@@ -415,8 +420,20 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
 
   return `${sectionHeading('6', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
-      ${block('Auftragnehmer', hwName, formatOrtDatumZeile(p.meta.unterschrift_ort_datum_an), hwSig)}
-      ${block('Auftraggeber', kundeName, formatOrtDatumZeile(p.meta.unterschrift_ort_datum_ag), kundeSig)}
+      ${block(
+        'Auftragnehmer',
+        hwName,
+        formatOrtDatumZeile(p.meta.unterschrift_ort_datum_an),
+        hwSig,
+        Boolean(p.meta.ohne_unterschrift_hw)
+      )}
+      ${block(
+        'Auftraggeber',
+        kundeName,
+        formatOrtDatumZeile(p.meta.unterschrift_ort_datum_ag),
+        kundeSig,
+        Boolean(p.meta.ohne_unterschrift_kunde)
+      )}
       ${block(
         'Anwesend bei Übergabe',
         p.meta.anwesend_uebergabe,

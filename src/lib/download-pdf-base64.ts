@@ -1,3 +1,12 @@
+/** Blob-URL für In-App-Vorschau (Caller muss revoke). */
+export function pdfBlobUrlFromBase64(base64: string): string {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  const blob = new Blob([bytes], { type: 'application/pdf' })
+  return URL.createObjectURL(blob)
+}
+
 /** Leeren Tab synchron im User-Gesture öffnen (Mobil blockiert sonst nach await). */
 export function openPreviewTab(): Window | null {
   try {

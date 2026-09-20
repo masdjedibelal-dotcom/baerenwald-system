@@ -583,7 +583,7 @@ export function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
   if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
   const safeSrc = src.replace(/"/g, '&quot;')
   return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${PROJEKT_ACCENT};">
-    <img src="${safeSrc}" alt="" role="presentation" style="height:80px;width:auto;max-width:320px;object-fit:contain;display:block;" />
+    <img src="${safeSrc}" alt="" role="presentation" style="height:80px;width:auto;max-width:320px;object-fit:contain;display:block;background:#fff;" />
   </div>`
 }
 

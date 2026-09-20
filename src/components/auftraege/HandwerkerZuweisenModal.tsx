@@ -108,22 +108,22 @@ function HandwerkerPickRow({
   onSelect: () => void
 }) {
   return (
-    <label className="flex cursor-pointer gap-3 rounded-field border border-bw-border p-3 hover:bg-bw-hover">
+    <label className="flex cursor-pointer gap-3.5 rounded-field border border-bw-border-strong p-4 min-h-[76px] items-center hover:bg-bw-hover">
       <input
         type="radio"
         name="hw-pick"
-        className="mt-1"
+        className="mt-0.5 shrink-0"
         checked={selected}
         disabled={disabled}
         onChange={onSelect}
       />
       <div className="min-w-0 flex-1 text-[length:var(--fs-text)]">
-        <p className="font-medium text-bw-text">
+        <p className="break-words font-semibold text-[length:var(--fs-title)] leading-snug text-bw-text whitespace-normal">
           {h.name}
-          {h.firma ? <span className="text-bw-text-muted"> · {h.firma}</span> : null}
+          {h.firma ? <span className="font-medium text-bw-text-muted"> · {h.firma}</span> : null}
         </p>
         {h.telefon ? (
-          <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="text-bw-link underline">
+          <a href={`tel:${h.telefon.replace(/\s/g, '')}`} className="mt-1 inline-block text-[length:var(--fs-meta)] text-bw-link underline">
             {h.telefon}
           </a>
         ) : null}
@@ -347,7 +347,7 @@ export function HandwerkerZuweisenModal({
 
   const leistungenPreview =
     scope?.type === 'gewerk' && scope.leistungen.length > 0 && !isReplace ? (
-      <div className="mb-4 rounded-card border border-bw-border bg-bw-bg-soft/50 p-3">
+      <div className="mb-4 rounded-card border border-bw-border bg-bw-bg-soft/50 p-4">
         <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
           {scope.leistungen.length === 1 ? 'Leistung in der Anfrage' : `${scope.leistungen.length} Leistungen in einer Anfrage`}
         </p>
@@ -372,7 +372,7 @@ export function HandwerkerZuweisenModal({
           {replacePositionen.map((p) => {
             const ziel = splitZiel[p.id] ?? 'neu'
             return (
-              <li key={p.id} className="rounded-card border border-bw-border p-3">
+              <li key={p.id} className="rounded-card border border-bw-border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-[length:var(--fs-text)] font-medium text-bw-text">

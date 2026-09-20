@@ -33,8 +33,12 @@ export type AbnahmeProtokollMeta = {
   /** Portal: Partner hat Protokoll bestätigt (ohne Mail). */
   handwerker_bestaetigt_at?: string | null
   handwerker_bestaetigt_von?: string | null
-  /** CRM: PDF ohne Kunden-/HW-Unterschrift (Kunde nicht vor Ort). */
+  /** CRM: PDF ohne Kunden-/HW-Unterschrift (Legacy; = Kunde oder HW „nicht vor Ort“). */
   ohne_unterschrift?: boolean
+  /** Auftragnehmer kann bei Abnahme nicht vor Ort unterschreiben. */
+  ohne_unterschrift_hw?: boolean
+  /** Kunde/Auftraggeber kann bei Abnahme nicht vor Ort unterschreiben. */
+  ohne_unterschrift_kunde?: boolean
   /** Optional Signatur-Data-URLs oder Storage-Pfade */
   signature_kunde_url?: string | null
   signature_hw_url?: string | null
@@ -74,6 +78,8 @@ export function emptyAbnahmeProtokollMeta(
     handwerker_bestaetigt_at: null,
     handwerker_bestaetigt_von: null,
     ohne_unterschrift: false,
+    ohne_unterschrift_hw: false,
+    ohne_unterschrift_kunde: false,
     signature_kunde_url: null,
     signature_hw_url: null,
     kunde_unterschrift_name: null,
@@ -119,7 +125,17 @@ export function normalizeAbnahmeProtokollMeta(raw: unknown): AbnahmeProtokollMet
     handwerker_bestaetigt_von: o.handwerker_bestaetigt_von
       ? String(o.handwerker_bestaetigt_von).trim() || null
       : null,
-    ohne_unterschrift: Boolean(o.ohne_unterschrift),
+    ohne_unterschrift_hw: Boolean(o.ohne_unterschrift_hw),
+    ohne_unterschrift_kunde: Boolean(
+      o.ohne_unterschrift_kunde != null
+        ? o.ohne_unterschrift_kunde
+        : o.ohne_unterschrift // Legacy-Flag → Kunde
+    ),
+    ohne_unterschrift: Boolean(
+      o.ohne_unterschrift_hw ||
+        o.ohne_unterschrift_kunde ||
+        o.ohne_unterschrift
+    ),
     signature_kunde_url: o.signature_kunde_url
       ? String(o.signature_kunde_url).trim() || null
       : null,

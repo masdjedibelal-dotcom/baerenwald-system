@@ -130,6 +130,23 @@ export function formatDatum(datum: string): string {
   return `${dd}.${mm}.${yyyy}`
 }
 
+/**
+ * Von–Bis-Anzeige: bei gleichem Tag nur ein Datum (kein „a – a“).
+ * Leere Seite → weglassen; eine Seite → nur diese.
+ */
+export function formatDatumZeitraum(
+  von: string | null | undefined,
+  bis: string | null | undefined
+): string {
+  const aRaw = (von ?? '').trim().slice(0, 10)
+  const bRaw = (bis ?? '').trim().slice(0, 10)
+  if (!aRaw && !bRaw) return '—'
+  if (aRaw && bRaw && aRaw === bRaw) return formatDatum(aRaw)
+  if (aRaw && bRaw) return `${formatDatum(aRaw)} – ${formatDatum(bRaw)}`
+  if (aRaw) return formatDatum(aRaw)
+  return formatDatum(bRaw)
+}
+
 export function formatDatumZeit(datum: string): string {
   const d = new Date(datum)
   if (Number.isNaN(d.getTime())) return '—'

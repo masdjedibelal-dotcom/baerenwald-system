@@ -131,7 +131,7 @@ export function pdfKopfHtml(input: PdfKopfInput): string {
     !/^file:/i.test(logoSrc) &&
     (logoSrc.startsWith('data:') || /^https?:\/\//i.test(logoSrc))
   const brandMark = logoOk
-    ? `<img src="${logoSrc!.replace(/"/g, '&quot;')}" alt="" role="presentation" style="height:48px;width:auto;max-width:180px;object-fit:contain;display:block;" />`
+    ? `<img src="${logoSrc!.replace(/"/g, '&quot;')}" alt="" role="presentation" style="height:48px;width:auto;max-width:180px;object-fit:contain;display:block;background:#fff;" />`
     : `<div style="width:40px;height:40px;border-radius:8px;background:${accent};color:${C.white};font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;">${esc(
         (a.name || 'BW').slice(0, 2).toUpperCase()
       )}</div>`

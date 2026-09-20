@@ -23,8 +23,8 @@ import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
 import {
   BEREICH_LABELS,
   KANAL_LABELS,
-  formatDatum,
   formatDatumZeit,
+  formatDatumZeitraum,
 } from '@/lib/utils'
 
 function FunnelProp({ label, children }: { label: string; children: ReactNode }) {
@@ -41,10 +41,9 @@ function resolveZeitraumAnzeige(
   normZeitraumLabel: string | null,
   normDringlichkeitLabel: string | null
 ): string {
-  if (lead.zeitraum_von && lead.zeitraum_bis) {
-    return `${formatDatum(lead.zeitraum_von)} – ${formatDatum(lead.zeitraum_bis)}`
+  if (lead.zeitraum_von || lead.zeitraum_bis) {
+    return formatDatumZeitraum(lead.zeitraum_von, lead.zeitraum_bis)
   }
-  if (lead.zeitraum_von) return formatDatum(lead.zeitraum_von)
 
   if (normZeitraumLabel) return normZeitraumLabel
   if (normDringlichkeitLabel) return normDringlichkeitLabel

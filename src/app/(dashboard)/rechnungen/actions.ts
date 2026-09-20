@@ -424,7 +424,15 @@ export async function createGutschriftFromRechnung(
  */
 export async function korrigiereRechnung(rechnungId: string): Promise<
   | { ok: true; mode: 'direkt' }
-  | { ok: true; mode: 'storno_neu'; stornoId: string; neuId: string; originalStatus: string }
+  | {
+      ok: true
+      mode: 'storno_neu'
+      stornoId: string
+      neuId: string
+      originalStatus: string
+      /** true = bestehender Korrektur-Entwurf, kein neuer angelegt */
+      resumed?: boolean
+    }
   | { ok: false; message: string }
 > {
   const gate = await requireStaffAndServiceRole()
@@ -471,12 +479,30 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
     if (error) logDbError('app/rechnungen/actions:rechnungen', error)
     const st = String(laufend?.status ?? '').toLowerCase()
     if (laufend && st !== 'storniert') {
+      // Offener Korrektur-Entwurf → immer denselben fortsetzen (nicht blockieren)
+      if (st === 'entwurf') {
+        const { data: gs, error: gsErr } = await supabase
+          .from('rechnungen')
+          .select('id')
+          .eq('bezug_rechnung_id', rechnungId)
+          .eq('beleg_typ', 'gutschrift')
+          .neq('status', 'storniert')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (gsErr) logDbError('app/rechnungen/actions:rechnungen', gsErr)
+        return {
+          ok: true,
+          mode: 'storno_neu',
+          stornoId: String(gs?.id ?? ''),
+          neuId: String(laufend.id),
+          originalStatus: status,
+          resumed: true,
+        }
+      }
       return {
         ok: false,
-        message:
-          st === 'entwurf'
-            ? 'Korrektur-Entwurf läuft bereits — bitte fortsetzen oder verwerfen.'
-            : 'Diese Rechnung wurde bereits ersetzt — keine weitere Korrektur.',
+        message: 'Diese Rechnung wurde bereits ersetzt — keine weitere Korrektur.',
       }
     }
   }

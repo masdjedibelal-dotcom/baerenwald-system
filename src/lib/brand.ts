@@ -7,8 +7,13 @@ import { getPublicAppUrl } from '@/lib/utils'
 
 export const BRAND_ALT = 'Bärenwald München'
 
-/** Grün auf hellem Hintergrund (Login, helle Flächen) */
+/** Grün auf hellem Hintergrund (Login, helle Flächen) — transparentes PNG */
 export const BRAND_LOGO_GREEN = '/brand/logo-mark-green.png'
+
+/**
+ * Grün auf opaken weißem Hintergrund — für PDF/Print (Chrome flacht Alpha sonst oft schwarz).
+ */
+export const BRAND_LOGO_GREEN_ON_WHITE = '/brand/logo-mark-green-on-white.png'
 
 /** Weiß auf dunklem Hintergrund (Sidebar, E-Mail-Kopf, Status-Seiten) */
 export const BRAND_LOGO_WHITE = '/brand/logo-mark-white.png'

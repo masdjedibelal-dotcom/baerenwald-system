@@ -23,7 +23,6 @@ import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
-  abschlagWeichtVonAktuellerAuftragssummeAb,
   berechneZahlungsplan,
   emptyZahlungsplan,
   parseZahlungsplan,
@@ -230,11 +229,6 @@ export function VorgangZahlungTab({
     kontext?.gesamtBrutto ??
     gesamtBruttoHint ??
     (gesamtNetto > 0 ? Math.round(gesamtNetto * 1.19 * 100) / 100 : 0)
-
-  const abschlagSummeAbweichungen = useMemo(() => {
-    if (variant === 'angebot' || !hasPlan) return []
-    return abschlagWeichtVonAktuellerAuftragssummeAb(plan, gesamtNetto, abschlagLinks)
-  }, [variant, hasPlan, plan, gesamtNetto, abschlagLinks])
 
   const rows: RateRow[] = useMemo(() => {
     // Mit Zahlungsplan: immer Plan-Raten (auch auf Rechnung-Detail) — Gutschriften hängen als Belege
@@ -543,7 +537,9 @@ export function VorgangZahlungTab({
         }
         if (korr.mode === 'storno_neu') {
           targetId = korr.neuId
-          toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
+          if (!korr.resumed) {
+            toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
+          }
         }
       } else if (modus === 'gesperrt') {
         toast.error(TOAST.diese_rechnung_kann_nicht_mehr_bearbeitet_werden)
@@ -820,28 +816,6 @@ export function VorgangZahlungTab({
         ) : (
           <div style={{ height: 8 }} aria-hidden />
         )}
-
-        {abschlagSummeAbweichungen.length > 0 ? (
-          <div className="zahlung-tab-hint">
-            <MockInfoTip
-              label="Abweichende Abschläge"
-              tip={
-                abschlagSummeAbweichungen.length === 1
-                  ? `${abschlagSummeAbweichungen[0]!.rechnungsnummer ?? 'Abschlag'} bleibt bei ${formatEurBetrag(abschlagSummeAbweichungen[0]!.gestelltBrutto)} (Soll ${formatEurBetrag(abschlagSummeAbweichungen[0]!.sollBrutto)}). Gestellte Rechnungen bleiben; Schlussrechnung gleicht ab.`
-                  : `${abschlagSummeAbweichungen.length} gestellte Abschläge auf alter Summe. Schlussrechnung gleicht ab — oder stornieren und Rate neu stellen.`
-              }
-            />
-          </div>
-        ) : null}
-
-        {variant === 'auftrag' && frozenRateIds.length > 0 ? (
-          <div className="zahlung-tab-hint">
-            <MockInfoTip
-              label="Gestellte Raten eingefroren"
-              tip="Bereits versendete Abschläge ändern sich nicht automatisch. Plan-Änderung aktualisiert nur Entwürfe (Betrag, Schluss vs. Abschlag, PDF). Gestellte Raten: über „Korrigieren“ Storno + neu, dann erneut senden."
-            />
-          </div>
-        ) : null}
 
         {nurEinzel ? (
           <div className="zahlung-tab-hint">

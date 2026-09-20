@@ -10,6 +10,11 @@ export type ProjektPhasenEntities = {
   hasAngebot?: boolean
   /** true wenn ein Auftrag existiert (Token-/Detail-Seite) */
   hasAuftrag?: boolean
+  /**
+   * Gestellte Kundenrechnung (gesendet/bezahlt, keine Gutschrift).
+   * → Live-Status: Punkt 5 „Fertig“ als erledigt (✓), nicht nur aktiv.
+   */
+  hasRechnung?: boolean
   aufStatus: AuftragStatus
   /** nur Fallback / Drift-Diagnose — nicht als Phasenquelle */
   leadStatus?: LeadStatus | null
@@ -18,10 +23,14 @@ export type ProjektPhasenEntities = {
 /**
  * Phasenindex aus EXISTIERENDEN Entitäten (Auftrag/Angebot), nicht aus Lead-status allein.
  * Drift (Lead sagt „auftrag“, aber kein Auftrag) wird geloggt.
+ *
+ * Rückgabe `PROJEKT_PHASEN.length` (5) = alle Schritte inkl. Fertig erledigt (✓).
+ * Index 0–4 = aktueller Schritt (aktiv); Vorgänger sind erledigt.
  */
 export function aktuellePhaseIndexFromEntities(e: ProjektPhasenEntities): number {
-  const { aufStatus, hasAngebot, hasAuftrag, leadStatus } = e
-  if (aufStatus === 'abgeschlossen') return 4
+  const { aufStatus, hasAngebot, hasAuftrag, hasRechnung, leadStatus } = e
+  // Fertig erledigt: Abschluss ODER gestellte Rechnung (Kunden-Live-Status Punkt 5)
+  if (aufStatus === 'abgeschlossen' || hasRechnung) return PROJEKT_PHASEN.length
   if (aufStatus === 'abnahme') return 3
   if (aufStatus === 'storniert') return 0
   if (aufStatus === 'offen' || aufStatus === 'in_arbeit' || hasAuftrag) return 2
@@ -71,7 +80,7 @@ export function aktuelleAuftragPhaseLabel(status: AuftragStatus): string {
 export function mailPhasenStepsHtml(phaseIdx: number): string {
   const cells = PROJEKT_PHASEN.map((label, i) => {
     const done = i < phaseIdx
-    const active = i === phaseIdx
+    const active = i === phaseIdx && phaseIdx < PROJEKT_PHASEN.length
     const color = done || active ? C.green : C.gray300
     const textColor = active ? C.greenDark : done ? C.green : C.gray400
     const weight = active ? '700' : '500'

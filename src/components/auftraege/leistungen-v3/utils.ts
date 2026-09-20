@@ -7,6 +7,7 @@ import {
   preisPartner,
 } from '@/lib/auftraege/auftrag-leistung-phasen'
 import type { AuftragPosition } from '@/lib/types'
+import { formatDatumZeitraum } from '@/lib/utils'
 
 /** Gruppiert nach gewerk_block_key (wie Angebot/Legacy), Fallback gewerk_slug / gewerk_name. */
 export function groupPositionenByGewerkSlug(
@@ -74,10 +75,11 @@ export function rowMarge(pos: AuftragPosition): { ek: number; marge: number; pct
 export function formatZeitraumKurz(pos: AuftragPosition): string | null {
   const von = pos.start_datum?.slice(0, 10)
   const bis = pos.end_datum?.slice(0, 10)
-  if (von && bis) return `${von} – ${bis}`
-  if (von) return `ab ${von}`
-  if (bis) return `bis ${bis}`
-  return null
+  if (!von && !bis) return null
+  if (von && !bis) return `ab ${formatDatumZeitraum(von, null)}`
+  if (!von && bis) return `bis ${formatDatumZeitraum(null, bis)}`
+  const s = formatDatumZeitraum(von, bis)
+  return s === '—' ? null : s
 }
 
 export function handwerkerInitialen(name: string): string {

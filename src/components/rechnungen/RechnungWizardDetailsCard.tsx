@@ -13,7 +13,7 @@ import {
 } from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { RechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, formatDatumZeitraum } from '@/lib/utils'
 
 export function RechnungWizardDetailsCard({
   meta,
@@ -118,9 +118,7 @@ export function RechnungWizardDetailsCard({
         label="Leistungszeitraum"
         value={
           meta.leistungszeitraum_von || meta.leistungszeitraum_bis
-            ? `${meta.leistungszeitraum_von ? formatDatum(meta.leistungszeitraum_von) : '—'} – ${
-                meta.leistungszeitraum_bis ? formatDatum(meta.leistungszeitraum_bis) : '—'
-              }`
+            ? formatDatumZeitraum(meta.leistungszeitraum_von, meta.leistungszeitraum_bis)
             : '—'
         }
       />

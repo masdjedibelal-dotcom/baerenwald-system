@@ -8,9 +8,12 @@ export type VorgangAnzeigeTitelAngebot = {
   titel?: string | null
 }
 
+/** Trenner in Titeln: Em-/En-Dash, Minus, Doppelpunkt, Mittelpunkt */
+const TITEL_SPLIT_RE = /\s*[\u2013\u2014\u2212\-|:·]\s*/
+
 /**
  * Platzhalter / PosBoard-Defaults / Slugs — kein sprechender Vorgangs-Titel.
- * (z. B. „Leistungen“, „Auftrag“, „Direktauftrag — sanitär“)
+ * (z. B. „Leistungen“, „Auftrag“, „Direktauftrag — sanitär“, „fenster_tuer – Firma“)
  */
 export function isPlaceholderVorgangTitel(
   t: string | null | undefined
@@ -34,8 +37,23 @@ export function isPlaceholderVorgangTitel(
   }
   if (/^angebot(\s+[a-z0-9][\w./-]{0,48})?$/i.test(raw)) return true
   if (/^[a-z][a-z0-9_]{1,40}$/.test(raw)) return true
-  if (/^direktauftrag\s*[—\-|:·]\s*[a-z0-9_]+$/i.test(raw)) return true
+  if (/^direktauftrag\s*[\u2013\u2014\u2212\-|:·]\s*[a-z0-9_]+$/i.test(raw))
+    return true
+  // Slug als linker Teil: „fenster_tuer – Belal GMBH“ / „fenster_tuer — …“
+  const left = raw.split(TITEL_SPLIT_RE, 1)[0]?.trim().toLowerCase() ?? ''
+  if (left && left !== n && /^[a-z][a-z0-9_]*_[a-z0-9_]+$/.test(left)) return true
+  if (left && left !== n && left in BEREICH_LABELS) return true
   return false
+}
+
+/** Bereich-Slug → Label; unbekannte Underscore-Slugs nicht roh anzeigen. */
+export function labelBereichOderLeer(slug: string | null | undefined): string {
+  const raw = slug?.trim() ?? ''
+  if (!raw) return ''
+  const labeled = BEREICH_LABELS[raw] ?? BEREICH_LABELS[raw.toLowerCase()]
+  if (labeled) return labeled
+  if (/^[a-z][a-z0-9_]*_[a-z0-9_]+$/i.test(raw)) return ''
+  return raw
 }
 
 /** Erster brauchbarer Titel aus Angebot (Leistungsumfang / Wizard / Spalte). */
@@ -57,7 +75,7 @@ function angebotSprechenderTitel(
   return null
 }
 
-/** Situation + Bereich (Labels), z. B. „Zuhause erneuern · Bad“. */
+/** Situation + Bereich (Labels), z. B. „Reparatur / Defekt · Fenster / Tür“. */
 export function situationBereichTitel(
   situation?: string | null,
   bereiche?: string[] | null
@@ -65,7 +83,7 @@ export function situationBereichTitel(
   const sit = situation?.trim()
   const sitLabel = sit ? (SITUATION_LABELS[sit] ?? sit) : ''
   const bereichLabel = (bereiche ?? [])
-    .map((b) => (b?.trim() ? (BEREICH_LABELS[b] ?? b) : ''))
+    .map((b) => labelBereichOderLeer(b))
     .filter(Boolean)
     .join(', ')
   const parts = [sitLabel, bereichLabel].filter(Boolean)

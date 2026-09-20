@@ -6,7 +6,7 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerLeistungZuweisung } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
-import { formatDatum } from '@/lib/utils'
+import { formatDatumZeitraum } from '@/lib/utils'
 import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 
 function one<T>(x: T | T[] | null | undefined): T | null {
@@ -15,10 +15,8 @@ function one<T>(x: T | T[] | null | undefined): T | null {
 }
 
 function formatZeitraum(start?: string | null, end?: string | null): string | undefined {
-  const a = start?.trim() ? formatDatum(start) : ''
-  const b = end?.trim() ? formatDatum(end) : ''
-  if (a && b) return `${a} – ${b}`
-  return a || b || undefined
+  const s = formatDatumZeitraum(start, end)
+  return s === '—' ? undefined : s
 }
 
 export async function sendAuftragHandwerkerZuweisungMail(input: {

@@ -4,7 +4,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import type { ReactNode } from 'react'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, formatDatumZeitraum } from '@/lib/utils'
 
 export type ProjektUebersichtExtraRow = {
   label: string
@@ -47,11 +47,12 @@ export function MockProjektUebersichtCard({
     preisrahmenLabel?.trim() ||
     (preisMin != null && preisMax != null ? formatEurRange(preisMin, preisMax) : null)
   const zeitraum =
-    startDatum && endDatum
-      ? `${formatDatum(startDatum)} – ${formatDatum(endDatum)}`
-      : startDatum
-        ? formatDatum(startDatum)
-        : null
+    startDatum || endDatum
+      ? (() => {
+          const s = formatDatumZeitraum(startDatum, endDatum)
+          return s === '—' ? null : s
+        })()
+      : null
 
   return (
     <MockCard title={title} icon="clipboard-list">

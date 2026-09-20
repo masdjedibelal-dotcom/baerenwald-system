@@ -30,9 +30,9 @@
     --text-4: #9aa39e;
     /* Placeholder / leere Selects — lesbarer als --text-4 */
     --placeholder: var(--text-3);
-    /* Form-Inputs: abgesetzt vom Sheet/Card-Weiß */
+    /* Form-Inputs: abgesetzt vom Sheet/Card-Weiß; Border klarer als --border-strong */
     --input-bg: var(--bg-soft);
-    --input-border: var(--border-strong);
+    --input-border: #bdb8b0;
     /* Sheets / Modals: Hintergrund weich blurren, nicht grau zudecken */
     --overlay-scrim: rgba(20, 24, 31, 0.22);
     --overlay-scrim-strong: rgba(20, 24, 31, 0.32);
@@ -70,7 +70,7 @@
     --fs-title: calc(15px * var(--app-font-scale));
     --fs-head: calc(19px * var(--app-font-scale));
     /* Weißraum — Spec §14 */
-    --sp-card: 20px;
+    --sp-card: 22px;
     --sp-stack: 16px;
     --sp-row: 11px;
     /* Aliase (Bestand) */
@@ -255,7 +255,7 @@
       --card-mobile: #ffffff;
       --bg-soft: #f3f5f3;
       --input-bg: var(--bg-soft);
-      --input-border: var(--border-strong);
+      --input-border: rgba(22, 32, 27, 0.22);
       /* Mobil: mehr Blur, leichter Scrim — Hintergrund bleibt sichtbar */
       --overlay-scrim: rgba(20, 24, 31, 0.26);
       --overlay-scrim-strong: rgba(20, 24, 31, 0.36);
@@ -385,7 +385,7 @@
   input:where(:not([type])),
   textarea,
   select {
-    border-color: var(--border);
+    border-color: var(--input-border, var(--border-strong, var(--border)));
   }
 
   input:where([type='checkbox']),

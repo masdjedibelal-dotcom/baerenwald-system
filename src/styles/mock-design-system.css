@@ -4145,7 +4145,7 @@ text-align: left;
   box-sizing: border-box;
   /* MockBtn setzt .btn { height: 32px; white-space: nowrap } — für KPI zurücksetzen */
   height: auto;
-  min-height: 64px;
+  min-height: 72px;
   white-space: normal;
   overflow: visible;
 }
@@ -8646,8 +8646,8 @@ flex-direction: column;
 display: inline-flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 14px;
-  border: 0.5px solid var(--border);
+  padding: 12px 16px;
+  border: 1px solid var(--border-strong, var(--border));
   border-radius: 10px;
   cursor: pointer;
   font-size: var(--fs-text);
@@ -8658,7 +8658,7 @@ display: inline-flex;
   text-align: left;
   /* MockBtn .btn { height:32; white-space:nowrap } — lbl/hint sonst abgeschnitten */
   height: auto;
-  min-height: 44px;
+  min-height: 52px;
   white-space: normal;
   overflow: visible;
   box-sizing: border-box;
@@ -9272,8 +9272,8 @@ display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   justify-content: flex-start;
   gap: 0;
   width: 100%;
-  padding: 14px 14px 12px;
-  border: 0.5px solid var(--border);
+  padding: 16px 16px 14px;
+  border: 1px solid var(--border-strong, var(--border));
   border-radius: 12px;
   background: var(--card);
   text-align: left;
@@ -9281,7 +9281,7 @@ display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   box-sizing: border-box;
   /* MockBtn .btn Höhe/nowrap sonst schneidet Kachel-Text ab */
   height: auto;
-  min-height: 88px;
+  min-height: 96px;
   white-space: normal;
   overflow: visible;
 }
@@ -11478,6 +11478,14 @@ text-align: left;
   color-scheme: light;
   padding-right: 40px;
   position: relative;
+  border: 1.5px solid var(--input-border, var(--border-strong, var(--border)));
+  background: var(--input-bg, var(--bg-soft, var(--card)));
+  box-sizing: border-box;
+}
+
+.date-field:focus-within .date-field__input {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(46, 125, 82, 0.12);
 }
 
 .date-field__input::-webkit-datetime-edit, .date-field__input::-webkit-datetime-edit-fields-wrapper, input[type='date']::-webkit-datetime-edit, input[type='date']::-webkit-datetime-edit-fields-wrapper, input[type='date']::-webkit-datetime-edit-text, input[type='date']::-webkit-datetime-edit-month-field, input[type='date']::-webkit-datetime-edit-day-field, input[type='date']::-webkit-datetime-edit-year-field {
@@ -11682,8 +11690,9 @@ display: grid;
 grid-template-columns: 1fr;
 }
 
-.wizard-zahlung-dates--single > .wizard-zahlung-dates__hidden, .wizard-zahlung-dates__hidden {
-display: none;
+.wizard-zahlung-dates--single > .wizard-zahlung-dates__hidden,
+.wizard-zahlung-dates__hidden {
+  display: none !important;
 }
 
 .wizard-zahlung-dates > .field {
@@ -12017,51 +12026,34 @@ min-width: 0;
 grid-template-columns: 1fr;
 }
 
+.hw-anfrage-date-row--single .hw-anfrage-date-bis--hidden,
+.hw-anfrage-date-bis--hidden {
+  display: none !important;
+}
+
 .hw-anfrage-date-field {
-display: flex;
-  align-items: stretch;
-  border: 0.5px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-  overflow: hidden;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+display: block;
+  width: 100%;
+  min-width: 0;
   position: relative;
 }
 
-.hw-anfrage-date-field:focus-within {
-border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(46, 125, 82, 0.1);
+.hw-anfrage-date-field .date-field {
+  width: 100%;
 }
 
+/* Legacy: doppeltes Kalender-Icon neben DateInput — nicht mehr rendern */
 .hw-anfrage-date-icon {
-display: grid;
-  place-items: center;
-  padding: 0 10px;
-  color: var(--text-3);
-  background: var(--bg-soft);
-  border-left: 0.5px solid var(--border);
-  border-right: none;
-  flex-shrink: 0;
-  cursor: pointer;
+  display: none !important;
 }
 
-.hw-anfrage-date-field .input {
-border: none;
-  border-radius: 0;
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  text-align: left;
-  direction: ltr;
-  padding-right: 12px;
-  background-image: none;
+.hw-anfrage-date-field .date-field__input {
+  /* DateInput behält eigenen Rahmen (kein border:none mehr) */
+  background: var(--input-bg, var(--bg-soft, var(--card)));
 }
 
-.hw-anfrage-date-field .input:focus {
-box-shadow: none;
-}
-
-.hw-anfrage-date-field input[type='date']::-webkit-datetime-edit, .hw-anfrage-date-field input[type='date']::-webkit-datetime-edit-fields-wrapper {
+.hw-anfrage-date-field input[type='date']::-webkit-datetime-edit,
+.hw-anfrage-date-field input[type='date']::-webkit-datetime-edit-fields-wrapper {
 text-align: left;
   padding-left: 0;
 }
@@ -12119,8 +12111,8 @@ list-style: none;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 240px;
+  gap: 12px;
+  max-height: min(420px, 55vh);
   overflow-y: auto;
 }
 
@@ -12170,15 +12162,21 @@ color: var(--text);
 .hw-anfrage-row {
 display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 0.5px solid var(--border);
+  padding: 16px 18px;
+  min-height: 76px;
+  /* MockBtn .btn { height:32; white-space:nowrap; padding:0 14px } — Card-Text sonst gequetscht */
+  height: auto;
+  white-space: normal;
+  overflow: visible;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong, var(--border));
   background: var(--card);
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
+  box-sizing: border-box;
 }
 
 .hw-anfrage-row:hover {
@@ -12192,8 +12190,8 @@ border-color: var(--green);
 
 .hw-anfrage-check {
 flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 5px;
   border: 1.5px solid var(--border);
   display: inline-flex;
@@ -12212,13 +12210,13 @@ background: var(--green);
 
 .hw-anfrage-avatar {
 flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--fs-meta);
+  font-size: var(--fs-title, var(--fs-text));
   font-weight: 600;
   background: var(--bg-soft, #f3f2ef);
   color: var(--text-2);
@@ -12229,18 +12227,25 @@ min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
+  white-space: normal;
 }
 
 .hw-anfrage-row-name {
-font-size: var(--fs-text);
+font-size: var(--fs-title, var(--fs-text));
   font-weight: 600;
   color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .hw-anfrage-row-meta {
 font-size: var(--fs-meta);
   color: var(--text-3);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .hw-anfrage-star {
@@ -14523,7 +14528,11 @@ color: var(--green);
 }
 
 .hw-pick-row {
-@apply flex items-center gap-2 bg-bw-card px-2.5 py-2;
+@apply flex items-center gap-3.5 bg-bw-card px-4 py-3.5;
+  min-height: 68px;
+  height: auto;
+  white-space: normal;
+  box-sizing: border-box;
 }
 
 .hw-pick-row-main {
@@ -14531,15 +14540,19 @@ color: var(--green);
 }
 
 .hw-pick-name {
-@apply w-full truncate text-[length:var(--fs-text)] font-semibold leading-tight text-bw-text;
+@apply w-full text-[length:var(--fs-title)] font-semibold leading-snug text-bw-text;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .hw-pick-meta {
-@apply w-full truncate text-[length:var(--fs-meta)] text-bw-text-muted;
+@apply w-full text-[length:var(--fs-meta)] leading-snug text-bw-text-muted;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .hw-pick-row .btn {
-@apply h-8 min-h-0 shrink-0 px-2.5 text-[length:var(--fs-meta)];
+@apply h-9 min-h-0 shrink-0 px-3 text-[length:var(--fs-text)];
 }
 
 .leistung-acc-hw-actions .btn {
@@ -14568,7 +14581,7 @@ width: 124px;
 }
 
 .hw-avatar {
-@apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-bw-green-bg text-[length:var(--fs-meta)] font-bold text-bw-primary;
+@apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bw-green-bg text-[length:var(--fs-title)] font-bold text-bw-primary;
 }
 
 .icon-btn {
@@ -17953,9 +17966,9 @@ padding: 12px 14px 32px;
   }
 .abnahme-canvas-footer__end .btn,
   .abnahme-canvas-footer__primary {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     width: auto;
-    min-width: 0;
+    min-width: 7.5rem;
     max-width: none;
   }
 .abnahme-canvas-footer .btn {
@@ -18106,6 +18119,107 @@ padding: 12px 14px 32px;
     font-size: var(--fs-text);
     flex: 1;
   }
+/* Abnahme: nur Zurück | Weiter/Abnehmen — kein Full-Width-Weiter */
+.document-canvas.abnahme-canvas .document-canvas__footer-cta,
+.document-canvas.abnahme-canvas .doccv-foot {
+  display: block;
+  padding: 0;
+  gap: 0;
+  border-top: 0.5px solid var(--app-separator, var(--border));
+  background-color: var(--bw-material-bar, var(--card));
+}
+.document-canvas.abnahme-canvas .doccv-foot .btn,
+.document-canvas.abnahme-canvas .document-canvas__footer-cta .btn {
+  flex: 0 0 auto;
+}
+.document-canvas.abnahme-canvas .abnahme-canvas-footer__primary {
+  min-width: 7.5rem;
+}
+.document-canvas.abnahme-canvas .document-canvas__actions {
+  display: none;
+}
+.document-canvas.abnahme-canvas .abnahme-canvas-gaps {
+  margin: 0 -0px;
+}
+
+/* Abnahme Unterschriften: Segment-Tabs volle Breite */
+.abnahme-sig-editor__tabs.seg {
+  display: flex;
+  width: 100%;
+}
+.abnahme-sig-editor__tab {
+  flex: 1 1 0;
+  text-align: center;
+  min-height: 36px;
+}
+
+/* Post-Stil: Querformat-Unterschrifts-Sheet */
+.signature-pad-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 560;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #fff);
+  padding:
+    max(8px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-right, 0px))
+    max(8px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+.signature-pad-sheet__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 4px 0 8px;
+}
+.signature-pad-sheet__hint {
+  font-size: var(--fs-title);
+  font-weight: 650;
+  color: var(--text);
+}
+.signature-pad-sheet__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.signature-pad-sheet__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1.5px dashed var(--border-strong, var(--border));
+  border-radius: 12px;
+  background: #fff;
+  background-color: #fff;
+}
+.signature-pad-stage {
+  background: #fff;
+  background-color: #fff;
+}
+.signature-pad-stage__canvas,
+.signature-pad-stage__img {
+  background: #fff;
+  background-color: #fff;
+}
+.signature-pad-sheet__stage canvas,
+.signature-pad-sheet__stage img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #fff;
+  background-color: #fff;
+}
+.signature-pad-sheet__footer {
+  flex-shrink: 0;
+  padding-top: 8px;
+  text-align: center;
+  font-size: var(--fs-meta);
+  color: var(--text-2, var(--bw-text-muted));
+}
+
 body.kb-open .document-canvas__footer-cta,
   body.kb-open .doccv-foot {
     display: none;

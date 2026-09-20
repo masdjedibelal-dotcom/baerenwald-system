@@ -20,8 +20,12 @@ import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
 import { buildInternSubject } from '@/lib/mail/build-subject'
-import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
-import { cronMahnungFuerRechnung, tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
+import { effektivesFaelligAmYmd, ymdAusIsoInZezone } from '@/lib/dates/werktag'
+import {
+  cronMahnungFuerRechnung,
+  inferZahlungserinnerungStufeFromBetreff,
+  tageSeitMahnAnker,
+} from '@/lib/rechnungen/mahnverlauf'
 import {
   berechneMahnungBetragKontext,
   loadGeschwisterMapFuerMahnung,
@@ -223,15 +227,12 @@ export async function sendBesichtigungTerminBestaetigung(input: {
   return { ok: true, emailLogId: r.emailLogId ?? emailLogId }
 }
 
-function tageUeberfaellig(faelligAm: string): number {
-  return tageSeitFaelligkeitRechnung(faelligAm)
-}
-
 type RechnungRow = {
   id: string
   rechnungsnummer: string
   brutto: number | null
   faellig_am: string | null
+  gesendet_at: string | null
   erinnerung_7_sent_at: string | null
   erinnerung_21_sent_at: string | null
   intern_warnung_30_at: string | null
@@ -243,6 +244,115 @@ type RechnungRow = {
   kunden: { name: string; email: string | null } | { name: string; email: string | null }[] | null
 }
 
+type ErinnerungMailMeta = {
+  letzteAt: string | null
+  stufe1At: string | null
+  stufe2At: string | null
+  hatStufe1: boolean
+  hatStufe2: boolean
+}
+
+async function loadErinnerungMailMetaByRechnung(
+  rechnungIds: string[]
+): Promise<Map<string, ErinnerungMailMeta>> {
+  const map = new Map<string, ErinnerungMailMeta>()
+  const ids = [...new Set(rechnungIds.map((x) => x.trim()).filter(Boolean))]
+  if (!ids.length) return map
+
+  const { data, error } = await supabaseAdmin
+    .from('email_log')
+    .select('rechnung_id, betreff, subject, sent_at, status')
+    .eq('typ', 'zahlungserinnerung')
+    .eq('status', 'gesendet')
+    .in('rechnung_id', ids)
+    .order('sent_at', { ascending: false })
+  if (error) {
+    logDbError('app/actions/mails:email_log', error)
+    return map
+  }
+
+  for (const row of data ?? []) {
+    const rid = String((row as { rechnung_id?: string | null }).rechnung_id ?? '').trim()
+    if (!rid) continue
+    const betreff = String(
+      (row as { betreff?: string | null }).betreff ??
+        (row as { subject?: string | null }).subject ??
+        ''
+    )
+    const stufe = inferZahlungserinnerungStufeFromBetreff(betreff)
+    const sentAt = String((row as { sent_at?: string | null }).sent_at ?? '').trim() || null
+    const cur = map.get(rid) ?? {
+      letzteAt: null,
+      stufe1At: null,
+      stufe2At: null,
+      hatStufe1: false,
+      hatStufe2: false,
+    }
+    if (!cur.letzteAt && sentAt) cur.letzteAt = sentAt
+    if (stufe === 1) {
+      cur.hatStufe1 = true
+      if (!cur.stufe1At && sentAt) cur.stufe1At = sentAt
+    }
+    if (stufe === 2) {
+      cur.hatStufe2 = true
+      if (!cur.stufe2At && sentAt) cur.stufe2At = sentAt
+    }
+    map.set(rid, cur)
+  }
+  return map
+}
+
+/** Claim vor Versand — verhindert Doppel-Mails wenn Cron nach sendMail stirbt. */
+async function claimMahnungStufe(
+  rechnungId: string,
+  stufe: 1 | 2
+): Promise<{ ok: true; claimedAt: string } | { ok: false }> {
+  const col = stufe === 1 ? 'erinnerung_7_sent_at' : 'erinnerung_21_sent_at'
+  const now = new Date().toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('rechnungen')
+    .update({ [col]: now, updated_at: now })
+    .eq('id', rechnungId)
+    .is(col, null)
+    .select('id')
+  if (error) {
+    logDbError('app/actions/mails:rechnungen-claim', error)
+    return { ok: false }
+  }
+  if (!data?.length) return { ok: false }
+  return { ok: true, claimedAt: now }
+}
+
+/** Timestamps aus email_log nachziehen (Cron früher nach Mail, vor Update abgebrochen). */
+async function backfillErinnerungTimestampsFromMailLog(
+  rows: RechnungRow[],
+  mailMeta: Map<string, ErinnerungMailMeta>
+): Promise<void> {
+  for (const r of rows) {
+    const meta = mailMeta.get(r.id)
+    if (!meta) continue
+    const patch: Record<string, unknown> = {}
+    if (meta.hatStufe1 && !r.erinnerung_7_sent_at) {
+      const at = meta.stufe1At ?? meta.letzteAt
+      if (at) {
+        patch.erinnerung_7_sent_at = at
+        r.erinnerung_7_sent_at = at
+      }
+    }
+    if (meta.hatStufe2 && !r.erinnerung_21_sent_at) {
+      const at = meta.stufe2At ?? meta.letzteAt
+      if (at) {
+        patch.erinnerung_21_sent_at = at
+        r.erinnerung_21_sent_at = at
+      }
+    }
+    if (!Object.keys(patch).length) continue
+    patch.updated_at = new Date().toISOString()
+    const { error } = await supabaseAdmin.from('rechnungen').update(patch).eq('id', r.id)
+    if (error) logDbError('app/actions/mails:rechnungen-backfill', error)
+  }
+}
+
 function normalizeKunde(
   k: RechnungRow['kunden']
 ): { name: string; email: string | null } | null {
@@ -251,7 +361,10 @@ function normalizeKunde(
   return k
 }
 
-/** Cron: 1. Erinnerung nach Zahlungsziel, 2. nach weiteren 7 Tagen, intern ab 30 Tagen. */
+/**
+ * Cron: 1. Erinnerung nach max(Fälligkeit, Versand), 2. frühestens 7 Tage später.
+ * Claim vor Mail — kein Doppelversand an aufeinanderfolgenden Tagen.
+ */
 export async function sendZahlungserinnerungen(): Promise<{
   ok: true
   bearbeitet: number
@@ -263,11 +376,12 @@ export async function sendZahlungserinnerungen(): Promise<{
   const { data: rows, error } = await supabaseAdmin
     .from('rechnungen')
     .select(
-      'id, rechnungsnummer, brutto, faellig_am, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, auftrag_id, rechnung_art, beleg_typ, richtung, kunden(name, email, typ)'
+      'id, rechnungsnummer, brutto, faellig_am, gesendet_at, erinnerung_7_sent_at, erinnerung_21_sent_at, intern_warnung_30_at, kunde_id, auftrag_id, rechnung_art, beleg_typ, richtung, kunden(name, email, typ)'
     )
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
     .not('faellig_am', 'is', null)
+    .not('gesendet_at', 'is', null)
   if (error) logDbError('app/actions/mails:rechnungen', error)
 
   if (error) {
@@ -277,6 +391,9 @@ export async function sendZahlungserinnerungen(): Promise<{
 
   const list = (rows ?? []) as RechnungRow[]
   const ergebnis: { id: string; aktion: string }[] = []
+
+  const mailMeta = await loadErinnerungMailMetaByRechnung(list.map((r) => r.id))
+  await backfillErinnerungTimestampsFromMailLog(list, mailMeta)
 
   const geschwisterMap = await loadGeschwisterMapFuerMahnung(
     supabaseAdmin,
@@ -301,7 +418,17 @@ export async function sendZahlungserinnerungen(): Promise<{
       continue
     }
 
-    const aktion = cronMahnungFuerRechnung(r)
+    const meta = mailMeta.get(r.id)
+    const aktion = cronMahnungFuerRechnung({
+      faellig_am: r.faellig_am,
+      gesendet_at: r.gesendet_at,
+      erinnerung_7_sent_at: r.erinnerung_7_sent_at,
+      erinnerung_21_sent_at: r.erinnerung_21_sent_at,
+      intern_warnung_30_at: r.intern_warnung_30_at,
+      letzteErinnerungMailAt: meta?.letzteAt ?? null,
+      hatStufe1Mail: meta?.hatStufe1 ?? false,
+      hatStufe2Mail: meta?.hatStufe2 ?? false,
+    })
     if (!aktion) continue
 
     const kunde = normalizeKunde(r.kunden)
@@ -309,7 +436,7 @@ export async function sendZahlungserinnerungen(): Promise<{
     const email = kunde?.email?.trim() ?? ''
     const kundeTyp = (kunde as { typ?: string | null } | null)?.typ ?? null
     const betragFelder = mahnungBetragMailFelder(mahnKontext)
-    const tage = tageUeberfaellig(r.faellig_am)
+    const tage = tageSeitMahnAnker(r.faellig_am, r.gesendet_at)
     const faelligEff = effektivesFaelligAmYmd(r.faellig_am) ?? r.faellig_am
     const faelligFmt = formatDeDate(faelligEff)
 
@@ -320,6 +447,14 @@ export async function sendZahlungserinnerungen(): Promise<{
           continue
         }
         const stufe = aktion === 'stufe1' ? 1 : 2
+        const claim = await claimMahnungStufe(r.id, stufe)
+        if (!claim.ok) {
+          ergebnis.push({ id: r.id, aktion: 'bereits_claim' })
+          continue
+        }
+        if (stufe === 1) r.erinnerung_7_sent_at = claim.claimedAt
+        if (stufe === 2) r.erinnerung_21_sent_at = claim.claimedAt
+
         const zahlbarBisIso = zahlungserinnerungZahlbarBis(r.faellig_am)
         const zahlbarBisFmt = formatDeDate(zahlbarBisIso)
         const tpl = mailZahlungserinnerung(
@@ -345,18 +480,20 @@ export async function sendZahlungserinnerungen(): Promise<{
           kundeId: r.kunde_id,
           rechnungId: r.id,
         })
-        if (send.success) {
-          const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-          if (stufe === 1) patch.erinnerung_7_sent_at = new Date().toISOString()
-          if (stufe === 2) patch.erinnerung_21_sent_at = new Date().toISOString()
-          const { error: __dbErr1 } = await supabaseAdmin.from('rechnungen').update(patch).eq('id', r.id)
-          if (__dbErr1) logDbError('app/actions/mails:rechnungen', __dbErr1)
-          ergebnis.push({ id: r.id, aktion: stufe === 1 ? 'erinnerung_1' : 'erinnerung_2' })
+        if (!send.success) {
+          console.error(
+            '[sendZahlungserinnerungen] Mail fehlgeschlagen nach Claim',
+            r.id,
+            send.error
+          )
+          ergebnis.push({ id: r.id, aktion: 'mail_fehler_nach_claim' })
+          continue
         }
+        ergebnis.push({ id: r.id, aktion: stufe === 1 ? 'erinnerung_1' : 'erinnerung_2' })
         continue
       }
 
-      const msg = `[Intern] Rechnung ${r.rechnungsnummer} (${r.id}) ist seit ${tage} Tagen überfällig (Fälligkeit ${r.faellig_am}).`
+      const msg = `[Intern] Rechnung ${r.rechnungsnummer} (${r.id}) ist seit ${tage} Tagen überfällig (Fälligkeit ${r.faellig_am}, Versand ${r.gesendet_at ? ymdAusIsoInZezone(r.gesendet_at) : '—'}).`
       console.warn(msg)
       const intern = process.env.INTERNE_RECHNUNG_WARNUNG_EMAIL
       if (intern) {
@@ -377,6 +514,7 @@ export async function sendZahlungserinnerungen(): Promise<{
         .from('rechnungen')
         .update({ intern_warnung_30_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('id', r.id)
+        .is('intern_warnung_30_at', null)
       if (__dbErr2) logDbError('app/actions/mails:rechnungen', __dbErr2)
       ergebnis.push({ id: r.id, aktion: 'intern_30' })
     } catch (e) {

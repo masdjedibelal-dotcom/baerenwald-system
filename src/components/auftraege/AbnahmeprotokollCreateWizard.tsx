@@ -14,7 +14,9 @@ import {
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
@@ -44,7 +46,8 @@ import {
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
-import { downloadPdfFromBase64, openPdfFromBase64 } from '@/lib/download-pdf-base64'
+import { downloadPdfFromBase64, pdfBlobUrlFromBase64 } from '@/lib/download-pdf-base64'
+import { PdfViewer } from '@/components/ui/PdfViewer'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
@@ -123,6 +126,7 @@ export function AbnahmeprotokollCreateWizard({
   const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
   const [pending, startTransition] = useLocalTransition('Wird gespeichert…')
   const [previewBusy, setPreviewBusy] = useState(false)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -144,6 +148,8 @@ export function AbnahmeprotokollCreateWizard({
     emptyAbnahmeProtokollMeta(initialMeta)
   )
   const [draftDirty, setDraftDirty] = useState(false)
+  const [abnahmeGaps, setAbnahmeGaps] = useState<{ id: string; label: string }[]>([])
+  const [sigTab, setSigTab] = useState<'an' | 'kunde'>('an')
 
   /* FORM_ZWISCHENSTAND: abnahme */
   const storageKey = useMemo(
@@ -182,6 +188,12 @@ export function AbnahmeprotokollCreateWizard({
   useEffect(() => {
     if (zwischen.savedHint) setLastSavedAt(Date.now())
   }, [zwischen.savedHint])
+
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+    }
+  }, [pdfPreviewUrl])
 
   const setPunkte = (
     next: AbnahmePunkt[] | ((prev: AbnahmePunkt[]) => AbnahmePunkt[])
@@ -245,19 +257,47 @@ export function AbnahmeprotokollCreateWizard({
       const s = (u ?? '').trim()
       return s.startsWith('data:image/') || /^https?:\/\//i.test(s)
     }
-    return Boolean(
-      sigOk(meta.signature_hw_url) &&
-        sigOk(meta.signature_kunde_url) &&
-        (meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim()) &&
-        (meta.kunde_unterschrift_name?.trim() ||
-          meta.ansprechpartner_kunde.trim() ||
-          kundeName.trim())
+    const hwNameOk = Boolean(
+      meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim()
     )
+    const kundeNameOk = Boolean(
+      meta.kunde_unterschrift_name?.trim() ||
+        meta.ansprechpartner_kunde.trim() ||
+        kundeName.trim()
+    )
+    const hwOk =
+      Boolean(meta.ohne_unterschrift_hw) || (sigOk(meta.signature_hw_url) && hwNameOk)
+    const kundeOk =
+      Boolean(meta.ohne_unterschrift_kunde) ||
+      (sigOk(meta.signature_kunde_url) && kundeNameOk)
+    return hwOk && kundeOk
   })()
+
+  useEffect(() => {
+    if (abnahmeGaps.length === 0) return
+    const next = abnahmeGaps.filter((g) => {
+      if (g.id === 'angaben') return !abnahmeDatum.trim()
+      if (g.id === 'pruefen') return !hasSignatur
+      return true
+    })
+    if (next.length !== abnahmeGaps.length) setAbnahmeGaps(next)
+  }, [abnahmeDatum, hasSignatur, abnahmeGaps])
 
   function patchMeta(patch: Partial<AbnahmeProtokollMeta>) {
     setDraftDirty(true)
-    setMeta((m) => ({ ...m, ...patch }))
+    setMeta((m) => {
+      const next = { ...m, ...patch }
+      // Legacy-Aggregat für Mail/Actions
+      if (
+        'ohne_unterschrift_hw' in patch ||
+        'ohne_unterschrift_kunde' in patch
+      ) {
+        next.ohne_unterschrift = Boolean(
+          next.ohne_unterschrift_hw || next.ohne_unterschrift_kunde
+        )
+      }
+      return next
+    })
   }
 
   /** Ort/Datum-Zeilen vorfüllen; Signatur-Namen aus Personen übernehmen. */
@@ -382,11 +422,23 @@ export function AbnahmeprotokollCreateWizard({
         toast.systemError(r)
         return
       }
-      openPdfFromBase64(r.pdfBase64)
+      // In-App-Sheet statt neuem Tab — sonst schließt iOS-Back den ganzen Wizard
+      const nextUrl = pdfBlobUrlFromBase64(r.pdfBase64)
+      setPdfPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return nextUrl
+      })
       toast.success(TOAST.vorschau_geoeffnet)
     } finally {
       setPreviewBusy(false)
     }
+  }
+
+  function closePdfPreview() {
+    setPdfPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
   }
 
   function erstellen(opts?: { abschliessen?: boolean; send?: boolean }) {
@@ -858,21 +910,25 @@ export function AbnahmeprotokollCreateWizard({
               <MobileOverviewField
                 label="Auftragnehmer"
                 value={
-                  meta.signature_hw_url
-                    ? `${meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim() || '—'} · signiert`
-                    : meta.hw_unterschrift_name?.trim() ||
-                      meta.vertreter_an.trim() ||
-                      'Noch nicht signiert'
+                  meta.ohne_unterschrift_hw
+                    ? 'Nicht vor Ort — Unterschrift folgt'
+                    : meta.signature_hw_url
+                      ? `${meta.hw_unterschrift_name?.trim() || meta.vertreter_an.trim() || '—'} · signiert`
+                      : meta.hw_unterschrift_name?.trim() ||
+                        meta.vertreter_an.trim() ||
+                        'Noch nicht signiert'
                 }
               />
               <MobileOverviewField
                 label="Auftraggeber"
                 value={
-                  meta.signature_kunde_url
-                    ? `${meta.kunde_unterschrift_name?.trim() || meta.ansprechpartner_kunde.trim() || kundeName || '—'} · signiert`
-                    : meta.kunde_unterschrift_name?.trim() ||
-                      meta.ansprechpartner_kunde.trim() ||
-                      'Noch nicht signiert'
+                  meta.ohne_unterschrift_kunde
+                    ? 'Nicht vor Ort — Unterschrift folgt'
+                    : meta.signature_kunde_url
+                      ? `${meta.kunde_unterschrift_name?.trim() || meta.ansprechpartner_kunde.trim() || kundeName || '—'} · signiert`
+                      : meta.kunde_unterschrift_name?.trim() ||
+                        meta.ansprechpartner_kunde.trim() ||
+                        'Noch nicht signiert'
                 }
               />
               <MobileOverviewField
@@ -886,109 +942,179 @@ export function AbnahmeprotokollCreateWizard({
             </dl>
           }
         >
-          <div className="space-y-6">
-            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-              Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer /
-              Auftraggeber. Ort/Datum leer = aus Übergabe.
+          <div className="abnahme-sig-editor space-y-4">
+            <MockSegment
+              aria-label="Unterzeichner"
+              value={sigTab}
+              onChange={setSigTab}
+              className="abnahme-sig-editor__tabs w-full"
+              buttonClassName="abnahme-sig-editor__tab flex-1"
+              options={[
+                {
+                  value: 'an',
+                  label:
+                    meta.ohne_unterschrift_hw || meta.signature_hw_url
+                      ? 'Auftragnehmer · ✓'
+                      : 'Auftragnehmer',
+                },
+                {
+                  value: 'kunde',
+                  label:
+                    meta.ohne_unterschrift_kunde || meta.signature_kunde_url
+                      ? 'Kunde · ✓'
+                      : 'Kunde',
+                },
+              ]}
+            />
+
+            <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
+              Name und Unterschrift wie vor Ort — erscheint im PDF. Ort/Datum leer = aus
+              Übergabe. Wenn jemand nicht signieren kann: Checkbox setzen.
             </p>
 
-            <div className="space-y-3">
-              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
-                Auftragnehmer (Handwerker)
-              </p>
-              <MockField label="Name">
-        <MockInput
-        value={meta.hw_unterschrift_name ?? meta.vertreter_an ?? ''}
-        onChange={(e) => {
-        const v = e.target.value
-        patchMeta({
-        hw_unterschrift_name: v,
-        vertreter_an: v.trim() || meta.vertreter_an,
-        })
-        }}
-        placeholder="Vor- und Nachname"
-        required
-      />
-      </MockField>
-              <MockField label="Ort, Datum">
-        <MockInput
-        value={meta.unterschrift_ort_datum_an}
-        onChange={(e) => patchMeta({ unterschrift_ort_datum_an: e.target.value })}
-        placeholder={
-        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-        }
-      />
-      </MockField>
-              <SignatureCanvas
-                initialDataUrl={meta.signature_hw_url}
-                onChange={(has, dataUrl) => {
-                  patchMeta({ signature_hw_url: has ? dataUrl : null })
-                }}
-              />
-            </div>
+            {sigTab === 'an' ? (
+              <div className="space-y-3">
+                <MockField label="Name">
+                  <MockInput
+                    value={meta.hw_unterschrift_name ?? meta.vertreter_an ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      patchMeta({
+                        hw_unterschrift_name: v,
+                        vertreter_an: v.trim() || meta.vertreter_an,
+                      })
+                    }}
+                    placeholder="Vor- und Nachname"
+                    required
+                  />
+                </MockField>
+                <MockField label="Ort, Datum">
+                  <MockInput
+                    value={meta.unterschrift_ort_datum_an}
+                    onChange={(e) =>
+                      patchMeta({ unterschrift_ort_datum_an: e.target.value })
+                    }
+                    placeholder={
+                      defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) ||
+                      'Ort, Datum'
+                    }
+                  />
+                </MockField>
+                <label className="abnahme-sig-editor__skip flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]">
+                  <MockCheckbox
+                    className="mt-0.5"
+                    checked={Boolean(meta.ohne_unterschrift_hw)}
+                    onChange={(e) => {
+                      const on = e.target.checked
+                      patchMeta({
+                        ohne_unterschrift_hw: on,
+                        ...(on ? { signature_hw_url: null } : {}),
+                      })
+                    }}
+                  />
+                  <span>
+                    <span className="font-medium">Kann hier nicht unterschreiben</span>
+                    <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                      Nicht vor Ort — Unterschrift folgt später (Pad ausblenden).
+                    </span>
+                  </span>
+                </label>
+                {meta.ohne_unterschrift_hw ? null : (
+                  <SignatureCanvas
+                    expandOnLandscape
+                    initialDataUrl={meta.signature_hw_url}
+                    onChange={(has, dataUrl) => {
+                      patchMeta({ signature_hw_url: has ? dataUrl : null })
+                    }}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <MockField label="Name">
+                  <MockInput
+                    value={
+                      meta.kunde_unterschrift_name ??
+                      meta.ansprechpartner_kunde ??
+                      kundeName ??
+                      ''
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value
+                      patchMeta({
+                        kunde_unterschrift_name: v,
+                        ansprechpartner_kunde: v.trim() || meta.ansprechpartner_kunde,
+                      })
+                    }}
+                    placeholder="Vor- und Nachname des Kunden"
+                    required
+                  />
+                </MockField>
+                <MockField label="Ort, Datum">
+                  <MockInput
+                    value={meta.unterschrift_ort_datum_ag}
+                    onChange={(e) =>
+                      patchMeta({ unterschrift_ort_datum_ag: e.target.value })
+                    }
+                    placeholder={
+                      defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) ||
+                      'Ort, Datum'
+                    }
+                  />
+                </MockField>
+                <label className="abnahme-sig-editor__skip flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]">
+                  <MockCheckbox
+                    className="mt-0.5"
+                    checked={Boolean(meta.ohne_unterschrift_kunde)}
+                    onChange={(e) => {
+                      const on = e.target.checked
+                      patchMeta({
+                        ohne_unterschrift_kunde: on,
+                        ...(on ? { signature_kunde_url: null } : {}),
+                      })
+                    }}
+                  />
+                  <span>
+                    <span className="font-medium">Kann hier nicht unterschreiben</span>
+                    <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                      Nicht vor Ort — Unterschrift folgt später (Pad ausblenden).
+                    </span>
+                  </span>
+                </label>
+                {meta.ohne_unterschrift_kunde ? null : (
+                  <SignatureCanvas
+                    expandOnLandscape
+                    initialDataUrl={meta.signature_kunde_url}
+                    onChange={(has, dataUrl) => {
+                      patchMeta({ signature_kunde_url: has ? dataUrl : null })
+                    }}
+                  />
+                )}
+              </div>
+            )}
 
-            <div className="space-y-3">
-              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
-                Auftraggeber (Kunde)
-              </p>
-              <MockField label="Name">
-        <MockInput
-        value={
-        meta.kunde_unterschrift_name ??
-        meta.ansprechpartner_kunde ??
-        kundeName ??
-        ''
-        }
-        onChange={(e) => {
-        const v = e.target.value
-        patchMeta({
-        kunde_unterschrift_name: v,
-        ansprechpartner_kunde: v.trim() || meta.ansprechpartner_kunde,
-        })
-        }}
-        placeholder="Vor- und Nachname des Kunden"
-        required
-      />
-      </MockField>
-              <MockField label="Ort, Datum">
-        <MockInput
-        value={meta.unterschrift_ort_datum_ag}
-        onChange={(e) => patchMeta({ unterschrift_ort_datum_ag: e.target.value })}
-        placeholder={
-        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-        }
-      />
-      </MockField>
-              <SignatureCanvas
-                initialDataUrl={meta.signature_kunde_url}
-                onChange={(has, dataUrl) => {
-                  patchMeta({ signature_kunde_url: has ? dataUrl : null })
-                }}
+            <MockField label="Anwesend — Ort, Datum (optional)">
+              <MockInput
+                value={meta.unterschrift_ort_datum_anwesend}
+                onChange={(e) =>
+                  patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
+                }
+                placeholder={
+                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) ||
+                  'Ort, Datum'
+                }
               />
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
-                Anwesend (optional)
-              </p>
-              <MockField label="Ort, Datum">
-        <MockInput
-        value={meta.unterschrift_ort_datum_anwesend}
-        onChange={(e) =>
-        patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
-        }
-        placeholder={
-        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-        }
-      />
-      </MockField>
-            </div>
+            </MockField>
 
             <MockBtn
               type="button"
-              kind="ghost" sm
+              kind="ghost"
+              sm
               onClick={() => {
-                const fallback = defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum)
+                const fallback = defaultUnterschriftOrtDatum(
+                  meta.uebergabe_ort,
+                  abnahmeDatum
+                )
                 patchMeta({
                   unterschrift_ort_datum_an: fallback,
                   unterschrift_ort_datum_ag: fallback,
@@ -1005,44 +1131,63 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const footerActions = (
-    <div className="flex flex-wrap gap-2">
-      {activeSection !== 'checkliste' ? (
-        <MockBtn
-          type="button"
-          kind="secondary"
-          sm
-          disabled={pending}
-          onClick={() =>
-            goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
-          }
-        >
-          Zurück
-        </MockBtn>
-      ) : null}
-      {activeSection !== 'pruefen' ? (
-        <MockBtn
-          type="button"
-          kind="primary"
-          sm
-          disabled={pending}
-          onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
-        >
-          Weiter
-        </MockBtn>
-      ) : (
-        <MockBtn
-          type="button"
-          kind="secondary"
-          sm
-          className="gap-1.5"
-          loading={previewBusy}
-          disabled={pending}
-          onClick={() => void vorschauPdf()}
-        >
-          <MockIcon n="eye" ctx="default" className="h-4 w-4" />
-          Vorschau
-        </MockBtn>
-      )}
+    <div className="abnahme-canvas-footer">
+      <div className="abnahme-canvas-footer__start">
+        {activeSection !== 'checkliste' ? (
+          <MockBtn
+            type="button"
+            kind="secondary"
+            className="abnahme-canvas-footer__nav"
+            disabled={pending || previewBusy}
+            onClick={() =>
+              goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
+            }
+          >
+            Zurück
+          </MockBtn>
+        ) : null}
+      </div>
+      <div className="abnahme-canvas-footer__end">
+        {activeSection !== 'pruefen' ? (
+          <MockBtn
+            type="button"
+            kind="primary"
+            className="abnahme-canvas-footer__primary"
+            disabled={pending || previewBusy}
+            onClick={() =>
+              goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')
+            }
+          >
+            Weiter
+          </MockBtn>
+        ) : (
+          <MockBtn
+            type="button"
+            kind="primary"
+            className="abnahme-canvas-footer__primary"
+            disabled={pending || previewBusy}
+            loading={pending}
+            onClick={() => {
+              const gaps: { id: string; label: string }[] = []
+              if (!abnahmeDatum.trim()) {
+                gaps.push({ id: 'angaben', label: 'Abnahmedatum' })
+              }
+              if (!hasSignatur) {
+                gaps.push({ id: 'pruefen', label: 'Unterschriften' })
+              }
+              if (gaps.length > 0) {
+                setAbnahmeGaps(gaps)
+                goSection(gaps[0]!.id === 'angaben' ? 'angaben' : 'pruefen')
+                return
+              }
+              setAbnahmeGaps([])
+              erstellen({ abschliessen: true })
+            }}
+          >
+            Abnehmen
+          </MockBtn>
+        )}
+      </div>
     </div>
   )
 
@@ -1054,8 +1199,10 @@ export function AbnahmeprotokollCreateWizard({
     >
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         {hasSignatur
-          ? 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
-          : 'Beide Unterschriften (Auftragnehmer + Auftraggeber: Name und Zeichnung) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
+          ? meta.ohne_unterschrift_hw || meta.ohne_unterschrift_kunde
+            ? 'Vorschau prüfen — fehlende Vor-Ort-Unterschrift: PDF kann an den Kunden zum Nachreichen gehen.'
+            : 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
+          : 'Beide Seiten: Unterschrift zeichnen oder „Kann hier nicht unterschreiben“ setzen.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
@@ -1083,8 +1230,24 @@ export function AbnahmeprotokollCreateWizard({
             label="Unterschriften"
             value={
               hasSignatur
-                ? 'AN + AG signiert'
-                : meta.signature_hw_url || meta.signature_kunde_url
+                ? [
+                    meta.ohne_unterschrift_hw
+                      ? 'AN folgt'
+                      : meta.signature_hw_url
+                        ? 'AN signiert'
+                        : null,
+                    meta.ohne_unterschrift_kunde
+                      ? 'AG folgt'
+                      : meta.signature_kunde_url
+                        ? 'AG signiert'
+                        : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'OK'
+                : meta.signature_hw_url ||
+                    meta.signature_kunde_url ||
+                    meta.ohne_unterschrift_hw ||
+                    meta.ohne_unterschrift_kunde
                   ? 'Unvollständig'
                   : '—'
             }
@@ -1102,8 +1265,34 @@ export function AbnahmeprotokollCreateWizard({
           placeholder="Rechtshinweise…"
         />
       </FieldCard>
-      <div className="hidden sm:block">{footerActions}</div>
     </div>
+  )
+
+  const headerActions = (
+    <>
+      {activeSection === 'pruefen' ? (
+        <MockBtn
+          className="editor-sheet__confirm"
+          type="button"
+          disabled={pending || previewBusy}
+          onClick={() => void vorschauPdf()}
+          aria-label="Vorschau"
+          title="Vorschau"
+        >
+          <MockIcon n="eye" ctx="row" className="h-5 w-5" aria-hidden />
+        </MockBtn>
+      ) : null}
+      <MockBtn
+        className="editor-sheet__confirm"
+        type="button"
+        disabled={pending || previewBusy}
+        onClick={() => erstellen({ abschliessen: false })}
+        aria-label={COPY_BUTTON.entwurfSpeichern}
+        title={COPY_BUTTON.entwurfSpeichern}
+      >
+        <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+      </MockBtn>
+    </>
   )
 
   return (
@@ -1117,27 +1306,33 @@ export function AbnahmeprotokollCreateWizard({
       onSaveDraftClose={() => erstellen({ abschliessen: false })}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
-        draftAction={{
-        label: COPY_BUTTON.entwurfSpeichern,
-        onClick: () => erstellen({ abschliessen: false }),
-        busy: pending,
-        disabled: previewBusy,
-      }}
-      primaryAction={{
-        label: 'Abnehmen',
-        onClick: () => erstellen({ abschliessen: true }),
-        busy: pending,
-        disabled: previewBusy,
-        getGaps: () => {
-          const gaps: { id: string; label: string }[] = []
-          if (!abnahmeDatum.trim()) gaps.push({ id: 'angaben', label: 'Abnahmedatum' })
-          if (!hasSignatur) gaps.push({ id: 'pruefen', label: 'Unterschriften' })
-          return gaps
-        },
-      }}
+      headerEnd={headerActions}
       footerCta={footerActions}
       className="wizard-flow abnahme-canvas"
     >
+      {abnahmeGaps.length > 0 ? (
+        <div className="document-canvas__checklist abnahme-canvas-gaps" role="alert">
+          <p className="document-canvas__checklist-lead m-0">
+            Bitte noch ergänzen: {abnahmeGaps.map((g) => g.label).join(', ')}
+          </p>
+          <ul className="document-canvas__checklist-list m-0">
+            {abnahmeGaps.map((g) => (
+              <li key={g.id}>
+                <MockBtn
+                  type="button"
+                  className="document-canvas__checklist-jump"
+                  onClick={() => {
+                    goSection(g.id === 'angaben' ? 'angaben' : 'pruefen')
+                  }}
+                >
+                  {g.label}
+                  <MockIcon n="chevron-right" ctx="row" className="h-3.5 w-3.5" aria-hidden />
+                </MockBtn>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {undokumentiert.n > 0 && undokumentiert.m > 0 ? (
         <div className="abnahme-canvas-warn" role="status">
           <MockIcon ctx="default" n="alert-triangle" size={16} />
@@ -1201,6 +1396,13 @@ export function AbnahmeprotokollCreateWizard({
         </div>
       </div>
     </DocumentCanvas>
+    <PdfViewer
+      open={Boolean(pdfPreviewUrl)}
+      onClose={closePdfPreview}
+      url={pdfPreviewUrl ?? ''}
+      title="Abnahme-Vorschau"
+      context="canvas"
+    />
     <ConfirmPopup
       open={zwischen.promptOpen}
       title={zwischen.promptTitle}

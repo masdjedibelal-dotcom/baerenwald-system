@@ -1,4 +1,4 @@
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, formatDatumZeitraum } from '@/lib/utils'
 import { buildPartnerSubject } from '@/lib/mail/build-subject'
 
 export type HandwerkerNachrichtInput = {
@@ -26,10 +26,12 @@ function ortZeile(plz?: string | null, ort?: string | null, adresse?: string | n
 }
 
 function zeitraumZeile(start?: string | null, end?: string | null): string {
-  if (start && end) return `${formatDatum(start)} – ${formatDatum(end)}`
-  if (start) return `ab ${formatDatum(start)}`
-  if (end) return `bis ${formatDatum(end)}`
-  return 'nach Absprache'
+  const a = (start ?? '').trim()
+  const b = (end ?? '').trim()
+  if (!a && !b) return 'nach Absprache'
+  if (a && !b) return `ab ${formatDatum(a)}`
+  if (!a && b) return `bis ${formatDatum(b)}`
+  return formatDatumZeitraum(a, b)
 }
 
 /** Kurze WhatsApp-/Mail-Nachricht an bekannte Partner */
