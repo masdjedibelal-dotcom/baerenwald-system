@@ -143,7 +143,7 @@ export function AnlageTeilPicker({
           ) : null}
         </div>
         {selectedGarantie ? (
-          <p style={{ margin: '0.3750remrem 0 0', color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+          <p style={{ margin: '0.375rem 0 0', color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
             {selectedGarantie}
           </p>
         ) : null}

@@ -16,12 +16,13 @@ export function useKiAssistDraftConsumer(
   const { pendingDraft, consumePendingDraft } = useAssistent()
   const onApplyRef = useRef(onApply)
   onApplyRef.current = onApply
+  const acceptKey = Array.isArray(accept) ? accept.slice().sort().join(',') : accept
 
   useEffect(() => {
     if (!active || !pendingDraft) return
-    const allow = Array.isArray(accept) ? accept : [accept]
+    const allow = acceptKey.split(',') as KiAssistDraft['type'][]
     if (!allow.includes(pendingDraft.type)) return
     const d = consumePendingDraft(allow)
     if (d) onApplyRef.current(d)
-  }, [active, pendingDraft, accept, consumePendingDraft])
+  }, [active, pendingDraft, acceptKey, consumePendingDraft])
 }

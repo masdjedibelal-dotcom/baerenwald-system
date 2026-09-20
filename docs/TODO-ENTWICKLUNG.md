@@ -152,3 +152,10 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 - offen: **8**
 - total: **63**
 
+## R2 (2026-09-21) — Inline remrem + Card-Text
+
+- 51 Inline-Werte in 21 CRM-Dateien repariert (`remrem` → 0).
+- Guard `scripts/check-inline-css-werte.mjs` in CRM + Portal Build.
+- MockBtn-Karten (doctype/Neu/Pos-Add/KPI): `height:auto` + `white-space:normal` gegen `.btn` 32px/nowrap.
+- PosTable-Checkbox: nur Rahmenwert korrigiert (kein MockCheckbox — visuelle Select-Box in DnD-Zeile).
+

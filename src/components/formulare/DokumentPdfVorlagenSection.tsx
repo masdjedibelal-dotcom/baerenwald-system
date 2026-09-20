@@ -156,7 +156,7 @@ export function DokumentPdfVorlagenSection({
         >
           <div
             style={{
-              border: '0.0.3125remrem solid var(--border)',
+              border: '0.03125rem solid var(--border)',
               borderRadius: 8,
               overflow: 'hidden',
               background: C.white,

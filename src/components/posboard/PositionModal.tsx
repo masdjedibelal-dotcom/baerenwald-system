@@ -123,7 +123,7 @@ export function PositionModal({
             multiline
             rows={4}
             placeholder="Hinweis ohne Preis — z. B. Ablauf oder Garantie"
-            sheetContext="detail"
+            sheetContext="canvas"
           />
         </div>
       ) : (
@@ -149,7 +149,7 @@ export function PositionModal({
             multiline
             rows={3}
             placeholder="Details zur Leistung…"
-            sheetContext="detail"
+            sheetContext="canvas"
           />
           <Field label="Kostenart" full>
             <div className="seg" role="group" aria-label="Kostenart">

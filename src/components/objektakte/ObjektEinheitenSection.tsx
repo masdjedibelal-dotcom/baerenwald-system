@@ -1102,9 +1102,9 @@ export function ObjektEinheitenSection({
               <MockField label="Auswahl" full>
                 <div
                   style={{
-                    border: '0.0625remrem solid var(--border)',
+                    border: '0.0625rem solid var(--border)',
                     borderRadius: 10,
-                    padding: '0.75rem 0.8750remrem',
+                    padding: '0.75rem 0.875rem',
                     fontSize: 'var(--fs-text)',
                     color: 'var(--text-2)',
                   }}

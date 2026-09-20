@@ -66,7 +66,7 @@ function SelectBox({ on }: { on: boolean }) {
         height: 17,
         flexShrink: 0,
         borderRadius: 4,
-        border: `1.0.3125remrem solid ${on ? 'var(--green)' : 'var(--border-strong)'}`,
+        border: `0.09375rem solid ${on ? 'var(--green)' : 'var(--border-strong)'}`,
         background: on ? 'var(--green)' : 'transparent',
         color: C.white,
         display: 'grid',
@@ -578,10 +578,10 @@ export function PosTable({
               <div
                 className="pt2-empty"
                 style={{
-                  padding: '0.75rem 0.8750remrem',
+                  padding: '0.75rem 0.875rem',
                   fontSize: 'var(--fs-meta)',
                   color: 'var(--text-4)',
-                  borderBottom: '0.0.3125remrem solid var(--border)',
+                  borderBottom: '0.03125rem solid var(--border)',
                 }}
               >
                 Keine Positionen
@@ -634,7 +634,7 @@ export function PosTable({
               </div>
             ) : null}
             {!onAddKind && onAddItem && !unifiedAdd ? (
-              <MockBtn className="pt-add" type="button" onClick={() => onAddItem(g)} style={{ borderBottom: '0.0.3125remrem solid var(--border)' }}>
+              <MockBtn className="pt-add" type="button" onClick={() => onAddItem(g)} style={{ borderBottom: '0.03125rem solid var(--border)' }}>
                 <MockIcon ctx="default" n="plus" size={13} /> Position hinzufügen
               </MockBtn>
             ) : null}
@@ -709,7 +709,7 @@ export function PosTable({
         <MockBtn className="pt-add" type="button" onClick={onAddGroup} style={{
             color: 'var(--green)',
             fontWeight: 600,
-            borderBottom: showTotals ? '0.0.3125remrem solid var(--border)' : 'none',
+            borderBottom: showTotals ? '0.03125rem solid var(--border)' : 'none',
           }}>
           <MockIcon ctx="default" n="plus" size={14} /> Gewerk hinzufügen
         </MockBtn>

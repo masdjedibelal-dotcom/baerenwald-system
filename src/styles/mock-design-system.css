@@ -4179,7 +4179,11 @@ min-width: 0; flex: 1;
 }
 
 .kpi-val {
-font-size: var(--fs-head); font-weight: 680; letter-spacing: -0.02em; line-height: 1;
+font-size: var(--fs-head);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi-label {
@@ -4189,8 +4193,13 @@ font-size: var(--fs-meta);
   margin-top: 3px;
   line-height: 1.3;
   white-space: normal;
-  overflow: visible;
+  overflow: hidden;
   text-overflow: unset;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 @media (max-width: 1200px) {
@@ -4208,8 +4217,26 @@ font-size: var(--fs-meta);
 @media (max-width: 767px) {
 .kpi-grid, .phase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .kpi-val { font-size: var(--fs-head); }
-.kpi-label { font-size: var(--fs-meta); margin-top: 3px; line-height: 1.3; white-space: normal; overflow: visible; display: block; }
-.kpi-tile { padding: 14px 14px; gap: 10px; border-radius: 14px; min-height: 78px; height: auto; }
+.kpi-label {
+    font-size: var(--fs-meta);
+    margin-top: 3px;
+    line-height: 1.3;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
+  }
+.kpi-tile {
+    padding: 14px 14px;
+    gap: 10px;
+    border-radius: 14px;
+    min-height: 88px;
+    height: auto;
+    align-items: flex-start;
+  }
 .kpi-ico { width: 34px; height: 34px; border-radius: 9px; }
 .dashboard-page .kpi-grid {
     display: grid;
@@ -5652,6 +5679,9 @@ display: flex;
   font-weight: 500;
   color: var(--text-2);
   cursor: pointer;
+  height: auto;
+  min-height: 48px;
+  white-space: normal;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
@@ -8613,15 +8643,32 @@ flex-direction: column;
 }
 
 .doctype-radio-opt {
-display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 14px; border: 0.5px solid var(--border); border-radius: 10px;
-  cursor: pointer; font-size: var(--fs-text); background: var(--card);
+display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: var(--fs-text);
+  background: var(--card);
   transition: border-color 120ms ease, background 120ms ease;
-  font: inherit; color: inherit; text-align: left;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  /* MockBtn .btn { height:32; white-space:nowrap } — lbl/hint sonst abgeschnitten */
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  overflow: visible;
+  box-sizing: border-box;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .doctype-radio-opt--block {
 width: 100%;
+  flex: 1 1 100%;
   padding: 14px 16px;
   align-items: flex-start;
 }
@@ -8631,6 +8678,8 @@ display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1 1 auto;
+  white-space: normal;
 }
 
 .doctype-radio-opt:disabled {
@@ -8657,11 +8706,19 @@ content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var
 }
 
 .doctype-radio-opt .lbl {
-font-weight: 600; letter-spacing: -0.01em;
+font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
 .doctype-radio-opt .hint {
-color: var(--text-3); font-size: var(--fs-meta); line-height: 1.35;
+color: var(--text-3);
+  font-size: var(--fs-meta);
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .mock-toast {
@@ -9208,16 +9265,37 @@ transform: translateY(0);
 display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
 }
 
+.neu-vorgang-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  width: 100%;
+  padding: 14px 14px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  /* MockBtn .btn Höhe/nowrap sonst schneidet Kachel-Text ab */
+  height: auto;
+  min-height: 88px;
+  white-space: normal;
+  overflow: visible;
+}
+
 .neu-vorgang-tile .ico {
 width: 40px; height: 40px; border-radius: 10px; background: var(--green-50); color: var(--green); display: grid; place-items: center; margin-bottom: 6px;
 }
 
 .neu-vorgang-tile .t {
-font-size: var(--fs-text); font-weight: 600;
+font-size: var(--fs-text); font-weight: 600; line-height: 1.3; white-space: normal; overflow-wrap: anywhere;
 }
 
 .neu-vorgang-tile .d {
-font-size: var(--fs-meta); color: var(--text-3);
+font-size: var(--fs-meta); color: var(--text-3); line-height: 1.35; white-space: normal;
 }
 
 .neu-vorgang-tile.sel {
@@ -12882,6 +12960,9 @@ min-height: 72px;
 
 .pos-add-btn {
 @apply flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-bw-border-strong bg-transparent px-3 py-3.5 text-[length:var(--fs-text)] font-medium text-bw-text-mid transition-colors;
+  height: auto;
+  min-height: 48px;
+  white-space: normal;
 }
 
 .pos-add-btn:hover {
@@ -17213,6 +17294,11 @@ font-weight: 600;
   min-height: 100dvh;
 }
 
+/* DocumentCanvas = 400 — Sheets aus dem Wizard müssen darüber liegen */
+.editor-sheet-overlay--over-wizard {
+  z-index: 450;
+}
+
 .editor-sheet-overlay:not(.editor-sheet-overlay--recessed) {
 /* Nicht touch-action:none — blockiert auf iOS/PWA oft Child-Scroll trotz pan-y am Body */
   touch-action: manipulation;
@@ -19083,6 +19169,7 @@ display: flex;
   gap: 8px;
   width: 100%;
   margin-top: 0;
+  height: auto;
   min-height: 48px;
   padding: 12px 14px;
   border: 1.5px dashed var(--border-strong, #d6d3ce);
@@ -19092,6 +19179,7 @@ display: flex;
   font: inherit;
   font-size: var(--fs-text);
   font-weight: 600;
+  white-space: normal;
   cursor: pointer;
   box-sizing: border-box;
   transition: background 120ms ease, border-color 120ms ease;
@@ -19217,7 +19305,7 @@ display: flex;
 
 .rw-tax__opt {
 display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 11px;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -19227,6 +19315,11 @@ display: flex;
   text-align: left;
   font-family: inherit;
   width: 100%;
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 .rw-tax__opt.on {
@@ -20913,6 +21006,8 @@ display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--fs-text);
   font-weight: 600;
   color: var(--text);
@@ -21036,8 +21131,15 @@ display: flex;
   min-width: 0;
 }
 
+.ap-mobile-card--row {
+  min-width: 0;
+}
+
 .ap-mobile-card--row .ap-mobile-card__name {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   width: 100%;
   font-size: var(--fs-title, 16px);
   font-weight: 650;
@@ -21045,11 +21147,14 @@ display: flex;
   color: var(--text);
   white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .ap-mobile-card--row .ap-mobile-card__meta {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   width: 100%;
   margin-top: 0;
   font-size: var(--fs-meta);
@@ -21057,7 +21162,7 @@ display: flex;
   color: var(--text-3);
   white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .ap-mobile-card--row .row-actions {

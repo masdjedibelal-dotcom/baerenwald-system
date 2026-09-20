@@ -55,7 +55,6 @@ import {
 import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
 import { CONFIRM, TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
-import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
 
 type StaffFunnelDraft = {
   state: StaffFunnelState
@@ -689,20 +688,6 @@ export function StaffFunnelWizard({
 
   if (!open || !mounted) return null
 
-  const anliegenComplete = isFormular
-    ? Boolean(state.anliegen)
-    : Boolean(state.vorhaben.trim() || state.freitext.trim())
-  const kontaktComplete = bestandskunde
-    ? Boolean(state.kundeId)
-    : needsFirma
-      ? Boolean(state.firmaName.trim())
-      : Boolean(state.vorname.trim() && state.nachname.trim())
-  const canvasSections: DocCanvasSection[] = [
-    { id: 'anliegen', label: 'Anliegen', complete: anliegenComplete },
-    { id: 'kontakt', label: 'Kontakt', complete: kontaktComplete },
-    { id: 'herkunft', label: 'Herkunft', complete: Boolean(state.kanal) },
-  ]
-
   return (
     <>
     <DocumentCanvas
@@ -711,7 +696,6 @@ export function StaffFunnelWizard({
       onClose={onClose}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
-      sections={canvasSections}
       primaryAction={{
         label: 'Anfrage anlegen',
         onClick: () => {

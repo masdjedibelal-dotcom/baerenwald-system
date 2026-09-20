@@ -168,7 +168,7 @@ export function AngebotWizardMailPreview({
           style={{
             padding: 12,
             borderRadius: 8,
-            border: '0.0.3125remrem solid var(--border)',
+            border: '0.03125rem solid var(--border)',
             background: 'var(--bg-soft)',
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
@@ -183,7 +183,7 @@ export function AngebotWizardMailPreview({
           style={{
             width: '100%',
             height: 'min(32.5rem, 55vh)',
-            border: '0.0.3125remrem solid var(--border)',
+            border: '0.03125rem solid var(--border)',
             borderRadius: 8,
             background: C.white,
           }}

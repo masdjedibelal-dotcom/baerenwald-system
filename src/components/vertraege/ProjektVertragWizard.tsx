@@ -30,7 +30,6 @@ import type { AuftragPosition } from '@/lib/types'
 import type { NachtragPositionDraft, ProjektVertragWizardBootstrap, ProjektVertragWizardMeta } from '@/lib/vertraege/types'
 import { cn } from '@/lib/utils'
 import { COPY_BUTTON, TOAST } from '@/lib/copy'
-import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /** Sichtbare Phasen ≤3: Partner · Inhalt (+ Unterlagen bei Accept) · PDF */
@@ -273,19 +272,7 @@ export function ProjektVertragWizard({
       }}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
-      sections={
-        PHASES.map((p) => ({
-          id: String(p.id),
-          label: p.label,
-          complete:
-            p.id === 1
-              ? Boolean(meta.handwerker_id)
-              : p.id === 2
-                ? Boolean(meta.bauvorhaben.trim() && meta.leistungsumfang.trim())
-                : Boolean(pdfUrl),
-        })) satisfies DocCanvasSection[]
-      }
-      draftAction={{
+        draftAction={{
         label: COPY_BUTTON.entwurfSpeichern,
         onClick: () => void persistDraft({ notify: true }),
         busy: saving,

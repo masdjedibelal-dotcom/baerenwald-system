@@ -383,7 +383,7 @@ export function AngeboteListeTab({
             <div className="px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Noch kein Angebot</div>
           ) : (
             rows.map((a) => (
-              <MockBtn fullWidth className="list-row-grid border-b border-bw-border text-left last:border-b-0 hover:bg-bw-hover" key={a.id} type="button" onClick={() => router.push(`/angebote/${a.id}`)} style={{ gridTemplateColumns: '7.5rem 1fr 6.25rem 6.8750remrem 2.75rem' }}>
+              <MockBtn fullWidth className="list-row-grid border-b border-bw-border text-left last:border-b-0 hover:bg-bw-hover" key={a.id} type="button" onClick={() => router.push(`/angebote/${a.id}`)} style={{ gridTemplateColumns: '7.5rem 1fr 6.25rem 6.875rem 2.75rem' }}>
                 <span className="font-mono text-[length:var(--fs-meta)] text-bw-text-muted">AN-{a.id.slice(0, 8).toUpperCase()}</span>
                 <span>
                   <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">Angebot</span>

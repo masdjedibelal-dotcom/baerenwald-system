@@ -10,7 +10,6 @@ import { finalizeRahmenVertrag } from '@/app/(dashboard)/vertraege/wizard-action
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
 import type { RahmenVertragWizardBootstrap } from '@/lib/vertraege/types'
 import { TOAST } from '@/lib/copy'
-import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
 
 /** Rahmenvertrag — DocumentCanvas, eine Scroll-Seite mit Anchors (P5.4). */
 export function RahmenvertragWizard({
@@ -63,19 +62,13 @@ export function RahmenvertragWizard({
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const canvasSections: DocCanvasSection[] = [
-    { id: 'partner', label: 'Partner', complete: Boolean(bootstrap.handwerker_id) },
-    { id: 'pdf', label: 'PDF', complete: Boolean(pdfUrl) },
-  ]
-
   return (
     <DocumentCanvas
       title="Rahmenvertrag"
       onClose={onClose}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
-      sections={canvasSections}
-      primaryAction={{
+        primaryAction={{
         label: pdfUrl ? 'PDF erneut erzeugen' : 'PDF erzeugen',
         onClick: () => void handlePdfErzeugen(),
         busy: saving,

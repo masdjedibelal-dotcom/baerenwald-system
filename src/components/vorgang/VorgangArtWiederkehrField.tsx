@@ -46,8 +46,10 @@ export function VorgangArtWiederkehrField({
         <MockBtn className={cn('doctype-radio-opt', !ist && 'on')} type="button" disabled={disabled} onClick={() => onChange({ ist_wiederkehrend: false, wiederkehr_turnus: null })}>
           <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="file-text" size={16} />
-          <span className="lbl">Einmalig</span>
-          <span className="hint">Klassischer Auftrag mit Abschluss</span>
+          <span className="doctype-radio-opt__copy">
+            <span className="lbl">Einmalig</span>
+            <span className="hint">Klassischer Auftrag mit Abschluss</span>
+          </span>
         </MockBtn>
         <MockBtn className={cn('doctype-radio-opt', ist && 'on')} type="button" disabled={disabled} onClick={() =>
             onChange({
@@ -56,8 +58,10 @@ export function VorgangArtWiederkehrField({
             })}>
           <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="refresh" size={16} />
-          <span className="lbl">Monatlich / wiederkehrend</span>
-          <span className="hint">Bestand — regelmäßige Einsätze</span>
+          <span className="doctype-radio-opt__copy">
+            <span className="lbl">Monatlich / wiederkehrend</span>
+            <span className="hint">Bestand — regelmäßige Einsätze</span>
+          </span>
         </MockBtn>
       </div>
       {ist ? (

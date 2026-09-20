@@ -126,6 +126,7 @@ function GewerkHandwerkerBlock({
     <div className="rounded-card border border-bw-border bg-bw-bg-soft/40 p-4">
       <p className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">{block.gewerk_name}</p>
       <MobileEditableBlock
+        sheetContext="canvas"
         sheetTitle={block.gewerk_name}
         overview={overview}
         disabled={disabled}

@@ -283,8 +283,8 @@ export function AuftragAbnahmeprotokollCard({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '0.6250remrem 0.75rem',
-                  border: '0.0.3125remrem solid var(--border)',
+                  padding: '0.625rem 0.75rem',
+                  border: '0.03125rem solid var(--border)',
                   borderRadius: 8,
                   background:
                     z.freigabeStatus === 'zur_freigabe' ? `var(--amber-50, ${C.accentBg})` : 'var(--card)',
@@ -320,7 +320,7 @@ export function AuftragAbnahmeprotokollCard({
           {!gesamtOk && gesamtMsg ? (
             <p
               style={{
-                margin: '0.6250remrem 0 0',
+                margin: '0.625rem 0 0',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
               }}
@@ -335,9 +335,9 @@ export function AuftragAbnahmeprotokollCard({
         <div
           style={{
             marginBottom: 12,
-            padding: '0.6250remrem 0.75rem',
+            padding: '0.625rem 0.75rem',
             borderRadius: 10,
-            border: `0.0.3125remrem solid var(--amber-border, ${C.accentBg2})`,
+            border: `0.03125rem solid var(--amber-border, ${C.accentBg2})`,
             background: `var(--amber-50, ${C.accentBg})`,
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
@@ -351,9 +351,9 @@ export function AuftragAbnahmeprotokollCard({
         <div
           style={{
             marginBottom: 12,
-            padding: '0.6250remrem 0.75rem',
+            padding: '0.625rem 0.75rem',
             borderRadius: 10,
-            border: `0.0.3125remrem solid var(--amber-border, ${C.accentBg2})`,
+            border: `0.03125rem solid var(--amber-border, ${C.accentBg2})`,
             background: `var(--amber-50, ${C.accentBg})`,
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',

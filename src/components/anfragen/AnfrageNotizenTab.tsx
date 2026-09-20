@@ -169,7 +169,7 @@ export function AnfrageNotizenTab({
                             height: 54,
                             borderRadius: 8,
                             overflow: "hidden",
-                            border: "0.0.3125remrem solid var(--border)",
+                            border: "0.03125rem solid var(--border)",
                             padding: 0,
                             background: "var(--bg)",
                             cursor: "pointer",

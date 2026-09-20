@@ -138,7 +138,7 @@ import type {
 import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
 import { ZAHLFRIST_SEG_OPTIONS, type ZahlfristSeg } from '@/lib/zahlfrist'
 import { COPY_BUTTON, TOAST } from '@/lib/copy'
-import type { DocCanvasGap, DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+import type { DocCanvasGap } from '@/lib/surfaces/document-canvas-chrome'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function kundenName(lead: LeadDetail) {
@@ -1220,18 +1220,8 @@ export function AngebotWizard({
   const hatLeistungszeile = zeilen.some(
     (z) => z.typ === 'artikel' && z.bezeichnung.trim()
   )
-  const kundeComplete = Boolean(kundeId?.trim()) || Boolean(crowKundeValue?.trim())
-  const zahlungComplete =
-    zahlfristSeg !== 'datum' || Boolean(zahlfristDatum.trim())
   const versandComplete =
     mailTo.some((e) => isValidEmail(e)) || Boolean(sheetEmail && isValidEmail(sheetEmail))
-
-  const canvasSections: DocCanvasSection[] = [
-    { id: 'kunde', label: 'Kunde', complete: kundeComplete },
-    { id: 'positionen', label: 'Positionen', complete: hatLeistungszeile },
-    { id: 'zahlung', label: 'Zahlung', complete: zahlungComplete },
-    { id: 'versand', label: 'Versand', complete: versandComplete },
-  ]
 
   function getAngebotSendGaps(): DocCanvasGap[] {
     const gaps: DocCanvasGap[] = []
@@ -1347,7 +1337,6 @@ export function AngebotWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
-        sections={canvasSections}
         draftAction={{
           onClick: () => {
             if (saving) return
@@ -1586,6 +1575,7 @@ export function AngebotWizard({
             onClose={() => setFotoLightboxUrl(null)}
             title="Foto"
             size="lg"
+            context="canvas"
           >
             {fotoLightboxUrl ? (
               <div className="wizard-dok-fotos__lightbox">
@@ -1722,7 +1712,7 @@ export function AngebotWizard({
             onSave={setMailBetreff}
             kiExtraHint="Mail-Betreff für den Angebotsversand an den Kunden."
             disabled={saving}
-            sheetContext="detail"
+            sheetContext="canvas"
           />
           <SheetEditableField
             label="E-Mail-Text"
@@ -1730,7 +1720,7 @@ export function AngebotWizard({
             multiline
             rows={14}
             disabled={saving}
-            sheetContext="detail"
+            sheetContext="canvas"
             kiExtraHint={`Kompletter Mail-Text inkl. Begrüßung. Die Zeile „${ANGEBOT_MAIL_BOX_MARKER}“ nicht löschen — dort erscheinen Angebotsnummer, Preis und Gültigkeit.`}
             placeholder="E-Mail-Text…"
             onSave={(text) => {
@@ -1787,7 +1777,7 @@ export function AngebotWizard({
           <>
             <p
               style={{
-                margin: '0 0 0.8750remrem',
+                margin: '0 0 0.875rem',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
                 lineHeight: 1.45,
@@ -1850,7 +1840,7 @@ export function AngebotWizard({
           <>
             <p
               style={{
-                margin: '0 0 0.8750remrem',
+                margin: '0 0 0.875rem',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
                 lineHeight: 1.45,

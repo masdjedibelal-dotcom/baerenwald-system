@@ -240,7 +240,7 @@ export function KatalogPickModal({
               multiline
               rows={3}
               placeholder="Projektspezifisch"
-              sheetContext="detail"
+              sheetContext="canvas"
             />
             <MockBtn
               sm

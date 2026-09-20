@@ -111,18 +111,6 @@ export function AbschlussberichtCreateCanvas({
       onClose={onClose}
       footerCta={footerCta}
       className="wizard-flow abschluss-canvas"
-      sections={[
-        {
-          id: 'abnahme',
-          label: 'Abnahme',
-          complete: hasAbnahme,
-        },
-        {
-          id: 'leistungen',
-          label: 'Leistungen',
-          complete: gewerkGruppen.length > 0,
-        },
-      ]}
       primaryAction={{
         label: 'Bericht erstellen',
         onClick: erstellen,

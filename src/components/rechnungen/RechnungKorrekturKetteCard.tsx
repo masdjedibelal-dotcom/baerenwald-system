@@ -50,7 +50,7 @@ export function RechnungKorrekturKetteCard({
                 alignItems: 'center',
                 gap: 10,
                 padding: '0.5rem 0',
-                borderBottom: '0.0.3125remrem solid var(--border)',
+                borderBottom: '0.03125rem solid var(--border)',
               }}
             >
               <span
@@ -130,7 +130,7 @@ export function RechnungKorrekturKetteCard({
       {kette.pending ? (
         <p
           style={{
-            margin: '0.6250remrem 0 0',
+            margin: '0.625rem 0 0',
             fontSize: 'var(--fs-meta)',
             color: 'var(--text-3)',
           }}

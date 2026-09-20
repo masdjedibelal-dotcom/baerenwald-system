@@ -93,7 +93,7 @@ export function AngebotWizardPdfPreview({
               justifyContent: 'flex-end',
               gap: 8,
               padding: '0.5rem 0.75rem',
-              borderBottom: '0.0.3125remrem solid var(--border)',
+              borderBottom: '0.03125rem solid var(--border)',
               background: 'var(--bg-soft)',
             }}
           >

@@ -129,7 +129,7 @@ import {
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import { COPY_BUTTON, TOAST } from '@/lib/copy'
-import type { DocCanvasGap, DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+import type { DocCanvasGap } from '@/lib/surfaces/document-canvas-chrome'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Rechnungsart = 'abschlag' | 'schluss'
@@ -1423,19 +1423,8 @@ export function RechnungWizard({
   const hatLeistungszeile = zeilen.some(
     (z) => z.typ === 'artikel' && z.bezeichnung.trim()
   )
-  const kundeComplete = Boolean(kundeId?.trim()) || Boolean(kundeCrowValue?.trim())
-  const zahlungComplete = hasPlan
-    ? planOk
-    : zahlfrist !== 'datum' || Boolean(zahlfristDatum.trim())
   const versandComplete =
     mailTo.some((e) => isValidEmail(e)) || Boolean(kundeEmail && isValidEmail(kundeEmail))
-
-  const canvasSections: DocCanvasSection[] = [
-    { id: 'kunde', label: 'Kunde', complete: kundeComplete },
-    { id: 'positionen', label: 'Positionen', complete: hatLeistungszeile },
-    { id: 'zahlung', label: 'Zahlung', complete: zahlungComplete },
-    { id: 'versand', label: 'Versand', complete: versandComplete },
-  ]
 
   function getRechnungSendGaps(): DocCanvasGap[] {
     const gaps: DocCanvasGap[] = []
@@ -1489,7 +1478,6 @@ export function RechnungWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
-        sections={canvasSections}
         draftAction={{
           onClick: () => {
             if (saving || (hasPlan && !planOk)) return
@@ -1672,7 +1660,7 @@ export function RechnungWizard({
             label="Rechnungsnummer"
             value={rechnungsnummer}
             placeholder="RE2026-2069"
-            sheetContext="detail"
+            sheetContext="canvas"
             onSave={(v) => {
               setRechnungsnummer(v.trim())
               setDraftDirty(true)
@@ -1685,7 +1673,7 @@ export function RechnungWizard({
             label="Rechnungstitel"
             value={rechnungTitel}
             placeholder="z.B. Badsanierung München"
-            sheetContext="detail"
+            sheetContext="canvas"
             onSave={(v) => {
               setRechnungTitel(v)
               setDraftDirty(true)
@@ -1755,7 +1743,7 @@ export function RechnungWizard({
               </div>
               <p
                 className="text-[length:var(--fs-meta)] leading-relaxed"
-                style={{ color: 'var(--text-3)', margin: '0.3750remrem 0 0' }}
+                style={{ color: 'var(--text-3)', margin: '0.375rem 0 0' }}
               >
                 Abschlagspläne sind nur mit Auftrag möglich.
               </p>
@@ -1778,8 +1766,8 @@ export function RechnungWizard({
               {rateLocked && selBerechnet ? (
                 <div
                   style={{
-                    padding: '0.75rem 0.8750remrem',
-                    border: '0.0625remrem solid var(--green)',
+                    padding: '0.75rem 0.875rem',
+                    border: '0.0625rem solid var(--green)',
                     background: 'var(--green-50)',
                     borderRadius: 8,
                     marginBottom: 12,
@@ -1839,8 +1827,8 @@ export function RechnungWizard({
                             display: 'flex',
                             alignItems: 'center',
                             gap: 10,
-                            padding: '0.6250remrem 0.75rem',
-                            border: `0.0625remrem solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                            padding: '0.625rem 0.75rem',
+                            border: `0.0625rem solid ${on ? 'var(--green)' : 'var(--border)'}`,
                             background: on ? 'var(--green-50)' : 'var(--card)',
                             borderRadius: 8,
                             cursor: 'pointer',
@@ -1987,7 +1975,7 @@ export function RechnungWizard({
             <div
               className="full"
               style={{
-                border: '0.0625remrem solid var(--bw-border, ${C.gray200})',
+                border: '0.0625rem solid var(--bw-border, ${C.gray200})',
                 borderRadius: 10,
                 overflow: 'hidden',
                 minHeight: 280,
@@ -2047,7 +2035,7 @@ export function RechnungWizard({
             value={mailBetreff || defaultBetreff}
             onSave={setMailBetreff}
             kiExtraHint="Mail-Betreff für den Rechnungsversand an den Kunden."
-            sheetContext="detail"
+            sheetContext="canvas"
           />
           <SheetEditableField
             label="Einleitung"
@@ -2057,7 +2045,7 @@ export function RechnungWizard({
             rows={5}
             kiExtraHint="Anschreiben in der Mail und auf der Rechnung."
             placeholder="Einleitung…"
-            sheetContext="detail"
+            sheetContext="canvas"
           />
           <div className="full">
             <RechnungWizardMailPreview
@@ -2100,7 +2088,7 @@ export function RechnungWizard({
       >
         <p
           style={{
-            margin: '0 0 0.8750remrem',
+            margin: '0 0 0.875rem',
             fontSize: 'var(--fs-meta)',
             color: 'var(--text-3)',
             lineHeight: 1.45,

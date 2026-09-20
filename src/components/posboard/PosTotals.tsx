@@ -35,7 +35,7 @@ export function PosTotals({
         marginLeft: 'auto',
         maxWidth: 300,
         marginTop: 12,
-        padding: '0.6250remrem 0.1250remrem 0.1250remrem',
+        padding: '0.625rem 0.125rem 0.125rem',
         background: 'transparent',
         border: 'none',
         borderRadius: 0,
@@ -60,7 +60,7 @@ export function PosTotals({
           justifyContent: 'space-between',
           fontSize: 'var(--fs-title)',
           paddingTop: su ? 6 : 0,
-          borderTop: su ? '0.0.3125remrem solid var(--border)' : 'none',
+          borderTop: su ? '0.03125rem solid var(--border)' : 'none',
         }}
       >
         <span style={{ fontWeight: 600 }}>{su ? 'Brutto' : 'Gesamt'}</span>

@@ -1298,5 +1298,60 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 
 **Aushang:** `buildAushangHtml` + `renderHtmlToPdfBuffer` (kein pdf-lib-Aushang)
 
+---
+
+## Angebot-Wizard — Position-Sheet + Outline weg
+
+**Commit-Text:** `fix: Angebot Position-Sheet über Canvas; Outline-Karussell weg`
+
+**Dateien:**
+- `src/styles/mock-design-system.css` — `.editor-sheet-overlay--over-wizard` z-index 450 (über DocumentCanvas 400)
+- `src/components/angebote/AngebotWizard.tsx` — `sections`/Outline-Chips entfernt; Send-Gaps unverändert
+
+**Ursache:** Position-Add-Sheet war hinter dem Fullscreen-Wizard unsichtbar.
+
+---
+
+## R2 + Card-Textüberlauf — remrem + MockBtn-Karten
+
+**Commit-Text:** `fix: Inline remrem + Card-Text (doctype/KPI/Neu)`
+
+### CRM
+- 21 Dateien: 51 kaputte Inline-Werte (`remrem` / `0.0.3125…`) → korrekte rem
+- `scripts/check-inline-css-werte.mjs` — Guard; `package.json` `check:css-werte` + Build-Kette
+- `src/styles/mock-design-system.css` — `.doctype-radio-opt`, `.neu-vorgang-tile`, `.pos-add-btn`, `.posboard-add-fab`, `.rw-tax__opt`: `height:auto` + `white-space:normal` (gegen MockBtn `.btn` 32px/nowrap); KPI line-height/clamp; Objekt-Karten wrap/clamp
+- `src/components/vorgang/VorgangArtWiederkehrField.tsx` — lbl/hint in `__copy`
+
+### Portal
+- `scripts/check-inline-css-werte.mjs` + Build-Hook (0 Treffer)
+
+**Ursache:** Verworfene Padding/Rahmen (`remrem`) + feste `.btn`-Höhe schnitten Mehrzeilen-Texte in Auswahl-Karten ab.
+
+---
+
+## KI Positionen — Übernahme trotz offenem Add-Sheet
+
+**Commit-Text:** `fix: KI-Positionen auch bei offenem Add-Sheet übernehmen`
+
+**Dateien:**
+- `src/components/posboard/PosBoard.tsx` — `positionen`-Drafts immer konsumieren; Add-Sheet dabei schließen
+- `src/components/assistent/AssistentPanel.tsx` — kein Fake-Erfolg-Toast vor Consumer
+- `src/components/assistent/useKiAssistDraftConsumer.ts` — stabile accept-Deps
+
+**Ursache:** Consumer war an `!addSheetOpen` gebunden; unsichtbares Add-Sheet (z-index) blockierte KI-Übernahme trotz Toast „übernommen“.
+
+---
+
+## Alle DocumentCanvas-Wizards — gleiche Sheet/Outline-Bugs
+
+**Commit-Text:** `fix: Wizard-Sheets über Canvas; Outline in allen Wizards weg`
+
+**Befund:** Dieselben Muster wie Angebot auch in Rechnung / Direkt beauftragen / Abnahme / Verträge / Staff-Funnel / Abschlussbericht.
+
+**Dateien:**
+- `PosBoard.tsx` — Gewerk-/Preisliste-Sheets `context="canvas"` (wirkt in Angebot+Rechnung+Direkt)
+- Outline `sections` entfernt: Rechnung, Direkt beauftragen, Abnahme, Abschlussbericht, Staff-Funnel, Projekt-/Rahmenvertrag
+- Nested `sheetContext` detail→canvas: Angebot/Rechnung-Mailfelder, PositionAddSheet/Modal, KatalogPick, Abnahme MobileEditable, HandwerkerStep
+- `AngebotWizard` Foto-Lightbox → canvas
 
 

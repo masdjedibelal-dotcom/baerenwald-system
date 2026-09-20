@@ -125,7 +125,7 @@ export function RechnungKorrekturWahlModal({
     >
       <p
         className="text-[length:var(--fs-meta)]"
-        style={{ color: 'var(--text-3)', margin: '0 0 0.8750remrem', lineHeight: 1.45 }}
+        style={{ color: 'var(--text-3)', margin: '0 0 0.875rem', lineHeight: 1.45 }}
       >
         <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{nr}</strong> ist bereits
         versendet. Eine Korrektur legt Storno-Gutschrift und neuen Entwurf an — das Original bleibt

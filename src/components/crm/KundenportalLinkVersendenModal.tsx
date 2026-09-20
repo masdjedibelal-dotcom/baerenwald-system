@@ -189,7 +189,7 @@ export function KundenportalLinkVersendenModal({
               style={{
                 width: '100%',
                 height: 280,
-                border: '0.0.3125remrem solid var(--border)',
+                border: '0.03125rem solid var(--border)',
                 borderRadius: 8,
                 background: C.white,
               }}

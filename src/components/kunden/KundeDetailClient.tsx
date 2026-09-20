@@ -392,9 +392,9 @@ export function KundeDetailClient({
                 <li
                   key={l.bewohnerId}
                   style={{
-                    border: '0.0.3125remrem solid var(--border)',
+                    border: '0.03125rem solid var(--border)',
                     borderRadius: 10,
-                    padding: '0.6250remrem 0.75rem',
+                    padding: '0.625rem 0.75rem',
                     background: 'var(--bg-soft)',
                   }}
                 >

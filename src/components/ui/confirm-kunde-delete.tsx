@@ -166,7 +166,7 @@ export function ConfirmKundeDeleteProvider({ children }: { children: ReactNode }
                   <p
                     className="m-0 mb-3"
                     style={{
-                      padding: '0.5rem 0.6250remrem',
+                      padding: '0.5rem 0.625rem',
                       borderRadius: 8,
                       background: 'var(--warn-soft)',
                       color: 'var(--text)',

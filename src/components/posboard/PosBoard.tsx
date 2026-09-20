@@ -266,43 +266,46 @@ export function PosBoard({
     setEditId(draft?.name?.trim() ? null : id)
   }
 
-  // KI „Positionen“-Chat → mehrere freie Positionen auf einmal
-  useKiAssistDraftConsumer(editable && !addSheetOpen, ['positionen', 'position'], (d) => {
-    if (!onChange) return
-    if (d.type === 'positionen') {
-      const fallbackGewerk = defaultGewerk()
-      const added = d.items.map((it) =>
-        neuePosBoardLine({
-          gewerk: it.gewerk?.trim() || fallbackGewerk,
-          name: it.name,
-          beschreibung: it.beschreibung?.trim() || '',
-          menge: it.menge && it.menge > 0 ? it.menge : 1,
-          einheit: it.einheit?.trim() || 'Stück',
-          preis: it.preis != null && it.preis >= 0 ? it.preis : 0,
-          ust: 19,
-          kind: 'position',
-          position_quelle: 'frei',
-          variante_id: null,
-          preisliste_id: null,
-        })
-      )
-      if (!added.length) return
-      onChange([...positionen, ...added])
-      toast.success(
-        added.length === 1 ? 'Position übernommen' : `${added.length} Positionen übernommen`
-      )
-      return
-    }
-    if (d.type === 'position') {
-      addPosition(d.gewerk?.trim() || defaultGewerk(), {
-        name: d.name,
-        beschreibung: d.beschreibung?.trim() || '',
-        menge: d.menge && d.menge > 0 ? d.menge : 1,
-        einheit: d.einheit?.trim() || 'Stück',
-        preis: d.preis != null && d.preis >= 0 ? d.preis : 0,
+  // KI „Positionen“-Chat → immer übernehmen (auch wenn Add-Sheet offen/unsichtbar).
+  // Einzel-„position“ nur wenn Add-Sheet zu — sonst füllt PositionAddSheet die Frei-Felder.
+  useKiAssistDraftConsumer(editable, 'positionen', (d) => {
+    if (!onChange || d.type !== 'positionen') return
+    setAddSheetOpen(false)
+    setPreislisteTargetGewerk(null)
+    const fallbackGewerk = defaultGewerk()
+    const added = d.items.map((it) =>
+      neuePosBoardLine({
+        gewerk: it.gewerk?.trim() || fallbackGewerk,
+        name: it.name,
+        beschreibung: it.beschreibung?.trim() || '',
+        menge: it.menge && it.menge > 0 ? it.menge : 1,
+        einheit: it.einheit?.trim() || 'Stück',
+        preis: it.preis != null && it.preis >= 0 ? it.preis : 0,
         ust: 19,
+        kind: 'position',
+        position_quelle: 'frei',
+        variante_id: null,
+        preisliste_id: null,
       })
-    }
+    )
+    if (!added.length) return
+    onChange([...positionen, ...added])
+    toast.success(
+      added.length === 1 ? 'Position übernommen' : `${added.length} Positionen übernommen`
+    )
+  })
+
+  useKiAssistDraftConsumer(editable && !addSheetOpen, 'position', (d) => {
+    if (!onChange || d.type !== 'position') return
+    addPosition(d.gewerk?.trim() || defaultGewerk(), {
+      name: d.name,
+      beschreibung: d.beschreibung?.trim() || '',
+      menge: d.menge && d.menge > 0 ? d.menge : 1,
+      einheit: d.einheit?.trim() || 'Stück',
+      preis: d.preis != null && d.preis >= 0 ? d.preis : 0,
+      ust: 19,
+    })
+    toast.success('Position übernommen')
   })
 
   const openAddSheet = (gewerk: string, mode: PositionAddMode = 'preisliste') => {
@@ -754,7 +757,7 @@ export function PosBoard({
         <div
           className="section-h posboard-sec-h"
           style={{
-            margin: '0.1250remrem 0.1250remrem 0.6250remrem',
+            margin: '0.125rem 0.125rem 0.625rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -785,7 +788,7 @@ export function PosBoard({
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            padding: '0.6250remrem 0.8750remrem',
+            padding: '0.625rem 0.875rem',
             marginBottom: 10,
             background: C.textMuted,
             color: C.white,
@@ -801,7 +804,7 @@ export function PosBoard({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '0.3750remrem 0.75rem',
+                padding: '0.375rem 0.75rem',
                 borderRadius: 8,
                 border: 'none',
                 background: 'rgba(255,255,255,0.16)',
@@ -928,6 +931,7 @@ export function PosBoard({
       {gEdit != null ? (
         <EditorSheet
           open
+          context="canvas"
           onClose={() => setGEdit(null)}
           title="Gewerk bearbeiten"
           subtitle={gEdit}
@@ -1033,6 +1037,7 @@ export function PosBoard({
       {preislisteOpen ? (
         <EditorSheet
           open
+          context="canvas"
           onClose={() => {
             setPreislisteOpen(false)
             setPreislistePick('')

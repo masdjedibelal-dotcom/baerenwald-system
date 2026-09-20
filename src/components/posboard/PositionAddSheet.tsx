@@ -570,7 +570,7 @@ export function PositionAddSheet({
                 multiline
                 rows={3}
                 placeholder="Projektspezifisch"
-                sheetContext="detail"
+                sheetContext="canvas"
               />
             </div>
           ) : null}
@@ -603,7 +603,7 @@ export function PositionAddSheet({
             multiline
             rows={3}
             placeholder="Details zur Leistung…"
-            sheetContext="detail"
+            sheetContext="canvas"
           />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <Toggle
@@ -695,7 +695,7 @@ export function PositionAddSheet({
             multiline
             rows={3}
             placeholder="z. B. Hinweis zu Ablauf oder Garantie"
-            sheetContext="detail"
+            sheetContext="canvas"
           />
         </div>
       ) : null}

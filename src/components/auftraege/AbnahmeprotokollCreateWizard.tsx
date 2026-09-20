@@ -50,7 +50,6 @@ import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
 import { CONFIRM, COPY_BUTTON, TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
-import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
 
 const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string }> = {
   abgenommen: { label: 'Abgenommen', cls: 'abnahme-erg-abgenommen' },
@@ -637,6 +636,7 @@ export function AbnahmeprotokollCreateWizard({
 
       <FieldCard title="Ergebnis">
         <MobileEditableBlock
+          sheetContext="canvas"
           sheetTitle="Ergebnis bearbeiten"
           overview={
             <dl className="space-y-2.5">
@@ -665,6 +665,7 @@ export function AbnahmeprotokollCreateWizard({
     >
       <FieldCard title="Übergabe">
         <MobileEditableBlock
+          sheetContext="canvas"
           sheetTitle="Übergabe bearbeiten"
           overview={
             <dl className="space-y-2.5">
@@ -704,6 +705,7 @@ export function AbnahmeprotokollCreateWizard({
 
       <FieldCard title="Personen">
         <MobileEditableBlock
+          sheetContext="canvas"
           sheetTitle="Personen bearbeiten"
           overview={
             <dl className="space-y-2.5">
@@ -746,6 +748,7 @@ export function AbnahmeprotokollCreateWizard({
 
       <FieldCard title="Bauvorhaben">
         <MobileEditableBlock
+          sheetContext="canvas"
           sheetTitle="Bauvorhaben bearbeiten"
           overview={
             <dl className="space-y-2.5">
@@ -780,7 +783,7 @@ export function AbnahmeprotokollCreateWizard({
               onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
               multiline
               rows={14}
-              sheetContext="detail"
+              sheetContext="canvas"
               placeholder="Leistungsumfang…"
             />
           </div>
@@ -848,6 +851,7 @@ export function AbnahmeprotokollCreateWizard({
 
       <FieldCard title="Unterschriften">
         <MobileEditableBlock
+          sheetContext="canvas"
           sheetTitle="Unterschriften bearbeiten"
           overview={
             <dl className="space-y-2.5">
@@ -1113,26 +1117,7 @@ export function AbnahmeprotokollCreateWizard({
       onSaveDraftClose={() => erstellen({ abschliessen: false })}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
-      sections={
-        [
-          {
-            id: 'checkliste',
-            label: 'Checkliste',
-            complete: progress.total > 0 && progress.done >= progress.total,
-          },
-          {
-            id: 'angaben',
-            label: 'Angaben',
-            complete: Boolean(abnahmeDatum.trim()),
-          },
-          {
-            id: 'pruefen',
-            label: 'Prüfen',
-            complete: hasSignatur,
-          },
-        ] satisfies DocCanvasSection[]
-      }
-      draftAction={{
+        draftAction={{
         label: COPY_BUTTON.entwurfSpeichern,
         onClick: () => erstellen({ abschliessen: false }),
         busy: pending,

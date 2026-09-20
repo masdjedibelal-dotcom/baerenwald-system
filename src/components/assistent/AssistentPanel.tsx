@@ -435,15 +435,11 @@ export function AssistentPanel() {
     }
     setPendingDraft(draft)
     if (scoped?.layer === 'over-sheet') {
-      const n =
-        draft.type === 'positionen'
-          ? draft.items.length
-          : draft.type === 'position'
-            ? 1
-            : 0
-      toast.success(
-        n > 1 ? `${n} Positionen übernommen` : n === 1 ? 'Position übernommen' : 'Übernommen'
-      )
+      // Erfolg-Toast erst im Consumer (PosBoard/Sheet) — sonst Fake-„übernommen“
+      // wenn Add-Sheet offen war und positionen blockiert wurden.
+      const isPos =
+        draft.type === 'positionen' || draft.type === 'position'
+      if (!isPos) toast.success(TOAST.in_formular_uebernommen)
       closePanel()
       return
     }

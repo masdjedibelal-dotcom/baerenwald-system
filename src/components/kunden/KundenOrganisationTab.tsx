@@ -208,7 +208,7 @@ if (!res.ok || !json.url) {
                   width: 64,
                   height: 64,
                   borderRadius: 10,
-                  border: '0.0.3125remrem solid var(--border)',
+                  border: '0.03125rem solid var(--border)',
                   background: 'var(--bg-soft)',
                   display: 'flex',
                   alignItems: 'center',

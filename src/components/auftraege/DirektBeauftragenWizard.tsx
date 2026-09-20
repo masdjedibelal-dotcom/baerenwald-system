@@ -202,9 +202,6 @@ export function DirektBeauftragenWizard({
       busy={pending}
       busyLabel="Auftrag wird angelegt…"
       className="wizard-flow direkt-beauftragen-canvas"
-      sections={[
-        { id: 'positionen', label: 'Positionen', complete: hatLeistung },
-      ]}
       primaryAction={{
         label: 'Auftrag anlegen',
         onClick: speichern,
