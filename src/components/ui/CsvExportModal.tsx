@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import type { ExportField } from '@/hooks/useExport'
 
 export function CsvExportModal({
@@ -41,8 +40,21 @@ export function CsvExportModal({
     onClose()
   }
 
+  const canDownload = fields.some((f) => selected[f.key])
+
   return (
-    <Modal open={open} onClose={onClose} title={title} size="md">
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="md"
+      secondary={{ label: 'Abbrechen', onClick: onClose }}
+      primary={{
+        label: 'CSV herunterladen',
+        onClick: handleDownload,
+        disabled: !canDownload,
+      }}
+    >
       <div className="space-y-4">
         <p className="text-sm text-bw-text-muted">Was exportieren?</p>
         <div className="space-y-2">
@@ -84,21 +96,7 @@ export function CsvExportModal({
             ))}
           </div>
         </div>
-
-        <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-          <MockBtn type="button" kind="secondary" onClick={onClose}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            type="button"
-            kind="primary"
-            onClick={handleDownload}
-            disabled={!fields.some((f) => selected[f.key])}
-          >
-            CSV herunterladen
-          </MockBtn>
-        </div>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

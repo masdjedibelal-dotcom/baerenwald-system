@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { MockBtn } from '@/components/mock-ui'
-import { SheetFooterActions } from '@/components/ui/SheetFooterActions'
+import { cn } from '@/lib/utils'
 
 /** Abbrechen/Zurücksetzen + Primary — kanonisches Paar für Modals/Sheets. */
 export function ModalFormFooter({
@@ -13,6 +13,7 @@ export function ModalFormFooter({
   loading = false,
   submitDisabled = false,
   extra,
+  className,
 }: {
   onCancel: () => void
   onSubmit: () => void
@@ -21,9 +22,15 @@ export function ModalFormFooter({
   loading?: boolean
   submitDisabled?: boolean
   extra?: ReactNode
+  className?: string
 }) {
   return (
-    <SheetFooterActions className="modal-form-footer">
+    <div
+      className={cn(
+        'modal-form-footer flex flex-wrap items-center justify-end gap-2',
+        className
+      )}
+    >
       {extra ? <div className="mr-auto w-full md:w-auto">{extra}</div> : null}
       <MockBtn type="button" kind="secondary" onClick={onCancel}>
         {cancelLabel}
@@ -37,6 +44,6 @@ export function ModalFormFooter({
       >
         {submitLabel}
       </MockBtn>
-    </SheetFooterActions>
+    </div>
   )
 }

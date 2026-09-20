@@ -5,14 +5,14 @@ import { useState } from 'react'
 import { LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { MockBtn } from '@/components/mock-ui'
-import { confirmAction } from '@/components/ui/confirm-action'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   function handleLogout() {
-    confirmAction({
+    openActionConfirm({
       title: 'Wirklich abmelden?',
       body: 'Du wirst aus dem CRM ausgeloggt.',
       confirmLabel: 'Abmelden',

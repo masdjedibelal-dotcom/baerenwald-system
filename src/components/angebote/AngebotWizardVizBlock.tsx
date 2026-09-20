@@ -117,13 +117,13 @@ export function AngebotWizardVizBlock({
 
       {imAngebot.length > 0 ? (
         <div className="mt-4 space-y-3">
-          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">Im Angebot (PDF)</p>
+          <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-primary">Im Angebot (PDF)</p>
           {imAngebot.map((s) => {
             const { istUrl, nachherUrl } = sessionVorschau(s)
             return (
               <div
                 key={s.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-[#2E7D52]/25 bg-[#EEF3EC]/60 p-2"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-bw-primary/25 bg-bw-primary/5 p-2"
               >
                 <div className="flex gap-2">
                   {istUrl ? (
@@ -139,9 +139,10 @@ export function AngebotWizardVizBlock({
                   {formatDatumZeit(s.created_at)}
                   {s.prompt_history.length > 1 ? ` · ${s.prompt_history.length} Versionen` : ''}
                 </div>
-                <button
+                <MockBtn
                   type="button"
-                  className="text-[length:var(--fs-meta)] text-bw-link hover:underline"
+                  kind="ghost"
+                  sm
                   disabled={disabled}
                   onClick={() =>
                     window.open(
@@ -152,7 +153,7 @@ export function AngebotWizardVizBlock({
                   }
                 >
                   Bearbeiten →
-                </button>
+                </MockBtn>
               </div>
             )
           })}
@@ -165,9 +166,10 @@ export function AngebotWizardVizBlock({
           {andere.slice(0, 3).map((s) => (
             <div key={s.id} className="flex items-center justify-between gap-2 text-[length:var(--fs-meta)]">
               <span className="text-bw-text-muted">{formatDatumZeit(s.created_at)} · {s.status}</span>
-              <button
+              <MockBtn
                 type="button"
-                className="text-bw-link hover:underline"
+                kind="ghost"
+                sm
                 disabled={disabled}
                 onClick={() =>
                   window.open(
@@ -178,7 +180,7 @@ export function AngebotWizardVizBlock({
                 }
               >
                 Öffnen
-              </button>
+              </MockBtn>
             </div>
           ))}
         </div>

@@ -21,7 +21,7 @@ export function AngebotVisualisierungenTab({
           KI-Visualisierungen für dieses Angebot — Vorher/Nachher für Kunden-PDF und Mail.
         </p>
         <Link href={`/angebote/${angebotId}/visualisierung`}>
-          <MockBtn type="button" kind="primary" className="bg-[#1A3D2B]">
+          <MockBtn type="button" kind="primary">
             <Sparkles className="mr-1.5 h-4 w-4" aria-hidden />
             Neue Visualisierung
           </MockBtn>
