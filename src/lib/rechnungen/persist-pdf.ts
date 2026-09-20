@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
 import { revalidateRechnungDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { Kunde, Rechnung } from '@/lib/types'

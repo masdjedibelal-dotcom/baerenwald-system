@@ -135,12 +135,7 @@ async function resolveLeadIdsForPartner(
 export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise<{
   rows: VorgangListeRow[]
   error: string | null
-<<<<<<< Updated upstream
   pagination?: VorgaengeListePagination | null
-=======
-  /** P4-5: gesetzt wenn Lead-Hard-Limit greift */
-  listeTruncated?: { shown: number; total: number } | null
->>>>>>> Stashed changes
 }> {
   try {
     return await loadVorgaengeListeInner(opts)
@@ -154,11 +149,7 @@ export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise
 async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   rows: VorgangListeRow[]
   error: string | null
-<<<<<<< Updated upstream
   pagination?: VorgaengeListePagination | null
-=======
-  listeTruncated?: { shown: number; total: number } | null
->>>>>>> Stashed changes
 }> {
   const supabase = createClient()
   const {
@@ -1020,41 +1011,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
 
   rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
-<<<<<<< Updated upstream
   return { rows, error: null, pagination }
-=======
-  let listeTruncated: { shown: number; total: number } | null = null
-  const loadedLeadCount = (leadsRes.data ?? []).length
-  if (loadedLeadCount >= leadLimit) {
-    const countRes = await withCrmReadFallback<number>(async (db) => {
-      let q = db
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .is('geloescht_am', null)
-      if (kundeId) {
-        q = q.or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
-      }
-      if (objektId) {
-        q = q.eq('kunde_objekt_id', objektId)
-      }
-      if (handwerkerLeadIds?.length) {
-        q = q.in('id', handwerkerLeadIds)
-      }
-      const r = await q
-      return { data: r.count ?? null, error: r.error }
-    })
-    const totalLeads = countRes.data ?? loadedLeadCount
-    if (totalLeads > loadedLeadCount) {
-      const extraRows = Math.max(0, rows.length - loadedLeadCount)
-      listeTruncated = {
-        shown: rows.length,
-        total: totalLeads + extraRows,
-      }
-    }
-  }
-
-  return { rows, error: null, listeTruncated }
->>>>>>> Stashed changes
 }
 
 function angebotBetragLabel(

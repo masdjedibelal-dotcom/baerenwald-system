@@ -6,12 +6,6 @@ import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 import { useRef, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Download, FileUp, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { deleteBaustellenDokument } from '@/app/(dashboard)/auftraege/baustelle-actions'
 import {
@@ -142,11 +136,7 @@ export function BaustelleBerichteDokumenteCard({
                 <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" />
               </a>
               <MockBtn type="button" kind="ghost" sm onClick={() => remove(d.id)}>
-<<<<<<< Updated upstream
                 <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
-=======
-                <Trash2 className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
               </MockBtn>
             </div>
           ))}

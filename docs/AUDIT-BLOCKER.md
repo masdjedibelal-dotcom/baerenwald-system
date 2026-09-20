@@ -1,12 +1,6 @@
-<<<<<<< Updated upstream
 # Audit: Blocker nur Belal (M1–M10)
 
 Stand: 2026-09-20  
-=======
-# Audit: Blocker nur Belal (M1–M8)
-
-Stand: 2026-09-19  
->>>>>>> Stashed changes
 Kein Agent-Code für diese Punkte. Nach Code-Blöcken am Ende erledigen.
 
 | ID | Thema | Aktion |
@@ -19,10 +13,7 @@ Kein Agent-Code für diese Punkte. Nach Code-Blöcken am Ende erledigen.
 | **M6** | Next 15 | Major-Upgrade + Abnahme (kein Patch in 14.2-Linie). |
 | **M7** | AVV | Vorlage korrigieren: Hosting/DB-Region **Irland (`eu-west-1`)**, nicht Frankfurt. |
 | **M8** | `data/` | Kundendaten/Verträge aus Repo entfernen oder außer Versionierung halten (nur auflisten, Agent fasst Inhalt nicht an). |
-<<<<<<< Updated upstream
 | **M10** | `PDF_SERVICE_SECRET` | Gleicher Secret-Wert in **CRM und Portal** Env (Staging + Prod). Portal ruft serverseitig CRM `POST /api/pdf/render` auf; ohne Secret schlägt PDF-Erzeugung fehl. Basis-URL: `NEXT_PUBLIC_CRM_URL` / `CRM_PUBLIC_URL`. |
-=======
->>>>>>> Stashed changes
 
 ## M8 — Liste `data/` (nicht anfassen, nur Inventar)
 

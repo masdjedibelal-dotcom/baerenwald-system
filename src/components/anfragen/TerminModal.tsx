@@ -6,11 +6,6 @@ import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import {
   insertKalenderTermin,
   loadCrmTeamFuerTermin,

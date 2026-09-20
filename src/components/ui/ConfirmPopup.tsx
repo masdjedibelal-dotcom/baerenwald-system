@@ -10,10 +10,6 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
@@ -129,11 +125,7 @@ export function ConfirmPopup({
               <MockBtn
                 type="button"
                 kind="danger"
-<<<<<<< Updated upstream
                 disabled={confirmBlocked}
-=======
-                disabled={busy}
->>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
                   if (confirmBlocked) return
@@ -159,11 +151,7 @@ export function ConfirmPopup({
               <MockBtn
                 type="button"
                 kind="danger"
-<<<<<<< Updated upstream
                 disabled={confirmBlocked}
-=======
-                disabled={busy}
->>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
                   if (confirmBlocked) return
@@ -200,11 +188,7 @@ export function ConfirmPopup({
               <MockBtn
                 type="button"
                 kind="primary"
-<<<<<<< Updated upstream
                 disabled={confirmBlocked}
-=======
-                disabled={busy}
->>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
                   if (confirmBlocked) return

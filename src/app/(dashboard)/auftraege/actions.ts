@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'

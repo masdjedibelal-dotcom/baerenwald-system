@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { fetchGptZielbildFromWebsite } from '@/lib/gpt-viz/fetch-zielbild'
 import {
   gptHeroBildUrl,

@@ -9,12 +9,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   createAngebot,
@@ -581,11 +575,7 @@ export function AngebotNeuForm({
           })}
         </div>
         <MockBtn type="button" kind="secondary" onClick={addRow}>
-<<<<<<< Updated upstream
           <MockIcon n="plus" ctx="default" className="mr-2 inline h-4 w-4" aria-hidden />
-=======
-          <Plus className="mr-2 inline h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
           Position hinzufügen
         </MockBtn>
 

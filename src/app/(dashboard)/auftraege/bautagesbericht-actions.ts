@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -262,11 +257,7 @@ export async function updateAuftragBautagesbericht(
   if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateAuftragDetail(existing.auftrag_id)
-=======
-  revalidatePath(`/auftraege/${existing.auftrag_id}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -285,11 +276,7 @@ export async function deleteAuftragBautagesbericht(
   const { error: error2 } = await supabase.from('auftrag_bautagesberichte').delete().eq('id', id)
   if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateAuftragDetail(existing.auftrag_id)
-=======
-  revalidatePath(`/auftraege/${existing.auftrag_id}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 

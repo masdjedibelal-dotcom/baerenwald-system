@@ -9,10 +9,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useListPage } from '@/hooks/useListPage'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { getHandwerkerEinreichungPdfUrl } from '@/app/(dashboard)/angebote/actions'
 import {

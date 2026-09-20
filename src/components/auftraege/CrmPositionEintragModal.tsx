@@ -6,10 +6,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -241,21 +237,8 @@ export function CrmPositionEintragModal({
       title={isEdit ? 'Eintrag bearbeiten' : 'Tagebuch-Eintrag'}
       size="lg"
       dirty={dirty && !busy}
-<<<<<<< Updated upstream
       secondary={{ label: 'Abbrechen', disabled: busy }}
       primary={{ label: 'Speichern', busy: pending, onClick: speichern }}
-=======
-      footer={
-        <div className="sheet-footer-actions ldr-cta">
-          <MockBtn type="button" kind="secondary" onClick={onClose} disabled={busy}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn type="button" kind="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </MockBtn>
-        </div>
-      }
->>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <div>

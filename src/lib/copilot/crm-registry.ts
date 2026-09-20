@@ -415,20 +415,10 @@ export const CRM_ACTION_REGISTRY: Record<
         .maybeSingle()
       if (error) logDbError('lib/copilot/crm-registry:leads', error)
       if (!lead) return { error: 'Lead nicht gefunden' }
-<<<<<<< Updated upstream
       const { error: error2 } = await writeLeadStatus(supabaseAdmin, leadId, status)
       if (error2) logDbError('lib/copilot/crm-registry:leads', error2)
       if (error2) return { error: error2.message }
       const { error: __dbErr2 } = await supabaseAdmin.from('leads_status_history').insert({
-=======
-      const { error: error2 } = await supabaseAdmin
-        .from('leads')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', leadId)
-      if (error2) logDbError('lib/copilot/crm-registry:leads', error2)
-      if (error2) return { error: error2.message }
-      await supabaseAdmin.from('leads_status_history').insert({
->>>>>>> Stashed changes
         lead_id: leadId,
         status_alt: lead.status,
         status_neu: status,

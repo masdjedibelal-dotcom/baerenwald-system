@@ -10,11 +10,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { confirmDelete } from '@/components/ui/confirm-delete'
->>>>>>> Stashed changes
 import {
   exportMelderAuskunft,
   loescheMelderDaten,

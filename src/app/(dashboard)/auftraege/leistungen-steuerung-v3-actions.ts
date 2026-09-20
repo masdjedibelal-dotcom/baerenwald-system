@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
@@ -135,11 +130,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     .eq('id', hwId)
     .maybeSingle()
   if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:handwerker', error)
-<<<<<<< Updated upstream
   if (!hw) return { ok: false, message: 'Partner nicht gefunden.' }
-=======
-  if (!hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
->>>>>>> Stashed changes
 
   const ekGlobal =
     input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0

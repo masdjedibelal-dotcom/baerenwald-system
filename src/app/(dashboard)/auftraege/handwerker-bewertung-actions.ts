@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { HandwerkerBewertungWerte } from '@/lib/handwerker/bewertung-kategorien'
 import { istHandwerkerBewertungVollstaendig } from '@/lib/handwerker/bewertung-kategorien'

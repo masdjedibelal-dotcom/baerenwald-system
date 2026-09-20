@@ -158,19 +158,9 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   }
 
   const now = new Date().toISOString()
-<<<<<<< Updated upstream
   const { error: upHw } = await writeAngebotHandwerkerStatus(supabaseAdmin, row.id, 'angefragt', {
     gesendet_at: now,
   })
-=======
-  const { error: upHw } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .update({
-      status: 'angefragt',
-      gesendet_at: now,
-    })
-    .eq('id', row.id)
->>>>>>> Stashed changes
   if (upHw) logDbError('lib/angebote/send-handwerker-anfrage:angebot_handwerker', upHw)
 
   if (upHw) {

@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { User } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { crmRoleFromUser } from '@/lib/auth/crm-access'
@@ -289,10 +284,6 @@ export async function setBenutzerAktiv(
   })
   if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateEinstellungenPath('/einstellungen/benutzer')
-=======
-  revalidatePath('/einstellungen/benutzer')
->>>>>>> Stashed changes
   return { ok: true }
 }

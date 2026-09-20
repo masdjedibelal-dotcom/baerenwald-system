@@ -38,11 +38,7 @@ export async function acceptRahmenvertragFromPortal(input: {
     .eq('id', handwerkerId)
     .maybeSingle()
   if (error) logDbError('lib/vertraege/provision-rahmenvertrag-portal:handwerker', error)
-<<<<<<< Updated upstream
   if (!hw?.id) return { ok: false, message: 'Partner nicht gefunden.' }
-=======
-  if (!hw?.id) return { ok: false, message: 'Handwerker nicht gefunden.' }
->>>>>>> Stashed changes
 
   let row = await loadRahmenRow(handwerkerId)
   const now = new Date().toISOString()

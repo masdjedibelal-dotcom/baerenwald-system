@@ -4,12 +4,6 @@ import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useMemo, useState } from 'react'
 import Papa from 'papaparse'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Select } from '@/components/ui/Select'
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import type { PreislistenImportMapping, PreislistenImportResponse } from '@/lib/preislisten-import'
 
 const MAP_FIELDS: { key: keyof PreislistenImportMapping; label: string }[] = [

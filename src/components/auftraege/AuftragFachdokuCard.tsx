@@ -12,10 +12,6 @@ import {
   fachdokuOffenCount,
   type FachdokuSlotRow,
 } from '@/lib/auftraege/fachdoku-slots'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'

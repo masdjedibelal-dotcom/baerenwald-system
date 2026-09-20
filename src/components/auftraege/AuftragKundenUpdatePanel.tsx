@@ -5,13 +5,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { useMemo, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Mail, Send, Upload, X } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { createKundenUpdateAndSend } from '@/app/(dashboard)/auftraege/kunden-update-actions'
 import {
@@ -208,11 +201,7 @@ export function AuftragKundenUpdatePanel({
         </div>
 
         <MockBtn type="button" kind="primary" loading={pending} onClick={absenden}>
-<<<<<<< Updated upstream
           <MockIcon n="mail" ctx="default" className="mr-2 inline h-4 w-4" aria-hidden />
-=======
-          <Mail className="mr-2 inline h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
           Update veröffentlichen{sendMail ? ' & senden' : ''}
         </MockBtn>
       </div>

@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase-server'

@@ -7,11 +7,6 @@ import { Combobox } from '@/components/ui/Combobox'
 import { useMemo, useState } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Select } from '@/components/ui/Select'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   updateAuftragHandwerkerStatus,
@@ -334,20 +329,7 @@ export function AuftragHandwerkerPanel({
                           <MockIcon n="file-text" ctx="default" className="mr-1 inline h-3.5 w-3.5" aria-hidden />
                           Details
                         </MockBtn>
-<<<<<<< Updated upstream
                         <Combobox id={`status-gw-${z.id}`} name={`status-gw-${z.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} value={(hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changeGewerkStatus(z.id, next as AuftragHandwerkerZuweisungStatus); }} className="!min-w-[160px]" />
-=======
-                        <Select
-                          name={`status-gw-${z.id}`}
-                          value={(hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
-                          onChange={(e) =>
-                            changeGewerkStatus(z.id, e.target.value as AuftragHandwerkerZuweisungStatus)
-                          }
-                          options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                          className="!min-w-[160px]"
-                          disabled={pending}
-                        />
->>>>>>> Stashed changes
                       </>
                     ) : null}
                     <MockBtn
@@ -361,13 +343,8 @@ export function AuftragHandwerkerPanel({
                         )
                       }
                     >
-<<<<<<< Updated upstream
                       <MockIcon n="user" ctx="default" className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
                       {hwName && !abgelehnt ? 'Partner bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
-=======
-                      <UserPlus className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
-                      {hwName && !abgelehnt ? 'Handwerker bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
->>>>>>> Stashed changes
                     </MockBtn>
                   </div>
                 </div>
@@ -408,17 +385,7 @@ export function AuftragHandwerkerPanel({
                                   <MockIcon n="file-text" ctx="default" className="mr-1 inline h-3.5 w-3.5" aria-hidden />
                                   Details
                                 </MockBtn>
-<<<<<<< Updated upstream
                                 <Combobox id={`status-pos-${p.id}`} name={`status-pos-${p.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
-=======
-                                <Select
-                                  name={`status-pos-${p.id}`}
-                                  value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
-                                  onChange={(e) =>
-                                    changePositionStatus(p.id, e.target.value as AuftragHandwerkerZuweisungStatus)
-                                  }
-                                  options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
->>>>>>> Stashed changes
                                     value: o.value,
                                     label: o.label }))} value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changePositionStatus(p.id, next as AuftragHandwerkerZuweisungStatus); }} className="!min-w-[140px]" />
                               </>
@@ -429,11 +396,7 @@ export function AuftragHandwerkerPanel({
                               disabled={!gruppe.gewerkId || pending}
                               onClick={() => openPositionModal(gruppe, p)}
                             >
-<<<<<<< Updated upstream
                               {p.handwerker_id ? 'Partner bearbeiten' : 'Zuweisen'}
-=======
-                              {p.handwerker_id ? 'Handwerker bearbeiten' : 'Zuweisen'}
->>>>>>> Stashed changes
                             </MockBtn>
                           </div>
                         </li>

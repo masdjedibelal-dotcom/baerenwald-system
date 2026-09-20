@@ -3,11 +3,7 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-<<<<<<< Updated upstream
 import { useMemo, useState, type ReactNode } from 'react'
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'

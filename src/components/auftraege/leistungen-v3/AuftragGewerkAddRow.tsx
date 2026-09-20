@@ -3,12 +3,6 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn, MockSelect } from '@/components/mock-ui'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Plus } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-
->>>>>>> Stashed changes
 type GewerkOpt = { id: string; name: string; slug: string }
 
 export function AuftragGewerkAddRow({
@@ -49,11 +43,7 @@ export function AuftragGewerkAddRow({
             {g.name}
           </option>
         ))}
-<<<<<<< Updated upstream
       </MockSelect>
-=======
-      </select>
->>>>>>> Stashed changes
       <MockBtn
         type="button"
         kind="secondary" sm

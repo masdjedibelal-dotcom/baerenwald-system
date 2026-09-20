@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
@@ -162,22 +157,10 @@ export async function notfallDirektBeauftragen(
   }
 
   // Banner-Felder am Auftrag
-<<<<<<< Updated upstream
   const { error: bannerErr } = await writeAuftragStatus(supabaseAdmin, auftragId, 'in_arbeit', {
     ist_notfall: true,
     notfall_verguetung: verguetung,
   })
-=======
-  const { error: bannerErr } = await supabaseAdmin
-    .from('auftraege')
-    .update({
-      ist_notfall: true,
-      notfall_verguetung: verguetung,
-      status: 'in_arbeit',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', auftragId)
->>>>>>> Stashed changes
   if (bannerErr) logDbError('app/auftraege/notfall-direkt-actions:auftraege', bannerErr)
   if (bannerErr && !/ist_notfall|notfall_verguetung/i.test(bannerErr.message)) {
     return { ok: false, message: bannerErr.message }

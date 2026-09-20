@@ -4,12 +4,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { ExternalLink } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-
->>>>>>> Stashed changes
 type Props = {
   kundeId?: string
   handwerkerId?: string

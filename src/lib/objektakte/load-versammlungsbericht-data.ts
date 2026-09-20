@@ -1,7 +1,4 @@
-<<<<<<< Updated upstream
 import { formatMonatNummerJahr } from '@/lib/utils'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { loadObjektHistorie } from '@/lib/objektakte/load-objekt-historie'
 import { loadKundenObjektForAkte } from '@/lib/objektakte/load-objekt-akte'

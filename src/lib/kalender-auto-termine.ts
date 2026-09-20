@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
 import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { KalenderTermin } from '@/lib/types'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 

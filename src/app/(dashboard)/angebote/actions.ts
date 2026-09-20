@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAngebotList, revalidateAngebotNeu, revalidateAuftragDetail, revalidateEinstellungenPath, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -637,12 +634,7 @@ export async function updateAngebotProjektFelder(
   const { error: error2 } = await supabase.from('angebote').update(db).eq('id', angebotId)
   if (error2) logDbError('app/angebote/actions:angebote', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateAngebotDetail(angebotId)
-=======
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
->>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -934,14 +926,7 @@ export async function setAngebotStatus(
   if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
   if (status === 'gesendet_kunde') extra.gesendet_kunde_at = now
 
-<<<<<<< Updated upstream
   const { error } = await writeAngebotStatus(supabase, angebotId, status, extra)
-=======
-  const { error } = await supabase
-    .from('angebote')
-    .update({ status, updated_at: now, ...extra })
-    .eq('id', angebotId)
->>>>>>> Stashed changes
   if (error) logDbError('app/angebote/actions:angebote', error)
   if (error) return { ok: false, message: error.message }
   if (!opts?.asSystem) {
@@ -1377,7 +1362,6 @@ export async function crmManuelleHandwerkerEinreichung(
   if (!upload.ok) return { ok: false, message: upload.message }
 
   const now = new Date().toISOString()
-<<<<<<< Updated upstream
   const { error: upErr } = await writeAngebotHandwerkerStatus(supabaseAdmin, zuweisungId, 'akzeptiert', {
     antwort_at: now,
     hw_preis_netto: preisNetto,
@@ -1387,21 +1371,6 @@ export async function crmManuelleHandwerkerEinreichung(
     hw_status: 'eingereicht',
     hw_notiz: notiz,
   })
-=======
-  const { error: upErr } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .update({
-      status: 'akzeptiert',
-      antwort_at: now,
-      hw_preis_netto: preisNetto,
-      hw_preis_brutto: preisBrutto,
-      hw_angebot_pdf_url: upload.path,
-      hw_eingereicht_at: now,
-      hw_status: 'eingereicht',
-      hw_notiz: notiz,
-    })
-    .eq('id', zuweisungId)
->>>>>>> Stashed changes
   if (upErr) logDbError('app/angebote/actions:angebot_handwerker', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
@@ -2432,27 +2401,12 @@ export async function recordKundeAbgelehntMitDetails(
     input.konkurrenz_preis_eur != null && Number.isFinite(input.konkurrenz_preis_eur)
       ? Math.round(input.konkurrenz_preis_eur * 100) / 100
       : null
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAngebotStatus(supabase, angebotId, 'abgelehnt', {
     status_einfach: 'abgelehnt',
     ablehnung_grund: input.grund,
     ablehnung_konkurrenz_preis: kp,
     ablehnung_notiz: input.notiz?.trim() || null,
   })
-=======
-  const now = new Date().toISOString()
-  const { error: error2 } = await supabase
-    .from('angebote')
-    .update({
-      status: 'abgelehnt' as AngebotStatus,
-      status_einfach: 'abgelehnt',
-      ablehnung_grund: input.grund,
-      ablehnung_konkurrenz_preis: kp,
-      ablehnung_notiz: input.notiz?.trim() || null,
-      updated_at: now,
-    })
-    .eq('id', angebotId)
->>>>>>> Stashed changes
   if (error2) logDbError('app/angebote/actions:angebote', error2)
   if (error2) return { ok: false, message: error2.message }
 
@@ -2485,24 +2439,11 @@ export async function schliesseLeadNachAngebotVerlust(
   if (a.status !== 'abgelehnt') {
     return { ok: false, message: 'Angebot ist nicht als abgelehnt markiert.' }
   }
-<<<<<<< Updated upstream
   const { error: error2 } = await writeLeadStatus(supabase, a.lead_id, 'abgebrochen')
   if (error2) logDbError('app/angebote/actions:leads', error2)
   if (error2) return { ok: false, message: error2.message }
   revalidateLeadDetail(a.lead_id)
   revalidateAngebotDetail(angebotId)
-=======
-  const { error: error2 } = await supabase
-    .from('leads')
-    .update({ status: 'abgebrochen', updated_at: new Date().toISOString() })
-    .eq('id', a.lead_id)
-  if (error2) logDbError('app/angebote/actions:leads', error2)
-  if (error2) return { ok: false, message: error2.message }
-  revalidatePath(`/anfragen/${a.lead_id}`)
-  revalidatePath('/anfragen')
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/')
->>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -2677,14 +2618,7 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
     return { ok: false, message: 'Partner deckt dieses Gewerk nicht ab.' }
   }
 
-<<<<<<< Updated upstream
   const { error: upAlt } = await writeAngebotHandwerkerStatus(supabase, input.alteZuweisungId, 'ersetzt')
-=======
-  const { error: upAlt } = await supabase
-    .from('angebot_handwerker')
-    .update({ status: 'ersetzt' })
-    .eq('id', input.alteZuweisungId)
->>>>>>> Stashed changes
   if (upAlt) logDbError('app/angebote/actions:angebot_handwerker', upAlt)
   if (upAlt) return { ok: false, message: upAlt.message }
 
@@ -3609,12 +3543,7 @@ export async function deleteAngebot(
   const { error: error4 } = await supabase.from('angebote').delete().eq('id', angebotId)
   if (error4) logDbError('app/angebote/actions:angebote', error4)
   if (error4) return { error: error4.message }
-<<<<<<< Updated upstream
   revalidateAngebotDetail(angebotId)
-=======
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
->>>>>>> Stashed changes
   const leadId = (ang as { lead_id?: string | null } | null)?.lead_id
   if (leadId) revalidateLeadDetail(leadId)
   return { success: true }
@@ -3661,10 +3590,6 @@ export async function duplicateAngebotVorlage(
   })
   if (error2) logDbError('app/angebote/actions:angebot_vorlagen', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateEinstellungenPath('/einstellungen/vorlagen')
-=======
-  revalidatePath('/einstellungen/vorlagen')
->>>>>>> Stashed changes
   return { ok: true }
 }

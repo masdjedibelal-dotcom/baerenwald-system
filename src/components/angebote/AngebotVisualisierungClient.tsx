@@ -8,12 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
-<<<<<<< Updated upstream
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { VizPrepareQuestions } from '@/components/angebote/VizPrepareQuestions'
 import { VizZielbildCard } from '@/components/angebote/VizZielbildCard'
@@ -798,16 +793,11 @@ export function AngebotVisualisierungClient({
           <MockBtn
             type="button"
             kind="primary"
-<<<<<<< Updated upstream
             className="w-full bg-bw-dark hover:bg-bw-dark"
-=======
-            className="w-full bg-[#1A3D2B] hover:bg-[#153222]"
->>>>>>> Stashed changes
             disabled={!kannRendern}
             loading={isRendering || isPreparing}
             onClick={() => requestRender()}
           >
-<<<<<<< Updated upstream
             {isPreparing
               ? 'Bereite Render vor…'
               : isRendering
@@ -818,19 +808,6 @@ export function AngebotVisualisierungClient({
                     Rendern →
                   </>
                 )}
-=======
-            {isRendering || isPreparing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                {isPreparing ? 'Bereite Render vor…' : 'KI rendert… (~8–60 Sek.)'}
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" aria-hidden />
-                Rendern →
-              </>
-            )}
->>>>>>> Stashed changes
           </MockBtn>
           {isRendering || isPreparing ? (
             <div className="h-1.5 overflow-hidden rounded-pill bg-bw-border">
@@ -879,11 +856,7 @@ export function AngebotVisualisierungClient({
                 <MockBtn
                   type="button"
                   kind="primary"
-<<<<<<< Updated upstream
                   className="flex-1 bg-bw-dark"
-=======
-                  className="flex-1 bg-[#1A3D2B]"
->>>>>>> Stashed changes
                   onClick={() => setInsAngebotOpen(true)}
                 >
                   ✓ Ins Angebot übernehmen
@@ -907,26 +880,12 @@ export function AngebotVisualisierungClient({
       <EditorSheet
         open={insAngebotOpen}
         onClose={() => setInsAngebotOpen(false)}
-<<<<<<< Updated upstream
         title="Ins Angebot speichern"
         secondary={{ label: 'Abbrechen', onClick: () => setInsAngebotOpen(false) }}
         primary={{
           label: 'Speichern',
           onClick: () => void insAngebotUebernehmen(),
         }}
-=======
-        title="Ins Angebot übernehmen"
-        footer={
-          <>
-            <MockBtn type="button" kind="secondary" onClick={() => setInsAngebotOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" onClick={() => void insAngebotUebernehmen()}>
-              Übernehmen
-            </MockBtn>
-          </>
-        }
->>>>>>> Stashed changes
       >
       {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2">

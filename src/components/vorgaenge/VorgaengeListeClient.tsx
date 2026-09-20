@@ -266,11 +266,7 @@ export function VorgaengeListeClient({
   restrictHandwerkerId,
   restrictKundeId,
   restrictLeadIds,
-<<<<<<< Updated upstream
   serverPagination = null,
-=======
-  listeTruncated = null,
->>>>>>> Stashed changes
 }: {
   rows: VorgangListeRow[]
   /** Partner-Eingangsrechnungen (angebot_handwerker mit PDF) */
@@ -283,13 +279,8 @@ export function VorgaengeListeClient({
   restrictKundeId?: string
   /** Alternative: auf Lead-IDs einschränken (z. B. Melder + Auftraggeber). */
   restrictLeadIds?: string[]
-<<<<<<< Updated upstream
   /** P3-3: echte DB-Seiten über crm_vorgaenge_lead_page (?seite=) */
   serverPagination?: VorgaengeListePagination | null
-=======
-  /** P4-5: Hard-Limit-Hinweis wenn Liste abgeschnitten */
-  listeTruncated?: { shown: number; total: number } | null
->>>>>>> Stashed changes
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1199,16 +1190,10 @@ export function VorgaengeListeClient({
         ) : null}
       </div>
 
-<<<<<<< Updated upstream
       {serverPagination && serverPagination.totalLeads > 0 ? (
         <p className="m-0 mb-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
           Seite {serverPagination.page} von {serverPagination.totalPages}:{' '}
           {filtered.length} von {serverPagination.totalLeads} Vorgängen angezeigt
-=======
-      {listeTruncated && listeTruncated.total > listeTruncated.shown ? (
-        <p className="m-0 mb-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-          {listeTruncated.shown} von {listeTruncated.total} Vorgängen angezeigt
->>>>>>> Stashed changes
         </p>
       ) : null}
 

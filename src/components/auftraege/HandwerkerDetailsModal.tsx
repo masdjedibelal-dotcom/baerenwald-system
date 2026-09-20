@@ -5,14 +5,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { FormSheet } from '@/components/ui/FormSheet'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   updateAuftragHandwerkerDetails,
@@ -91,7 +83,6 @@ export function HandwerkerDetailsModal({
     })
   }
 
-<<<<<<< Updated upstream
   return (
     <EditorSheet
       open={open}
@@ -101,21 +92,6 @@ export function HandwerkerDetailsModal({
       secondary={{ label: 'Abbrechen' }}
       primary={{ label: 'Speichern', busy: pending, onClick: save }}
     >
-=======
-  const footer = (
-    <div className="flex gap-2">
-      <MockBtn type="button" kind="secondary" onClick={onClose}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn type="button" kind="primary" loading={pending} onClick={save}>
-        Speichern
-      </MockBtn>
-    </div>
-  )
-
-  const body = (
-    <>
->>>>>>> Stashed changes
       <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
         Intern: Preis, Absprachen und Notizen zur Partner-Zuweisung.
       </p>

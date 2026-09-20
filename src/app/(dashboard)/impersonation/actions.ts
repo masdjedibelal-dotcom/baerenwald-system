@@ -85,11 +85,7 @@ async function resolveHandwerkerTarget(handwerkerId: string): Promise<
     .eq('id', handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/impersonation/actions:handwerker', error)
-<<<<<<< Updated upstream
   if (error || !data) return { ok: false, message: error?.message ?? 'Partner nicht gefunden.' }
-=======
-  if (error || !data) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden.' }
->>>>>>> Stashed changes
   if ((data as { ist_portal_gesperrt?: boolean | null }).ist_portal_gesperrt) {
     return { ok: false, message: 'Partner ist vom Portal ausgeschlossen — Zugang gesperrt.' }
   }

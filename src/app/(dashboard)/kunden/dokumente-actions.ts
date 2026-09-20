@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateKundeDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -92,11 +87,6 @@ export async function deleteKundeDokument(
   if (error2) logDbError('app/kunden/dokumente-actions:kunden_dokumente', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateKundeDetail(kundeId)
-=======
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/kunden')
->>>>>>> Stashed changes
   return { ok: true }
 }

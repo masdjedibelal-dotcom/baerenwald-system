@@ -7,13 +7,6 @@ import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Download, FileText, Plus, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   createAuftragWochenbericht,
@@ -140,17 +133,10 @@ export function BaustelleWochenberichteCard({
           <MockField label="Kalenderwoche"><MockInput type="number" min={1} max={53} value={kw} onChange={(e) => setKw(Number(e.target.value) || 1)} /></MockField>
           <MockField label="Jahr"><MockInput type="number" value={jahr} onChange={(e) => setJahr(Number(e.target.value) || new Date().getFullYear())} /></MockField>
         </div>
-<<<<<<< Updated upstream
         <MockField label="Wochenzusammenfassung"><RichTextEditor value={typeof (fazit) === 'string' ? (fazit) : ''} onChange={(__v) => setFazit(__v)} minHeight={120} aria-label="Wochenzusammenfassung" /></MockField>
         <MockField label="Ausblick"><RichTextEditor value={typeof (ausblick) === 'string' ? (ausblick) : ''} onChange={(__v) => setAusblick(__v)} minHeight={120} aria-label="Ausblick" /></MockField>
         <MockBtn type="button" kind="secondary" sm className="gap-1" disabled={pending} onClick={create}>
           <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
-=======
-        <Textarea label="Wochenzusammenfassung" value={fazit} onChange={(e) => setFazit(e.target.value)} rows={2} />
-        <Textarea label="Ausblick" value={ausblick} onChange={(e) => setAusblick(e.target.value)} rows={2} />
-        <MockBtn type="button" kind="secondary" sm className="gap-1" disabled={pending} onClick={create}>
-          <Plus className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
           Wochenbericht anlegen
         </MockBtn>
       </div>
@@ -245,11 +231,7 @@ export function BaustelleWochenberichteCard({
                         </a>
                       ) : null}
                       <MockBtn type="button" kind="ghost" sm onClick={() => remove(w.id)}>
-<<<<<<< Updated upstream
                         <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
-=======
-                        <Trash2 className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
                       </MockBtn>
                     </div>
                   </div>

@@ -6,10 +6,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { toast } from '@/components/ui/app-toast'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { TokenLinkInvalid, PublicTokenLegalFooter } from '@/components/public/TokenLinkInvalid'
 import {
@@ -38,11 +34,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
     setFehler(null)
     const res = await fetch(`/api/handwerker/anfrage/${encodeURIComponent(token)}`)
     const json = (await res.json().catch((err) => {
-<<<<<<< Updated upstream
       console.error('[PartnerAnfrageClient] res.json', err)
-=======
-      console.error('[HandwerkerAnfrageClient] res.json', err)
->>>>>>> Stashed changes
       return null
     })) as
       | (HandwerkerAnfragePublicPayload & { ok?: boolean; error?: string })

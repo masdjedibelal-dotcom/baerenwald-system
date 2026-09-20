@@ -52,12 +52,6 @@ import { RechnungLeistungenMitBautagebuch } from '@/components/rechnungen/Rechnu
 import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
-<<<<<<< Updated upstream
-=======
-import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
 import { RechnungKorrekturKetteCard } from '@/components/rechnungen/RechnungKorrekturKetteCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -988,23 +982,9 @@ export function RechnungDetailClient({
           if (!pending) setRechnungConfirm(null)
         }}
         title="Gutschrift anlegen?"
-<<<<<<< Updated upstream
         busy={pending}
         confirmLabel={pending ? 'Wird erstellt…' : 'Gutschrift erstellen'}
         onConfirm={ausfuehrenGutschrift}
-=======
-        size="sm"
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn type="button" kind="secondary" onClick={() => setRechnungConfirm(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
-              Gutschrift erstellen
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Es entsteht ein Gutschrift-Beleg (negative Beträge). Die Originalrechnung wird als

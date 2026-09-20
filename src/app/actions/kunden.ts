@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotList, revalidateAuftragList, revalidateKundeDetail, revalidateLeadDetail, revalidateLeadList, revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'
@@ -206,11 +201,7 @@ export async function deleteKundenNotiz(
   const { error: error2 } = await supabase.from('kunden_notizen').delete().eq('id', notizId)
   if (error2) logDbError('app/actions/kunden:kunden_notizen', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateKundeDetail(kundeId)
-=======
-  revalidatePath(`/kunden/${kundeId}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 

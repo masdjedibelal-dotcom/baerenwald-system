@@ -24,12 +24,6 @@ import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
 import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
-<<<<<<< Updated upstream
-=======
-import { Input } from '@/components/ui/Input'
-import { Modal } from '@/components/ui/Modal'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
@@ -598,25 +592,12 @@ export function HandwerkerDetailClient({
         onClose={() => setPortalModalOpen(false)}
         title="Partner-Link versenden"
         size="lg"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen' }}
         primary={{
           label: 'Senden',
           onClick: () => void sendenPortalLink(),
           busy: portalSending,
         }}
-=======
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn type="button" kind="secondary" onClick={() => setPortalModalOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary" type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
-              Senden
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <div className="space-y-3">
           <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="partner@beispiel.de; weitere@beispiel.de" /></MockField>

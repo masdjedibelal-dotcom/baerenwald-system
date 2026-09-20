@@ -8,10 +8,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import {
   EinstellungenListBody,
   EinstellungenListItem,
@@ -186,25 +182,12 @@ export function ComplianceEinstellungenClient({ initial }: { initial: Compliance
         open={modal}
         onClose={() => setModal(false)}
         title="Neuer Dokument-Typ"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen', onClick: () => setModal(false), kind: 'ghost' }}
         primary={{
           label: 'Speichern',
           onClick: () => create(),
           busy: pending,
         }}
-=======
-        footer={
-          <div className="flex justify-end gap-2">
-            <MockBtn type="button" kind="ghost" onClick={() => setModal(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" loading={pending} onClick={() => create()}>
-              Speichern
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <div className="space-y-3">
           <MockField label="Bezeichnung" required><MockInput required value={bez} onChange={(e) => setBez(e.target.value)} /></MockField>

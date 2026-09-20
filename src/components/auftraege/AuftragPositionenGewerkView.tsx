@@ -15,11 +15,6 @@ import {
 import {
   HandwerkerZuweisungMailModal,
   type HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Select } from '@/components/ui/Select'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { updateAuftragPositionHandwerkerStatus } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import {
@@ -375,13 +370,8 @@ export function AuftragPositionenGewerkView({
                                 disabled={!block.gewerkId || pending}
                                 onClick={() => openPositionModal(block, pos)}
                               >
-<<<<<<< Updated upstream
                                 <MockIcon n="user" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                                 {pos.handwerker_id ? 'Partner bearbeiten' : 'HW zuweisen'}
-=======
-                                <UserPlus className="mr-1 h-3 w-3" aria-hidden />
-                                {pos.handwerker_id ? 'Handwerker bearbeiten' : 'HW zuweisen'}
->>>>>>> Stashed changes
                               </MockBtn>
                               {pos.handwerker_id ? (
                                 <>
@@ -395,20 +385,7 @@ export function AuftragPositionenGewerkView({
                                     <MockIcon n="file-text" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                                     Details
                                   </MockBtn>
-<<<<<<< Updated upstream
                                   <Combobox id={`hw-status-${pos.id}`} name={`hw-status-${pos.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
-=======
-                                  <Select
-                                    name={`hw-status-${pos.id}`}
-                                    value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
-                                    onChange={(e) =>
-                                      changePositionStatus(
-                                        pos.id,
-                                        e.target.value as AuftragHandwerkerZuweisungStatus
-                                      )
-                                    }
-                                    options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
->>>>>>> Stashed changes
                                       value: o.value,
                                       label: o.label }))} value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changePositionStatus(
                                         pos.id,

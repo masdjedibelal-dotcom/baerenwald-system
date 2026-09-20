@@ -4,10 +4,6 @@ import { MockBtn, MockEmpty } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
@@ -93,7 +89,6 @@ export function LeistungDrawer({
     )
   }
 
-<<<<<<< Updated upstream
   const footerPrimary = brauchtFreigabe
     ? {
         label: pruefungPending ? '…' : 'Annehmen',
@@ -109,28 +104,6 @@ export function LeistungDrawer({
         disabled: pruefungPending,
       }
     : null
-=======
-  const footer = brauchtFreigabe ? (
-    <div className="ldr-cta">
-      <MockBtn
-        type="button"
-        kind="secondary"
-        disabled={pruefungPending}
-        onClick={() => onNachtragEntscheiden?.('abgelehnt')}
-      >
-        Ablehnen
-      </MockBtn>
-      <MockBtn
-        type="button"
-        kind="primary"
-        disabled={pruefungPending}
-        onClick={() => onNachtragEntscheiden?.('anerkannt')}
-      >
-        {pruefungPending ? '…' : 'Annehmen'}
-      </MockBtn>
-    </div>
-  ) : undefined
->>>>>>> Stashed changes
 
   return (
     <EditorSheet

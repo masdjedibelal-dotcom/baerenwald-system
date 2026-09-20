@@ -6,12 +6,9 @@
  */
 import { readdirSync, readFileSync, writeFileSync, statSync, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
-<<<<<<< Updated upstream
 import { spawnSync } from 'node:child_process'
 import { findDirectStatusUpdates } from './lib/find-direct-status-updates.mjs'
 import { countRawElementsOutsideAllowlist } from './lib/count-raw-elements.mjs'
-=======
->>>>>>> Stashed changes
 
 const ROOT = process.cwd()
 const SRC = join(ROOT, 'src')
@@ -85,7 +82,6 @@ function hasEslint() {
   )
 }
 
-<<<<<<< Updated upstream
 /** P7-7: Portal tc-08-security + kernjourneys ohne Skip-Ketten. */
 function p77SecurityJourneysOk() {
   const portalRoot = process.env.PORTAL_ROOT || join(ROOT, '..', 'baerenwald')
@@ -102,8 +98,6 @@ function p77SecurityJourneysOk() {
   return tests >= 4 && skips === 0
 }
 
-=======
->>>>>>> Stashed changes
 function hasCi() {
   const d = join(ROOT, '.github/workflows')
   if (!existsSync(d)) return false
@@ -115,7 +109,6 @@ function pkgHas(name) {
   return pkg.includes(`"${name}"`)
 }
 
-<<<<<<< Updated upstream
 /** P5-14: „Handwerker“ als Wort in Anzeigestrings (nicht FooHandwerkerBar / Imports). */
 function countHandwerkerDisplay() {
   let n = 0
@@ -609,16 +602,6 @@ function supabaseWithoutErrorHeuristic() {
       const win = t.slice(start, end)
       if (/\berror\b/.test(win) || /logDbError/.test(win)) continue
       hits++
-=======
-/** Heuristik: .from(...).select/… ohne .error in Nähe — grob, Zähler für Trend */
-function supabaseWithoutErrorHeuristic() {
-  let hits = 0
-  for (const t of texts.values()) {
-    const parts = t.split(/\.from\s*\(/)
-    for (let i = 1; i < parts.length; i++) {
-      const chunk = parts[i].slice(0, 400)
-      if (!/\berror\b/.test(chunk) && !/logDbError/.test(chunk)) hits++
->>>>>>> Stashed changes
     }
   }
   return hits
@@ -634,7 +617,6 @@ const metrics = {
   logDbError_calls: countInSrc(/logDbError\s*\(/g),
   silent_catch: countInSrc(/\.catch\s*\(\s*\(\s*\)\s*=>\s*\{\s*\}\s*\)|\.catch\s*\(\s*\(\s*\)\s*=>\s*(?:null|undefined|\[\])\s*\)/g),
   void_notify: countInSrc(/void\s+notify/gi),
-<<<<<<< Updated upstream
   void_mail_notify_push: countVoidMailNotifyPush(),
   void_outside_allowlist: countVoidOutsideAllowlist(),
   handwerker_display: countHandwerkerDisplay(),
@@ -772,8 +754,6 @@ const metrics = {
   animate_spin_outside_loading: countAnimateSpinOutsideLoading(),
   class_card_outside_mockcard: countClassCardOutsideMockCard(),
   locale_format_outside_helpers: countLocaleFormatOutsideHelpers(),
-=======
->>>>>>> Stashed changes
   modal_import_files: filesMatching(/from ['"]@\/components\/ui\/Modal['"]/),
   mockmodal_import_files: filesMatching(/MockModal/),
   modal_tsx_exists: fileExists('src/components/ui/Modal.tsx'),
@@ -786,7 +766,6 @@ const metrics = {
   raw_input: countInSrc(/<input\b/g),
   raw_select: countInSrc(/<select\b/g),
   raw_textarea: countInSrc(/<textarea\b/g),
-<<<<<<< Updated upstream
   ...(() => {
     const r = countRawElementsOutsideAllowlist(SRC)
     return {
@@ -898,17 +877,6 @@ const metrics = {
     }
     return n
   })(),
-=======
-  status_badge_variants: filesMatching(/AngebotStatusBadge|AuftragStatusBadge|AngebotEinfachStatusBadge/),
-  menu_variants: filesMatching(/ActionsMenu|ListbarActionsMenu|MockEntityRowMenu|MockPopoverMenu/),
-  animate_spin: countInSrc(/animate-spin/g),
-  class_card_token: countInSrc(/className=\{?[`'"][^`'"]*\bcard\b/g),
-  toLocaleDateString: countInSrc(/toLocaleDateString/g),
-  toLocaleString_de: countInSrc(/toLocaleString\(\s*['"]de/g),
-  tw_std_colors: countInSrc(/\b(?:bg|text|border)-(?:red|green|blue|gray|slate|zinc|amber|yellow|emerald|indigo)-\d{2,3}\b/g),
-  hex_in_class: countInSrc(/\[#[0-9a-fA-F]{3,8}\]/g),
-  style_jsx: countInSrc(/style=\{\{/g),
->>>>>>> Stashed changes
   copy_imports: filesMatching(/from ['"]@\/lib\/copy/),
   snake_in_ui_heuristic: countInSrc(/>[a-z]+_[a-z_]+</g),
   files_over_1000: filesOverLines(1000),
@@ -919,7 +887,6 @@ const metrics = {
   audit_status: fileExists('scripts/audit-status.mjs'),
   pattern_katalog: fileExists('docs/PATTERN-KATALOG.md'),
   confirm_popup: fileExists('src/components/ui/ConfirmPopup.tsx'),
-<<<<<<< Updated upstream
   confirm_delete_action_calls: countInSrc(/\bconfirmDelete\b|\bconfirmAction\b/g),
   confirm_helpers_exist:
     fileExists('src/components/ui/confirm-delete.tsx') ||
@@ -969,8 +936,6 @@ const metrics = {
       return -1
     }
   })(),
-=======
->>>>>>> Stashed changes
   mockbtn: filesMatching(/MockBtn/),
   mockfield: filesMatching(/MockField/),
   editorsheet: filesMatching(/EditorSheet/),
@@ -1091,46 +1056,31 @@ const todos = [
   },
   {
     id: 'P2-4',
-<<<<<<< Updated upstream
     title: 'Sync-Skript + Byte-Parität + Resolver',
     check: () =>
       metrics.sync_shared &&
       metrics.shared_domain_byte_ok &&
       metrics.resolver_diff_lines === 0,
     target: `sync --check OK + resolver_diff=0 (ist ${metrics.resolver_diff_lines})`,
-=======
-    title: 'Sync-Skript + Byte-Parität',
-    check: () => metrics.sync_shared,
-    target: 'scripts/sync-shared-domain.mjs',
->>>>>>> Stashed changes
   },
   {
     id: 'P2-5',
     title: 'Status-Writes nur write-*',
-<<<<<<< Updated upstream
     check: () =>
       filesMatching(/write-lead-status|writeLeadStatus|writeAuftragStatus|lib\/status\/write/) > 0 &&
       fileExists('scripts/check-status-writes.mjs') &&
       metrics.status_update_outside_lib === 0,
     target: `direkte .update({ status }) außerhalb lib/status=0 (ist ${metrics.status_update_outside_lib})`,
-=======
-    check: () => filesMatching(/write-lead-status|writeLeadStatus|writeAuftragStatus|lib\/status\/write/) > 0,
-    target: 'write-*-Helfer + Guard 0 direkte Updates',
->>>>>>> Stashed changes
   },
   {
     id: 'P2-6',
     title: 'Vertrags-Tests Status',
-<<<<<<< Updated upstream
     check: () =>
       fileExists('scripts/test-status-contracts.ts') &&
       fileExists('src/lib/status/write-lead-status.ts') &&
       fileExists('src/lib/status/write-angebot-status.ts') &&
       fileExists('src/lib/status/write-auftrag-status.ts') &&
       fileExists('src/lib/status/write-rechnung-status.ts'),
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Tests HV-Freigabe/Partner/Abnahme/RE/Storno',
   },
   {
@@ -1142,7 +1092,6 @@ const todos = [
   {
     id: 'P2-8',
     title: 'Lib-Kopien abgearbeitet',
-<<<<<<< Updated upstream
     check: () => {
       const d = readSafe(join(ROOT, 'docs/P2-8-lib-kopien.md'))
       if (!d) return false
@@ -1150,23 +1099,16 @@ const todos = [
       const openDrift = (d.match(/\|\s*DRIFT\s*\|/gi) || []).length
       return /P2-8/i.test(d) && openDrift === 0
     },
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: '0 offene DRIFT in P2-8-Liste',
   },
   {
     id: 'P3-1',
     title: 'Index-Migration (Staging-Datei)',
-<<<<<<< Updated upstream
     check: () =>
       existsSync(join(ROOT, 'supabase/migrations')) &&
       readdirSync(join(ROOT, 'supabase/migrations')).some((f) =>
         /common_list_indexes|list_indexes/i.test(f)
       ),
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Gezielte Index-Migration nachgewiesen + Staging angewandt (Prod=Belal M5)',
   },
   {
@@ -1178,7 +1120,6 @@ const todos = [
   {
     id: 'P3-3',
     title: 'Vorgangsliste RPC + echte Paginierung',
-<<<<<<< Updated upstream
     check: () => {
       const src = readSafe(join(ROOT, 'src/lib/vorgang/load-vorgaenge-liste.ts'))
       const page = readSafe(join(ROOT, 'src/app/(dashboard)/vorgaenge/page.tsx'))
@@ -1188,26 +1129,17 @@ const todos = [
       const hasPageParam = /seite|pageSize|fetchAllPages/.test(src) && /seite/.test(page)
       return hasRpc && noHard200 && hasPageParam
     },
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'crm_vorgaenge_lead_page ohne Hard-Limit 200',
   },
   {
     id: 'P3-4',
     title: 'revalidatePath gezielt / refresh-Duplikate weg',
-<<<<<<< Updated upstream
     check: () => metrics.revalidatePath < 250 && metrics.router_refresh < 30,
     target: `revalidatePath<250 · router.refresh<30 (ist ${metrics.revalidatePath}/${metrics.router_refresh})`,
-=======
-    check: () => false,
-    target: 'nur betroffene Pfade; doppeltes router.refresh=0',
->>>>>>> Stashed changes
   },
   {
     id: 'P3-5',
     title: 'force-dynamic / unstable_cache Stammdaten',
-<<<<<<< Updated upstream
     check: () => {
       const hasDoc =
         fileExists('docs/P3-5-force-dynamic.md') ||
@@ -1215,10 +1147,6 @@ const todos = [
       return hasDoc && metrics.force_dynamic_off_allowlist === 0
     },
     target: `force-dynamic nur Allowlist-Doc (off=${metrics.force_dynamic_off_allowlist})`,
-=======
-    check: () => false,
-    target: 'Inventur + Cache für Stammdaten',
->>>>>>> Stashed changes
   },
   {
     id: 'P3-6',
@@ -1229,27 +1157,18 @@ const todos = [
   {
     id: 'P3-7',
     title: 'CRM-Sheets Skeleton',
-<<<<<<< Updated upstream
     check: () => {
       const sheet = readSafe(join(ROOT, 'src/components/auftraege/AuftragAbschliessenSheet.tsx'))
       return /SkeletonCard|SkeletonList|SkeletonRow/.test(sheet) && !/Wird geladen…/.test(sheet)
     },
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Skeleton statt Ladetext in Sheets',
   },
   {
     id: 'P4-1',
     title: 'logDbError an allen Reads',
-<<<<<<< Updated upstream
     check: () =>
       metrics.logDbError_calls > 500 && metrics.supabase_no_error_heuristic < 50,
     target: `logDbError flächig (calls=${metrics.logDbError_calls}, no_error≈${metrics.supabase_no_error_heuristic}; Ziel <50 nach Heuristik-Fix bewusst-ignoriert)`,
-=======
-    check: () => metrics.logDbError_calls > 50 && metrics.supabase_no_error_heuristic < 50,
-    target: `logDbError flächig (calls=${metrics.logDbError_calls}, no_error≈${metrics.supabase_no_error_heuristic})`,
->>>>>>> Stashed changes
   },
   {
     id: 'P4-2',
@@ -1260,7 +1179,6 @@ const todos = [
   {
     id: 'P4-3',
     title: 'Mail/Notify → email_log Ergebnis',
-<<<<<<< Updated upstream
     check: () => {
       if (metrics.void_mail_notify_push !== 0) return false
       if (metrics.void_outside_allowlist !== 0) return false
@@ -1282,22 +1200,14 @@ const todos = [
       return mailOk && notifyOk && pushOk && filesMatching(/insertEmailLogRow/) >= 2
     },
     target: `void Mail/Notify/Push=0 · void außerhalb Allowlist=0 (ist ${metrics.void_mail_notify_push}/${metrics.void_outside_allowlist}) + email_log gesendet|fehler`,
-=======
-    check: () => metrics.void_notify === 0 && filesMatching(/safeVoidNotify|insertEmailLogRow/).length >= 2,
-    target: `void_notify=0 + email_log bei Mail-Ergebnis (void=${metrics.void_notify})`,
->>>>>>> Stashed changes
   },
   {
     id: 'P4-4',
     title: 'Error-Boundaries flächig',
-<<<<<<< Updated upstream
     check: () => {
       const errs = walk(join(ROOT, 'src/app')).filter((p) => /\/error\.tsx$/.test(p.replace(/\\/g, '/')))
       return errs.length >= 3 || filesMatching(/ErrorBoundary/).length >= 3
     },
-=======
-    check: () => filesMatching(/error\.tsx|ErrorBoundary/).length >= 3,
->>>>>>> Stashed changes
     target: 'error.tsx / Boundaries an Kernrouten',
   },
   {
@@ -1321,17 +1231,12 @@ const todos = [
   {
     id: 'P5-2',
     title: 'Confirm nur ConfirmPopup (E1)',
-<<<<<<< Updated upstream
     check: () =>
       metrics.confirm_popup &&
       !metrics.confirm_helpers_exist &&
       metrics.confirm_delete_action_calls === 0 &&
       countInSrc(/window\.confirm/g) === 0,
     target: `confirmDelete/confirmAction=0, Helfer weg (ist calls=${metrics.confirm_delete_action_calls})`,
-=======
-    check: () => metrics.confirm_popup && countInSrc(/window\.confirm/g) === 0 && filesMatching(/ConfirmPopup/) >= 5,
-    target: 'confirmDelete/Action → ConfirmPopup; kein window.confirm',
->>>>>>> Stashed changes
   },
   {
     id: 'P5-3',
@@ -1346,30 +1251,20 @@ const todos = [
   {
     id: 'P5-4',
     title: 'Buttons nur MockBtn; Button.tsx weg (E2)',
-<<<<<<< Updated upstream
     check: () =>
       !metrics.button_tsx_exists &&
       metrics.button_import_files === 0 &&
       metrics.raw_button_off_allowlist === 0,
     target: `Button.tsx weg; Imports=0; raw_button außerhalb Allowlist=0 (ist ${metrics.raw_button_off_allowlist}; total=${metrics.raw_button})`,
-=======
-    check: () => !metrics.button_tsx_exists && metrics.button_import_files === 0,
-    target: `Button.tsx gelöscht; ui/Button-Imports=0 (ist ${metrics.button_import_files}; raw_button=${metrics.raw_button})`,
->>>>>>> Stashed changes
   },
   {
     id: 'P5-5',
     title: 'Felder nur MockField (E3)',
-<<<<<<< Updated upstream
     check: () =>
       !metrics.field_alias_exists &&
       !metrics.input_tsx_exists &&
       metrics.raw_field_off_allowlist === 0,
     target: `Field-Alias weg; raw input/select/textarea außerhalb Allowlist=0 (ist ${metrics.raw_field_off_allowlist})`,
-=======
-    check: () => !metrics.field_alias_exists && !metrics.input_tsx_exists,
-    target: 'Field-Alias + Input/Textarea/Select-Label-Komponenten entfernt',
->>>>>>> Stashed changes
   },
   {
     id: 'P5-6',
@@ -1380,7 +1275,6 @@ const todos = [
   {
     id: 'P5-7',
     title: 'Nur MockEntityRowMenu',
-<<<<<<< Updated upstream
     check: () => filesMatching(/MockEntityRowMenu/) > 0 && metrics.old_menus === 0,
     target: `alte Menüs=0 (ist ${metrics.old_menus})`,
   },
@@ -1414,47 +1308,29 @@ const todos = [
       metrics.detail_rahmen === 1 &&
       metrics.freie_leertexte === 0,
     target: `raw_table_off_allowlist=0 filter_varianten=0 card_class=0 detail_rahmen=1 freie_leertexte=0 (ist ${metrics.raw_table_off_allowlist}/${metrics.filter_varianten}/${metrics.card_class}/${metrics.detail_rahmen}/${metrics.freie_leertexte})`,
-=======
-    check: () => filesMatching(/MockEntityRowMenu/).length > 0 && filesMatching(/ActionsMenu/).length === 0,
-    target: 'ActionsMenu/Listbar → MockEntityRowMenu oder begründet intern',
->>>>>>> Stashed changes
   },
   {
     id: 'P5-8',
     title: 'Laden/Leer Crm* + MockEmpty; EmptyState weg',
-<<<<<<< Updated upstream
     check: () =>
       !fileExists('src/components/ui/EmptyState.tsx') &&
       !fileExists('src/components/layout/EmptyState.tsx') &&
       metrics.animate_spin_outside_loading === 0,
     target: `animate-spin außerhalb Lade-Komponente=0 (ist ${metrics.animate_spin_outside_loading})`,
-=======
-    check: () => !fileExists('src/components/ui/EmptyState.tsx') && !fileExists('src/components/layout/EmptyState.tsx'),
-    target: 'EmptyState gelöscht',
->>>>>>> Stashed changes
   },
   {
     id: 'P5-9',
     title: 'Klasse card → MockCard',
-<<<<<<< Updated upstream
     check: () => metrics.class_card_outside_mockcard === 0,
     target: `class card außerhalb MockCard=0 (ist ${metrics.class_card_outside_mockcard})`,
-=======
-    check: () => metrics.class_card_token < 5,
-    target: `class card ≈0 (ist ${metrics.class_card_token})`,
->>>>>>> Stashed changes
   },
   {
     id: 'P5-10',
     title: 'Detail-Layout-Standard (Baseline)',
     baseline: true,
-<<<<<<< Updated upstream
     check: () =>
       fileExists('src/components/layout/EntityDetailLayout.tsx') ||
       fileExists('src/components/mock-ui/MockDetailShell.tsx'),
-=======
-    check: () => fileExists('src/components/mock-ui/DetailShell.tsx') || fileExists('src/components/mock-ui/MockDetailShell.tsx'),
->>>>>>> Stashed changes
   },
   {
     id: 'P5-11',
@@ -1465,14 +1341,9 @@ const todos = [
   {
     id: 'P5-12',
     title: 'Datum/Geld eine Format-API',
-<<<<<<< Updated upstream
     check: () =>
       metrics.toLocaleDateString === 0 && metrics.locale_format_outside_helpers === 0,
     target: `toLocaleString('de)/Intl.NumberFormat außerhalb Format=0 (ist ${metrics.locale_format_outside_helpers}); toLocaleDateString=0`,
-=======
-    check: () => metrics.toLocaleDateString === 0,
-    target: `toLocaleDateString=0 (ist ${metrics.toLocaleDateString}); Euro 2 NK`,
->>>>>>> Stashed changes
   },
   {
     id: 'P5-13',
@@ -1481,7 +1352,6 @@ const todos = [
     target: `tw_std=0 hex_class=0 (ist ${metrics.tw_std_colors}/${metrics.hex_in_class})`,
   },
   {
-<<<<<<< Updated upstream
     id: 'P5-19',
     title: 'Schriftskala/Rundung/Icons/Farben Token-Konsolidierung',
     check: () =>
@@ -1554,27 +1424,16 @@ const todos = [
       const hasBefund = fileExists('docs/mobile-audit/BEFUNDLISTE.md')
       return `touch_zu_klein=0 horizontal_scroll=0 (ist ${m.touch_zu_klein ?? '?'}/${m.horizontal_scroll ?? '?'})${hasBefund ? ' · Phase-A-Befund ok' : ''} · npm run audit:mobile`
     })(),
-=======
-    id: 'P5-14',
-    title: 'Copy-Quelle lib/copy (E5/E6)',
-    check: () => metrics.copy_imports > 0 && fileExists('src/lib/copy'),
-    target: 'copy-Importe >0; keine snake_case-Anzeige',
->>>>>>> Stashed changes
   },
   {
     id: 'P5-15',
     title: 'Screen-Contracts',
-<<<<<<< Updated upstream
     check: () => fileExists('docs/SCREEN-CONTRACTS.md'),
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Screen-Contracts dokumentiert+eingehalten',
   },
   {
     id: 'P5-E8a',
     title: 'Demo-Banner nur Einstellungen',
-<<<<<<< Updated upstream
     check: () => {
       const shell = readSafe(join(ROOT, 'src/components/layout/DashboardShell.tsx'))
       const settings = readSafe(
@@ -1586,9 +1445,6 @@ const todos = [
         metrics.demo_banner_settings === 1
       )
     },
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Banner „Transaktionsdaten leeren“ nur Einstellungen',
   },
   {
@@ -1600,13 +1456,8 @@ const todos = [
   {
     id: 'P7-5',
     title: 'ESLint ignoreDuringBuilds false',
-<<<<<<< Updated upstream
     check: () => metrics.eslint && metrics.ignore_during_builds_false,
     target: 'ESLint aktiv + ignoreDuringBuilds: false',
-=======
-    check: () => metrics.eslint,
-    target: 'ESLint aktiv',
->>>>>>> Stashed changes
   },
   {
     id: 'P7-6',
@@ -1617,11 +1468,7 @@ const todos = [
   {
     id: 'P7-7',
     title: 'Security-/Kernjourney-Tests',
-<<<<<<< Updated upstream
     check: () => p77SecurityJourneysOk(),
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'tc-08 + Kernjourneys ohne Skip-Ketten',
   },
   {
@@ -1645,11 +1492,7 @@ const todos = [
   {
     id: 'P7-1',
     title: 'Baseline-Migration vorbereitet',
-<<<<<<< Updated upstream
     check: () => fileExists('docs/BASELINE-MIGRATION.md'),
-=======
-    check: () => false,
->>>>>>> Stashed changes
     target: 'Datei+Anleitung, nicht anwenden',
   },
   {

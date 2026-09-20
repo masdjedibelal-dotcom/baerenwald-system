@@ -21,13 +21,8 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
     const sp = (await searchParams) ?? {}
     const page = Math.max(1, Number.parseInt(String(sp.seite ?? '1'), 10) || 1)
     const supabase = createClient()
-<<<<<<< Updated upstream
     const [{ rows, error, pagination }, hw] = await Promise.all([
       loadVorgaengeListe({ page, pageSize: 50, fetchAllPages: false }),
-=======
-    const [{ rows, error, listeTruncated }, hw] = await Promise.all([
-      loadVorgaengeListe(),
->>>>>>> Stashed changes
       loadHwEingangsrechnungen(supabase),
     ])
 
@@ -52,11 +47,7 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
         <VorgaengeListeClient
           rows={rows}
           hwEingangsrechnungen={hw.rows}
-<<<<<<< Updated upstream
           serverPagination={pagination ?? null}
-=======
-          listeTruncated={listeTruncated ?? null}
->>>>>>> Stashed changes
         />
       </Suspense>
     )

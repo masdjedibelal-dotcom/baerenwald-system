@@ -5,10 +5,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useState } from 'react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { finalizeRahmenVertrag } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
@@ -156,26 +152,10 @@ export function RahmenvertragWizard({
               PDF öffnen
             </a>
             <MockBtn kind="secondary" onClick={onClose}>
-<<<<<<< Updated upstream
               Abbrechen
             </MockBtn>
           </div>
         ) : null}
-=======
-              Schließen
-            </MockBtn>
-          </div>
-        ) : (
-          <MockBtn
-            type="button"
-            kind="primary"
-            loading={saving}
-            onClick={() => void handlePdfErzeugen()}
-          >
-            PDF erzeugen
-          </MockBtn>
-        )}
->>>>>>> Stashed changes
       </section>
     </DocumentCanvas>
   )

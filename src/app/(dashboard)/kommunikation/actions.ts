@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateAuftragFinanzen, revalidateEinstellungenPath, revalidateKundeDetail, revalidateLeadDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'

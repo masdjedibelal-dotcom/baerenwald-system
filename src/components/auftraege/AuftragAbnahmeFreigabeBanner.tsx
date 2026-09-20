@@ -6,11 +6,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   ablehnenAbnahmeprotokoll,

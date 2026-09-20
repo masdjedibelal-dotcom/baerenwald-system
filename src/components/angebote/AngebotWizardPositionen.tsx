@@ -8,10 +8,6 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { PosAddRow } from '@/components/posboard/PosAddRow'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'

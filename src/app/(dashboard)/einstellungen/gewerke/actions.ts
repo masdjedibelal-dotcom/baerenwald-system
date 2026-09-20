@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateEinstellungenPath, revalidatePreislistenList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { revalidateWizardContext } from '@/lib/wizard-context'
 import {
@@ -115,13 +110,8 @@ export async function deleteGewerkIfEmpty(
   const { error: error2 } = await supabase.from('gewerke').delete().eq('id', id)
   if (error2) logDbError('app/einstellungen/gewerke/actions:gewerke', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateEinstellungenPath('/einstellungen/gewerke')
   revalidatePreislistenList()
   revalidateWizardContext()
-=======
-  revalidatePath('/einstellungen/gewerke')
-  revalidatePath('/preislisten')
->>>>>>> Stashed changes
   return { ok: true }
 }

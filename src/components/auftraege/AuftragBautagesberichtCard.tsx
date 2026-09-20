@@ -7,13 +7,7 @@ import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useEffect, useMemo, useRef, useState } from 'react'
-<<<<<<< Updated upstream
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-=======
-import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { TimeInput } from '@/components/ui/TimeInput'
@@ -83,7 +77,6 @@ function StringListEditor({
                 const next = [...items]
                 next[i] = e.target.value
                 onChange(next)
-<<<<<<< Updated upstream
               }} placeholder={placeholder} />
             <MockBtn
               type="button"
@@ -92,18 +85,6 @@ function StringListEditor({
               onClick={() => onChange(items.filter((_, j) => j !== i))}
             >
               <MockIcon n="x" ctx="default" className="h-4 w-4" />
-=======
-              }}
-              placeholder={placeholder}
-            />
-            <MockBtn
-              type="button"
-              kind="ghost" sm
-              aria-label="Zeile entfernen"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
-            >
-              <X className="h-4 w-4" />
->>>>>>> Stashed changes
             </MockBtn>
           </div>
         ))}
@@ -325,11 +306,7 @@ export function AuftragBautagesberichtCard({
                     PDF
                   </a>
                   <MockBtn type="button" kind="ghost" sm onClick={() => startEdit(b)}>
-<<<<<<< Updated upstream
                     <MockIcon n="pencil" ctx="default" className="h-3.5 w-3.5" />
-=======
-                    <Pencil className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
                   </MockBtn>
                   <MockBtn
                     type="button"
@@ -337,11 +314,7 @@ export function AuftragBautagesberichtCard({
                     onClick={() => removeBericht(b.id)}
                     disabled={pending}
                   >
-<<<<<<< Updated upstream
                     <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5 text-status-cancel-text" />
-=======
-                    <Trash2 className="h-3.5 w-3.5 text-status-cancel-text" />
->>>>>>> Stashed changes
                   </MockBtn>
                 </div>
                 {open ? (
@@ -504,12 +477,7 @@ export function AuftragBautagesberichtCard({
                       const fotos = [...form.fotos]
                       fotos[i] = { ...fotos[i], caption: e.target.value }
                       setForm((prev) => ({ ...prev, fotos }))
-<<<<<<< Updated upstream
                     }} />
-=======
-                    }}
-                  />
->>>>>>> Stashed changes
                   <MockBtn
                     type="button"
                     kind="ghost" sm
@@ -520,11 +488,7 @@ export function AuftragBautagesberichtCard({
                       }))
                     }
                   >
-<<<<<<< Updated upstream
                     Löschen
-=======
-                    Entfernen
->>>>>>> Stashed changes
                   </MockBtn>
                 </div>
               ))}
@@ -556,26 +520,3 @@ export function AuftragBautagesberichtCard({
     </div>
   )
 }
-<<<<<<< Updated upstream
-=======
-
-function BautagesberichtFormFooter({
-  pending,
-  onSave,
-}: {
-  pending: boolean
-  onSave: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn type="button" kind="primary" loading={pending} onClick={onSave}>
-        Speichern
-      </MockBtn>
-    </div>
-  )
-}
->>>>>>> Stashed changes

@@ -3,11 +3,6 @@ import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useRouter } from 'next/navigation'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import type { VerlaufInspectTarget } from '@/lib/crm/verlauf'
 import { formatDatumZeit } from '@/lib/utils'
 
@@ -38,7 +33,6 @@ export function VerlaufEreignisModal({
       onClose={onClose}
       title={target.title}
       size="md"
-<<<<<<< Updated upstream
       secondary={{ label: 'Schließen', onClick: onClose }}
       primary={
         target.href
@@ -50,26 +44,6 @@ export function VerlaufEreignisModal({
               },
             }
           : null
-=======
-      footer={
-        <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          <MockBtn type="button" kind="secondary" onClick={onClose}>
-            Schließen
-          </MockBtn>
-          {target.href ? (
-            <MockBtn
-              type="button"
-              kind="primary"
-              onClick={() => {
-                onClose()
-                router.push(target.href!)
-              }}
-            >
-              {target.hrefLabel ?? 'Öffnen'}
-            </MockBtn>
-          ) : null}
-        </div>
->>>>>>> Stashed changes
       }
     >
       <dl className="grid gap-2 text-sm sm:grid-cols-[120px_1fr]">

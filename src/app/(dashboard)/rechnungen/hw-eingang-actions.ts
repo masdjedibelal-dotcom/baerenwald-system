@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { planRechnungStatusWrite } from '@/lib/status/write-rechnung-status'
@@ -91,11 +86,7 @@ export async function setHwEingangsrechnungStatus(
     .limit(1)
     .maybeSingle()
   if (error4) logDbError('app/rechnungen/hw-eingang-actions:auftraege', error4)
-<<<<<<< Updated upstream
   if (auf?.id) revalidateAuftragDetail(auf.id)
-=======
-  if (auf?.id) revalidatePath(`/auftraege/${auf.id}`)
->>>>>>> Stashed changes
 
   return { ok: true }
 }

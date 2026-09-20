@@ -13,12 +13,8 @@ import {
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { MockBtn } from '@/components/mock-ui'
-<<<<<<< Updated upstream
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-=======
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
@@ -810,12 +806,6 @@ export function AbnahmeprotokollCreateWizard({
           <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
           {uploading ? 'Lädt…' : 'Fotos hinzufügen'}
         </MockBtn>
-<<<<<<< Updated upstream
-=======
-        <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-          Max. 8 Fotos · erscheinen im PDF unter „Vor-Ort“
-        </p>
->>>>>>> Stashed changes
         {meta.uebergabe_foto_urls.length > 0 ? (
           <div className="mt-3 space-y-3">
             {meta.uebergabe_foto_urls.map((url, i) => (

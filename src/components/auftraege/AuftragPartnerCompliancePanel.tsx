@@ -9,11 +9,6 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
-<<<<<<< Updated upstream
-=======
-import { confirmDelete } from '@/components/ui/confirm-delete'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import type { AuftragCompliancePartner } from '@/lib/auftraege/auftrag-compliance-partners'
 import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import {
@@ -584,7 +579,6 @@ export function AuftragPartnerCompliancePanel({
                             </MockBtn>
                           </>
                         ) : null}
-<<<<<<< Updated upstream
                         <MockBtn className="icon-btn text-status-cancel-text" type="button" disabled={busy} title="Löschen" onClick={() => removeDoc(doc.id, titel)}>
                           <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                         </MockBtn>
@@ -595,82 +589,6 @@ export function AuftragPartnerCompliancePanel({
               })}
             </tbody>
           </MockTable>
-=======
-                        {doc.status === 'abgelehnt' && doc.ablehnung_grund ? (
-                          <span className="mt-0.5 block text-[length:var(--fs-meta)] text-status-cancel-text">
-                            {doc.ablehnung_grund}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          className="input py-1 text-[length:var(--fs-meta)] w-[9rem]"
-                          defaultValue={doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''}
-                          key={`${doc.id}-${doc.gueltig_bis ?? ''}`}
-                          disabled={busy}
-                          onBlur={(e) => {
-                            const v = e.target.value
-                            const cur = doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''
-                            if (v !== cur) saveGueltigBis(doc.id, v)
-                          }}
-                        />
-                      </td>
-                      <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
-                        {doc.hochgeladen_am ? formatDatum(doc.hochgeladen_am) : '—'}
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap justify-end gap-1">
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-bw-border"
-                            disabled={busy}
-                            title="Dokument ansehen"
-                            onClick={() => void openDatei(doc.datei_url)}
-                          >
-                            <FileText className="h-3.5 w-3.5" aria-hidden />
-                          </button>
-                          {needsOk ? (
-                            <>
-                              <MockBtn
-                                type="button"
-                                kind="primary" sm
-                                className="h-8 gap-1 px-2 text-[length:var(--fs-meta)]"
-                                disabled={busy}
-                                onClick={() => freigeben(doc.id)}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-                                Bestätigen
-                              </MockBtn>
-                              <MockBtn
-                                type="button"
-                                kind="ghost" sm
-                                className="h-8 text-[length:var(--fs-meta)] text-status-cancel-text"
-                                disabled={busy}
-                                onClick={() => ablehnen(doc.id, titel)}
-                              >
-                                Ablehnen
-                              </MockBtn>
-                            </>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="icon-btn text-status-cancel-text"
-                            disabled={busy}
-                            title="Löschen"
-                            onClick={() => removeDoc(doc.id, titel)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
->>>>>>> Stashed changes
         )}
       </section>
     </div>

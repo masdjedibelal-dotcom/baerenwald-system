@@ -10,11 +10,6 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Combobox } from '@/components/ui/Combobox'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-<<<<<<< Updated upstream
-=======
-import { Select } from '@/components/ui/Select'
-import { Plus } from 'lucide-react'
->>>>>>> Stashed changes
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
   deleteKundenObjekt,
@@ -335,11 +330,7 @@ export function KundenObjekteCard({
         <Combobox label="Objekt für dieses Angebot" id="kunde_objekt" name="kunde_objekt" options={selectOptions} value={selectedId ?? '' == null ? '' : String(selectedId ?? '')} placeholder="Auswählen…" onChange={(next) => { onSelect?.(next.trim() || null); }} />
       </div>
       <MockBtn type="button" kind="primary" sm className="shrink-0 gap-1.5" onClick={openNeu}>
-<<<<<<< Updated upstream
         <MockIcon n="plus" ctx="default" className="h-4 w-4" aria-hidden />
-=======
-        <Plus className="h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
         Objekt hinzufügen
       </MockBtn>
     </div>

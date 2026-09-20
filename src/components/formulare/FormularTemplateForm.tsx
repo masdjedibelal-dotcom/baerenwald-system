@@ -30,24 +30,6 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-<<<<<<< Updated upstream
-=======
-import {
-  AlignLeft,
-  Calendar,
-  Camera,
-  CheckSquare,
-  GripVertical,
-  Hash,
-  List,
-  Monitor,
-  Pencil,
-  Smartphone,
-  Trash2,
-  Type,
-} from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'

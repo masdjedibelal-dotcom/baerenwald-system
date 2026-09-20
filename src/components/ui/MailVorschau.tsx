@@ -4,13 +4,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useEffect, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Send, Paperclip} from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { cn } from '@/lib/utils'
 
 export interface MailVorschauProps {
@@ -60,26 +53,12 @@ export function MailVorschau({
       onClose={onClose}
       title="E-Mail Vorschau"
       size="lg"
-<<<<<<< Updated upstream
       secondary={{ label: 'Abbrechen', onClick: onClose }}
       primary={{
         label: loading ? 'Wird gesendet…' : 'Jetzt senden',
         onClick: () => void handleSend(),
         busy: loading,
       }}
-=======
-      footer={
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <MockBtn type="button" kind="secondary" onClick={onClose}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn type="button" kind="primary" loading={loading} onClick={() => void handleSend()}>
-            <Send className="mr-2 h-4 w-4" aria-hidden />
-            {loading ? 'Wird gesendet…' : 'Jetzt senden'}
-          </MockBtn>
-        </div>
-      }
->>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <div>

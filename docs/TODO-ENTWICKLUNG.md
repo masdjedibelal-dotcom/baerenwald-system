@@ -11,7 +11,6 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 
 | Kennzahl | Ist |
 |----------|-----|
-<<<<<<< Updated upstream
 | `withCrmReadFallback_files` | 0 |
 | `revalidatePath` | 25 |
 | `router_refresh` | 11 |
@@ -60,49 +59,11 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 | `files_over_1000` | 29 |
 | `eslint` | true |
 | `ci` | true |
-=======
-| `withCrmReadFallback_files` | 25 |
-| `revalidatePath` | 600 |
-| `router_refresh` | 126 |
-| `force_dynamic` | 36 |
-| `css_kb` | 575 |
-| `supabase_no_error_heuristic` | 695 |
-| `logDbError_calls` | 1239 |
-| `silent_catch` | 0 |
-| `void_notify` | 0 |
-| `modal_import_files` | 38 |
-| `mockmodal_import_files` | 26 |
-| `modal_tsx_exists` | true |
-| `mockmodal_tsx_exists` | true |
-| `button_import_files` | 0 |
-| `button_tsx_exists` | false |
-| `field_alias_exists` | false |
-| `input_tsx_exists` | true |
-| `raw_button` | 566 |
-| `raw_input` | 378 |
-| `raw_select` | 98 |
-| `raw_textarea` | 24 |
-| `status_badge_variants` | 8 |
-| `menu_variants` | 36 |
-| `animate_spin` | 17 |
-| `class_card_token` | 162 |
-| `toLocaleDateString` | 48 |
-| `toLocaleString_de` | 130 |
-| `tw_std_colors` | 347 |
-| `hex_in_class` | 173 |
-| `style_jsx` | 637 |
-| `copy_imports` | 0 |
-| `snake_in_ui_heuristic` | 5 |
-| `files_over_1000` | 29 |
-| `eslint` | false |
-| `ci` | false |
->>>>>>> Stashed changes
 | `sentry_pkg` | true |
 | `gitignore` | true |
 | `audit_status` | true |
 | `pattern_katalog` | false |
 | `confirm_popup` | true |
-<<<<<<< Updated upstream
 | `confirm_delete_action_calls` | 0 |
 | `confirm_helpers_exist` | false |
 | `ignore_during_builds_false` | true |
@@ -114,14 +75,6 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 | `verlauf_panel` | 2 |
 | `status_vokabular` | true |
 | `sync_shared` | true |
-=======
-| `mockbtn` | 166 |
-| `mockfield` | 27 |
-| `editorsheet` | 91 |
-| `verlauf_panel` | 2 |
-| `status_vokabular` | false |
-| `sync_shared` | false |
->>>>>>> Stashed changes
 | `demo_banner_settings` | 1 |
 
 ## To-dos
@@ -134,7 +87,6 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 | P0-4 | erledigt | Guards / kritische Dateien | Baseline Belal |
 | P0-5 | erledigt | .env.example / Secrets-Doku | Baseline Belal |
 | P0-6 | offen | Branch-Schutz (Belal M3) | Belal: GitHub Branch-Schutz staging→main |
-<<<<<<< Updated upstream
 | P1-1 | erledigt | Perf-Baseline Staging | docs/perf-baseline.md mit Messwerten |
 | P1-2 | offen | Netlify-Region = Prod-Supabase (Belal M1) | Belal: Region eu-west-1 (Prod) |
 | P1-3 | erledigt | Sentry-Code (@sentry/nextjs, ohne DSN inaktiv) | @sentry/nextjs installiert + Instrumentation |
@@ -190,74 +142,13 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 | P7-10 | offen | Dateien >1000 Zeilen teilen | files>1000 <5 (ist 29) |
 | P7-11 | erledigt | Doku archiviert | docs/archiv + Leitdokumente |
 | P7-1 | erledigt | Baseline-Migration vorbereitet | Datei+Anleitung, nicht anwenden |
-=======
-| P1-1 | offen | Perf-Baseline Staging | docs/perf-baseline.md mit Messwerten |
-| P1-2 | offen | Netlify-Region = Prod-Supabase (Belal M1) | Belal: Region eu-west-1 (Prod) |
-| P1-3 | erledigt | Sentry-Code (@sentry/nextjs, ohne DSN inaktiv) | @sentry/nextjs installiert + Instrumentation |
-| P1-4 | offen | Next 15 (Belal M6) | next@15 (Belal-Abnahme) |
-| P1-5 | offen | Service-Role Gates | scripts/check-service-role-gate.mjs + 0 Verstöße |
-| P1-6 | erledigt | Import-/Critical-Guards | Baseline Belal |
-| P1-7 | erledigt | Mock-Primitives-Guard | Baseline Belal |
-| P2-1 | offen | Resolver-Abgleich dokumentiert | Abweichungstabelle ohne Logik-Änderung |
-| P2-2 | offen | status-vokabular vollständig | src/lib/.../status-vokabular.ts |
-| P2-3 | erledigt | Shared-Domain-Weg = E4 Hybrid | docs/P2-3-shared-domain.md = E4 freigegeben |
-| P2-4 | offen | Sync-Skript + Byte-Parität | scripts/sync-shared-domain.mjs |
-| P2-5 | offen | Status-Writes nur write-* | write-*-Helfer + Guard 0 direkte Updates |
-| P2-6 | offen | Vertrags-Tests Status | Tests HV-Freigabe/Partner/Abnahme/RE/Storno |
-| P2-7 | offen | Mail/Notify Sync oder markiert | Inventur + Sync oder app-spezifisch |
-| P2-8 | offen | Lib-Kopien abgearbeitet | 0 offene DRIFT in P2-8-Liste |
-| P3-1 | offen | Index-Migration (Staging-Datei) | Gezielte Index-Migration nachgewiesen + Staging angewandt (Prod=Belal M5) |
-| P3-2 | offen | RLS-Rekursion weg + withCrmReadFallback=0 | withCrmReadFallback_files=0 (ist 25) |
-| P3-3 | offen | Vorgangsliste RPC + echte Paginierung | crm_vorgaenge_lead_page ohne Hard-Limit 200 |
-| P3-4 | offen | revalidatePath gezielt / refresh-Duplikate weg | nur betroffene Pfade; doppeltes router.refresh=0 |
-| P3-5 | offen | force-dynamic / unstable_cache Stammdaten | Inventur + Cache für Stammdaten |
-| P3-6 | offen | CSS < 150 KB | css_kb<150 (ist 575) |
-| P3-7 | offen | CRM-Sheets Skeleton | Skeleton statt Ladetext in Sheets |
-| P4-1 | offen | logDbError an allen Reads | logDbError flächig (calls=1239, no_error≈695) |
-| P4-2 | erledigt | Stille catches geloggt | silent_catch=0 (ist 0) |
-| P4-3 | offen | Mail/Notify → email_log Ergebnis | void_notify=0 + email_log bei Mail-Ergebnis (void=0) |
-| P4-4 | offen | Error-Boundaries flächig | error.tsx / Boundaries an Kernrouten |
-| P4-5 | erledigt | Vorgangsliste Limit-Hinweis | Hinweis „X von Y Vorgängen angezeigt“ |
-| P4-6 | offen | Geld ??0 / null-sicher | null-sichere Beträge in UI |
-| P5-1 | erledigt | Pattern-Katalog Entscheidungen | Baseline Belal |
-| P5-2 | offen | Confirm nur ConfirmPopup (E1) | confirmDelete/Action → ConfirmPopup; kein window.confirm |
-| P5-3 | offen | Overlays nur EditorSheet; Modal/MockModal gelöscht | Modal/MockModal Dateien=0 Imports=0 (modal_files=38, mock=26) |
-| P5-4 | erledigt | Buttons nur MockBtn; Button.tsx weg (E2) | Button.tsx gelöscht; ui/Button-Imports=0 (ist 0; raw_button=566) |
-| P5-5 | offen | Felder nur MockField (E3) | Field-Alias + Input/Textarea/Select-Label-Komponenten entfernt |
-| P5-6 | offen | Nur StatusBadge | Sonderbadges=0 (ist 8) |
-| P5-7 | offen | Nur MockEntityRowMenu | ActionsMenu/Listbar → MockEntityRowMenu oder begründet intern |
-| P5-8 | offen | Laden/Leer Crm* + MockEmpty; EmptyState weg | EmptyState gelöscht |
-| P5-9 | offen | Klasse card → MockCard | class card ≈0 (ist 162) |
-| P5-10 | erledigt | Detail-Layout-Standard (Baseline) | Baseline Belal |
-| P5-11 | offen | Timeline nur VerlaufPanel | VerlaufPanel kanonisch; Legacy-timeline weg |
-| P5-12 | offen | Datum/Geld eine Format-API | toLocaleDateString=0 (ist 48); Euro 2 NK |
-| P5-13 | offen | Farben nur Tokens | tw_std=0 hex_class=0 (ist 347/173) |
-| P5-14 | offen | Copy-Quelle lib/copy (E5/E6) | copy-Importe >0; keine snake_case-Anzeige |
-| P5-15 | offen | Screen-Contracts | Screen-Contracts dokumentiert+eingehalten |
-| P5-E8a | offen | Demo-Banner nur Einstellungen | Banner „Transaktionsdaten leeren“ nur Einstellungen |
-| P7-4 | offen | Generated types Staging | supabase gen types (Staging) |
-| P7-5 | offen | ESLint ignoreDuringBuilds false | ESLint aktiv |
-| P7-6 | offen | CI auf staging | .github/workflows Build+Guards+audit-status |
-| P7-7 | offen | Security-/Kernjourney-Tests | tc-08 + Kernjourneys ohne Skip-Ketten |
-| P7-9 | offen | knip + remove-deploy-blockers obsolet | remove-deploy-blockers.mjs entfernt |
-| P7-10 | offen | Dateien >1000 Zeilen teilen | files>1000 <5 (ist 29) |
-| P7-11 | offen | Doku archiviert | docs/archiv + Leitdokumente |
-| P7-1 | offen | Baseline-Migration vorbereitet | Datei+Anleitung, nicht anwenden |
->>>>>>> Stashed changes
 | META-gitignore | erledigt | .gitignore vorhanden | .gitignore Root |
 | META-audit-status | erledigt | audit-status.mjs | scripts/audit-status.mjs |
 
 ## Summe
 
-<<<<<<< Updated upstream
 - erledigt: **55**
 - teilweise: **0**
 - offen: **8**
 - total: **63**
-=======
-- erledigt: **16**
-- teilweise: **0**
-- offen: **44**
-- total: **60**
->>>>>>> Stashed changes
 

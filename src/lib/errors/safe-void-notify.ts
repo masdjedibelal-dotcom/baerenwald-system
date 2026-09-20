@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 /**
  * P4-3: Fire-and-forget Mail/Notify/Push — Fehler nicht still schlucken.
  * Server-Pfad: optional Ergebnis → email_log (gesendet|fehler).
@@ -76,16 +75,4 @@ export function safeVoidNotify(
           .catch((e) => logDbError(`voidNotify:email_log-fail:${label}`, e))
       }
     })
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-
-/**
- * P4-3 Vorarbeit: Fire-and-forget Notifies nicht still schlucken.
- * Volle email_log-Ergebnisbindung bleibt P4-3 (Restarbeit).
- */
-export function safeVoidNotify(label: string, promise: Promise<unknown>): void {
-  void promise.catch((err) => {
-    logDbError(`voidNotify:${label}`, err)
-  })
->>>>>>> Stashed changes
 }

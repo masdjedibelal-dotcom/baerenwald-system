@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAngebotNeu, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
@@ -1214,12 +1209,7 @@ export async function saveLeadFunnelPositionen(
   if (error2) logDbError('app/anfragen/actions:leads', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateLeadDetail(leadId)
-=======
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -1250,12 +1240,7 @@ export async function saveLeadProjektWasZeilen(
   if (error2) logDbError('app/anfragen/actions:leads', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateLeadDetail(leadId)
-=======
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -1492,11 +1477,7 @@ export async function deleteLeadNotizRow(
   const { error: error2 } = await supabase.from('lead_notizen').delete().eq('id', deleteId).eq('lead_id', leadId)
   if (error2) logDbError('app/anfragen/actions:lead_notizen', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateLeadDetail(leadId)
-=======
-  revalidatePath(`/anfragen/${leadId}`)
->>>>>>> Stashed changes
   return { ok: true }
 }
 

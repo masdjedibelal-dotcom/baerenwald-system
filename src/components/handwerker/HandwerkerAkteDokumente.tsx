@@ -5,11 +5,6 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-<<<<<<< Updated upstream
-=======
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
   DokumenteVorgangAccordions,

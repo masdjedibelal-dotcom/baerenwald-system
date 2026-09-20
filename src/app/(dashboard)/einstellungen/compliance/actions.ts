@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragList, revalidateEinstellungenPath, revalidateHandwerkerList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { toSlug } from '@/lib/utils'
 
@@ -121,11 +116,7 @@ export async function createComplianceTyp(input: {
     })
     if (error2) logDbError('app/einstellungen/compliance/actions:compliance_dokument_typen', error2)
     if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
     revalidateEinstellungenPath('/einstellungen/compliance')
-=======
-    revalidatePath('/einstellungen/compliance')
->>>>>>> Stashed changes
     return { ok: true }
   }
   return { ok: false, message: 'Kein freier Slug' }

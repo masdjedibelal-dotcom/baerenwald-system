@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateVorgaengeListe } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'

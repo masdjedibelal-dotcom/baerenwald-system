@@ -2,11 +2,6 @@
 import { MockBtn } from '@/components/mock-ui'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 
 export function VertragNachtragPickerModal({

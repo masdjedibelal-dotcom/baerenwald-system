@@ -1,14 +1,8 @@
 'use client'
 
-<<<<<<< Updated upstream
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-=======
-import { Plus, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import type { NachtragPositionDraft } from '@/lib/vertraege/types'
 
 function neuePosition(gewerkName: string): NachtragPositionDraft {
@@ -86,11 +80,7 @@ export function NachtragPositionenEditor({
       )}
 
       <MockBtn type="button" kind="secondary" sm className="gap-1.5" onClick={add}>
-<<<<<<< Updated upstream
         <MockIcon n="plus" ctx="default" className="h-4 w-4" aria-hidden />
-=======
-        <Plus className="h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
         Position hinzufügen
       </MockBtn>
     </div>

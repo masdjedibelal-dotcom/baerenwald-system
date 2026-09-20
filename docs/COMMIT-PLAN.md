@@ -4,7 +4,6 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
-<<<<<<< Updated upstream
 ## O1–O6 — Freigaben 2026-09-20
 
 **Commit-Text CRM:** `O1–O6: ConfirmPopup, P4-1 <50, PDF-Service, P5-7 Kanon`  
@@ -793,8 +792,6 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 
 ---
 
-=======
->>>>>>> Stashed changes
 ## Block 1 – Messbarkeit
 
 **Commit-Text (CRM):** `Audit Block 1: audit-status, TODO-Status, E4-Doc, Blocker M1–M8, gitignore`
@@ -844,16 +841,11 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 - `src/lib/errors/log-db-error.ts` (mit optionalem Sentry)
 
 **Build:** CRM ✅ (nach Block-2-Änderungen)
-<<<<<<< Updated upstream
 **audit-status CRM:** P1-3 ✅ · P4-2 ✅ · P4-5 ✅ · P4-1 ✅ (calls=1494, no_error≈99) · P4-3 ◐ (void=0, email_log-Ergebnis Rest) · P4-4/6 offen
-=======
-**audit-status CRM:** P1-3 ✅ · P4-2 ✅ · P4-5 ✅ · P4-1 ◐ (1239 calls, Heuristik noch ~695) · P4-3 ◐ (void=0, email_log-Ergebnis Rest) · P4-4/6 offen
->>>>>>> Stashed changes
 **Summe CRM:** erledigt 15 · offen 45
 
 ---
 
-<<<<<<< Updated upstream
 ## P5-13 – Farben nur Tokens
 
 **Commit-Text:** `P5-13: Tailwind-Palette/Hex-Klassen → CRM-Tokens; Guard`
@@ -914,8 +906,6 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 
 ---
 
-=======
->>>>>>> Stashed changes
 ## Block P4-1 / P4-5 – DB-Logging + Vorgangsliste-Hinweis
 
 **Commit-Text:** `P4-1/P4-5: logDbError flächig, void-notify sicher, Vorgänge Truncation-Hinweis`
@@ -933,7 +923,6 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 - `docs/OFFENE-FRAGEN.md` — Rest P4-3 email_log
 - `docs/COMMIT-PLAN.md` — dieser Abschnitt
 
-<<<<<<< Updated upstream
 **Messung (Abschluss):** `logDbError_calls=1494` · `supabase_no_error≈99` · P4-1 ✅ · P4-5 ✅ · `tsc` ✅  
 **Hinweis:** Heuristik nach Lookback/Array.from/Buffer/storage-Fix; Rest ≈99 schwer instrumentierbar (Promise.all / Callbacks).
 
@@ -1027,10 +1016,6 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 - `docs/COMMIT-PLAN.md` — dieser Abschnitt
 
 **Messung:** P3-4 ✅ (`revalidatePath`/`router.refresh` unter Ziel) · P3-5 ✅ (force-dynamic Allowlist) · `tsc` ✅
-=======
-**Messung:** `logDbError_calls=1238` · `supabase_no_error≈697` · `void_notify=0` · P4-5 ✅  
-**P4-1:** noch offen (Heuristik &lt;50 fehlt) · **Build:** ✅
->>>>>>> Stashed changes
 
 ---
 
@@ -1073,7 +1058,6 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 - `docs/TODO-ENTWICKLUNG.md` / `docs/COMMIT-PLAN.md` — Status
 
 **Messung:** `button_tsx_exists=false` · `button_import_files=0` · P5-4 ✅
-<<<<<<< Updated upstream
 
 ---
 
@@ -1234,5 +1218,3 @@ Tastatur: EditorSheet/PortalModalShell mit visualViewport (S7); Termin-Sheet Fel
 
 
 
-=======
->>>>>>> Stashed changes

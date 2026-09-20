@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { bauvorhabenAusAuftrag, leistungsumfangAusPositionen, verguetungAusPositionen } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'

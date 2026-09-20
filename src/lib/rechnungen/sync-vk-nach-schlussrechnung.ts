@@ -2,10 +2,7 @@
  * Schlussrechnung teurer als Auftragssumme → Auftrag + verknüpftes Angebot
  * still anheben (nur hoch, nie runter; keine Positionen löschen).
  */
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import 'server-only'
 

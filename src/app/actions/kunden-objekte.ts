@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateKundeDetail, revalidateKundeObjekt, revalidateLeadDetail, revalidateLeadList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { kundeHatOrgKennung } from '@/app/actions/kunden-organisation'
 import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
@@ -322,10 +317,6 @@ export async function setLeadKundeObjekt(
   if (error2) logDbError('app/actions/kunden-objekte:leads', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateLeadDetail(leadId)
-=======
-  revalidatePath(`/anfragen/${leadId}`)
->>>>>>> Stashed changes
   return { ok: true }
 }

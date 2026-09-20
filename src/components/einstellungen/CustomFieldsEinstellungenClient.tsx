@@ -19,12 +19,6 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-<<<<<<< Updated upstream
-=======
-import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { FilterChips } from '@/components/ui/FilterChips'
->>>>>>> Stashed changes
 import { EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
 import { toast } from '@/components/ui/app-toast'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
@@ -88,17 +82,10 @@ function SortRow({
         <EinstellungenListMeta>{labelFeldtyp(f.feld_typ)}</EinstellungenListMeta>
       </div>
       <MockBtn type="button" kind="ghost" sm onClick={onEdit}>
-<<<<<<< Updated upstream
         <MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden />
       </MockBtn>
       <MockBtn type="button" kind="ghost" sm onClick={onDelete}>
         <MockIcon n="trash" ctx="default" className="h-4 w-4 text-status-cancel-text" aria-hidden />
-=======
-        <Pencil className="h-4 w-4" aria-hidden />
-      </MockBtn>
-      <MockBtn type="button" kind="ghost" sm onClick={onDelete}>
-        <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
->>>>>>> Stashed changes
       </MockBtn>
     </li>
   )
@@ -237,25 +224,12 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
         open={modal !== null}
         onClose={() => setModal(null)}
         title={modal !== 'new' && modal ? 'Feld bearbeiten' : 'Neues Feld'}
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen', onClick: () => setModal(null), kind: 'ghost' }}
         primary={{
           label: 'Speichern',
           onClick: () => saveModal(),
           busy: pending,
         }}
-=======
-        footer={
-          <div className="flex justify-end gap-2">
-            <MockBtn type="button" kind="ghost" onClick={() => setModal(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" loading={pending} onClick={() => saveModal()}>
-              Speichern
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <div className="space-y-4">
           <MockField label="Label" required><MockInput required value={label} onChange={(e) => setLabel(e.target.value)} /></MockField>

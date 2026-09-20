@@ -1,13 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
-
->>>>>>> Stashed changes
 import { createNachtragManuell } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { setWeitereArbeitAnerkennung } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { neuePositionsId, normalizeAngebotPositionen } from '@/lib/angebot-positionen'

@@ -5,11 +5,7 @@ import { EMPTY } from '@/lib/crm-labels'
 import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-<<<<<<< Updated upstream
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import {
   composeVizZielbildBlob,
   composeVizZielbildDataUrl,
@@ -112,22 +108,8 @@ export function VizZielbildCard({
         disabled={loading || !previewUrl}
         onClick={() => void handleDownload()}
       >
-<<<<<<< Updated upstream
         <MockIcon n="download" ctx="default" className="mr-2 h-4 w-4" aria-hidden />
         Zielbild herunterladen
-=======
-        {downloading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-            Wird gespeichert …
-          </>
-        ) : (
-          <>
-            <Download className="mr-2 h-4 w-4" aria-hidden />
-            Zielbild herunterladen
-          </>
-        )}
->>>>>>> Stashed changes
       </MockBtn>
 
       {error && previewUrl ? (

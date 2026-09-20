@@ -7,10 +7,6 @@ import { useEffect, useState } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -20,48 +16,8 @@ import {
   sendKundeInformierenMail,
   type KundeInformierenScope,
 } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
-<<<<<<< Updated upstream
 import { TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
-=======
-
-function InformierenFooter({
-  pending,
-  showPreview,
-  onTogglePreview,
-  onSend,
-}: {
-  pending: boolean
-  showPreview: boolean
-  onTogglePreview: () => void
-  onSend: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn type="button" kind="secondary" loading={pending} onClick={onTogglePreview}>
-        {showPreview ? (
-          <>
-            <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
-            Vorschau aus
-          </>
-        ) : (
-          <>
-            <Eye className="mr-1.5 h-4 w-4" aria-hidden />
-            Vorschau
-          </>
-        )}
-      </MockBtn>
-      <MockBtn type="button" kind="primary" loading={pending} onClick={onSend}>
-        Senden
-      </MockBtn>
-    </div>
-  )
-}
->>>>>>> Stashed changes
 
 /** Kunde informieren — EditorSheet Split-over (Mock Surface B). */
 export function KundeInformierenModal({

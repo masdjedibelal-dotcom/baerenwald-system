@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'

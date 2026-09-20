@@ -22,14 +22,6 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { Textarea } from '@/components/ui/Textarea'
-import { MockBtn } from '@/components/mock-ui'
-import { Modal } from '@/components/ui/Modal'
-import { Select } from '@/components/ui/Select'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
@@ -702,25 +694,12 @@ export function KundeDetailClient({
         onClose={() => setPortalModalOpen(false)}
         title="Kundenportal-Link versenden"
         size="lg"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen' }}
         primary={{
           label: 'Senden',
           onClick: () => void sendenPortalLink(),
           busy: portalSending,
         }}
-=======
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn type="button" kind="secondary" onClick={() => setPortalModalOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary" type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
-              Senden
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <div className="space-y-3">
           <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="kunde@beispiel.de; weitere@beispiel.de" /></MockField>
@@ -774,23 +753,9 @@ export function KundeDetailClient({
           if (!pending) setMergeOther(null)
         }}
         title="Kunden zusammenführen"
-<<<<<<< Updated upstream
         busy={pending}
         confirmLabel={pending ? 'Wird zusammengeführt…' : 'Zusammenführen'}
         onConfirm={() => executeMerge()}
-=======
-        size="sm"
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn type="button" kind="secondary" onClick={() => setMergeOther(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary" type="button" loading={pending} onClick={() => executeMerge()}>
-              Zusammenführen
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         {mergeOther ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">

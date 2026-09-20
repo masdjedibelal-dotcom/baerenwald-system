@@ -8,12 +8,6 @@ import { useCallback, useMemo, useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
->>>>>>> Stashed changes
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -347,7 +341,6 @@ export function ProjektVertragWizard({
             {p.label}
           </MockBtn>
         ))}
-<<<<<<< Updated upstream
         {step > 1 ? (
           <div className="ml-auto hidden items-center gap-2 md:flex">
             <MockBtn kind="secondary" sm onClick={() => setStep((s) => s - 1)}>
@@ -356,38 +349,6 @@ export function ProjektVertragWizard({
             </MockBtn>
           </div>
         ) : null}
-=======
-        <div className="ml-auto hidden items-center gap-2 md:flex">
-          {step > 1 ? (
-            <MockBtn kind="secondary" sm onClick={() => setStep((s) => s - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-              Zurück
-            </MockBtn>
-          ) : null}
-          {step < pdfStep ? (
-            <>
-              <MockBtn
-                kind="secondary" sm
-                disabled={saving}
-                onClick={() => void persistDraft({ notify: true })}
-                className="gap-1.5"
-              >
-                <Save className="h-4 w-4" aria-hidden />
-                Speichern
-              </MockBtn>
-              <MockBtn kind="primary" sm disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
-                Weiter
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </MockBtn>
-            </>
-          ) : (
-            <MockBtn kind="primary" sm disabled={saving} onClick={() => void handlePdfErzeugen()} className="gap-1.5">
-              <FileText className="h-4 w-4" aria-hidden />
-              {acceptMode ? 'Vertrag senden' : 'PDF erzeugen'}
-            </MockBtn>
-          )}
-        </div>
->>>>>>> Stashed changes
       </nav>
 
       <div className="wizard-inner max-w-3xl">
@@ -662,11 +623,7 @@ export function ProjektVertragWizard({
                     PDF öffnen
                   </a>
                   <MockBtn kind="secondary" onClick={onClose}>
-<<<<<<< Updated upstream
                     Abbrechen
-=======
-                    Schließen
->>>>>>> Stashed changes
                   </MockBtn>
                 </div>
               ) : null}

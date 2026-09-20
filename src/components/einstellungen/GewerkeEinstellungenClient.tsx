@@ -18,13 +18,6 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-<<<<<<< Updated upstream
-=======
-import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   createGewerk,
@@ -127,11 +120,7 @@ function SortRow({
         aktiv
       </label>
       <MockBtn type="button" kind="ghost" sm onClick={() => setEditing(true)}>
-<<<<<<< Updated upstream
         <MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden />
-=======
-        <Pencil className="h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
       </MockBtn>
       <MockBtn
         type="button"
@@ -140,11 +129,7 @@ function SortRow({
         title={g.anzahl_leistungen > 0 ? 'Zuerst Leistungen entfernen' : 'Löschen'}
         onClick={onDelete}
       >
-<<<<<<< Updated upstream
         <MockIcon n="trash" ctx="default" className="h-4 w-4 text-status-cancel-text" aria-hidden />
-=======
-        <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
->>>>>>> Stashed changes
       </MockBtn>
     </li>
   )
@@ -268,13 +253,8 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
       </DndContext>
 
       {neuOpen ? (
-<<<<<<< Updated upstream
         <div className="flex flex-wrap items-end gap-2 rounded-field border border-bw-border bg-surface p-3">
           <MockField label="Neues Gewerk"><MockInput value={neuName} onChange={(e) => setNeuName(e.target.value)} /></MockField>
-=======
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-bw-border bg-bw-card p-3">
-          <Input label="Neues Gewerk" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
->>>>>>> Stashed changes
           <MockBtn type="button" kind="ghost" onClick={() => setNeuOpen(false)}>
             Abbrechen
           </MockBtn>

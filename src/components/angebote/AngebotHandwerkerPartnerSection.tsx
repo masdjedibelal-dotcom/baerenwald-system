@@ -10,11 +10,6 @@ import { useTransition } from '@/components/ui/action-busy'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Check, ExternalLink, FileUp, Trash2, UserPlus } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
@@ -184,13 +179,8 @@ function ZuweisungCard({
                 loading={replacePending}
                 onClick={openReplacePicker}
               >
-<<<<<<< Updated upstream
                 <MockIcon n="user" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
                 {abgelehnt ? 'Anderen Partner zuweisen' : 'Partner bearbeiten'}
-=======
-                <UserPlus className="mr-1 h-3.5 w-3.5" aria-hidden />
-                {abgelehnt ? 'Anderen Partner zuweisen' : 'Handwerker bearbeiten'}
->>>>>>> Stashed changes
               </MockBtn>
             ) : null}
             {kannLoeschen ? (

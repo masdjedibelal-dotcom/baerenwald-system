@@ -7,13 +7,7 @@ import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-<<<<<<< Updated upstream
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-=======
-import { Link2 } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
@@ -29,43 +23,6 @@ export type HandwerkerZuweisungMailTarget = {
   positionIds?: string[]
 }
 
-<<<<<<< Updated upstream
-=======
-function MailFooter({
-  pending,
-  loading,
-  canSend,
-  portalLink,
-  onSend,
-  onCopyLink,
-}: {
-  pending: boolean
-  loading: boolean
-  canSend: boolean
-  portalLink?: string
-  onSend: () => void
-  onCopyLink: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Später
-      </MockBtn>
-      {portalLink ? (
-        <MockBtn type="button" kind="secondary" onClick={() => void onCopyLink()}>
-          <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
-          Link kopieren
-        </MockBtn>
-      ) : null}
-      <MockBtn type="button" kind="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
-        Jetzt senden
-      </MockBtn>
-    </div>
-  )
-}
-
->>>>>>> Stashed changes
 /** Partner-Mail — EditorSheet Split-over (Mock Surface B). */
 export function HandwerkerZuweisungMailModal({
   open,

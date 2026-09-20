@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -357,11 +352,7 @@ export async function loadRahmenVertragBootstrap(
   const supabase = createClient()
   const { data: hw, error } = await supabase.from('handwerker').select(HW_SELECT).eq('id', handwerkerId).maybeSingle()
   if (error) logDbError('app/vertraege/wizard-actions:handwerker', error)
-<<<<<<< Updated upstream
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
-=======
-  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
 
   let existingId = vertragId ?? null
   let existingNr: string | null = null

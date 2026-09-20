@@ -219,14 +219,7 @@ export async function createLead(input: {
 }
 
 export async function updateLeadStatus(leadId: string, status: string) {
-<<<<<<< Updated upstream
   const { error } = await writeLeadStatus(supabaseAdmin, leadId, status)
-=======
-  const { error } = await supabaseAdmin
-    .from('leads')
-    .update({ status: status as LeadStatus, updated_at: new Date().toISOString() })
-    .eq('id', leadId)
->>>>>>> Stashed changes
   if (error) logDbError('lib/copilot/tools:leads', error)
   if (error) throw error
   return { ok: true }

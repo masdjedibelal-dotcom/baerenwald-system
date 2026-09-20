@@ -6,12 +6,6 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import type { ExportField } from '@/hooks/useExport'
 import { getZeitraumRange, type ZeitraumPreset } from '@/lib/listZeitraum'

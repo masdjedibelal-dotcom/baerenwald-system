@@ -15,7 +15,6 @@
 **Nicht ändern ohne Belal:** Resolver-Logik-Abweichungen → `docs/OFFENE-FRAGEN.md` + Tabelle in `docs/P2-1-resolver-abgleich.md`.
 
 Portal-spezifisch bleibt getrennt: `portal2/status-mapping.ts`.
-<<<<<<< Updated upstream
 
 ## Aktive Sync-Liste (`scripts/shared-domain-files.json`)
 
@@ -26,5 +25,3 @@ Portal-spezifisch bleibt getrennt: `portal2/status-mapping.ts`.
 | `src/lib/format/geld-datum.ts` | `src/lib/shared-domain/geld-datum.ts` |
 
 Geplant (noch Fork): `resolve-vorgang`, `vorgang-labels` — siehe P2-1 / P2-8.
-=======
->>>>>>> Stashed changes

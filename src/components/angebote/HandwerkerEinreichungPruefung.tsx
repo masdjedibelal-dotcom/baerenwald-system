@@ -12,13 +12,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Modal } from '@/components/ui/Modal'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn, formatDatumZeit } from '@/lib/utils'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
@@ -325,11 +318,7 @@ export function HandwerkerEinreichungPruefung({
 
           {hatRechnung ? (
             <MockBtn type="button" kind="secondary" sm loading={pending} onClick={openRechnungPdf}>
-<<<<<<< Updated upstream
               <MockIcon n="download" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
-=======
-              <Download className="mr-1 h-3.5 w-3.5" aria-hidden />
->>>>>>> Stashed changes
               {partnerHwDokumentListenName('rechnung')}
             </MockBtn>
           ) : null}
@@ -376,23 +365,9 @@ export function HandwerkerEinreichungPruefung({
       <EditorSheet
         open={notizModal != null}
         onClose={() => setNotizModal(null)}
-<<<<<<< Updated upstream
         title={notizModal === 'rueckfrage' ? 'Rückfrage an Partner' : 'Angebot ablehnen'}
         secondary={{ label: 'Abbrechen', onClick: () => setNotizModal(null) }}
         primary={{ label: 'Weiter zur E-Mail', onClick: weiterZurMail }}
-=======
-        title={notizModal === 'rueckfrage' ? 'Rückfrage an Handwerker' : 'Angebot ablehnen'}
-        footer={
-          <div className="flex flex-wrap gap-2">
-            <MockBtn type="button" kind="secondary" onClick={() => setNotizModal(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" onClick={weiterZurMail}>
-              Weiter zur E-Mail
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
       {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
                 <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
@@ -409,25 +384,12 @@ export function HandwerkerEinreichungPruefung({
         onClose={() => setMailModal(null)}
         title={`E-Mail an ${handwerkerName}`}
         size="lg"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen', onClick: () => setMailModal(null) }}
         primary={{
           label: 'Senden & Status aktualisieren',
           onClick: sendAntwort,
           busy: pending,
         }}
-=======
-        footer={
-          <div className="flex flex-wrap gap-2">
-            <MockBtn type="button" kind="secondary" onClick={() => setMailModal(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" loading={pending} onClick={sendAntwort}>
-              Senden & Status aktualisieren
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         {mailModal ? (
           <div className="space-y-3">

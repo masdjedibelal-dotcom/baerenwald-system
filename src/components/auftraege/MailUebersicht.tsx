@@ -13,11 +13,6 @@ import {
   sendKundenProjektLinkEmail,
 } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import type { EmailLogRow } from '@/app/(dashboard)/auftraege/auftraege-data'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import type { AuftragDetail } from '@/lib/types'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { formatDatumZeit } from '@/lib/utils'
@@ -201,15 +196,9 @@ export function MailUebersicht({
           />
         ) : null}
         <MockBtn type="button" kind="secondary" className="mt-4 w-full" onClick={() => setShowQr(false)}>
-<<<<<<< Updated upstream
           Abbrechen
         </MockBtn>
       </EditorSheet>
-=======
-          Schließen
-        </MockBtn>
-      </Modal>
->>>>>>> Stashed changes
     </>
   )
 }

@@ -9,13 +9,6 @@ import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
@@ -116,11 +109,7 @@ export function KommunikationVorlagenClient({
         title="Vorlagen"
         action={
           <MockBtn type="button" kind="primary" sm onClick={openNew}>
-<<<<<<< Updated upstream
             <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
-=======
-            <Plus className="h-3.5 w-3.5" aria-hidden />
->>>>>>> Stashed changes
             Neu
           </MockBtn>
         }

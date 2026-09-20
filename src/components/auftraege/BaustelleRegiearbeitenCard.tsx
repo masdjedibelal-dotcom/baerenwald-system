@@ -8,13 +8,6 @@ import { useTransition } from '@/components/ui/action-busy'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DateInput } from '@/components/ui/DateInput'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   createAuftragRegiearbeit,
@@ -116,11 +109,7 @@ export function BaustelleRegiearbeitenCard({
           {regiearbeiten.length} Regiearbeit{regiearbeiten.length === 1 ? '' : 'en'}
         </p>
         <MockBtn type="button" kind="primary" sm className="gap-1" onClick={openCreate}>
-<<<<<<< Updated upstream
           <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
-=======
-          <Plus className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
           Hinzufügen
         </MockBtn>
       </div>
@@ -161,17 +150,10 @@ export function BaustelleRegiearbeitenCard({
               </div>
               <div className="flex shrink-0 gap-1">
                 <MockBtn type="button" kind="ghost" sm onClick={() => openEdit(r)}>
-<<<<<<< Updated upstream
                   <MockIcon n="pencil" ctx="default" className="h-3.5 w-3.5" />
                 </MockBtn>
                 <MockBtn type="button" kind="ghost" sm onClick={() => remove(r.id)}>
                   <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
-=======
-                  <Pencil className="h-3.5 w-3.5" />
-                </MockBtn>
-                <MockBtn type="button" kind="ghost" sm onClick={() => remove(r.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
                 </MockBtn>
               </div>
             </div>

@@ -6,22 +6,8 @@ import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
-<<<<<<< Updated upstream
 import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
-=======
-import {
-  Calendar,
-  CircleX,
-  Info,
-  PhoneOff,
-  Save,
-  type LucideIcon,
-} from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import {
   loadCrmTeamFuerTermin,
   saveLeadAlsVerloren,
@@ -363,32 +349,12 @@ export function StatusModal({
         </div>
   )
 
-<<<<<<< Updated upstream
   const saveAction = {
     label: meta.saveLabel,
     onClick: () => void handleSave(),
     busy: saving,
     icon: 'check' as const,
   }
-=======
-  const formFooter = (
-    <div className="sheet-footer-actions">
-      <MockBtn type="button" kind="secondary" onClick={onClose}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn
-        type="button"
-        kind={meta.danger ? 'danger' : 'primary'}
-        loading={saving}
-        className="inline-flex gap-1.5"
-        onClick={() => void handleSave()}
-      >
-        <Save className="h-4 w-4" aria-hidden />
-        {meta.saveLabel}
-      </MockBtn>
-    </div>
-  )
->>>>>>> Stashed changes
 
   return (
     <EditorSheet

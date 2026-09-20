@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
@@ -206,11 +201,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/auftraege/handwerker-actions:handwerker', error)
-<<<<<<< Updated upstream
   if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
-=======
-  if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
 
   const { data: gw, error: error2 } = await supabase.from('gewerke').select('id, name, slug').eq('id', input.gewerkId).maybeSingle()
   if (error2) logDbError('app/auftraege/handwerker-actions:gewerke', error2)
@@ -371,11 +362,7 @@ export async function assignAuftragHandwerkerPosition(input: {
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error2) logDbError('app/auftraege/handwerker-actions:handwerker', error2)
-<<<<<<< Updated upstream
   if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
-=======
-  if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
 
   const posPatch: Record<string, unknown> = {
     handwerker_id: input.handwerkerId,
@@ -768,14 +755,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   }
 
   if (toAlt.length === 0) {
-<<<<<<< Updated upstream
     const { error: markAltErr } = await writeAuftragHandwerkerStatus(supabase, alteZuweisungId, 'ersetzt')
-=======
-    const { error: markAltErr } = await supabase
-      .from('auftrag_handwerker')
-      .update({ status: 'ersetzt' })
-      .eq('id', alteZuweisungId)
->>>>>>> Stashed changes
     if (markAltErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', markAltErr)
     if (markAltErr) return { ok: false, message: markAltErr.message }
   }
@@ -962,18 +942,11 @@ export async function updateAuftragHandwerkerStatus(input: {
   if (findErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', findErr)
   if (findErr || !row) return { ok: false, message: 'Zuweisung nicht gefunden' }
 
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAuftragHandwerkerStatus(
     supabase,
     input.zuweisungId,
     input.status
   )
-=======
-  const { error: error2 } = await supabase
-    .from('auftrag_handwerker')
-    .update({ status: input.status })
-    .eq('id', input.zuweisungId)
->>>>>>> Stashed changes
   if (error2) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error2)
   if (error2) return { ok: false, message: error2.message }
 

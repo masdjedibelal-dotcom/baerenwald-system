@@ -9,11 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
-<<<<<<< Updated upstream
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-=======
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   initKundeStammEditFelder,
@@ -394,33 +390,12 @@ export function KundeModal({
         open={mergeConfirmOpen && Boolean(editKunde && mergeTarget)}
         onClose={() => setMergeConfirmOpen(false)}
         title="Kunden zusammenführen"
-<<<<<<< Updated upstream
         confirmLabel="Zusammenführen"
         busy={pending}
         onConfirm={() => {
           if (!editKunde || !mergeTarget) return
           runMerge(mergeTarget.id, editKunde.id)
         }}
-=======
-        size="sm"
-        footer={
-          <div className="kunde-create-footer">
-            <MockBtn type="button" kind="secondary" onClick={() => setMergeConfirmOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary"
-              type="button"
-              loading={pending}
-              onClick={() => {
-                if (!editKunde || !mergeTarget) return
-                runMerge(mergeTarget.id, editKunde.id)
-              }}
-            >
-              Zusammenführen
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         {editKunde && mergeTarget ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">

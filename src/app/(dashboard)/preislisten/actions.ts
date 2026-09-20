@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidatePreislistenList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { revalidateWizardContext } from '@/lib/wizard-context'
 import type { NeueLeistungSyncInput } from '@/lib/preislisten/sync-neue-leistungen'
@@ -131,14 +126,8 @@ export async function createGewerk(
     if (error2) logDbError('app/preislisten/actions:gewerke', error2)
 
     if (error2 || !data) return { ok: false, message: error2?.message ?? 'Anlegen fehlgeschlagen' }
-<<<<<<< Updated upstream
     revalidatePreislistenList()
   revalidateWizardContext()
-=======
-    revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-    revalidatePath('/einstellungen/gewerke')
->>>>>>> Stashed changes
     return { ok: true, id: data.id as string, slug: data.slug as string, name: data.name as string }
   }
 

@@ -11,14 +11,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
-<<<<<<< Updated upstream
-=======
-import { confirmAction } from '@/components/ui/confirm-action'
-import { confirmDelete } from '@/components/ui/confirm-delete'
-import { MockBtn } from '@/components/mock-ui'
-import { Modal } from '@/components/ui/Modal'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
@@ -545,25 +537,12 @@ export function AngebotVersandSection({
         onClose={() => setKundeModal(false)}
         title="E-Mail an Kunden"
         size="lg"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen', onClick: () => setKundeModal(false) }}
         primary={{
           label: 'E-Mail senden',
           onClick: sendKunde,
           disabled: pending,
         }}
-=======
-        footer={
-          <div className="flex flex-wrap gap-2">
-            <MockBtn type="button" kind="secondary" onClick={() => setKundeModal(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" onClick={sendKunde} disabled={pending}>
-              E-Mail senden
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Empfänger:{' '}
@@ -618,25 +597,12 @@ export function AngebotVersandSection({
         onClose={() => setHwModal(null)}
         title={hwModal ? `Partner-Mail an ${hwModal.name}` : 'Partner-Mail'}
         size="lg"
-<<<<<<< Updated upstream
         secondary={{ label: 'Abbrechen', onClick: () => setHwModal(null) }}
         primary={{
           label: 'Jetzt senden',
           onClick: sendHandwerkerAusModal,
           busy: pending,
         }}
-=======
-        footer={
-          <div className="flex flex-wrap gap-2">
-            <MockBtn type="button" kind="secondary" onClick={() => setHwModal(null)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn type="button" kind="primary" loading={pending} onClick={sendHandwerkerAusModal}>
-              Jetzt senden
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         {hwModal ? (
           <div className="space-y-3">

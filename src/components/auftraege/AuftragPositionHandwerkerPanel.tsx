@@ -5,12 +5,6 @@ import { MockField } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 import { Combobox } from '@/components/ui/Combobox'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { ChevronDown, FileUp } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Select } from '@/components/ui/Select'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'

@@ -1,7 +1,4 @@
-<<<<<<< Updated upstream
 import { createClient } from '@/lib/supabase-server'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'

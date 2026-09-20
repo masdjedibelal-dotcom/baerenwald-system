@@ -5,11 +5,6 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { loadEmailLogDetail, type EmailLogDetail } from '@/app/(dashboard)/email-log/actions'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { freitextMailTypLabel } from '@/lib/kommunikation/types'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { formatDatumZeit } from '@/lib/utils'
@@ -60,15 +55,7 @@ export function EmailLogPreviewModal({
       onClose={onClose}
       title={title}
       size="lg"
-<<<<<<< Updated upstream
       secondary={{ label: 'Schließen', onClick: onClose }}
-=======
-      footer={
-        <MockBtn type="button" kind="secondary" onClick={onClose}>
-          Schließen
-        </MockBtn>
-      }
->>>>>>> Stashed changes
     >
       {pending && !row ? <p className="text-sm text-bw-text-muted">Lade Vorschau …</p> : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}

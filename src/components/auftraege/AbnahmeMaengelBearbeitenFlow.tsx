@@ -6,12 +6,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useRef, useState } from 'react'
 import { AuftragBaustelleScreen } from '@/components/auftraege/AuftragBaustelleScreen'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -145,11 +139,7 @@ export function AbnahmeMaengelBearbeitenFlow({
   const footer = (
     <div className="sheet-footer-actions">
       <MockBtn type="button" kind="secondary" onClick={onClose}>
-<<<<<<< Updated upstream
         Abbrechen
-=======
-        Schließen
->>>>>>> Stashed changes
       </MockBtn>
       <MockBtn type="button" kind="primary" onClick={onDone} disabled={pending}>
         Speichern

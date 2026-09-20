@@ -1,13 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
->>>>>>> Stashed changes
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'

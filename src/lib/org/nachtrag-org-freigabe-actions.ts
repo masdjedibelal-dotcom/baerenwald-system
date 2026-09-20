@@ -1,9 +1,6 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'

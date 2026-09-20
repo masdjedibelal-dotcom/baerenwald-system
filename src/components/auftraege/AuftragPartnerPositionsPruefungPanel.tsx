@@ -4,10 +4,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   decidePartnerPositionsAnfrageAblehnen,

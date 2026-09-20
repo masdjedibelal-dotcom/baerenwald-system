@@ -10,11 +10,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/app-toast'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import type {
   DatenschutzAnfrageKontext,
@@ -634,27 +629,10 @@ export function DatenschutzPageClient({ fristen, faellig, log, anfragen, vvt }: 
         onConfirm={() => void runLoeschen()}
       >
         {delModal ? (
-<<<<<<< Updated upstream
           <p className="m-0" style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
             {delModal.beschreibung} für <strong>{delModal.titel}</strong> wirklich ausführen? Dieser Vorgang kann nicht
             rückgängig gemacht werden (Fotos werden aus dem Speicher entfernt, personenbezogene Felder anonymisiert).
           </p>
-=======
-          <>
-            <p className="text-sm text-ink">
-              {delModal.beschreibung} für <strong>{delModal.titel}</strong> wirklich ausführen? Dieser Vorgang kann nicht
-              rückgängig gemacht werden (Fotos werden aus dem Speicher entfernt, personenbezogene Felder anonymisiert).
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <MockBtn type="button" kind="danger" loading={busy === 'del'} onClick={() => void runLoeschen()}>
-                Endgültig ausführen
-              </MockBtn>
-              <MockBtn type="button" kind="secondary" onClick={() => setDelModal(null)}>
-                Abbrechen
-              </MockBtn>
-            </div>
-          </>
->>>>>>> Stashed changes
         ) : null}
       </ConfirmPopup>
 

@@ -3,10 +3,7 @@
  * Notification-Titel leer (App-Name „Bärenwald“ kommt vom Manifest) — Inhalt nur im Body.
  */
 import { logDbError } from '@/lib/errors/log-db-error'
-<<<<<<< Updated upstream
 import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
-=======
->>>>>>> Stashed changes
 import webpush from 'web-push'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'

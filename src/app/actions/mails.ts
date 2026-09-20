@@ -688,11 +688,7 @@ export async function getPartnerPortalMailDraft(
     .eq('id', handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
-<<<<<<< Updated upstream
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
-=======
-  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
   const to = String((hw as { email?: string | null }).email ?? '').trim()
   if (!to) return { ok: false, message: 'Partner hat keine E-Mail-Adresse.' }
 
@@ -727,11 +723,7 @@ export async function sendPartnerPortalLinkMail(input: {
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
-<<<<<<< Updated upstream
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
-=======
-  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
 
   const portalLink = buildPartnerDashboardLink()
   const branding = await getMailBranding(supabaseAdmin)
@@ -765,11 +757,7 @@ export async function previewPartnerPortalMail(input: {
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
-<<<<<<< Updated upstream
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
-=======
-  if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
->>>>>>> Stashed changes
 
   const portalLink = buildPartnerDashboardLink()
   const branding = await getMailBranding(supabaseAdmin)

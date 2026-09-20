@@ -27,13 +27,6 @@ import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'

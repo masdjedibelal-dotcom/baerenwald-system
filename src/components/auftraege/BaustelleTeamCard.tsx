@@ -4,12 +4,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Mail, Phone, Plus, User, Users, X } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { saveAuftragBaustelleTeam } from '@/app/(dashboard)/auftraege/baustelle-actions'
 import type { AuftragBaustelleTeam } from '@/lib/auftraege/baustelle-types'
@@ -123,21 +117,11 @@ export function BaustelleTeamCard({
                   const next = [...team.bau_mannschaft]
                   next[i] = e.target.value
                   setTeam((t) => ({ ...t, bau_mannschaft: next }))
-<<<<<<< Updated upstream
                 }} placeholder="Name" />
               <MockBtn
                 type="button"
                 kind="ghost" sm
                 aria-label="Löschen"
-=======
-                }}
-                placeholder="Name"
-              />
-              <MockBtn
-                type="button"
-                kind="ghost" sm
-                aria-label="Entfernen"
->>>>>>> Stashed changes
                 onClick={() =>
                   setTeam((t) => ({
                     ...t,
@@ -145,11 +129,7 @@ export function BaustelleTeamCard({
                   }))
                 }
               >
-<<<<<<< Updated upstream
                 <MockIcon n="x" ctx="default" className="h-4 w-4" />
-=======
-                <X className="h-4 w-4" />
->>>>>>> Stashed changes
               </MockBtn>
             </div>
           ))}

@@ -2,10 +2,6 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { positionNettoZeile } from '@/lib/angebot-positionen'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -110,11 +106,7 @@ export function AngebotPositionDetailModal({
       {editable && onRemove ? (
         <div className="mt-4">
           <MockBtn type="button" kind="danger" onClick={onRemove} disabled={disabled}>
-<<<<<<< Updated upstream
             Löschen
-=======
-            Entfernen
->>>>>>> Stashed changes
           </MockBtn>
         </div>
       ) : null}

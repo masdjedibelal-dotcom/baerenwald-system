@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateKundeDetail, revalidateKundeObjekt, revalidateLeadList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { OBJEKT_ANLAGE_STATUS, OBJEKT_KONTAKT_ROLLEN, OBJEKT_ANLAGE_WARTUNGSINTERVALL } from '@/lib/objektakte/labels'
 import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
@@ -242,7 +237,6 @@ export async function deleteObjektKontakt(
     .eq('kunde_id', kundeId)
     .eq('kunde_objekt_id', objektId)
   if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
-<<<<<<< Updated upstream
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)
@@ -263,8 +257,6 @@ export async function restoreObjektKontakt(
     .eq('kunde_id', kundeId)
     .eq('kunde_objekt_id', objektId)
   if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
-=======
->>>>>>> Stashed changes
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)

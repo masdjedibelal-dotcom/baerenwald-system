@@ -5,10 +5,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import {
   FormularFelderRenderer,
   validateFormularPflicht,

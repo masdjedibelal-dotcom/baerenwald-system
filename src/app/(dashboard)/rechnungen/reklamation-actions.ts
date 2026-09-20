@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 
 /** Spec §9 RateDrawer — Reklamation ohne Statuswechsel. */
@@ -47,12 +42,7 @@ export async function setRechnungReklamation(
   if (error2) logDbError('app/rechnungen/reklamation-actions:rechnungen', error2)
   if (error2) return { ok: false, message: error2.message }
 
-<<<<<<< Updated upstream
   revalidateRechnungDetail(rechnungId)
-=======
-  revalidatePath('/rechnungen')
-  revalidatePath(`/rechnungen/${rechnungId}`)
->>>>>>> Stashed changes
   const { data: withAuftrag, error: error3 } = await supabase
     .from('rechnungen')
     .select('auftrag_id')

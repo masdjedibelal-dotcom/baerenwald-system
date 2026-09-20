@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -354,11 +349,7 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     .eq('id', hwId)
     .maybeSingle()
   if (hwErr) logDbError('app/angebote/angebot-positionen-steuerung-actions:handwerker', hwErr)
-<<<<<<< Updated upstream
   if (hwErr || !hw) return { ok: false, message: 'Partner nicht gefunden.' }
-=======
-  if (hwErr || !hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
->>>>>>> Stashed changes
 
   const hwName =
     (hw.firma as string | null)?.trim() ||

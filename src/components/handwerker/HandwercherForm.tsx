@@ -9,12 +9,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import {
   createHandwerker,
   updateHandwerker,

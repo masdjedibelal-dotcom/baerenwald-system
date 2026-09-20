@@ -1,5 +1,4 @@
 /**
-<<<<<<< Updated upstream
  * P4-1: logDbError nach Supabase-Aufrufen ohne Fehler-Auswertung.
  * Rückgabewerte / Control-Flow unverändert (nur Logging).
  *
@@ -18,36 +17,6 @@ const SKIP_RE = /(node_modules|\.next|migrations|generated|database\.types|log-d
 function walk(dir, acc = []) {
   if (!existsSync(dir)) return acc
   for (const name of readdirSync(dir)) {
-=======
- * P4-1: fügt logDbError nach stillen Supabase-Destructures ein.
- * Ändert keine Return-Werte / Control-Flow außer Logging.
- *
- * Usage: node scripts/p4-1-add-log-db-error.mjs [--dry]
- */
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs'
-import { join, relative } from 'path'
-
-const ROOT = new URL('..', import.meta.url).pathname
-const DRY = process.argv.includes('--dry')
-const IMPORT = `import { logDbError } from '@/lib/errors/log-db-error'\n`
-
-const TARGET_DIRS = [
-  'src/lib',
-  'src/app/actions',
-  'src/app/(dashboard)',
-]
-
-const SKIP_RE = /(node_modules|\.next|migrations|generated|database\.types)/
-
-function walk(dir, acc = []) {
-  let entries
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return acc
-  }
-  for (const name of entries) {
->>>>>>> Stashed changes
     const p = join(dir, name)
     if (SKIP_RE.test(p)) continue
     const st = statSync(p)
@@ -58,7 +27,6 @@ function walk(dir, acc = []) {
 }
 
 function ensureImport(src) {
-<<<<<<< Updated upstream
   if (/from ['"]@\/lib\/errors\/log-db-error['"]/.test(src)) return src
   const trimmed = src.trimStart()
   if (/^['"]use server['"]/.test(trimmed)) {
@@ -69,20 +37,6 @@ function ensureImport(src) {
     const m = src.match(/^(['"]use client['"];?\s*\n)/)
     if (m) return m[1] + IMPORT + src.slice(m[1].length)
   }
-=======
-  if (/logDbError/.test(src) && /from ['"]@\/lib\/errors\/log-db-error['"]/.test(src)) {
-    return src
-  }
-  if (/^['"]use server['"]/.test(src.trimStart())) {
-    const m = src.match(/^(['"]use server['"];?\s*\n)/)
-    if (m) return m[1] + IMPORT + src.slice(m[1].length)
-  }
-  if (/^['"]use client['"]/.test(src.trimStart())) {
-    const m = src.match(/^(['"]use client['"];?\s*\n)/)
-    if (m) return m[1] + IMPORT + src.slice(m[1].length)
-  }
-  // nach 'server-only' oder erstem import-block
->>>>>>> Stashed changes
   const serverOnly = src.match(/^(import ['"]server-only['"]\s*\n)/)
   if (serverOnly) return serverOnly[1] + IMPORT + src.slice(serverOnly[1].length)
   const firstImport = src.search(/^import\s/m)
@@ -91,23 +45,12 @@ function ensureImport(src) {
 }
 
 function findAwaitExprEnd(src, awaitIdx) {
-<<<<<<< Updated upstream
   let i = awaitIdx + 5
   while (i < src.length && /\s/.test(src[i])) i++
-=======
-  // awaitIdx zeigt auf 'await'
-  let i = awaitIdx + 5
-  while (i < src.length && /\s/.test(src[i])) i++
-  // Expression bis Statement-Ende: ; oder Newline vor gleichem Indent-Keyword
->>>>>>> Stashed changes
   let depthParen = 0
   let depthBracket = 0
   let depthBrace = 0
   let inStr = null
-<<<<<<< Updated upstream
-=======
-  let inTemplate = 0
->>>>>>> Stashed changes
   let inLineComment = false
   let inBlockComment = false
   for (; i < src.length; i++) {
@@ -132,13 +75,6 @@ function findAwaitExprEnd(src, awaitIdx) {
       if (c === inStr) inStr = null
       continue
     }
-<<<<<<< Updated upstream
-=======
-    if (c === '`' && inTemplate) {
-      // simplified: track ${ }
-      continue
-    }
->>>>>>> Stashed changes
     if (c === '/' && n === '/') {
       inLineComment = true
       i++
@@ -161,7 +97,6 @@ function findAwaitExprEnd(src, awaitIdx) {
     else if (c === '}') {
       depthBrace--
       if (depthBrace < 0 && depthParen <= 0 && depthBracket <= 0) return i
-<<<<<<< Updated upstream
     } else if (
       c === ';' &&
       depthParen <= 0 &&
@@ -175,28 +110,14 @@ function findAwaitExprEnd(src, awaitIdx) {
       depthBracket <= 0 &&
       depthBrace <= 0
     ) {
-=======
-    } else if (c === ';' && depthParen <= 0 && depthBracket <= 0 && depthBrace <= 0) {
-      return i + 1
-    } else if (c === '\n' && depthParen <= 0 && depthBracket <= 0 && depthBrace <= 0) {
-      // Peek next non-empty line: if starts with . continue (chain)
->>>>>>> Stashed changes
       let j = i + 1
       while (j < src.length && (src[j] === ' ' || src[j] === '\t')) j++
       if (src[j] === '.') continue
       if (src[j] === '/' && src[j + 1] === '/') {
-<<<<<<< Updated upstream
-=======
-        // skip comment lines
->>>>>>> Stashed changes
         while (j < src.length && src[j] !== '\n') j++
         i = j - 1
         continue
       }
-<<<<<<< Updated upstream
-=======
-      // End of statement
->>>>>>> Stashed changes
       return i
     }
   }
@@ -208,7 +129,6 @@ function extractTableHint(awaitSlice) {
   return m ? m[1] : 'query'
 }
 
-<<<<<<< Updated upstream
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -228,18 +148,12 @@ const CLIENT =
 function processFile(filePath) {
   let src = readFileSync(filePath, 'utf8')
   if (!/\.from\s*\(/.test(src)) return { filePath, added: 0 }
-=======
-function processFile(filePath) {
-  let src = readFileSync(filePath, 'utf8')
-  if (!/(supabase|supabaseAdmin|\.from\s*\()/.test(src)) return { filePath, added: 0 }
->>>>>>> Stashed changes
   if (filePath.endsWith('log-db-error.ts')) return { filePath, added: 0 }
 
   const rel = relative(ROOT, filePath).replace(/\\/g, '/')
   const short = rel
     .replace(/^src\//, '')
     .replace(/\.(ts|tsx)$/, '')
-<<<<<<< Updated upstream
     .replace(/\(dashboard\)\//g, '')
     .replace(/\(auth\)\//g, '')
 
@@ -370,106 +284,6 @@ function processFile(filePath) {
       src = src.slice(0, op.matchStart) + replaced + logLine + src.slice(op.end)
       added++
     }
-=======
-    .replace(/\(dashboard\)\//, '')
-    .replace(/\(auth\)\//, '')
-
-  let added = 0
-  const insertions = [] // { index, text } — insert AFTER index (exclusive end of await)
-
-  // Pattern A: const { … } = await client — without error in braces, client looks like supabase
-  const reA =
-    /const\s*\{\s*([^}]+)\s*\}\s*=\s*await\s+((?:supabase(?:Admin)?|db|admin|gate\.db|gate\.supabase!?|createClient\(\)|getSupabaseAdmin\(\)|withCrmReadFallback)[\s\S]*?)/g
-
-  // Simpler: find const { ... } = await X where X starts with known client
-  const re =
-    /const\s*\{([^}]+)\}\s*=\s*await\s+(supabase(?:Admin)?|db\b|admin\b|gate\.db|gate\.supabase!?|createClient\(\)|getSupabaseAdmin\(\))/g
-
-  let m
-  const matches = []
-  while ((m = re.exec(src))) {
-    const braces = m[1]
-    if (/\berror\b/.test(braces)) {
-      // Already has error — check if logDbError follows within ~300 chars after await expr
-      const awaitStart = m.index + m[0].indexOf('await')
-      const end = findAwaitExprEnd(src, awaitStart)
-      const after = src.slice(end, end + 280)
-      if (/logDbError\s*\(/.test(after)) continue
-      // Only add if error is used soon OR unused — always add log before existing handling
-      const errName = (braces.match(/\berror(?:\s*:\s*(\w+))?/) || [])[1] || 'error'
-      const table = extractTableHint(src.slice(awaitStart, end))
-      const ctx = `${short}:${table}`
-      const logLine = `\n  if (${errName}) logDbError('${ctx}', ${errName})`
-      insertions.push({ index: end, text: logLine, kind: 'with-error' })
-      continue
-    }
-
-    // No error in destructure — add it + log
-    const awaitStart = m.index + m[0].indexOf('await')
-    const end = findAwaitExprEnd(src, awaitStart)
-    const after = src.slice(end, end + 200)
-    if (/logDbError\s*\(/.test(after)) continue
-
-    const table = extractTableHint(src.slice(awaitStart, end))
-    const ctx = `${short}:${table}`
-    matches.push({
-      bracesStart: m.index + m[0].indexOf('{') + 1,
-      braces: braces,
-      fullMatch: m[0],
-      matchStart: m.index,
-      awaitStart,
-      end,
-      ctx,
-    })
-  }
-
-  // Apply from end to start so indices stay valid
-  const allOps = [
-    ...matches.map((x) => ({ ...x, kind: 'add-error' })),
-    ...insertions,
-  ].sort((a, b) => (b.end ?? b.index) - (a.end ?? a.index))
-
-  // Deduplicate by end index
-  const seen = new Set()
-  const ops = []
-  for (const op of allOps) {
-    const key = op.end ?? op.index
-    if (seen.has(key)) continue
-    seen.add(key)
-    ops.push(op)
-  }
-
-  for (const op of ops) {
-    if (op.kind === 'with-error') {
-      src = src.slice(0, op.index) + op.text + src.slice(op.index)
-      added++
-      continue
-    }
-    // add-error: patch braces + insert log
-    const bracesContent = op.braces.trim()
-    // Avoid naming conflict if `error` already in outer scope — still use error (shadowing ok in const)
-    const newBraces = bracesContent.endsWith(',')
-      ? `${bracesContent} error`
-      : `${bracesContent}, error`
-    // Replace first `{braces}` in this match region
-    const region = src.slice(op.matchStart, op.end)
-    const replacedRegion = region.replace(`{${op.braces}}`, `{${newBraces}}`)
-    if (replacedRegion === region) {
-      // try trimmed braces match
-      const alt = region.replace(
-        new RegExp(`\\{\\s*${escapeRe(op.braces.trim())}\\s*\\}`),
-        `{ ${newBraces} }`
-      )
-      if (alt === region) continue
-      const logLine = `\n  if (error) logDbError('${op.ctx}', error)`
-      src = src.slice(0, op.matchStart) + alt + logLine + src.slice(op.end)
-      added++
-      continue
-    }
-    const logLine = `\n  if (error) logDbError('${op.ctx}', error)`
-    src = src.slice(0, op.matchStart) + replacedRegion + logLine + src.slice(op.end)
-    added++
->>>>>>> Stashed changes
   }
 
   if (added > 0) {
@@ -479,25 +293,11 @@ function processFile(filePath) {
   return { filePath: rel, added }
 }
 
-<<<<<<< Updated upstream
 const files = walk(join(ROOT, 'src'))
 let total = 0
 const touched = []
 for (const f of files) {
   // Skip pure client UI components (no server supabase usually) — still process if .from present
-=======
-function escapeRe(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-const files = TARGET_DIRS.flatMap((d) => walk(join(ROOT, d)))
-let total = 0
-const touched = []
-for (const f of files) {
-  // Prefer high-traffic: actions + lib; skip pages/tsx UI except actions
-  if (f.includes('/components/')) continue
-  if (/\.tsx$/.test(f) && !/actions/.test(f)) continue
->>>>>>> Stashed changes
   const r = processFile(f)
   if (r.added > 0) {
     total += r.added
@@ -508,9 +308,5 @@ for (const f of files) {
 touched.sort((a, b) => b.added - a.added)
 console.log(DRY ? 'DRY RUN' : 'APPLIED')
 console.log('files', touched.length, 'calls_added', total)
-<<<<<<< Updated upstream
 touched.slice(0, 50).forEach((t) => console.log(`  +${t.added} ${t.filePath}`))
 if (touched.length > 50) console.log(`  … +${touched.length - 50} weitere`)
-=======
-touched.slice(0, 40).forEach((t) => console.log(`  +${t.added} ${t.filePath}`))
->>>>>>> Stashed changes

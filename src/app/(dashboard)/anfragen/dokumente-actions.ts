@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -90,11 +85,6 @@ export async function deleteLeadDokument(
   if (error2) logDbError('app/anfragen/dokumente-actions:lead_dokumente', error2)
 
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateLeadDetail(leadId)
-=======
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
->>>>>>> Stashed changes
   return { ok: true }
 }

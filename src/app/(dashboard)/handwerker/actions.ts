@@ -1,13 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateHandwerkerDetail, revalidateHandwerkerList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -826,11 +820,7 @@ export async function duplicateHandwerker(
     .eq('id', handwerkerId)
     .maybeSingle()
   if (loadErr) logDbError('app/handwerker/actions:handwerker', loadErr)
-<<<<<<< Updated upstream
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
-=======
-  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
->>>>>>> Stashed changes
 
   const row = src as Record<string, unknown>
   const payload: Record<string, unknown> = { ...row }

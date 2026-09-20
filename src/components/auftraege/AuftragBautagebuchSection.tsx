@@ -5,10 +5,6 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -279,7 +275,6 @@ export function AuftragBautagebuchSection({
         title={active ? eintragTitel(active) : 'Tagebuch-Eintrag'}
         subtitle={active ? eintragZeit(active) : null}
         size="md"
-<<<<<<< Updated upstream
         danger={
           active && !disabled && !isPartnerEintrag(active)
             ? {
@@ -297,29 +292,6 @@ export function AuftragBautagebuchSection({
                 onClick: () => startEdit(active),
               }
             : null
-=======
-        footer={
-          active && !disabled && !isPartnerEintrag(active) ? (
-            <div className="sheet-footer-actions ldr-cta">
-              <MockBtn
-                type="button"
-                kind="danger"
-                disabled={deletePending}
-                onClick={() => askDelete(active)}
-              >
-                Löschen
-              </MockBtn>
-              <MockBtn
-                type="button"
-                kind="primary"
-                disabled={deletePending}
-                onClick={() => startEdit(active)}
-              >
-                Bearbeiten
-              </MockBtn>
-            </div>
-          ) : null
->>>>>>> Stashed changes
         }
       >
         {active ? (

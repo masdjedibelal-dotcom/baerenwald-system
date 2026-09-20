@@ -1,14 +1,5 @@
 'use client'
 
-<<<<<<< Updated upstream
-=======
-import {
-  forwardRef,
-  type ButtonHTMLAttributes,
-  type PointerEvent,
-  type ReactNode,
-} from 'react'
->>>>>>> Stashed changes
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   forwardRef,

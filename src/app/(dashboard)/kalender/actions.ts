@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin } from '@/lib/types'
 
@@ -197,11 +192,7 @@ export async function deleteKalenderTermin(
   const { error: error2 } = await supabase.from('kalender_termine').delete().eq('id', id)
   if (error2) logDbError('app/kalender/actions:kalender_termine', error2)
   if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
   revalidateKalender()
-=======
-  revalidatePath('/kalender')
->>>>>>> Stashed changes
   const lid = row && typeof (row as { lead_id?: string }).lead_id === 'string' ? (row as { lead_id: string }).lead_id : null
   if (lid) revalidateLeadDetail(lid)
   return { ok: true }

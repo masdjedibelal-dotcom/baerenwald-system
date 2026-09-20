@@ -20,10 +20,6 @@ import {
   freigebenEinbehalt,
   toggleEingangsrechnungBezahlt,
 } from '@/app/(dashboard)/auftraege/auftraege-finanz-actions'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import type {
   AuftragHandwerkerRow,

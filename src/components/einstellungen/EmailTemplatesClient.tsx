@@ -6,12 +6,6 @@ import { useTransition } from '@/components/ui/action-busy'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useMemo, useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
@@ -143,11 +137,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
               <MockBtn type="button" kind="secondary" sm onClick={() => openModal(t)}>
-<<<<<<< Updated upstream
                 <MockIcon n="pencil" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
-=======
-                <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
->>>>>>> Stashed changes
                 Bearbeiten
               </MockBtn>
             </EinstellungenListItem>
@@ -235,17 +225,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
             )}
 
             <div className="flex flex-wrap items-end gap-3 border-t border-bw-border pt-4">
-<<<<<<< Updated upstream
               <MockField label="Test-Mail an"><MockInput type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} className="min-w-[200px] flex-1" /></MockField>
-=======
-              <Input
-                label="Test-Mail an"
-                type="email"
-                className="min-w-[200px] flex-1"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
->>>>>>> Stashed changes
               <MockBtn type="button" kind="secondary" loading={testBusy} onClick={() => void sendTest()}>
                 Test senden
               </MockBtn>

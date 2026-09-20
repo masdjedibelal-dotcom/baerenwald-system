@@ -8,10 +8,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'

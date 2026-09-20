@@ -16,15 +16,7 @@ import {
   updateAuftragDokumentMeta,
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
-<<<<<<< Updated upstream
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-=======
-import { MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { toast } from '@/components/ui/app-toast'
@@ -586,20 +578,3 @@ export function AuftragDokumenteTab({
     </div>
   )
 }
-<<<<<<< Updated upstream
-=======
-
-function DokumentEditFooter({ pending, onSave }: { pending: boolean; onSave: () => void }) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn type="button" kind="primary" loading={pending} onClick={onSave}>
-        Speichern
-      </MockBtn>
-    </div>
-  )
-}
->>>>>>> Stashed changes

@@ -10,14 +10,6 @@ import { Combobox } from '@/components/ui/Combobox'
 import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-<<<<<<< Updated upstream
-=======
-import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   ablehnenPartnerDokument,
@@ -412,49 +404,6 @@ export function PartnerDokumentEditorSheet({
     isPdfPath(existing?.datei_url) || isPdfPath(previewUrl) || file?.type === 'application/pdf'
   const showUrl = localPreviewUrl || previewUrl
 
-<<<<<<< Updated upstream
-=======
-  const reviewFooter = isReview ? (
-    nurEndgueltigLoeschen ? (
-      <MockBtn
-        type="button"
-        kind="danger"
-        className="w-full"
-        disabled={pending}
-        loading={pending}
-        onClick={removeDoc}
-      >
-        Endgültig löschen
-      </MockBtn>
-    ) : (
-      <div className="flex w-full gap-2">
-        <MockBtn
-          type="button"
-          kind="secondary"
-          className="flex-1"
-          disabled={pending}
-          onClick={() => {
-            setAblehnGrund(existing?.ablehnung_grund?.trim() || '')
-            setAblehnenOpen(true)
-          }}
-        >
-          Ablehnen
-        </MockBtn>
-        <MockBtn
-          type="button"
-          kind="primary"
-          className="flex-1"
-          disabled={pending}
-          loading={pending}
-          onClick={freigeben}
-        >
-          Annehmen
-        </MockBtn>
-      </div>
-    )
-  ) : undefined
-
->>>>>>> Stashed changes
   return (
     <>
       <EditorSheet

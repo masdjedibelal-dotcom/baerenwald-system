@@ -190,23 +190,11 @@ export async function acceptHandwerkerZuweisung(
   const ablehnungGrund = antwort === 'abgelehnt' ? input.ablehnungGrund!.trim() : null
   const status = antwort === 'akzeptiert' ? HW_ZUWEISUNG_STATUS_AKZEPTIERT : HW_ZUWEISUNG_STATUS_ABGELEHNT
 
-<<<<<<< Updated upstream
   const { error: updErr } = await writeAngebotHandwerkerStatus(supabaseAdmin, zuweisungId, status, {
     antwort_at: now,
     antwort_notiz: notiz,
     ablehnung_grund: ablehnungGrund,
   })
-=======
-  const { error: updErr } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .update({
-      status,
-      antwort_at: now,
-      antwort_notiz: notiz,
-      ablehnung_grund: ablehnungGrund,
-    })
-    .eq('id', zuweisungId)
->>>>>>> Stashed changes
   if (updErr) logDbError('lib/angebote/handwerker-annahme:angebot_handwerker', updErr)
 
   if (updErr) return { ok: false, message: updErr.message, httpStatus: 500 }

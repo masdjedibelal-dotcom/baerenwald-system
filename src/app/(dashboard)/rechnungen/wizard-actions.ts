@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
@@ -1727,11 +1722,7 @@ export async function syncRechnungWizardMetaToEntwurf(
     if (error2) logDbError('app/rechnungen/wizard-actions:rechnungen', error2)
 
     if (error2) return { ok: false, message: error2.message }
-<<<<<<< Updated upstream
     revalidateRechnungDetail(rechnungId)
-=======
-    revalidatePath(`/rechnungen/${rechnungId}`)
->>>>>>> Stashed changes
     return { ok: true }
   } catch (e) {
     console.error('[syncRechnungWizardMetaToEntwurf]', e)

@@ -6,10 +6,6 @@ import { useEffect, useState } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Accordion } from '@/components/ui/Accordion'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   assignAuftragHandwerkerPosition,

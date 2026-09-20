@@ -23,19 +23,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-<<<<<<< Updated upstream
-=======
-  Camera,
-  ChevronDown,
-  ChevronUp,
-  GripVertical,
-  Plus,
-  Trash2,
-} from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import {
->>>>>>> Stashed changes
   ABNAHME_GEWERK_OHNE,
   abnahmeGewerkLabel,
   bereinigeAbnahmeLeistungName,
@@ -264,11 +251,7 @@ function EditLeistungRow({
           <LeistungNotizen notizen={notizenFuerLeistung(leistung.punkte)} onChange={onNotizen} />
 
           <MockBtn type="button" kind="ghost" sm className="mt-2" onClick={onAddBullet}>
-<<<<<<< Updated upstream
             <MockIcon n="plus" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
-=======
-            <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
->>>>>>> Stashed changes
             Checkpunkt
           </MockBtn>
         </div>

@@ -5,13 +5,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { crmManuelleHandwerkerEinreichung } from '@/app/(dashboard)/angebote/actions'
 import { TOAST } from '@/lib/copy'
@@ -80,25 +73,12 @@ export function HandwerkerEinreichungManuellModal({
       onClose={resetAndClose}
       title="Angebot manuell erfassen"
       size="md"
-<<<<<<< Updated upstream
       secondary={{ label: 'Abbrechen', onClick: resetAndClose, disabled: pending }}
       primary={{
         label: 'Speichern',
         onClick: speichern,
         busy: pending,
       }}
-=======
-      footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <MockBtn type="button" kind="secondary" onClick={resetAndClose} disabled={pending}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn type="button" kind="primary" loading={pending} onClick={speichern}>
-            Speichern
-          </MockBtn>
-        </div>
-      }
->>>>>>> Stashed changes
     >
       {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
               <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">

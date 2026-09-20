@@ -11,12 +11,7 @@ import {
   AbnahmeProgressBar,
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
-<<<<<<< Updated upstream
 import { SkeletonCard } from '@/components/ui/Skeleton'
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import {
@@ -240,7 +235,6 @@ export function AuftragAbschliessenSheet({
         title="Auftrag abschließen"
         size="lg"
         manageHistory={false}
-<<<<<<< Updated upstream
         secondary={{
           label: 'Speichern',
           disabled: pending,
@@ -253,38 +247,6 @@ export function AuftragAbschliessenSheet({
           busy: pending && pendingKind === 'send',
           onClick: () => speichernMitHwProtokoll(true),
         }}
-=======
-        footer={
-          <div className="sheet-footer-actions zahlplan-editor-footer">
-            <MockBtn
-              type="button"
-              kind="ghost"
-              disabled={pending}
-              onClick={abschliessenOhneAbnahme}
-            >
-              Ohne Abnahme
-            </MockBtn>
-            <MockBtn
-              type="button"
-              kind="secondary"
-              disabled={pending}
-              loading={pending && pendingKind === 'save'}
-              onClick={() => speichernMitHwProtokoll(false)}
-            >
-              Speichern
-            </MockBtn>
-            <MockBtn
-              type="button"
-              kind="primary"
-              disabled={pending}
-              loading={pending && pendingKind === 'send'}
-              onClick={() => speichernMitHwProtokoll(true)}
-            >
-              Senden
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <div className="space-y-5">
           <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed">
@@ -294,7 +256,6 @@ export function AuftragAbschliessenSheet({
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}
-<<<<<<< Updated upstream
           <div className="flex flex-wrap gap-2">
             <MockBtn
               type="button"
@@ -308,11 +269,6 @@ export function AuftragAbschliessenSheet({
               Eigenes Abnahmeprotokoll erstellen
             </MockBtn>
           </div>
-=======
-          <MockBtn type="button" kind="secondary" onClick={openAbnahmeWizard}>
-            Eigenes Abnahmeprotokoll erstellen
-          </MockBtn>
->>>>>>> Stashed changes
         </div>
       </EditorSheet>
     )
@@ -326,7 +282,6 @@ export function AuftragAbschliessenSheet({
         title="Auftrag abschließen"
         size="md"
         manageHistory={false}
-<<<<<<< Updated upstream
         secondary={{
           label: 'Ohne Abnahme',
           disabled: pending,
@@ -337,23 +292,6 @@ export function AuftragAbschliessenSheet({
           disabled: pending,
           onClick: openAbnahmeWizard,
         }}
-=======
-        footer={
-          <div className="sheet-footer-actions zahlplan-editor-footer">
-            <MockBtn
-              type="button"
-              kind="secondary"
-              disabled={pending}
-              onClick={abschliessenOhneAbnahme}
-            >
-              Ohne Abnahme
-            </MockBtn>
-            <MockBtn type="button" kind="primary" disabled={pending} onClick={openAbnahmeWizard}>
-              Abnahme erstellen
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
           Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
@@ -371,7 +309,6 @@ export function AuftragAbschliessenSheet({
       size="lg"
       manageHistory={false}
       dirty={!pending}
-<<<<<<< Updated upstream
       secondary={{
         label: 'Speichern',
         disabled: pending,
@@ -384,30 +321,6 @@ export function AuftragAbschliessenSheet({
         busy: pending && pendingKind === 'send',
         onClick: () => speichernMitAbnahme(true),
       }}
-=======
-      footer={
-        <div className="sheet-footer-actions zahlplan-editor-footer">
-          <MockBtn
-            type="button"
-            kind="secondary"
-            disabled={pending}
-            loading={pending && pendingKind === 'save'}
-            onClick={() => speichernMitAbnahme(false)}
-          >
-            Speichern
-          </MockBtn>
-          <MockBtn
-            type="button"
-            kind="primary"
-            disabled={pending}
-            loading={pending && pendingKind === 'send'}
-            onClick={() => speichernMitAbnahme(true)}
-          >
-            Senden
-          </MockBtn>
-        </div>
-      }
->>>>>>> Stashed changes
     >
       <div className="space-y-5">
         <AbnahmeProgressBar done={progress.done} total={progress.total || positionen.length} />

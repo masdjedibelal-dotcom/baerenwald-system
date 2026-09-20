@@ -1,7 +1,4 @@
-<<<<<<< Updated upstream
 import { formatDatum } from '@/lib/utils'
-=======
->>>>>>> Stashed changes
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatEuro } from '@/lib/format/geld-datum'

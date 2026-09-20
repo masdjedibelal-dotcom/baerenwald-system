@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
@@ -62,26 +57,12 @@ export async function sendAngebotEinfach(
     .maybeSingle()
   if (error) logDbError('app/angebote/angebot-flow-actions:angebote', error)
 
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAngebotStatus(supabase, angebotId, 'gesendet_kunde', {
     status_einfach: 'gesendet',
     gesendet_am: now,
     gesendet_kunde_at: now,
     gueltig_bis: gueltig,
   })
-=======
-  const { error: error2 } = await supabase
-    .from('angebote')
-    .update({
-      status_einfach: 'gesendet',
-      status: 'gesendet_kunde',
-      gesendet_am: now,
-      gesendet_kunde_at: now,
-      gueltig_bis: gueltig,
-      updated_at: now,
-    })
-    .eq('id', angebotId)
->>>>>>> Stashed changes
   if (error2) logDbError('app/angebote/angebot-flow-actions:angebote', error2)
   if (error2) return { ok: false, message: error2.message }
 
@@ -112,26 +93,12 @@ export async function resendAngebotEinfach(
     .maybeSingle()
   if (error) logDbError('app/angebote/angebot-flow-actions:angebote', error)
 
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAngebotStatusEinfach(supabase, angebotId, 'gesendet', {
     gesendet_am: now,
     gesendet_kunde_at: now,
     gueltig_bis: gueltig,
     nachgefasst_am: null,
   })
-=======
-  const { error: error2 } = await supabase
-    .from('angebote')
-    .update({
-      status_einfach: 'gesendet',
-      gesendet_am: now,
-      gesendet_kunde_at: now,
-      gueltig_bis: gueltig,
-      nachgefasst_am: null,
-      updated_at: now,
-    })
-    .eq('id', angebotId)
->>>>>>> Stashed changes
   if (error2) logDbError('app/angebote/angebot-flow-actions:angebote', error2)
   if (error2) return { ok: false, message: error2.message }
 
@@ -169,24 +136,11 @@ export async function markAngebotAbgelehntEinfach(input: {
   const grundLabel = KUNDE_ABLEHNUNG_GRUND_LABELS[input.grund] ?? input.grund
   const now = new Date().toISOString()
 
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAngebotStatus(supabaseAdmin, id, 'abgelehnt', {
     status_einfach: 'abgelehnt',
     ablehnung_grund: input.grund,
     ablehnung_notiz: input.notiz?.trim() || null,
   })
-=======
-  const { error: error2 } = await supabaseAdmin
-    .from('angebote')
-    .update({
-      status_einfach: 'abgelehnt',
-      status: 'abgelehnt',
-      ablehnung_grund: input.grund,
-      ablehnung_notiz: input.notiz?.trim() || null,
-      updated_at: now,
-    })
-    .eq('id', id)
->>>>>>> Stashed changes
   if (error2) logDbError('app/angebote/angebot-flow-actions:angebote', error2)
   if (error2) return { ok: false, message: error2.message }
 
@@ -323,20 +277,9 @@ export async function acceptAngebotAndCreateAuftrag(
   }
   const sendKundenMail = direktOhneHv ? false : (opts?.send_kunden_email ?? false)
 
-<<<<<<< Updated upstream
   const { error: acceptErr } = await writeAngebotStatus(supabaseAdmin, id, 'kunde_akzeptiert', {
     status_einfach: 'angenommen',
   })
-=======
-  const { error: acceptErr } = await supabaseAdmin
-    .from('angebote')
-    .update({
-      status_einfach: 'angenommen',
-      status: 'kunde_akzeptiert',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
->>>>>>> Stashed changes
   if (acceptErr) logDbError('app/angebote/angebot-flow-actions:angebote', acceptErr)
   if (acceptErr) return { ok: false, message: acceptErr.message }
 

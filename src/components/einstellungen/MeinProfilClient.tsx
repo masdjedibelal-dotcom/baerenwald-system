@@ -3,11 +3,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
->>>>>>> Stashed changes
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { toast } from '@/components/ui/app-toast'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'

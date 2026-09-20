@@ -4,10 +4,6 @@ import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase'
 import {
   IDLE_COUNTDOWN_SEC,

@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
 import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'

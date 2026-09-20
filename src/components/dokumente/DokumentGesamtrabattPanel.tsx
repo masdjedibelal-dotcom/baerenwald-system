@@ -1,12 +1,7 @@
 'use client'
 
-<<<<<<< Updated upstream
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn, MockInput } from '@/components/mock-ui'
-=======
-import { Percent, Plus, Trash2 } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import {
   formatEurBetrag,
@@ -124,11 +119,7 @@ export function DokumentGesamtrabattPanel({
         </p>
         {!rabatt ? (
           <MockBtn type="button" kind="secondary" className="sm gap-1" onClick={addRabatt}>
-<<<<<<< Updated upstream
             <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
-=======
-            <Plus className="h-3.5 w-3.5" />
->>>>>>> Stashed changes
             Rabatt hinzufügen
           </MockBtn>
         ) : (

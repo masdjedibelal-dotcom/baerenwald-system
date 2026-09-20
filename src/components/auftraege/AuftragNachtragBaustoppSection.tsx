@@ -23,10 +23,6 @@ import {
 } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe-actions'
 import { IconText } from '@/components/ui/IconText'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import type { AuftragDetail, AngebotPosition } from '@/lib/types'
@@ -315,11 +311,7 @@ export function AuftragNachtragBaustoppSection({
                                 })
                               }}
                             >
-<<<<<<< Updated upstream
                               <IconText icon="mail">Per Mail senden</IconText>
-=======
-                              <IconText icon={Mail}>Per Mail senden</IconText>
->>>>>>> Stashed changes
                             </MockBtn>
                             <a
                               className="inline-flex min-h-[40px] items-center rounded-card border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
@@ -391,11 +383,7 @@ export function AuftragNachtragBaustoppSection({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Baustopps</h2>
             <MockBtn type="button" kind="primary" onClick={() => setBaustoppOpen(true)}>
-<<<<<<< Updated upstream
               <IconText icon="droplet">Baustopp melden</IconText>
-=======
-              <IconText icon={CloudRain}>Baustopp melden</IconText>
->>>>>>> Stashed changes
             </MockBtn>
           </div>
           {aktiv.length > 0 ? (

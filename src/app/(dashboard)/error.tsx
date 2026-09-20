@@ -2,11 +2,6 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { useEffect } from 'react'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
-
->>>>>>> Stashed changes
 function isChunkLoadError(error: Error): boolean {
   const msg = `${error.name} ${error.message}`
   return msg.includes('ChunkLoadError') || msg.includes('Loading chunk')

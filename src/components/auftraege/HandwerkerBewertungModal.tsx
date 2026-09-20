@@ -6,13 +6,6 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
-<<<<<<< Updated upstream
-=======
-import { Star } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn } from '@/components/mock-ui'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { StarRatingInput } from '@/components/ui/StarRatingInput'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -142,7 +135,6 @@ export function HandwerkerBewertungModal({
       onClose={onClose}
       title="Partner bewerten"
       size="lg"
-<<<<<<< Updated upstream
       secondary={{ label: 'Abbrechen' }}
       primary={{
         label: 'Bewertungen speichern',
@@ -150,29 +142,6 @@ export function HandwerkerBewertungModal({
         disabled: loading || vollstaendigCount === 0,
         onClick: speichern,
       }}
-=======
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            {vollstaendigCount}/{ziele.length} Handwerker vollständig bewertet
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <MockBtn type="button" kind="secondary" onClick={onClose}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn
-              type="button"
-              kind="primary"
-              loading={pending}
-              disabled={loading || vollstaendigCount === 0}
-              onClick={speichern}
-            >
-              Bewertungen speichern
-            </MockBtn>
-          </div>
-        </div>
-      }
->>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">

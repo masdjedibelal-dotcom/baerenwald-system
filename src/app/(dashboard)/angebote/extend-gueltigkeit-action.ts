@@ -1,12 +1,7 @@
 'use server'
 
-<<<<<<< Updated upstream
 import { revalidateAngebotDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-=======
-import { logDbError } from '@/lib/errors/log-db-error'
-import { revalidatePath } from 'next/cache'
->>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { heuteYmd } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
@@ -49,24 +44,11 @@ export async function extendAngebotGueltigkeit(input: {
   }
 
   const now = new Date().toISOString()
-<<<<<<< Updated upstream
   const { error: error2 } = await writeAngebotStatusEinfach(supabase, input.angebotId, 'gesendet', {
     gueltig_bis: gueltig,
     verlaengert_am: now,
     nachgefasst_am: null,
   })
-=======
-  const { error: error2 } = await supabase
-    .from('angebote')
-    .update({
-      gueltig_bis: gueltig,
-      verlaengert_am: now,
-      nachgefasst_am: null,
-      status_einfach: 'gesendet',
-      updated_at: now,
-    })
-    .eq('id', input.angebotId)
->>>>>>> Stashed changes
   if (error2) logDbError('app/angebote/extend-gueltigkeit-action:angebote', error2)
 
   if (error2) return { ok: false, message: error2.message }

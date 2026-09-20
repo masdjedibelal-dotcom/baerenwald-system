@@ -9,10 +9,6 @@ import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { RichTextContent } from '@/components/ui/RichTextContent'
-<<<<<<< Updated upstream
-=======
-import { MockBtn } from '@/components/mock-ui'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { bulkDeleteAngebotPositionen } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -311,26 +307,12 @@ export function AngebotPositionenV3Tab({
         <div className="pos-v3-bulk-bar">
           <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{selectedCount} ausgewählt</span>
           <MockBtn type="button" kind="danger" sm disabled={disabled} onClick={bulkDelete}>
-<<<<<<< Updated upstream
             <MockIcon n="trash" ctx="default" className="h-4 w-4" />
             Löschen
           </MockBtn>
           <MockBtn className="pos-v3-bulk-close" type="button" aria-label="Auswahl aufheben" onClick={clearSelection}>
             <MockIcon n="x" ctx="default" className="h-4 w-4" />
           </MockBtn>
-=======
-            <Trash2 className="h-4 w-4" />
-            Entfernen
-          </MockBtn>
-          <button
-            type="button"
-            className="pos-v3-bulk-close"
-            aria-label="Auswahl aufheben"
-            onClick={clearSelection}
-          >
-            <X className="h-4 w-4" />
-          </button>
->>>>>>> Stashed changes
         </div>
       ) : null}
 

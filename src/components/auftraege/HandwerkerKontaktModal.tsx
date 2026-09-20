@@ -4,16 +4,8 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState } from 'react'
-<<<<<<< Updated upstream
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-=======
-import { Copy, ExternalLink, Mail, MessageCircle } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import {
@@ -27,47 +19,8 @@ import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export type HandwerkerKontaktModalMode = 'whatsapp' | 'email'
 
-<<<<<<< Updated upstream
 /** Partner WhatsApp/Mail — EditorSheet Split-over (Mock Surface B). */
 export function PartnerKontaktModal({
-=======
-function KontaktFooter({
-  mode,
-  onCopy,
-  onPrimary,
-}: {
-  mode: HandwerkerKontaktModalMode
-  onCopy: () => void
-  onPrimary: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="sheet-footer-actions ldr-cta">
-      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()}>
-        Abbrechen
-      </MockBtn>
-      <MockBtn type="button" kind="secondary" onClick={onCopy}>
-        <Copy className="mr-1.5 h-4 w-4" aria-hidden />
-        Text kopieren
-      </MockBtn>
-      {mode === 'whatsapp' ? (
-        <MockBtn type="button" kind="primary" onClick={onPrimary}>
-          <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
-          In WhatsApp öffnen
-        </MockBtn>
-      ) : (
-        <MockBtn type="button" kind="primary" onClick={onPrimary}>
-          <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-          In Mail-App öffnen
-        </MockBtn>
-      )}
-    </div>
-  )
-}
-
-/** Handwerker WhatsApp/Mail — EditorSheet Split-over (Mock Surface B). */
-export function HandwerkerKontaktModal({
->>>>>>> Stashed changes
   open,
   onClose,
   mode,

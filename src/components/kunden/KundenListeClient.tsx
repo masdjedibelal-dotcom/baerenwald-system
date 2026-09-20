@@ -27,10 +27,6 @@ import {
 import { cn } from '@/lib/utils'
 import { deleteKunde, mergeKunden } from '@/app/actions/kunden'
 import { KundenMergeAssistentSheet } from '@/components/kunden/KundenMergeAssistentSheet'
-<<<<<<< Updated upstream
-=======
-import { Modal } from '@/components/ui/Modal'
->>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
@@ -760,7 +756,6 @@ export function KundenListeClient({
           if (!listMergePending) setMergeListOpen(false)
         }}
         title="Kunden zusammenführen"
-<<<<<<< Updated upstream
         busy={listMergePending}
         confirmLabel={listMergePending ? 'Wird zusammengeführt…' : 'Zusammenführen'}
         onConfirm={() => {
@@ -780,39 +775,6 @@ export function KundenListeClient({
             afterServerActionRefresh()
           })
         }}
-=======
-        size="sm"
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <MockBtn type="button" kind="secondary" onClick={() => setMergeListOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary"
-              type="button"
-              loading={listMergePending}
-              onClick={() => {
-                if (!listMergePair) return
-                const [survivor, merge] = listMergePair
-                setListMergePending(true)
-                void mergeKunden(survivor.id, merge.id).then((res) => {
-                  setListMergePending(false)
-                  if (!res.ok) {
-                    toast.error(res.message)
-                    return
-                  }
-                  toast.success(res.message)
-                  setMergeListOpen(false)
-                  setSelected({})
-                  router.push(`/kunden/${survivor.id}`)
-                  router.refresh()
-                })
-              }}
-            >
-              Zusammenführen
-            </MockBtn>
-          </div>
-        }
->>>>>>> Stashed changes
       >
         {listMergePair ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">

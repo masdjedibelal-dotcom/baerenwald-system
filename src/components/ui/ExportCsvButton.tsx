@@ -1,10 +1,6 @@
 'use client'
 
-<<<<<<< Updated upstream
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-=======
-import { Download } from 'lucide-react'
->>>>>>> Stashed changes
 import { MockBtn } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
 
